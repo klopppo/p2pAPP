@@ -8,6 +8,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { TypingEffect } from '@/components/ui/typing-effect'
 import MotionButton from '@/components/ui/motion-button'
 import InteractiveHoverButton from '@/components/ui/interactive-hover-button'
+import { SectionHeader } from '@/components/ui/section-header'
 import {
   Shield,
   Users,
@@ -65,9 +66,11 @@ export function LandingPage() {
         {/* How It Works Section */}
         <PageContainer type="landing">
           <section className="py-20">
-          <h2 className="text-4xl md:text-5xl font-bold text-center mb-4">How it works</h2>
-          <p className="text-sm text-muted-foreground mb-16 text-center">Simple Process</p>
-          <div className="relative">
+            <SectionHeader
+              title="How It Works"
+              description="Four simple steps to start trading with confidence"
+            />
+            <div className="relative">
             {/* 4-column grid */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
               {/* Step 01 */}
@@ -136,8 +139,12 @@ export function LandingPage() {
         {/* Features Section - Bento Grid */}
         <PageContainer type="landing">
           <section className="py-20">
-            <h2 className="text-3xl font-bold text-center mb-4">Built for Trustless Trading</h2>
-            <p className="text-sm text-muted-foreground mb-12 text-center">Why Choose Us</p>
+            <SectionHeader
+              title="Built for Trustless Trading"
+              description="Discover why thousands of traders trust our platform"
+              align="center"
+              maxWidth="3xl"
+            />
 
             <div className="max-w-5xl mx-auto">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-3">
@@ -217,12 +224,12 @@ export function LandingPage() {
         {/* FAQ Section */}
         <PageContainer type="landing">
           <section className="py-20">
-            <div className="max-w-3xl mx-auto text-center">
-              <h2 className="text-4xl font-bold tracking-tight mb-4">Frequently asked questions</h2>
-              <p className="text-lg text-muted-foreground">
-                Quick answers to the questions we get the most.
-              </p>
-            </div>
+            <SectionHeader
+              title="Frequently Asked Questions"
+              description="Quick answers to the questions we get the most"
+              align="center"
+              maxWidth="3xl"
+            />
 
             <div className="mt-12 max-w-3xl mx-auto">
               <Accordion type="single" collapsible className="w-full rounded-2xl border bg-card p-2">

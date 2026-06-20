@@ -16,6 +16,7 @@ import { MiniSparkline } from '@/components/custom/MiniSparkline'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { PageContainer } from '@/components/layout/PageContainer'
+import { SectionHeader } from '@/components/ui/section-header'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -121,9 +122,12 @@ export function OffersPage() {
           <section className="py-8">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">Offers</h1>
-          <Button className="rounded-full shadow-none">Create Offer</Button>
-        </div>
+              <SectionHeader
+                title="Offers"
+                align="left"
+              />
+              <Button className="rounded-full shadow-none">Create Offer</Button>
+            </div>
 
         {/* Filters */}
         <div className="flex flex-wrap gap-3 mb-6">

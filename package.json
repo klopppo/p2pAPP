@@ -1,19 +1,26 @@
 {
-  "name": "vite-app",
+  "name": "p2p-app",
   "private": true,
   "version": "0.0.1",
+  "description": "A P2P application with Web3 integration",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",
     "@tailwindcss/vite": "^4",
+    "@tanstack/react-query": "^5.101.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.21.0",
@@ -22,10 +29,13 @@
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.18.0",
+    "recharts": "^3.8.1",
     "shadcn": "^4.11.0",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4",
-    "tw-animate-css": "^1.4.0"
+    "tw-animate-css": "^1.4.0",
+    "viem": "^2.53.1",
+    "wagmi": "^3.6.17"
   },
   "devDependencies": {
     "@eslint/js": "^10",
@@ -42,6 +52,24 @@
     "prettier-plugin-tailwindcss": "^0.8.0",
     "typescript": "~6",
     "typescript-eslint": "^8",
-    "vite": "^8"
+    "vite": "^8.0.16"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "keywords": [
+    "p2p",
+    "web3",
+    "blockchain",
+    "react",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "packageManager": "npm@10.0.0",
+  "repository": {
+    "type": "git",
+    "url": ""
   }
 }

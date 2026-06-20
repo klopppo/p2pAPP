@@ -1,10 +1,12 @@
+import type { ReactNode } from 'react'
+
 interface OffersTableWrapperProps {
-  children: React.ReactNode
+  children: ReactNode
 }
 
 export function OffersTableWrapper({ children }: OffersTableWrapperProps) {
   return (
-    <div className="bg-card border border-x border-t border-border rounded-t-2xl rounded-b-none border-b-0 overflow-hidden shadow-none">
+    <div className="glass-panel rounded-2xl p-6 md:p-8 shadow-lg shadow-black/20">
       {children}
     </div>
   )
