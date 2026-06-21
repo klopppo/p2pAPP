@@ -8,7 +8,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { TypingEffect } from '@/components/ui/typing-effect'
 import MotionButton from '@/components/ui/motion-button'
 import InteractiveHoverButton from '@/components/ui/interactive-hover-button'
-import { SectionHeader } from '@/components/ui/section-header'
 import {
   Shield,
   Users,
@@ -19,6 +18,18 @@ import {
   MessageCircle,
   Handshake,
 } from 'lucide-react'
+import { Marquee } from '@joycostudio/marquee/react'
+import {
+  TokenBTC,
+  TokenETH,
+  TokenUSDC,
+  TokenUSDT,
+  NetworkEthereum,
+  NetworkBase,
+  NetworkArbitrumOne,
+  NetworkOptimism,
+  NetworkPolygon,
+} from '@web3icons/react'
 
 export function LandingPage() {
   return (
@@ -30,47 +41,89 @@ export function LandingPage() {
         <div className="absolute top-3/4 left-1/2 w-96 h-96 bg-blue-900/20 rounded-full blur-[120px]" />
       </div>
 
-      <Navbar />
-
       <main className="flex-1">
         {/* Hero Section */}
         <PageContainer type="landing">
-          <section className="py-20 md:py-32 text-center">
-            <div className="mb-6 flex justify-center">
-              <TypingEffect
-                texts={['Trustless', 'Secure', 'Private']}
-                className="text-5xl md:text-7xl font-bold text-foreground"
-              />
-              <h1 className="text-5xl md:text-7xl font-bold text-foreground ml-2">
-                P2P Crypto
-              </h1>
+          <section className="relative min-h-screen flex flex-col items-center justify-center px-4">
+            {/* Navbar sits inside hero viewport, aligned to top */}
+            <div className="absolute top-0 left-0 right-0 z-20">
+              <Navbar />
             </div>
-            <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Trade cryptocurrency peer-to-peer with smart contract escrow.
-              Non-custodial, secure, and permissionless.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/app/dashboard">
-                <InteractiveHoverButton text="Open App" classes="bg-primary text-primary-foreground" />
-              </Link>
-              <Button
-                variant="outline"
-                className="rounded-full shadow-none px-8 py-6 text-lg"
-              >
-                Documentation
-              </Button>
+            {/* Hero title content, centered to screen */}
+            <div className="pt-16">
+              <div className="mx-auto max-w-4xl text-center space-y-3">
+                <div className="flex justify-center">
+                  <TypingEffect
+                    texts={['Trustless', 'Secure', 'Private']}
+                    className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground"
+                  />
+                  <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground tracking-tight ml-2">
+                    P2P Crypto
+                  </h1>
+                </div>
+                <p className="text-lg md:text-xl max-w-2xl mx-auto leading-relaxed text-muted-foreground">
+                  Trade cryptocurrency peer-to-peer with smart contract escrow.
+                  Non-custodial, secure, and permissionless.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
+                <Link to="/app/dashboard">
+                  <InteractiveHoverButton text="Open App" classes="bg-primary text-primary-foreground" />
+                </Link>
+                <Button
+                  variant="outline"
+                  className="rounded-full shadow-none px-8 py-6 text-lg"
+                >
+                  Documentation
+                </Button>
+              </div>
             </div>
           </section>
         </PageContainer>
 
+        {/* Marquee Section */}
+        <section className="py-8 overflow-hidden">
+          <Marquee speed={25} speedFactor={1} direction={1}>
+            <div className="flex items-end gap-12">
+              {/* Icons — duplicated for seamless loop, grayscaled/muted, subtle random vertical offset */}
+              <TokenBTC size={56} variant="branded" className="grayscale opacity-70 mb-1" />
+              <TokenETH size={56} variant="branded" className="grayscale opacity-70 -mb-0.5" />
+              <TokenUSDC size={56} variant="branded" className="grayscale opacity-70 mb-1.5" />
+              <TokenUSDT size={56} variant="branded" className="grayscale opacity-70 -mb-1" />
+              <NetworkEthereum size={56} variant="branded" className="grayscale opacity-70" />
+              <NetworkBase size={56} variant="branded" className="grayscale opacity-70 mb-0.5" />
+              <NetworkArbitrumOne size={56} variant="branded" className="grayscale opacity-70 -mb-0.5" />
+              <NetworkOptimism size={56} variant="branded" className="grayscale opacity-70 mb-1" />
+              <NetworkPolygon size={56} variant="branded" className="grayscale opacity-70" />
+              {/* Same set again for continuous scroll */}
+              <TokenBTC size={56} variant="branded" className="grayscale opacity-70 mb-1" />
+              <TokenETH size={56} variant="branded" className="grayscale opacity-70 -mb-0.5" />
+              <TokenUSDC size={56} variant="branded" className="grayscale opacity-70 mb-1.5" />
+              <TokenUSDT size={56} variant="branded" className="grayscale opacity-70 -mb-1" />
+              <NetworkEthereum size={56} variant="branded" className="grayscale opacity-70" />
+              <NetworkBase size={56} variant="branded" className="grayscale opacity-70 mb-0.5" />
+              <NetworkArbitrumOne size={56} variant="branded" className="grayscale opacity-70 -mb-0.5" />
+              <NetworkOptimism size={56} variant="branded" className="grayscale opacity-70 mb-1" />
+              <NetworkPolygon size={56} variant="branded" className="grayscale opacity-70" />
+            </div>
+          </Marquee>
+        </section>
+
         {/* How It Works Section */}
         <PageContainer type="landing">
-          <section className="py-20">
-            <SectionHeader
-              title="How It Works"
-              description="Four simple steps to start trading with confidence"
-            />
-            <div className="relative">
+          <section className="py-20 md:py-32 px-4">
+          <div className="mx-auto max-w-4xl text-center mb-16">
+            <p className="text-xs font-medium uppercase tracking-[0.2em] mb-2">
+              SIMPLE PROCESS
+            </p>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-4">
+              How it works
+            </h2>
+            <p className="text-base md:text-lg max-w-2xl mx-auto leading-relaxed text-muted-foreground">
+              From contact to trade in four straightforward steps.
+            </p>
+          </div>
+          <div className="relative">
             {/* 4-column grid */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
               {/* Step 01 */}
@@ -138,13 +191,18 @@ export function LandingPage() {
 
         {/* Features Section - Bento Grid */}
         <PageContainer type="landing">
-          <section className="py-20">
-            <SectionHeader
-              title="Built for Trustless Trading"
-              description="Discover why thousands of traders trust our platform"
-              align="center"
-              maxWidth="3xl"
-            />
+          <section className="py-20 md:py-32 px-4">
+            <div className="mx-auto max-w-4xl text-center mb-12">
+              <p className="text-xs font-medium uppercase tracking-[0.2em] mb-2">
+                WHY CHOOSE US
+              </p>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-4">
+                Built for Trustless Trading
+              </h2>
+              <p className="text-base md:text-lg max-w-2xl mx-auto leading-relaxed text-muted-foreground">
+                Smart contract escrow, zero platform fees, and full control over your assets.
+              </p>
+            </div>
 
             <div className="max-w-5xl mx-auto">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-3">
@@ -223,13 +281,18 @@ export function LandingPage() {
 
         {/* FAQ Section */}
         <PageContainer type="landing">
-          <section className="py-20">
-            <SectionHeader
-              title="Frequently Asked Questions"
-              description="Quick answers to the questions we get the most"
-              align="center"
-              maxWidth="3xl"
-            />
+          <section className="py-20 md:py-32 px-4">
+            <div className="mx-auto max-w-3xl text-center">
+              <p className="text-xs font-medium uppercase tracking-[0.2em] mb-2">
+                FAQ
+              </p>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-4">
+                Frequently asked questions
+              </h2>
+              <p className="text-base md:text-lg max-w-2xl mx-auto leading-relaxed text-muted-foreground">
+                Quick answers to the questions we get the most.
+              </p>
+            </div>
 
             <div className="mt-12 max-w-3xl mx-auto">
               <Accordion type="single" collapsible className="w-full rounded-2xl border bg-card p-2">

@@ -1,4 +1,5 @@
-import { useAccount, useDisconnect } from 'wagmi'
+import { useAccount } from 'wagmi'
+import { motion } from 'framer-motion'
 import { MetricCard } from '@/components/custom/MetricCard'
 import { StatDividerGrid } from '@/components/custom/StatDividerGrid'
 import { OfferRow } from '@/components/custom/OfferRow'
@@ -7,8 +8,9 @@ import { OffersTableWrapper } from '@/components/custom/OffersTableWrapper'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { PageContainer } from '@/components/layout/PageContainer'
-import { Search } from 'lucide-react'
+import { Search, Wallet } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { WalletConnectButton } from '@/components/custom/WalletConnectButton'
 
 export function DashboardPage() {
   const { isConnected } = useAccount()
@@ -23,13 +25,24 @@ export function DashboardPage() {
         </div>
 
         <Navbar showTabs />
-        <main className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold mb-4">Connect Your Wallet</h2>
-            <p className="text-muted-foreground mb-6">
-              Connect to view your dashboard and trade
-            </p>
-            <p className="text-muted-foreground">Use the wallet button in the navigation</p>
+        <main className="flex-1">
+          <div className="flex flex-col items-center justify-center min-h-[70vh] text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="max-w-md space-y-6"
+            >
+              <div className="w-16 h-16 mx-auto rounded-full bg-foreground/10 flex items-center justify-center">
+                <Wallet className="w-8 h-8 text-foreground" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-black tracking-tight font-display mb-2">Connect your wallet</h1>
+                <p className="text-muted-foreground">Connect your wallet to view your portfolio dashboard, track your positions, and monitor vault performance.</p>
+              </div>
+              <div className="flex justify-center">
+                <WalletConnectButton />
+              </div>
+            </motion.div>
           </div>
         </main>
         <Footer />
@@ -51,7 +64,10 @@ export function DashboardPage() {
           <section className="py-8">
             {/* Header */}
             <div className="flex items-center justify-between mb-8">
-              <h1 className="text-3xl font-bold">Market Offers</h1>
+              <div>
+                <h1 className="text-2xl font-bold">Dashboard</h1>
+                <p className="text-sm text-muted-foreground">View your portfolio and market activity</p>
+              </div>
               <Button className="rounded-full shadow-none bg-primary text-primary-foreground hover:bg-primary/90">
                 Post Offer
               </Button>

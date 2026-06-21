@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Loader2, CheckCircle2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
 export function WalletConnectButton() {
   const { connect, connectors, isPending } = useConnect()

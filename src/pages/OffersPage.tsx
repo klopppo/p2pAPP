@@ -122,10 +122,10 @@ export function OffersPage() {
           <section className="py-8">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
-              <SectionHeader
-                title="Offers"
-                align="left"
-              />
+              <div>
+                <h1 className="text-2xl font-bold">Offers</h1>
+                <p className="text-sm text-muted-foreground">Browse and create trade offers</p>
+              </div>
               <Button className="rounded-full shadow-none">Create Offer</Button>
             </div>
 
