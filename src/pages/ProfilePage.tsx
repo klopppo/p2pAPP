@@ -145,7 +145,7 @@ export function ProfilePage({ isOwn = false }: { isOwn?: boolean }) {
               <div className="flex flex-col gap-4">
                 {/* Trader Details */}
                 <Card>
-                  <CardContent className="pt-4">
+                  <CardContent className="px-6 py-0">
                     <Text variant="h4" className="font-bold mb-4">Trader Details</Text>
                     <div className="space-y-3">
                       <div className="flex justify-between"><span className="text-muted-foreground">Member since</span><span>{PROFILE_DATA.memberSince}</span></div>
@@ -159,7 +159,7 @@ export function ProfilePage({ isOwn = false }: { isOwn?: boolean }) {
                 </Card>
                 {/* Ratings & Feedback */}
                 <Card>
-                  <CardContent className="pt-4">
+                  <CardContent className="px-4 py-0">
                     <Text variant="h4" className="font-bold mb-4">Ratings & Feedback</Text>
                     <div className="space-y-3">
                       <div className="flex justify-between"><span className="text-muted-foreground">Rating</span><button className="text-primary">{PROFILE_DATA.rating} — View feedback</button></div>
@@ -174,21 +174,21 @@ export function ProfilePage({ isOwn = false }: { isOwn?: boolean }) {
               <div className="flex flex-col gap-4">
                 {/* Total Trades */}
                 <Card>
-                  <CardContent className="pt-4">
+                  <CardContent className="px-4 py-0">
                     <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">Total Trades</Text>
                     <Text variant="h3" className="mt-1">{PROFILE_DATA.totalTrades.toLocaleString()}</Text>
                   </CardContent>
                 </Card>
                 {/* Total Volume */}
                 <Card>
-                  <CardContent className="pt-4">
+                  <CardContent className="px-4 py-0">
                     <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">Total Volume</Text>
                     <Text variant="h3" className="mt-1">{PROFILE_DATA.totalVolume}</Text>
                   </CardContent>
                 </Card>
                 {/* Activity stats */}
                 <Card>
-                  <CardContent className="pt-4">
+                  <CardContent className="px-4 py-0">
                     <Text variant="h4" className="font-bold mb-4">Activity</Text>
                     <div className="space-y-3">
                       <div className="flex justify-between"><span className="text-muted-foreground">Imported trades</span><span>{PROFILE_DATA.importedTrades}+</span></div>
