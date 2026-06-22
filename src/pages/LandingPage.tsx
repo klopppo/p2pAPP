@@ -18,7 +18,7 @@ import {
   MessageCircle,
   Handshake,
 } from 'lucide-react'
-import { Marquee } from '@joycostudio/marquee/react'
+import { ReactMarquee as Marquee } from '@joycostudio/marquee/react'
 import {
   TokenBTC,
   TokenETH,
