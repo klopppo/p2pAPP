@@ -26,6 +26,7 @@ import {
 const NAV_LINKS = [
   { label: 'Dashboard', to: '/app/dashboard' as const, icon: LayoutDashboard },
   { label: 'Offers', to: '/app/offers' as const, icon: Tag },
+  { label: 'Profile', to: '/app/profile' as const, icon: MessageCircle },
 ]
 
 const RESOURCE_LINKS = [
