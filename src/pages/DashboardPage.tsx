@@ -8,6 +8,7 @@ import { OffersTableWrapper } from '@/components/custom/OffersTableWrapper'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { PageContainer } from '@/components/layout/PageContainer'
+import { Text } from '@/components/ui/text'
 import { Search, Wallet } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { WalletConnectButton } from '@/components/custom/WalletConnectButton'
@@ -35,9 +36,9 @@ export function DashboardPage() {
               <div className="w-16 h-16 mx-auto rounded-full bg-foreground/10 flex items-center justify-center">
                 <Wallet className="w-8 h-8 text-foreground" />
               </div>
-              <div>
-                <h1 className="text-3xl font-black tracking-tight font-display mb-2">Connect your wallet</h1>
-                <p className="text-muted-foreground">Connect your wallet to view your portfolio dashboard, track your positions, and monitor vault performance.</p>
+              <div className="text-center">
+                <Text variant="h3" className="mb-2">Connect your wallet</Text>
+                <Text variant="muted">Connect your wallet to view your portfolio dashboard, track your positions, and monitor vault performance.</Text>
               </div>
               <div className="flex justify-center">
                 <WalletConnectButton />
@@ -65,8 +66,8 @@ export function DashboardPage() {
             {/* Header */}
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h1 className="text-2xl font-bold">Dashboard</h1>
-                <p className="text-sm text-muted-foreground">View your portfolio and market activity</p>
+                <Text variant="h3">Dashboard</Text>
+                <Text variant="muted">View your portfolio and market activity</Text>
               </div>
               <Button className="rounded-full shadow-none bg-primary text-primary-foreground hover:bg-primary/90">
                 Post Offer

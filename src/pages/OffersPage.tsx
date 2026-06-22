@@ -15,6 +15,7 @@ import { OffersTableWrapper } from '@/components/custom/OffersTableWrapper'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { PageContainer } from '@/components/layout/PageContainer'
+import { Text } from '@/components/ui/text'
 import { MaskedList, useInfiniteList } from '@/components/infinite-list'
 import {
   DropdownMenu,
@@ -150,8 +151,8 @@ export function OffersPage() {
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h1 className="text-2xl font-bold">Offers</h1>
-                <p className="text-sm text-muted-foreground">Browse and create trade offers</p>
+                <Text variant="h3">Offers</Text>
+                <Text variant="muted">Browse and create trade offers</Text>
               </div>
               <Button className="rounded-full shadow-none">Create Offer</Button>
             </div>

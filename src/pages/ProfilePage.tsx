@@ -15,6 +15,7 @@ import { OffersTableWrapper } from '@/components/custom/OffersTableWrapper'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { PageContainer } from '@/components/layout/PageContainer'
+import { Text } from '@/components/ui/text'
 import { ArrowUpDown } from 'lucide-react'
 
 interface Offer {
@@ -130,76 +131,79 @@ export function ProfilePage({ isOwn = false }: { isOwn?: boolean }) {
               </Avatar>
               <div className="flex-1">
                 <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-bold">{PROFILE_DATA.name}</h1>
+                  <Text variant="h2">{PROFILE_DATA.name}</Text>
                   <Badge className="bg-green-500 text-white hover:bg-green-600 text-sm">{PROFILE_DATA.lastOnline}</Badge>
                 </div>
-                <p className="text-sm text-muted-foreground font-mono">{PROFILE_DATA.address}</p>
+                <Text variant="small" className="font-mono text-muted-foreground">{PROFILE_DATA.address}</Text>
                 {isOwn && <Button className="mt-4">Edit Profile</Button>}
               </div>
             </div>
 
             {/* Stats Grid (bento boxes) */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Big stat card: Total Trades */}
-              <Card className="md:col-span-2">
-                <CardContent className="pt-6">
-                  <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Total Trades</p>
-                  <p className="text-5xl font-black mt-2">{PROFILE_DATA.totalTrades.toLocaleString()}</p>
-                </CardContent>
-              </Card>
-              {/* Big stat card: Total Volume */}
-              <Card className="md:col-span-2">
-                <CardContent className="pt-6">
-                  <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Total Volume</p>
-                  <p className="text-5xl font-black mt-2">{PROFILE_DATA.totalVolume}</p>
-                </CardContent>
-              </Card>
-              {/* Trader Details */}
-              <Card>
-                <CardContent className="pt-6">
-                  <h3 className="text-base font-bold mb-4">Trader Details</h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between"><span className="text-muted-foreground">Member since</span><span>{PROFILE_DATA.memberSince}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Timezone</span><span>{PROFILE_DATA.timezone}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Languages</span><span>{PROFILE_DATA.languages.join(', ')}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Blocked by</span><span>{PROFILE_DATA.blockedBy} traders</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Trusted by</span><span>{PROFILE_DATA.trustedBy.toLocaleString()} traders</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Following</span><button className="text-primary">{PROFILE_DATA.following} — View list</button></div>
-                  </div>
-                </CardContent>
-              </Card>
-              {/* Ratings & Feedback */}
-              <Card>
-                <CardContent className="pt-6">
-                  <h3 className="text-base font-bold mb-4">Ratings & Feedback</h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between"><span className="text-muted-foreground">Rating</span><button className="text-primary">{PROFILE_DATA.rating} — View feedback</button></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Unique traders</span><span>{PROFILE_DATA.uniqueTraders.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Completion rate</span><span>{PROFILE_DATA.completionRate}</span></div>
-                  </div>
-                </CardContent>
-              </Card>
-              {/* Volume & Activity */}
-              <Card className="md:col-span-2">
-                <CardContent className="pt-6">
-                  <h3 className="text-base font-bold mb-4">Volume & Activity</h3>
-                  <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Left column */}
+              <div className="flex flex-col gap-4">
+                {/* Trader Details */}
+                <Card>
+                  <CardContent className="pt-4">
+                    <Text variant="h4" className="font-bold mb-4">Trader Details</Text>
+                    <div className="space-y-3">
+                      <div className="flex justify-between"><span className="text-muted-foreground">Member since</span><span>{PROFILE_DATA.memberSince}</span></div>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Timezone</span><span>{PROFILE_DATA.timezone}</span></div>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Languages</span><span>{PROFILE_DATA.languages.join(', ')}</span></div>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Blocked by</span><span>{PROFILE_DATA.blockedBy} traders</span></div>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Trusted by</span><span>{PROFILE_DATA.trustedBy.toLocaleString()} traders</span></div>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Following</span><button className="text-primary">{PROFILE_DATA.following} — View list</button></div>
+                    </div>
+                  </CardContent>
+                </Card>
+                {/* Ratings & Feedback */}
+                <Card>
+                  <CardContent className="pt-4">
+                    <Text variant="h4" className="font-bold mb-4">Ratings & Feedback</Text>
+                    <div className="space-y-3">
+                      <div className="flex justify-between"><span className="text-muted-foreground">Rating</span><button className="text-primary">{PROFILE_DATA.rating} — View feedback</button></div>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Unique traders</span><span>{PROFILE_DATA.uniqueTraders.toLocaleString()}</span></div>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Completion rate</span><span>{PROFILE_DATA.completionRate}</span></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Right column */}
+              <div className="flex flex-col gap-4">
+                {/* Total Trades */}
+                <Card>
+                  <CardContent className="pt-4">
+                    <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">Total Trades</Text>
+                    <Text variant="h3" className="mt-1">{PROFILE_DATA.totalTrades.toLocaleString()}</Text>
+                  </CardContent>
+                </Card>
+                {/* Total Volume */}
+                <Card>
+                  <CardContent className="pt-4">
+                    <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">Total Volume</Text>
+                    <Text variant="h3" className="mt-1">{PROFILE_DATA.totalVolume}</Text>
+                  </CardContent>
+                </Card>
+                {/* Activity stats */}
+                <Card>
+                  <CardContent className="pt-4">
+                    <Text variant="h4" className="font-bold mb-4">Activity</Text>
                     <div className="space-y-3">
                       <div className="flex justify-between"><span className="text-muted-foreground">Imported trades</span><span>{PROFILE_DATA.importedTrades}+</span></div>
                       <div className="flex justify-between"><span className="text-muted-foreground">Imported volume</span><span>{PROFILE_DATA.importedVolume}</span></div>
-                    </div>
-                    <div className="space-y-3">
                       <div className="flex justify-between"><span className="text-muted-foreground">Last 30d Trades</span><span>{PROFILE_DATA.last30dTrades}</span></div>
                       <div className="flex justify-between"><span className="text-muted-foreground">Last 30d Volume</span><span>{PROFILE_DATA.last30dVolume}</span></div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
 
             {/* User's Offers Table */}
             <div>
-              <h2 className="text-xl font-bold mb-4">{isOwn ? 'Your active offers' : `${PROFILE_DATA.name}'s offers`}</h2>
+              <Text variant="h4" className="mb-4">{isOwn ? 'Your active offers' : `${PROFILE_DATA.name}'s offers`}</Text>
               <OffersTableWrapper>
                 <Table>
                   <TableHeader>
