@@ -6,6 +6,7 @@ import { LandingPage } from './pages/LandingPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { OffersPage } from './pages/OffersPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { ChatPage } from './pages/ChatPage'
 
 const queryClient = new QueryClient()
 
@@ -16,9 +17,9 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<LandingPage />} />
-            <Route path="/app/dashboard" element={<DashboardPage />} />
             <Route path="/app/offers" element={<OffersPage />} />
             <Route path="/app/profile" element={<ProfilePage />} />
+            <Route path="/app/messages" element={<ChatPage />} />
           </Routes>
         </BrowserRouter>
       </QueryClientProvider>
