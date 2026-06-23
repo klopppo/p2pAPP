@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -11,9 +12,17 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { OffersTableWrapper } from '@/components/custom/OffersTableWrapper'
 import { Text } from '@/components/ui/text'
-import { ArrowUpDown } from 'lucide-react'
+import { ArrowUpDown, MoreVertical, UserPlus, MessageCircle, Flag, BellOff, ShieldAlert } from 'lucide-react'
 
 interface Offer {
   id: number
@@ -87,8 +96,10 @@ const SortableHeader = ({ label, sortField, activeKey, onClick }: { label: strin
 )
 
 export function ProfilePage({ isOwn = false }: { isOwn?: boolean }) {
+  const navigate = useNavigate()
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [isFollowing, setIsFollowing] = useState(false)
   const [userOffers] = useState<Offer[]>(generateUserOffers())
 
   const toggleSort = (key: string) => {
@@ -122,8 +133,59 @@ export function ProfilePage({ isOwn = false }: { isOwn?: boolean }) {
                   <Badge className="bg-green-500 text-white hover:bg-green-600 text-sm">{PROFILE_DATA.lastOnline}</Badge>
                 </div>
                 <Text variant="small" className="font-mono text-muted-foreground">{PROFILE_DATA.address}</Text>
-                {isOwn && <Button className="mt-4">Edit Profile</Button>}
               </div>
+              {isOwn ? (
+                <Button onClick={() => navigate('/app/profile/edit')}>Edit Profile</Button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant={isFollowing ? 'secondary' : 'default'}
+                    onClick={() => setIsFollowing((f) => !f)}
+                    className="rounded-full shadow-none"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    {isFollowing ? 'Following' : 'Follow'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate(`/app/messages/${PROFILE_DATA.address}`)}
+                    className="rounded-full border-border shadow-none"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Chat
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon" className="rounded-full border-border shadow-none">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      <DropdownMenuGroup>
+                        <DropdownMenuItem onSelect={() => setIsFollowing((f) => !f)}>
+                          <UserPlus className="w-4 h-4" />
+                          {isFollowing ? 'Unfollow' : 'Follow'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <BellOff className="w-4 h-4" />
+                          Mute notifications
+                        </DropdownMenuItem>
+                      </DropdownMenuGroup>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuGroup>
+                        <DropdownMenuItem variant="destructive">
+                          <Flag className="w-4 h-4" />
+                          Report user
+                        </DropdownMenuItem>
+                        <DropdownMenuItem variant="destructive">
+                          <ShieldAlert className="w-4 h-4" />
+                          Block user
+                        </DropdownMenuItem>
+                      </DropdownMenuGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
             </div>
 
             {/* Stats Grid (bento boxes) */}
@@ -195,7 +257,6 @@ export function ProfilePage({ isOwn = false }: { isOwn?: boolean }) {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-b border-border/50 bg-muted/50 -mx-3 md:-mx-4 px-3 md:px-4">
-                      <TableHead className="text-muted-foreground font-mono">#</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Token</TableHead>
                       <TableHead className="text-right">
@@ -211,12 +272,11 @@ export function ProfilePage({ isOwn = false }: { isOwn?: boolean }) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredOffers.map((offer, index) => (
+                    {filteredOffers.map((offer) => (
                       <TableRow
                         key={offer.id}
                         className="hover:bg-muted/50 transition-colors border-b border-border/50"
                       >
-                        <TableCell className="text-muted-foreground font-mono">{index + 1}</TableCell>
                         <TableCell>
                           <Badge
                             variant={offer.type === 'buy' ? 'default' : 'secondary'}

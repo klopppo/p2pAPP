@@ -18,6 +18,8 @@ import { WalletConnectButton } from '@/components/custom/WalletConnectButton'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -101,20 +103,21 @@ export function Navbar({ showTabs = false }: NavbarProps) {
                 <DropdownMenuContent
                   align="start"
                   sideOffset={8}
-                  className="w-44 rounded-xl border border-border bg-card/95 backdrop-blur-xl shadow-lg overflow-hidden"
                 >
-                  {RESOURCE_LINKS.map((r) => (
-                    <a
-                      key={r.label}
-                      href={r.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors cursor-pointer"
-                    >
-                      <r.icon className="w-4 h-4" />
-                      {r.label}
-                    </a>
-                  ))}
+                  <DropdownMenuGroup>
+                    {RESOURCE_LINKS.map((r) => (
+                      <DropdownMenuItem key={r.label} asChild>
+                        <a
+                          href={r.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <r.icon className="w-4 h-4" />
+                          {r.label}
+                        </a>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuGroup>
                 </DropdownMenuContent>
               </DropdownMenu>
             </nav>

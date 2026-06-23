@@ -1,4 +1,5 @@
-import { useConnect, useAccount, useDisconnect } from 'wagmi'
+import { useAccount, useDisconnect } from 'wagmi'
+import { useConnectModal } from '@rainbow-me/rainbowkit'
 import MotionButton from '@/components/ui/motion-button'
 import {
   DropdownMenu,
@@ -10,7 +11,7 @@ import {
 import { Loader2 } from 'lucide-react'
 
 export function WalletConnectButton() {
-  const { connect, connectors, isPending } = useConnect()
+  const { openConnectModal, connectModalOpen } = useConnectModal()
   const { address, isConnected } = useAccount()
   const { disconnect } = useDisconnect()
 
@@ -25,26 +26,28 @@ export function WalletConnectButton() {
 
   if (!isConnected) {
     return (
-      <div onClick={() => connect({ connector: connectors[0] })} className="cursor-pointer">
-        {isPending ? (
-          <div className="flex items-center gap-2">
+      <button onClick={openConnectModal} className="cursor-pointer">
+        {connectModalOpen ? (
+          <div className="flex items-center gap-2 h-10 px-4 bg-background text-foreground border border-border rounded-full">
             <Loader2 className="h-4 w-4 animate-spin" />
             <span className="text-sm">Connecting...</span>
           </div>
         ) : (
           <MotionButton label="Connect Wallet" classes="bg-background text-foreground border border-border" />
         )}
-      </div>
+      </button>
     )
   }
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <MotionButton
-          label={`${address && formatAddress(address)}`}
-          classes="bg-background text-foreground border border-border"
-        />
+        <div className="cursor-pointer">
+          <MotionButton
+            label={address ? formatAddress(address) : ''}
+            classes="bg-background text-foreground border border-border"
+          />
+        </div>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="bg-card border-border shadow-none rounded-2xl">
         <DropdownMenuItem onClick={copyAddress} className="rounded-xl">

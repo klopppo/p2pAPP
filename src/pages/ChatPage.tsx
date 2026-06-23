@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -39,6 +40,7 @@ const mockMessages: Record<string, Message[]> = {
 }
 
 export function ChatPage() {
+  const { userId } = useParams<{ userId: string }>()
   const [selectedPartner, setSelectedPartner] = useState<ChatPartner | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [inputValue, setInputValue] = useState('')
@@ -46,9 +48,26 @@ export function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
 
-  // Auto-select first chat on mount
+  // Select partner from route param, or fall back to first chat
   useEffect(() => {
-    if (partners.length > 0 && !selectedPartner) {
+    if (selectedPartner) return
+    if (userId) {
+      const existing = partners.find((p) => p.id === userId)
+      if (existing) {
+        selectPartner(existing)
+      } else {
+        const newPartner: ChatPartner = {
+          id: userId,
+          name: `User ${userId.slice(0, 6)}`,
+          avatar: '',
+          lastMessage: '',
+          online: false,
+          unread: 0,
+        }
+        setPartners((prev) => [newPartner, ...prev])
+        selectPartner(newPartner)
+      }
+    } else if (partners.length > 0) {
       selectPartner(partners[0])
     }
   }, [])

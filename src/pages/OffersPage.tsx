@@ -251,7 +251,6 @@ export function OffersPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="border-b border-border/50 bg-muted/50 -mx-6 md:-mx-8 px-6 md:px-8">
-                    <TableHead className="text-muted-foreground font-mono">#</TableHead>
                     <TableHead>Trader</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Token</TableHead>
@@ -268,14 +267,11 @@ export function OffersPage() {
                 </TableHeader>
                 <TableBody>
                   <MaskedList {...list}>
-                    {filteredOffers.map((offer, index) => (
+                    {filteredOffers.map((offer) => (
                       <TableRow
                         key={offer.id}
                         className="hover:bg-muted/50 transition-colors border-b border-border/50"
                       >
-                        <TableCell className="text-muted-foreground font-mono">
-                          {index + 1}
-                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Avatar className="h-8 w-8">
