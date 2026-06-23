@@ -1,8 +1,5 @@
-import type { ReactNode } from 'react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { MiniSparkline } from './MiniSparkline'
 import { ShieldCheck, Verified, Bolt } from 'lucide-react'
 
 interface OfferRowProps {
@@ -39,13 +36,10 @@ export function OfferRow({
   isKYCVerified,
   price,
   currency,
-  priceChange,
   belowMarket,
   limits,
   limitLabel,
-  volumeType,
   isPositive,
-  sparkline,
   onTrade,
 }: OfferRowProps) {
   return (

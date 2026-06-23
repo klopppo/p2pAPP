@@ -6,7 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { ChevronDown, ChevronRight, Check } from 'lucide-react'
+import { ChevronDown, Check } from 'lucide-react'
 
 interface FilterDropdownProps {
   label: string

@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  LayoutDashboard,
   Tag,
   BookOpen,
   MessageCircle,
@@ -13,6 +12,7 @@ import {
   Globe,
   DollarSign,
   MoreHorizontal,
+  User,
 } from 'lucide-react'
 import { WalletConnectButton } from '@/components/custom/WalletConnectButton'
 import {
@@ -24,9 +24,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 
 const NAV_LINKS = [
-  { label: 'Dashboard', to: '/app/dashboard' as const, icon: LayoutDashboard },
+  { label: 'Messages', to: '/app/messages' as const, icon: MessageCircle },
   { label: 'Offers', to: '/app/offers' as const, icon: Tag },
-  { label: 'Profile', to: '/app/profile' as const, icon: MessageCircle },
+  { label: 'Profile', to: '/app/profile' as const, icon: User },
 ]
 
 const RESOURCE_LINKS = [
@@ -56,9 +56,9 @@ export function Navbar({ showTabs = false }: NavbarProps) {
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="sticky top-0 inset-x-0 z-50 bg-transparent"
+      className="inset-x-0 z-50 bg-transparent"
     >
-      <div className="max-w-[1100px] mx-auto px-4 md:px-6 w-full flex h-14 items-center justify-between gap-4">
+      <div className="px-4 md:px-6 w-full flex h-14 items-center justify-between gap-4">
         {/* Left: Logo + nav links */}
         <div className="flex items-center gap-6">
           <Link to="/" className="text-xl font-bold text-foreground">

@@ -1,4 +1,5 @@
 import { useState, useTransition, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -12,18 +13,16 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { OffersTableWrapper } from '@/components/custom/OffersTableWrapper'
-import { Navbar } from '@/components/layout/Navbar'
-import { Footer } from '@/components/layout/Footer'
-import { PageContainer } from '@/components/layout/PageContainer'
 import { Text } from '@/components/ui/text'
 import { MaskedList, useInfiniteList } from '@/components/infinite-list'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { ArrowUpDown } from 'lucide-react'
+import { ArrowUpDown, Check } from 'lucide-react'
 
 interface Offer {
   id: number
@@ -137,24 +136,16 @@ export function OffersPage() {
   )
 
   return (
-    <div className="relative z-10 min-h-screen flex flex-col">
-      <div className="fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[120px]" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-600/20 rounded-full blur-[120px]" />
-        <div className="absolute top-3/4 left-1/2 w-96 h-96 bg-blue-900/20 rounded-full blur-[120px]" />
-      </div>
-
-      <Navbar showTabs />
-      <main className="flex-1">
-        <PageContainer type="app">
-          <section className="py-8">
+    <section className="py-8">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
               <div>
                 <Text variant="h3">Offers</Text>
                 <Text variant="muted">Browse and create trade offers</Text>
               </div>
-              <Button className="rounded-full shadow-none">Create Offer</Button>
+              <Link to="/app/create-offer">
+                <Button className="rounded-full shadow-none">Create Offer</Button>
+              </Link>
             </div>
 
             {/* Filters */}
@@ -175,10 +166,21 @@ export function OffersPage() {
                       Type: {typeFilter}
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="bg-card border-border shadow-none rounded-2xl">
-                    <DropdownMenuItem onClick={() => setTypeFilter('all')}>All</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setTypeFilter('buy')}>Buy</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setTypeFilter('sell')}>Sell</DropdownMenuItem>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuGroup>
+                      <DropdownMenuItem onSelect={() => setTypeFilter('all')}>
+                        All
+                        {typeFilter === 'all' && <Check className="w-4 h-4 ml-auto" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setTypeFilter('buy')}>
+                        Buy
+                        {typeFilter === 'buy' && <Check className="w-4 h-4 ml-auto" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setTypeFilter('sell')}>
+                        Sell
+                        {typeFilter === 'sell' && <Check className="w-4 h-4 ml-auto" />}
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>
                 <DropdownMenu>
@@ -190,11 +192,25 @@ export function OffersPage() {
                       Token: {tokenFilter}
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="bg-card border-border shadow-none rounded-2xl">
-                    <DropdownMenuItem onClick={() => setTokenFilter('all')}>All</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setTokenFilter('ETH')}>ETH</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setTokenFilter('BTC')}>BTC</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setTokenFilter('USDC')}>USDC</DropdownMenuItem>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuGroup>
+                      <DropdownMenuItem onSelect={() => setTokenFilter('all')}>
+                        All
+                        {tokenFilter === 'all' && <Check className="w-4 h-4 ml-auto" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setTokenFilter('ETH')}>
+                        ETH
+                        {tokenFilter === 'ETH' && <Check className="w-4 h-4 ml-auto" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setTokenFilter('BTC')}>
+                        BTC
+                        {tokenFilter === 'BTC' && <Check className="w-4 h-4 ml-auto" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setTokenFilter('USDC')}>
+                        USDC
+                        {tokenFilter === 'USDC' && <Check className="w-4 h-4 ml-auto" />}
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>
                 <DropdownMenu>
@@ -206,11 +222,25 @@ export function OffersPage() {
                       Payment: {paymentFilter}
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="bg-card border-border shadow-none rounded-2xl">
-                    <DropdownMenuItem onClick={() => setPaymentFilter('all')}>All</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setPaymentFilter('bank')}>Bank Transfer</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setPaymentFilter('paypal')}>PayPal</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setPaymentFilter('wise')}>Wise</DropdownMenuItem>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuGroup>
+                      <DropdownMenuItem onSelect={() => setPaymentFilter('all')}>
+                        All
+                        {paymentFilter === 'all' && <Check className="w-4 h-4 ml-auto" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setPaymentFilter('bank')}>
+                        Bank Transfer
+                        {paymentFilter === 'bank' && <Check className="w-4 h-4 ml-auto" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setPaymentFilter('paypal')}>
+                        PayPal
+                        {paymentFilter === 'paypal' && <Check className="w-4 h-4 ml-auto" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setPaymentFilter('wise')}>
+                        Wise
+                        {paymentFilter === 'wise' && <Check className="w-4 h-4 ml-auto" />}
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -297,9 +327,5 @@ export function OffersPage() {
               </Button>
             </div>
           </section>
-        </PageContainer>
-      </main>
-      <Footer />
-    </div>
   )
 }

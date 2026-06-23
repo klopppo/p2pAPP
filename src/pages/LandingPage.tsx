@@ -1,12 +1,10 @@
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { LandingLayout } from '@/components/layout/LandingLayout'
 import { Navbar } from '@/components/layout/Navbar'
-import { Footer } from '@/components/layout/Footer'
-import { PageContainer } from '@/components/layout/PageContainer'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { TypingEffect } from '@/components/ui/typing-effect'
-import MotionButton from '@/components/ui/motion-button'
 import InteractiveHoverButton from '@/components/ui/interactive-hover-button'
 import {
   Shield,
@@ -33,53 +31,44 @@ import {
 
 export function LandingPage() {
   return (
-    <div className="relative z-10 min-h-screen flex flex-col">
-      {/* Background Mesh Gradient */}
-      <div className="fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[120px]" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-600/20 rounded-full blur-[120px]" />
-        <div className="absolute top-3/4 left-1/2 w-96 h-96 bg-blue-900/20 rounded-full blur-[120px]" />
-      </div>
-
-      <main className="flex-1">
+    <LandingLayout>
+      <>
         {/* Hero Section */}
-        <PageContainer type="landing">
-          <section className="relative min-h-screen flex flex-col items-center justify-center px-4">
-            {/* Navbar sits inside hero viewport, aligned to top */}
-            <div className="absolute top-0 left-0 right-0 z-20">
-              <Navbar />
-            </div>
-            {/* Hero title content, centered to screen */}
-            <div className="pt-16">
-              <div className="mx-auto max-w-4xl text-center space-y-3">
-                <div className="flex justify-center">
-                  <TypingEffect
-                    texts={['Trustless', 'Secure', 'Private']}
-                    className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground"
-                  />
-                  <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground tracking-tight ml-2">
-                    P2P Crypto
-                  </h1>
-                </div>
-                <p className="text-lg md:text-xl max-w-2xl mx-auto leading-relaxed text-muted-foreground">
-                  Trade cryptocurrency peer-to-peer with smart contract escrow.
-                  Non-custodial, secure, and permissionless.
-                </p>
+        <section className="relative min-h-screen flex flex-col items-center justify-center px-4">
+          {/* Navbar sits inside hero viewport, aligned to top */}
+          <div className="absolute top-0 left-0 right-0 z-20">
+            <Navbar />
+          </div>
+          {/* Hero title content, centered to screen */}
+          <div className="pt-16">
+            <div className="mx-auto max-w-4xl text-center space-y-3">
+              <div className="flex justify-center">
+                <TypingEffect
+                  texts={['Trustless', 'Secure', 'Private']}
+                  className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground"
+                />
+                <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground tracking-tight ml-2">
+                  P2P Crypto
+                </h1>
               </div>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
-                <Link to="/app/dashboard">
-                  <InteractiveHoverButton text="Open App" classes="bg-primary text-primary-foreground" />
-                </Link>
-                <Button
-                  variant="outline"
-                  className="rounded-full shadow-none px-8 py-6 text-lg"
-                >
-                  Documentation
-                </Button>
-              </div>
+              <p className="text-lg md:text-xl max-w-2xl mx-auto leading-relaxed text-muted-foreground">
+                Trade cryptocurrency peer-to-peer with smart contract escrow.
+                Non-custodial, secure, and permissionless.
+              </p>
             </div>
-          </section>
-        </PageContainer>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
+              <Link to="/app/offers">
+                <InteractiveHoverButton text="Open App" classes="bg-primary text-primary-foreground" />
+              </Link>
+              <Button
+                variant="outline"
+                className="rounded-full shadow-none px-8 py-6 text-lg"
+              >
+                Documentation
+              </Button>
+            </div>
+          </div>
+        </section>
 
         {/* Marquee Section */}
         <section className="py-8 overflow-hidden">
@@ -110,8 +99,7 @@ export function LandingPage() {
         </section>
 
         {/* How It Works Section */}
-        <PageContainer type="landing">
-          <section className="py-20 md:py-32 px-4">
+        <section className="py-20 md:py-32 px-4">
           <div className="mx-auto max-w-4xl text-center mb-16">
             <p className="text-xs font-medium uppercase tracking-[0.2em] mb-2">
               SIMPLE PROCESS
@@ -186,12 +174,10 @@ export function LandingPage() {
             {/* Progress line */}
             <div className="hidden md:block absolute top-1/2 left-0 right-0 h-px border-t border-dashed border-foreground/10 -translate-y-1/2 pointer-events-none"></div>
           </div>
-          </section>
-        </PageContainer>
+        </section>
 
         {/* Features Section - Bento Grid */}
-        <PageContainer type="landing">
-          <section className="py-20 md:py-32 px-4">
+        <section className="py-20 md:py-32 px-4">
             <div className="mx-auto max-w-4xl text-center mb-12">
               <p className="text-xs font-medium uppercase tracking-[0.2em] mb-2">
                 WHY CHOOSE US
@@ -277,68 +263,63 @@ export function LandingPage() {
               </div>
             </div>
           </section>
-        </PageContainer>
 
         {/* FAQ Section */}
-        <PageContainer type="landing">
-          <section className="py-20 md:py-32 px-4">
-            <div className="mx-auto max-w-3xl text-center">
-              <p className="text-xs font-medium uppercase tracking-[0.2em] mb-2">
-                FAQ
-              </p>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-4">
-                Frequently asked questions
-              </h2>
-              <p className="text-base md:text-lg max-w-2xl mx-auto leading-relaxed text-muted-foreground">
-                Quick answers to the questions we get the most.
-              </p>
-            </div>
+        <section className="py-20 md:py-32 px-4">
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="text-xs font-medium uppercase tracking-[0.2em] mb-2">
+              FAQ
+            </p>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-4">
+              Frequently asked questions
+            </h2>
+            <p className="text-base md:text-lg max-w-2xl mx-auto leading-relaxed text-muted-foreground">
+              Quick answers to the questions we get the most.
+            </p>
+          </div>
 
-            <div className="mt-12 max-w-3xl mx-auto">
-              <Accordion type="single" collapsible className="w-full rounded-2xl border bg-card p-2">
-                <AccordionItem value="item-1" className="border-b px-4 last:border-b-0">
-                  <AccordionTrigger className="text-left text-lg font-medium py-6 hover:no-underline">
-                    Is my crypto safe?
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-6 text-muted-foreground leading-relaxed">
-                    Yes. Funds are locked in smart contract escrow, released
-                    only when both parties confirm. We never hold your crypto.
-                  </AccordionContent>
-                </AccordionItem>
-                <AccordionItem value="item-2" className="border-b px-4 last:border-b-0">
-                  <AccordionTrigger className="text-left text-lg font-medium py-6 hover:no-underline">
-                    What are the fees?
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-6 text-muted-foreground leading-relaxed">
-                    Zero platform fees. You only pay standard network gas for
-                    on-chain transactions.
-                  </AccordionContent>
-                </AccordionItem>
-                <AccordionItem value="item-3" className="border-b px-4 last:border-b-0">
-                  <AccordionTrigger className="text-left text-lg font-medium py-6 hover:no-underline">
-                    How are disputes handled?
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-6 text-muted-foreground leading-relaxed">
-                    Disputes are resolved by decentralized community jurors.
-                    Smart contract enforces their decision.
-                  </AccordionContent>
-                </AccordionItem>
-                <AccordionItem value="item-4" className="px-4">
-                  <AccordionTrigger className="text-left text-lg font-medium py-6 hover:no-underline">
-                    Is it non-custodial?
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-6 text-muted-foreground leading-relaxed">
-                    Yes. You always control your private keys. Funds move only
-                    when you sign transactions.
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-            </div>
-          </section>
-        </PageContainer>
-      </main>
-
-      <Footer />
-    </div>
+          <div className="mt-12 max-w-3xl mx-auto">
+            <Accordion type="single" collapsible className="w-full rounded-2xl border bg-card p-2">
+              <AccordionItem value="item-1" className="border-b px-4 last:border-b-0">
+                <AccordionTrigger className="text-left text-lg font-medium py-6 hover:no-underline">
+                  Is my crypto safe?
+                </AccordionTrigger>
+                <AccordionContent className="pb-6 text-muted-foreground leading-relaxed">
+                  Yes. Funds are locked in smart contract escrow, released
+                  only when both parties confirm. We never hold your crypto.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-2" className="border-b px-4 last:border-b-0">
+                <AccordionTrigger className="text-left text-lg font-medium py-6 hover:no-underline">
+                  What are the fees?
+                </AccordionTrigger>
+                <AccordionContent className="pb-6 text-muted-foreground leading-relaxed">
+                  Zero platform fees. You only pay standard network gas for
+                  on-chain transactions.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-3" className="border-b px-4 last:border-b-0">
+                <AccordionTrigger className="text-left text-lg font-medium py-6 hover:no-underline">
+                  How are disputes handled?
+                </AccordionTrigger>
+                <AccordionContent className="pb-6 text-muted-foreground leading-relaxed">
+                  Disputes are resolved by decentralized community jurors.
+                  Smart contract enforces their decision.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-4" className="px-4">
+                <AccordionTrigger className="text-left text-lg font-medium py-6 hover:no-underline">
+                  Is it non-custodial?
+                </AccordionTrigger>
+                <AccordionContent className="pb-6 text-muted-foreground leading-relaxed">
+                  Yes. You always control your private keys. Funds move only
+                  when you sign transactions.
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </div>
+        </section>
+      </>
+    </LandingLayout>
   )
 }
