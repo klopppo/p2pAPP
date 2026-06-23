@@ -12,9 +12,6 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { OffersTableWrapper } from '@/components/custom/OffersTableWrapper'
-import { Navbar } from '@/components/layout/Navbar'
-import { Footer } from '@/components/layout/Footer'
-import { PageContainer } from '@/components/layout/PageContainer'
 import { Text } from '@/components/ui/text'
 import { ArrowUpDown } from 'lucide-react'
 
@@ -79,7 +76,7 @@ const PROFILE_DATA: ProfileData = {
   avatar: 'https://images.unsplash.com/photo-1472099645745-095597429a3b?auto=format&fit=crop&q=80&w=100&h=100',
 }
 
-const SortableHeader = ({ label, sortField, activeKey, sortDir, onClick }: { label: string; sortField: string; activeKey: string | null; sortDir: string; onClick: () => void }) => (
+const SortableHeader = ({ label, sortField, activeKey, onClick }: { label: string; sortField: string; activeKey: string | null; onClick: () => void }) => (
   <button
     onClick={onClick}
     className="inline-flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer"
@@ -112,17 +109,7 @@ export function ProfilePage({ isOwn = false }: { isOwn?: boolean }) {
   }, [userOffers, sortKey, sortDir])
 
   return (
-    <div className="relative z-10 min-h-screen flex flex-col">
-      <div className="fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[120px]" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-600/20 rounded-full blur-[120px]" />
-        <div className="absolute top-3/4 left-1/2 w-96 h-96 bg-blue-900/20 rounded-full blur-[120px]" />
-      </div>
-
-      <Navbar showTabs />
-      <main className="flex-1">
-        <PageContainer type="app">
-          <section className="py-8 space-y-8">
+    <section className="py-8 space-y-8">
             {/* Profile Header */}
             <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
               <Avatar className="h-24 w-24">
@@ -212,13 +199,13 @@ export function ProfilePage({ isOwn = false }: { isOwn?: boolean }) {
                       <TableHead>Type</TableHead>
                       <TableHead>Token</TableHead>
                       <TableHead className="text-right">
-                        <SortableHeader label="Price" sortField="price" activeKey={sortKey} sortDir={sortDir} onClick={() => toggleSort('price')} />
+                        <SortableHeader label="Price" sortField="price" activeKey={sortKey} onClick={() => toggleSort('price')} />
                       </TableHead>
                       <TableHead className="text-right">
-                        <SortableHeader label="Min Amount" sortField="minAmount" activeKey={sortKey} sortDir={sortDir} onClick={() => toggleSort('minAmount')} />
+                        <SortableHeader label="Min Amount" sortField="minAmount" activeKey={sortKey} onClick={() => toggleSort('minAmount')} />
                       </TableHead>
                       <TableHead className="text-right">
-                        <SortableHeader label="Max Amount" sortField="maxAmount" activeKey={sortKey} sortDir={sortDir} onClick={() => toggleSort('maxAmount')} />
+                        <SortableHeader label="Max Amount" sortField="maxAmount" activeKey={sortKey} onClick={() => toggleSort('maxAmount')} />
                       </TableHead>
                       {isOwn && <TableHead>Action</TableHead>}
                     </TableRow>
@@ -252,9 +239,5 @@ export function ProfilePage({ isOwn = false }: { isOwn?: boolean }) {
               </OffersTableWrapper>
             </div>
           </section>
-        </PageContainer>
-      </main>
-      <Footer />
-    </div>
   )
 }

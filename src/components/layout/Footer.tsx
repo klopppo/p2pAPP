@@ -2,7 +2,7 @@ import { Separator } from '@/components/ui/separator'
 
 export function Footer() {
   return (
-    <footer className="max-w-[1100px] mx-auto px-4 md:px-6 w-full py-8">
+    <footer className="px-4 md:px-6 w-full py-8">
       <Separator className="mb-4" />
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <p className="text-sm text-muted-foreground">
