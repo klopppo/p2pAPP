@@ -15,7 +15,10 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "db:migrate": "supabase db push",
+    "db:studio": "supabase status && supabase start && supabase db studio",
+    "db:reset": "supabase db reset"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",
@@ -58,6 +61,7 @@
     "playwright": "^1.61.0",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
+    "supabase": "^2.107.0",
     "typescript": "~6",
     "typescript-eslint": "^8",
     "vite": "^8.0.16"
