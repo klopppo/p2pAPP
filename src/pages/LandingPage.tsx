@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { LandingLayout } from '@/components/layout/LandingLayout'
 import { Navbar } from '@/components/layout/Navbar'
@@ -33,15 +32,24 @@ export function LandingPage() {
   return (
     <LandingLayout>
       <>
-        {/* Hero Section */}
-        <section className="relative min-h-screen flex flex-col items-center justify-center px-4">
+        {/* Hero + Marquee — single screen */}
+        <section className="relative min-h-[100dvh] flex flex-col px-4">
           {/* Navbar sits inside hero viewport, aligned to top */}
           <div className="absolute top-0 left-0 right-0 z-20">
             <Navbar />
           </div>
-          {/* Hero title content, centered to screen */}
-          <div className="pt-16">
+          {/* Hero title content — takes all space, centered vertically */}
+          <div className="flex-1 flex flex-col justify-center items-center pb-12">
             <div className="mx-auto max-w-4xl text-center space-y-3">
+              <div className="flex justify-center">
+                <span className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500/60" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+                  </span>
+                  Online now
+                </span>
+              </div>
               <div className="flex justify-center">
                 <TypingEffect
                   texts={['Trustless', 'Secure', 'Private']}
@@ -60,42 +68,42 @@ export function LandingPage() {
               <Link to="/app/offers">
                 <InteractiveHoverButton text="Open App" classes="bg-primary text-primary-foreground" />
               </Link>
-              <Button
-                variant="outline"
-                className="rounded-full shadow-none px-8 py-6 text-lg"
-              >
-                Documentation
-              </Button>
             </div>
           </div>
-        </section>
 
-        {/* Marquee Section */}
-        <section className="py-8 overflow-hidden">
-          <Marquee speed={25} speedFactor={1} direction={1}>
-            <div className="flex items-end gap-12">
-              {/* Icons — duplicated for seamless loop, grayscaled/muted, subtle random vertical offset */}
-              <TokenBTC size={56} variant="branded" className="grayscale opacity-70 mb-1" />
-              <TokenETH size={56} variant="branded" className="grayscale opacity-70 -mb-0.5" />
-              <TokenUSDC size={56} variant="branded" className="grayscale opacity-70 mb-1.5" />
-              <TokenUSDT size={56} variant="branded" className="grayscale opacity-70 -mb-1" />
-              <NetworkEthereum size={56} variant="branded" className="grayscale opacity-70" />
-              <NetworkBase size={56} variant="branded" className="grayscale opacity-70 mb-0.5" />
-              <NetworkArbitrumOne size={56} variant="branded" className="grayscale opacity-70 -mb-0.5" />
-              <NetworkOptimism size={56} variant="branded" className="grayscale opacity-70 mb-1" />
-              <NetworkPolygon size={56} variant="branded" className="grayscale opacity-70" />
-              {/* Same set again for continuous scroll */}
-              <TokenBTC size={56} variant="branded" className="grayscale opacity-70 mb-1" />
-              <TokenETH size={56} variant="branded" className="grayscale opacity-70 -mb-0.5" />
-              <TokenUSDC size={56} variant="branded" className="grayscale opacity-70 mb-1.5" />
-              <TokenUSDT size={56} variant="branded" className="grayscale opacity-70 -mb-1" />
-              <NetworkEthereum size={56} variant="branded" className="grayscale opacity-70" />
-              <NetworkBase size={56} variant="branded" className="grayscale opacity-70 mb-0.5" />
-              <NetworkArbitrumOne size={56} variant="branded" className="grayscale opacity-70 -mb-0.5" />
-              <NetworkOptimism size={56} variant="branded" className="grayscale opacity-70 mb-1" />
-              <NetworkPolygon size={56} variant="branded" className="grayscale opacity-70" />
+          {/* Marquee — pinned to bottom of first screen, full viewport width with edge fade */}
+          <div className="w-screen relative left-1/2 -translate-x-1/2 mt-auto pb-6">
+            <div
+              className="w-full overflow-hidden py-4
+                         [mask-image:linear-gradient(to_right,transparent,black_15%,black_85%,transparent)]
+                         [-webkit-mask-image:linear-gradient(to_right,transparent,black_15%,black_85%,transparent)]"
+            >
+              <Marquee speed={25} speedFactor={1} direction={1}>
+                <div className="flex items-end gap-12">
+                  {/* Icons — duplicated for seamless loop, grayscaled/muted, subtle random vertical offset */}
+                  <TokenBTC size={56} variant="branded" className="grayscale opacity-70 mb-1" />
+                  <TokenETH size={56} variant="branded" className="grayscale opacity-70 -mb-0.5" />
+                  <TokenUSDC size={56} variant="branded" className="grayscale opacity-70 mb-1.5" />
+                  <TokenUSDT size={56} variant="branded" className="grayscale opacity-70 -mb-1" />
+                  <NetworkEthereum size={56} variant="branded" className="grayscale opacity-70" />
+                  <NetworkBase size={56} variant="branded" className="grayscale opacity-70 mb-0.5" />
+                  <NetworkArbitrumOne size={56} variant="branded" className="grayscale opacity-70 -mb-0.5" />
+                  <NetworkOptimism size={56} variant="branded" className="grayscale opacity-70 mb-1" />
+                  <NetworkPolygon size={56} variant="branded" className="grayscale opacity-70" />
+                  {/* Same set again for continuous scroll */}
+                  <TokenBTC size={56} variant="branded" className="grayscale opacity-70 mb-1" />
+                  <TokenETH size={56} variant="branded" className="grayscale opacity-70 -mb-0.5" />
+                  <TokenUSDC size={56} variant="branded" className="grayscale opacity-70 mb-1.5" />
+                  <TokenUSDT size={56} variant="branded" className="grayscale opacity-70 -mb-1" />
+                  <NetworkEthereum size={56} variant="branded" className="grayscale opacity-70" />
+                  <NetworkBase size={56} variant="branded" className="grayscale opacity-70 mb-0.5" />
+                  <NetworkArbitrumOne size={56} variant="branded" className="grayscale opacity-70 -mb-0.5" />
+                  <NetworkOptimism size={56} variant="branded" className="grayscale opacity-70 mb-1" />
+                  <NetworkPolygon size={56} variant="branded" className="grayscale opacity-70" />
+                </div>
+              </Marquee>
             </div>
-          </Marquee>
+          </div>
         </section>
 
         {/* How It Works Section */}
@@ -104,7 +112,7 @@ export function LandingPage() {
             <p className="text-xs font-medium uppercase tracking-[0.2em] mb-2">
               SIMPLE PROCESS
             </p>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-4">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-2">
               How it works
             </h2>
             <p className="text-base md:text-lg max-w-2xl mx-auto leading-relaxed text-muted-foreground">
@@ -182,7 +190,7 @@ export function LandingPage() {
               <p className="text-xs font-medium uppercase tracking-[0.2em] mb-2">
                 WHY CHOOSE US
               </p>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-4">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-2">
                 Built for Trustless Trading
               </h2>
               <p className="text-base md:text-lg max-w-2xl mx-auto leading-relaxed text-muted-foreground">
@@ -203,7 +211,7 @@ export function LandingPage() {
                       <Shield className="h-5 w-5 text-primary" />
                     </div>
                   </div>
-                  <p className="text-sm leading-relaxed text-muted-foreground mb-4">
+                  <p className="text-base leading-relaxed text-muted-foreground mb-4">
                     Funds are locked in smart contracts, not our servers. Full control over your assets.
                   </p>
                   <div className="grid grid-cols-3 gap-2">
@@ -224,7 +232,7 @@ export function LandingPage() {
                       <Users className="h-5 w-5 text-primary" />
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     Direct trades. No centralized entity can freeze you.
                   </p>
                 </Card>
@@ -240,7 +248,7 @@ export function LandingPage() {
                       <Coins className="h-5 w-5 text-primary" />
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     Zero platform fees. Only standard network gas.
                   </p>
                 </Card>
@@ -256,7 +264,7 @@ export function LandingPage() {
                       <FileCode className="h-5 w-5 text-primary" />
                     </div>
                   </div>
-                  <p className="leading-relaxed text-sm text-muted-foreground">
+                  <p className="leading-relaxed text-base text-muted-foreground">
                     Fully automated escrow logic. Open-source, auditable, and trustless by design.
                   </p>
                 </Card>
@@ -270,7 +278,7 @@ export function LandingPage() {
             <p className="text-xs font-medium uppercase tracking-[0.2em] mb-2">
               FAQ
             </p>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-4">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-2">
               Frequently asked questions
             </h2>
             <p className="text-base md:text-lg max-w-2xl mx-auto leading-relaxed text-muted-foreground">
@@ -298,22 +306,38 @@ export function LandingPage() {
                   on-chain transactions.
                 </AccordionContent>
               </AccordionItem>
-              <AccordionItem value="item-3" className="border-b px-4 last:border-b-0">
-                <AccordionTrigger className="text-left text-lg font-medium py-6 hover:no-underline">
-                  How are disputes handled?
-                </AccordionTrigger>
-                <AccordionContent className="pb-6 text-muted-foreground leading-relaxed">
-                  Disputes are resolved by decentralized community jurors.
-                  Smart contract enforces their decision.
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="item-4" className="px-4">
+
+              <AccordionItem value="item-4" className="border-b px-4 last:border-b-0">
                 <AccordionTrigger className="text-left text-lg font-medium py-6 hover:no-underline">
                   Is it non-custodial?
                 </AccordionTrigger>
                 <AccordionContent className="pb-6 text-muted-foreground leading-relaxed">
                   Yes. You always control your private keys. Funds move only
                   when you sign transactions.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-5" className="border-b px-4 last:border-b-0">
+                <AccordionTrigger className="text-left text-lg font-medium py-6 hover:no-underline">
+                  Do I need to trust the other person?
+                </AccordionTrigger>
+                <AccordionContent className="pb-6 text-muted-foreground leading-relaxed">
+                  No. The crypto is locked in a smart contract that neither the buyer nor the seller can touch alone. Only after the buyer confirms, or after a dispute is resolved by the arbitrator, are the funds released.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-6" className="border-b px-4 last:border-b-0">
+                <AccordionTrigger className="text-left text-lg font-medium py-6 hover:no-underline">
+                  What if there's a disagreement (dispute)?
+                </AccordionTrigger>
+                <AccordionContent className="pb-6 text-muted-foreground leading-relaxed">
+                  Either party can open a dispute. The platform's arbitrator will review the evidence and decide whether the funds go to the seller or back to the buyer. The arbitrator's decision is final.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-7" className="px-4">
+                <AccordionTrigger className="text-left text-lg font-medium py-6 hover:no-underline">
+                  What cryptocurrencies can I use?
+                </AccordionTrigger>
+                <AccordionContent className="pb-6 text-muted-foreground leading-relaxed">
+                  The platform supports any ERC-20 token (like USDC, DAI, USDT) that the seller chooses to accept. The contract handles the token securely.
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
