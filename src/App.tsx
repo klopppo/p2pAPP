@@ -13,6 +13,7 @@ import { CreateOfferPage } from './pages/CreateOfferPage'
 import { OpenOfferPage } from './pages/OpenOfferPage'
 import { AppLayout } from './components/layout/AppLayout'
 import { UserSync } from './hooks/useSyncUser'
+import { TrustlessFlowOverlay } from './components/custom/TrustlessFlow'
 
 const queryClient = new QueryClient()
 
@@ -25,6 +26,7 @@ function App() {
           borderRadius: 'large',
         })}>
           <UserSync />
+          <TrustlessFlowOverlay />
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<LandingPage />} />
