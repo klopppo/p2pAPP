@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
@@ -11,7 +12,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
-import { Check, ChevronDown } from 'lucide-react'
+import { Check, ChevronDown, Loader2 } from 'lucide-react'
+import { createOffer, supabase } from '@/lib/supabase'
 
 interface OfferForm {
   type: 'buy' | 'sell'
@@ -27,6 +29,7 @@ interface OfferForm {
 }
 
 export function CreateOfferPage() {
+  const navigate = useNavigate()
   const [formData, setFormData] = useState<OfferForm>({
     type: 'buy',
     token: 'EUR',
@@ -40,10 +43,55 @@ export function CreateOfferPage() {
     targetUser: ''
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    console.log('Creating offer:', formData)
-    // TODO: Implement actual offer creation
+    setIsSubmitting(true)
+
+    try {
+      // Get user ID from session
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) {
+        throw new Error('User not authenticated. Please sign in first.')
+      }
+
+      const userId = session.user.id
+
+      // Prepare offer data
+      const offerData = {
+        seller_id: userId,
+        type: formData.type,
+        crypto_token: formData.token,
+        crypto_amount: formData.maxAmount, // Using max amount for now
+        fiat_currency: 'EUR',
+        fiat_amount: formData.maxAmount * formData.price,
+        price_per_unit: formData.price,
+        min_amount: formData.minAmount,
+        max_amount: formData.maxAmount,
+        payment_methods: [formData.paymentMethod],
+        available_regions: formData.location === 'Global' ? [] : [formData.location],
+        platform_fee_bps: 50, // 0.5%
+        network_fee: 0,
+        tags: [formData.location],
+        featured: false,
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // Expires in 7 days
+        grace_period_hours: formData.gracePeriod
+      }
+
+      // Create offer in database
+      const createdOffer = await createOffer(offerData)
+      console.log('Offer created successfully:', createdOffer)
+
+      // Show success message and navigate
+      alert('Offer created successfully!')
+      navigate('/app/offers')
+    } catch (error) {
+      console.error('Error creating offer:', error)
+      alert(error instanceof Error ? error.message : 'Failed to create offer. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const tokens = ['EUR', 'USD', 'GBP', 'BTC', 'ETH', 'USDC', 'USDT']
@@ -292,9 +340,17 @@ export function CreateOfferPage() {
                   <div className="flex justify-end pt-4">
                     <Button
                       type="submit"
-                      className="rounded-full px-8 py-3 bg-primary text-primary-foreground hover:bg-primary/90"
+                      disabled={isSubmitting}
+                      className="rounded-full px-8 py-3 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Create Offer
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        'Create Offer'
+                      )}
                     </Button>
                   </div>
                 </form>

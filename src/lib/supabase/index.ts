@@ -4,7 +4,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import { User, Offer, Trade, KYCApplication, Dispute, TradeRating } from '@/types/database'
+import type { User, Offer, KYCApplication, Dispute, TradeRating } from '@/types/database'
 
 // Environment variables (these should be set in .env.local)
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
@@ -591,12 +591,6 @@ export async function getUserIdFromSession() {
   const session = await getSession()
   return session?.user?.id
 }
-
-// =================================================================
-// EXPORT FOR ACCESSIBILITY
-// =================================================================
-
-export { supabase }
 
 // =================================================================
 // USAGE EXAMPLES

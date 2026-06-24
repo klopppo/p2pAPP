@@ -1,4 +1,4 @@
-import type { FC } from 'react'
+import type { FC, MouseEvent } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -8,11 +8,13 @@ interface Props {
   classes?: string
   animate?: boolean
   delay?: number
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => void
 }
 
-const MotionButton: FC<Props> = ({ label, classes }) => {
+const MotionButton: FC<Props> = ({ label, classes, onClick }) => {
   return (
     <button
+      onClick={onClick}
       className={cn(
         'bg-background group relative h-auto w-40 cursor-pointer rounded-full border-[none] p-1 outline-none',
         classes

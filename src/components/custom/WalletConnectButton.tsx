@@ -25,17 +25,17 @@ export function WalletConnectButton() {
   }
 
   if (!isConnected) {
-    return (
-      <button onClick={openConnectModal} className="cursor-pointer">
-        {connectModalOpen ? (
-          <div className="flex items-center gap-2 h-10 px-4 bg-background text-foreground border border-border rounded-full">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm">Connecting...</span>
-          </div>
-        ) : (
-          <MotionButton label="Connect Wallet" classes="bg-background text-foreground border border-border" />
-        )}
-      </button>
+    return connectModalOpen ? (
+      <div className="flex items-center gap-2 h-10 px-4 bg-background text-foreground border border-border rounded-full">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span className="text-sm">Connecting...</span>
+      </div>
+    ) : (
+      <MotionButton
+        label="Connect Wallet"
+        classes="bg-background text-foreground border border-border"
+        onClick={openConnectModal}
+      />
     )
   }
 
