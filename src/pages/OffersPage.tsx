@@ -1,5 +1,5 @@
 import { useState, useTransition, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -77,6 +77,7 @@ function generateMoreOffers(offset: number, count: number): Offer[] {
 }
 
 export function OffersPage() {
+  const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [tokenFilter, setTokenFilter] = useState('all')
@@ -270,7 +271,8 @@ export function OffersPage() {
                     {filteredOffers.map((offer) => (
                       <TableRow
                         key={offer.id}
-                        className="hover:bg-muted/50 transition-colors border-b border-border/50"
+                        onClick={() => navigate(`/app/trade/${offer.id}`)}
+                        className="hover:bg-muted/50 transition-colors border-b border-border/50 cursor-pointer"
                       >
                         <TableCell>
                           <div className="flex items-center gap-2">

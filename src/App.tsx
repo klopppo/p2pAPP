@@ -11,6 +11,7 @@ import { EditProfilePage } from './pages/EditProfilePage'
 import { ChatPage } from './pages/ChatPage'
 import { CreateOfferPage } from './pages/CreateOfferPage'
 import { OpenOfferPage } from './pages/OpenOfferPage'
+import { TradePage } from './pages/TradePage'
 import { AppLayout } from './components/layout/AppLayout'
 import { UserSync } from './hooks/useSyncUser'
 
@@ -36,6 +37,7 @@ function App() {
                 <Route path="messages/:userId" element={<ChatPage />} />
                 <Route path="create-offer" element={<CreateOfferPage />} />
                 <Route path="offer/:id" element={<OpenOfferPage />} />
+        <Route path="trade/:id" element={<TradePage />} />
               </Route>
             </Routes>
           </BrowserRouter>
@@ -45,4 +47,4 @@ function App() {
   )
 }
 
-export default App
+export default App;
