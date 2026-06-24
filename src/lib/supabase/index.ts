@@ -126,14 +126,17 @@ export async function upsertUser(
 ) {
   const { data, error } = await supabase
     .from('users')
-    .upsert({
-      wallet_address: walletAddress.toLowerCase(),
-      nickname: nickname || null,
-      avatar_url: avatarUrl || null,
-      bio: bio || null,
-      location: location || null,
-      last_active_at: new Date().toISOString(),
-    })
+    .upsert(
+      {
+        wallet_address: walletAddress.toLowerCase(),
+        nickname: nickname || null,
+        avatar_url: avatarUrl || null,
+        bio: bio || null,
+        location: location || null,
+        last_active_at: new Date().toISOString(),
+      },
+      { onConflict: 'wallet_address' }
+    )
     .select()
     .single()
 

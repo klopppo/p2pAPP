@@ -12,6 +12,7 @@ import { ChatPage } from './pages/ChatPage'
 import { CreateOfferPage } from './pages/CreateOfferPage'
 import { OpenOfferPage } from './pages/OpenOfferPage'
 import { AppLayout } from './components/layout/AppLayout'
+import { UserSync } from './hooks/useSyncUser'
 
 const queryClient = new QueryClient()
 
@@ -23,6 +24,7 @@ function App() {
           accentColor: 'hsl(var(--primary))',
           borderRadius: 'large',
         })}>
+          <UserSync />
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<LandingPage />} />
