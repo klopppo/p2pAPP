@@ -14,4 +14,8 @@ export default defineConfig({
     },
     dedupe: ["react", "react-dom"],
   },
+  define: {
+    'process.env': '{}',
+    global: 'globalThis',
+  },
 })
