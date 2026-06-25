@@ -41,18 +41,27 @@ Defined in [`src/index.css`](src/index.css) as CSS vars, surfaced to Tailwind vi
 
 ## Layout & Spacing
 
-- App shell: [`AppLayout`](src/components/layout/AppLayout.tsx) → wraps each page in [`PageContainer`](src/components/layout/PageContainer.tsx): `max-w-[1100px] mx-auto px-4 md:px-6 w-full`. Pages render inside this; do NOT add another `max-w`/centering wrapper.
-- **Page root:** `<section className="py-8 space-y-8">` (ProfilePage) or `<section className="py-8">` with internal `mb-6` blocks (OffersPage). Top/bottom padding `py-8`.
-- **Page header:** flex row, `items-center justify-between`, title block left + action button right, `mb-6`:
-  ```tsx
-  <div className="flex items-center justify-between mb-6">
-    <div>
-      <Text variant="h3">Title</Text>
-      <Text variant="muted">Subtitle</Text>
-    </div>
-    <Button className="rounded-full shadow-none">Action</Button>
-  </div>
-  ```
+- App shell: [`AppLayout`](src/components/layout/AppLayout.tsx) → wraps each page in [`PageContainer`](src/components/layout/PageContainer.tsx) `type="app"`: `max-w-[1000px] mx-auto px-4 md:px-6 py-8 w-full`. **The `py-8` top/bottom padding is already applied here — do NOT add `py-8`/`mt-8`/`mb-8` on the page root.** Pages render inside this; do NOT add another outer `max-w`/centering wrapper.
+- **Page root:** bare `<section className="space-y-8">` (no padding). Only narrow centered content (forms, detail cards) wraps in an inner `<div className="max-w-xl mx-auto space-y-N">` — header included so its back button aligns to that column.
+- **Page header:** use [`AppPageHeader`](src/components/custom/AppPageHeader.tsx) — do NOT hand-roll header markup. Two variants:
+  - `variant="split"` — title + subtitle left, optional `action` node right (list pages, e.g. OffersPage):
+    ```tsx
+    <AppPageHeader
+      title="Offers"
+      subtitle="Browse and create trade offers"
+      variant="split"
+      action={<Button className="rounded-full shadow-none">Create Offer</Button>}
+    />
+    ```
+  - `variant="centered"` — back button left, title + subtitle absolutely centered (detail/form pages, e.g. TradePage, CreateOfferPage, EditProfilePage). Place it INSIDE the `max-w-xl` column so the back button indents to the column, not flush to the viewport:
+    ```tsx
+    <AppPageHeader
+      title="Title"
+      subtitle="subtitle"
+      variant="centered"
+      onBack={() => navigate(-1)}
+    />
+    ```
 - **Section gaps:** `space-y-8` between major sections; `gap-4` in grids; `gap-3` between inline controls.
 - **Responsive:** mobile-first. `flex-col md:flex-row`, `grid-cols-1 md:grid-cols-2`.
 
@@ -103,28 +112,22 @@ Default `variant="body"`.
 - Status badge (e.g. "Online"): custom `bg-green-500 text-white hover:bg-green-600`.
 
 ### Dropdowns / Filters
-**Only** [`src/components/ui/dropdown-menu.tsx`](src/components/ui/dropdown-menu.tsx). Pattern (OffersPage filter buttons):
+**Default to [`FullDropdown`](src/components/custom/FullDropdown.tsx)** for all filter/selector dropdowns going forward. One reusable component over hand-assembling `DropdownMenu*` each time. Pill trigger (`label: value` + rotating `ChevronDown`), `cursor-pointer` items, `Check` on active option:
 ```tsx
-<DropdownMenu>
-  <DropdownMenuTrigger asChild>
-    <Button variant="outline" className="rounded-full border-border shadow-none">
-      Filter: {value}
-    </Button>
-  </DropdownMenuTrigger>
-  <DropdownMenuContent align="start">
-    <DropdownMenuGroup>
-      <DropdownMenuItem onSelect={() => setValue(opt)}>
-        {label}
-        {value === opt && <Check className="w-4 h-4 ml-auto" />}
-      </DropdownMenuItem>
-    </DropdownMenuGroup>
-  </DropdownMenuContent>
-</DropdownMenu>
+<FullDropdown
+  label="Type"
+  value={typeFilter}
+  onSelect={setTypeFilter}
+  options={[
+    { label: 'All', value: 'all' },
+    { label: 'Buy', value: 'buy' },
+    { label: 'Sell', value: 'sell' },
+  ]}
+/>
 ```
-- Use `onSelect` (not `onClick`) on items.
-- Show selected state with `<Check className="w-4 h-4 ml-auto" />`.
-- Items are `cursor-pointer`, hover = `bg-accent`.
-- For links inside menus: `<DropdownMenuItem asChild><a href={...}>...</a></DropdownMenuItem>`.
+- Props: `label`, `value`, `options: {label, value, icon?}[]`, `onSelect`, optional `icon` (trigger), `align`, `sideOffset`.
+- Items are `cursor-pointer`, hover = `bg-accent`, active option shows `<Check>`.
+- Reach for the raw [`dropdown-menu.tsx`](src/components/ui/dropdown-menu.tsx) primitives only when `FullDropdown` can't express the layout (separators, submenus, multi-group menus like the Navbar profile menu). Then use `onSelect` on items and `asChild`+`<a>` for links.
 
 ### Inputs
 Pill search: `<Input className="max-w-xs rounded-full border-border" />`. Pill number inputs: `rounded-full border border-border`.
@@ -140,9 +143,10 @@ Pill search: `<Input className="max-w-xs rounded-full border-border" />`. Pill n
 ## Building a new page — checklist
 
 1. Wrap in `AppLayout` route (see [`App.tsx`](src/App.tsx)). No manual `max-w` container.
-2. Root `<section className="py-8 space-y-8">`.
-3. Page header block (title `variant="h3"` + `variant="muted"`, action button `rounded-full shadow-none`).
-4. Use `Text`, `Button`, `Card`, `Table`, `Badge`, `DropdownMenu` from `components/ui/` — no raw equivalents.
-5. Color = tokens only. Radius = `rounded-2xl` cards, `rounded-full` buttons/badges/inputs, `rounded-xl` rows.
-6. Mono font for addresses/numbers (`font-mono`).
-7. Verify in both light and dark (toggle `.dark`).
+2. Root `<section className="space-y-8">` — **no `py-8`**, padding comes from `PageContainer`.
+3. Header via [`AppPageHeader`](src/components/custom/AppPageHeader.tsx) — `variant="split"` for list pages, `variant="centered"` for detail/form pages.
+4. Use `Text`, `Button`, `Card`, `Table`, `Badge` from `components/ui/` — no raw equivalents.
+5. Dropdowns: [`FullDropdown`](src/components/custom/FullDropdown.tsx) by default (raw `DropdownMenu*` only when FullDropdown can't fit).
+6. Color = tokens only. Radius = `rounded-2xl` cards, `rounded-full` buttons/badges/inputs, `rounded-xl` rows.
+7. Mono font for addresses/numbers (`font-mono`).
+8. Verify in both light and dark (toggle `.dark`).

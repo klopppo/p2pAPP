@@ -14,15 +14,11 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { OffersTableWrapper } from '@/components/custom/OffersTableWrapper'
 import { Text } from '@/components/ui/text'
+import { AppPageHeader } from '@/components/custom/AppPageHeader'
+import { SellerHoverCard, type SellerPreview } from '@/components/custom/SellerHoverCard'
+import { FullDropdown } from '@/components/custom/FullDropdown'
 import { MaskedList, useInfiniteList } from '@/components/infinite-list'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { ArrowUpDown, Check } from 'lucide-react'
+import { ArrowUpDown } from 'lucide-react'
 
 interface Offer {
   id: number
@@ -36,6 +32,7 @@ interface Offer {
   minAmount: number
   maxAmount: number
   isPositive: boolean
+  seller: SellerPreview
 }
 
 type SortKey = 'price' | 'minAmount' | 'maxAmount'
@@ -51,13 +48,35 @@ const generateOffer = (index: number): Offer => {
   const price = basePrice + (Math.random() * 100 - 50)
   const hex = () => Math.floor(Math.random() * 16).toString(16)
   const trader = `0x${Array.from({ length: 16 }, hex).join('')}`
+  const trades = Math.floor(Math.random() * 300)
   const minAmount = Math.floor(Math.random() * 500) + 10
   const maxAmount = minAmount + Math.floor(Math.random() * 5000) + 100
+
+  // Mock seller data
+  const names = ['CryptoKing', 'FastTrader', 'TrustSeller', 'QuickSwap', 'SafeTrade']
+  const ratings = [4.5, 4.7, 4.9, 4.95, 5.0]
+  const completionRates = ['95%', '98%', '100%', '100%', '99%']
+  const tagsOptions = [
+    ['Fast', 'Verified'],
+    ['No KYC', 'Trusted'],
+    ['Instant'],
+    ['Fast', 'No KYC'],
+    ['Verified'],
+  ]
+
+  const seller: SellerPreview = {
+    name: names[index % names.length],
+    address: trader,
+    rating: ratings[index % ratings.length],
+    totalTrades: trades,
+    completionRate: completionRates[index % completionRates.length],
+    tags: tagsOptions[index % tagsOptions.length],
+  }
 
   return {
     id: index + 1,
     trader,
-    trades: Math.floor(Math.random() * 300),
+    trades,
     type,
     token,
     amount: token === 'BTC' ? (Math.random() * 2).toFixed(3) : token === 'ETH' ? (Math.random() * 10).toFixed(2) : Math.floor(Math.random() * 50000).toString(),
@@ -66,6 +85,7 @@ const generateOffer = (index: number): Offer => {
     minAmount,
     maxAmount,
     isPositive,
+    seller,
   }
 }
 
@@ -137,17 +157,18 @@ export function OffersPage() {
   )
 
   return (
-    <section className="py-8">
+    <section>
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <Text variant="h3">Offers</Text>
-                <Text variant="muted">Browse and create trade offers</Text>
-              </div>
-              <Link to="/app/create-offer">
-                <Button className="rounded-full shadow-none">Create Offer</Button>
-              </Link>
-            </div>
+            <AppPageHeader
+              title="Offers"
+              subtitle="Browse and create trade offers"
+              variant="split"
+              action={
+                <Link to="/app/create-offer">
+                  <Button className="rounded-full shadow-none">Create Offer</Button>
+                </Link>
+              }
+            />
 
             {/* Filters */}
             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
@@ -158,92 +179,38 @@ export function OffersPage() {
                 className="max-w-xs rounded-full border-border"
               />
               <div className="flex items-center gap-3">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="rounded-full border-border shadow-none"
-                    >
-                      Type: {typeFilter}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuGroup>
-                      <DropdownMenuItem onSelect={() => setTypeFilter('all')}>
-                        All
-                        {typeFilter === 'all' && <Check className="w-4 h-4 ml-auto" />}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setTypeFilter('buy')}>
-                        Buy
-                        {typeFilter === 'buy' && <Check className="w-4 h-4 ml-auto" />}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setTypeFilter('sell')}>
-                        Sell
-                        {typeFilter === 'sell' && <Check className="w-4 h-4 ml-auto" />}
-                      </DropdownMenuItem>
-                    </DropdownMenuGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="rounded-full border-border shadow-none"
-                    >
-                      Token: {tokenFilter}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuGroup>
-                      <DropdownMenuItem onSelect={() => setTokenFilter('all')}>
-                        All
-                        {tokenFilter === 'all' && <Check className="w-4 h-4 ml-auto" />}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setTokenFilter('ETH')}>
-                        ETH
-                        {tokenFilter === 'ETH' && <Check className="w-4 h-4 ml-auto" />}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setTokenFilter('BTC')}>
-                        BTC
-                        {tokenFilter === 'BTC' && <Check className="w-4 h-4 ml-auto" />}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setTokenFilter('USDC')}>
-                        USDC
-                        {tokenFilter === 'USDC' && <Check className="w-4 h-4 ml-auto" />}
-                      </DropdownMenuItem>
-                    </DropdownMenuGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="rounded-full border-border shadow-none"
-                    >
-                      Payment: {paymentFilter}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuGroup>
-                      <DropdownMenuItem onSelect={() => setPaymentFilter('all')}>
-                        All
-                        {paymentFilter === 'all' && <Check className="w-4 h-4 ml-auto" />}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setPaymentFilter('bank')}>
-                        Bank Transfer
-                        {paymentFilter === 'bank' && <Check className="w-4 h-4 ml-auto" />}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setPaymentFilter('paypal')}>
-                        PayPal
-                        {paymentFilter === 'paypal' && <Check className="w-4 h-4 ml-auto" />}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setPaymentFilter('wise')}>
-                        Wise
-                        {paymentFilter === 'wise' && <Check className="w-4 h-4 ml-auto" />}
-                      </DropdownMenuItem>
-                    </DropdownMenuGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <FullDropdown
+                  label="Type"
+                  value={typeFilter}
+                  onSelect={setTypeFilter}
+                  options={[
+                    { label: 'All', value: 'all' },
+                    { label: 'Buy', value: 'buy' },
+                    { label: 'Sell', value: 'sell' },
+                  ]}
+                />
+                <FullDropdown
+                  label="Token"
+                  value={tokenFilter}
+                  onSelect={setTokenFilter}
+                  options={[
+                    { label: 'All', value: 'all' },
+                    { label: 'ETH', value: 'ETH' },
+                    { label: 'BTC', value: 'BTC' },
+                    { label: 'USDC', value: 'USDC' },
+                  ]}
+                />
+                <FullDropdown
+                  label="Payment"
+                  value={paymentFilter}
+                  onSelect={setPaymentFilter}
+                  options={[
+                    { label: 'All', value: 'all' },
+                    { label: 'Bank Transfer', value: 'bank' },
+                    { label: 'PayPal', value: 'paypal' },
+                    { label: 'Wise', value: 'wise' },
+                  ]}
+                />
               </div>
             </div>
 
@@ -275,21 +242,23 @@ export function OffersPage() {
                         className="hover:bg-muted/50 transition-colors border-b border-border/50 cursor-pointer"
                       >
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-8 w-8">
-                              <AvatarFallback>
-                                {offer.trader.slice(2, 4).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <div className="font-mono text-sm">
-                                {offer.trader.slice(0, 6)}...{offer.trader.slice(-4)}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {offer.trades} trades
+                          <SellerHoverCard seller={offer.seller}>
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback>
+                                  {offer.trader.slice(2, 4).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="font-mono text-sm">
+                                  {offer.trader.slice(0, 6)}...{offer.trader.slice(-4)}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {offer.trades} trades
+                                </div>
                               </div>
                             </div>
-                          </div>
+                          </SellerHoverCard>
                         </TableCell>
                         <TableCell>
                           <Badge

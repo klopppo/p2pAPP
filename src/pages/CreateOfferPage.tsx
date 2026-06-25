@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
-import { Text } from '@/components/ui/text'
+import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -107,13 +107,15 @@ export function CreateOfferPage() {
   const locations = ['Italy', 'Germany', 'France', 'Spain', 'Global']
 
   return (
-    <section className="py-8">
-      <div className="w-full max-w-xl mx-auto mt-8">
+      <div className="w-full max-w-xl mx-auto">
         {/* Centered Header Block */}
-        <div className="text-center mb-8">
-          <Text variant="h3">Create New Offer</Text>
-          <Text variant="muted" className="mt-1">Browse and create trade offers</Text>
-        </div>
+        <AppPageHeader
+          title="Create New Offer"
+          subtitle="Browse and create trade offers"
+          variant="centered"
+          onBack={() => navigate(-1)}
+          className="mb-8"
+        />
 
         {/* Centered Card */}
         <Card className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl">
@@ -356,6 +358,5 @@ export function CreateOfferPage() {
                 </form>
         </Card>
       </div>
-    </section>
   )
 }

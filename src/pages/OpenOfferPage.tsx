@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Text } from '@/components/ui/text'
+import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Clock, Shield, AlertTriangle } from 'lucide-react'
 
@@ -64,11 +65,12 @@ export function OpenOfferPage() {
   }
 
   return (
-    <section className="py-8">
-            <div className="mb-6">
-              <Text variant="h3">View Offer</Text>
-              <Text variant="muted">Review the offer details and decide if you want to accept</Text>
-            </div>
+    <section>
+            <AppPageHeader
+              title="View Offer"
+              subtitle="Review the offer details and decide if you want to accept"
+              variant="split"
+            />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Offer Details */}

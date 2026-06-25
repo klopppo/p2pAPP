@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { Text } from '@/components/ui/text'
+import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
@@ -68,12 +69,14 @@ export function EditProfilePage() {
     setPrivateData({ ...privateData, [key]: value })
 
   return (
-    <section className="py-6">
       <div className="w-full max-w-xl mx-auto">
-        <div className="text-center mb-4">
-          <Text variant="h3">Edit Profile</Text>
-          <Text variant="muted" className="mt-1">Update your public and private information</Text>
-        </div>
+        <AppPageHeader
+          title="Edit Profile"
+          subtitle="Update your public and private information"
+          variant="centered"
+          onBack={() => navigate(-1)}
+          className="mb-4"
+        />
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Public Information */}
@@ -294,6 +297,5 @@ export function EditProfilePage() {
           </div>
         </form>
       </div>
-    </section>
   )
 }

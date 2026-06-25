@@ -120,7 +120,7 @@ export function ProfilePage({ isOwn = false }: { isOwn?: boolean }) {
   }, [userOffers, sortKey, sortDir])
 
   return (
-    <section className="py-8 space-y-8">
+    <section className="space-y-8">
             {/* Profile Header */}
             <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
               <Avatar className="h-24 w-24">

@@ -7,7 +7,8 @@ import { Text } from '@/components/ui/text'
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowLeft, ShieldCheck, Clock, Globe, Tag } from 'lucide-react'
+import { AppPageHeader } from '@/components/custom/AppPageHeader'
+import { ShieldCheck, Clock, Globe, Tag } from 'lucide-react'
 
 interface OfferDetail {
   id: number
@@ -80,28 +81,19 @@ export function TradePage() {
   const feePercent = (OFFER.platformFeeBps / 100).toFixed(2)
 
   return (
-    <section className="py-8 space-y-8">
-      {/* Header — back on left, title centered */}
-      <div className="relative flex items-center">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate(-1)}
-          className="rounded-full shadow-none"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <div className="absolute left-1/2 -translate-x-1/2 text-center">
-          <Text variant="h3" className="leading-tight">Buy ETH</Text>
-          <Text variant="small" className="text-muted-foreground">sell · Offer #{OFFER.id}</Text>
-        </div>
-      </div>
-
-      {/* Centered column — card + actions share the same constrained width */}
-      <div className="max-w-xl mx-auto space-y-4">
+    <section className="space-y-8">
+      {/* Centered column — header + cards share the same constrained width */}
+      <div className="max-w-xl mx-auto space-y-6">
+        <AppPageHeader
+          title="Buy ETH"
+          subtitle={`sell · Offer #${OFFER.id}`}
+          variant="centered"
+          onBack={() => navigate(-1)}
+        />
+        <div className="space-y-4">
         {/* Unified main card: seller header + offer details + description */}
         <Card>
-          <CardContent className="px-6 py-6 space-y-6">
+          <CardContent className="space-y-6">
             {/* Seller header — cohesive row */}
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
               <div className="flex items-center gap-3">
@@ -195,7 +187,7 @@ export function TradePage() {
 
         {/* Trade input card */}
         <Card>
-          <CardContent className="px-6 py-6 space-y-5">
+          <CardContent className="space-y-5">
             {/* Amount input + currency selector */}
             <div className="space-y-2">
               <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground">
@@ -237,6 +229,7 @@ export function TradePage() {
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
     </section>
   )
