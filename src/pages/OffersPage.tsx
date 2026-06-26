@@ -1,5 +1,6 @@
-import { useState, useTransition, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useOffers } from '@/hooks/useOffers'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -13,15 +14,14 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { OffersTableWrapper } from '@/components/custom/OffersTableWrapper'
-import { Text } from '@/components/ui/text'
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import { SellerHoverCard, type SellerPreview } from '@/components/custom/SellerHoverCard'
 import { FullDropdown } from '@/components/custom/FullDropdown'
 import { MaskedList, useInfiniteList } from '@/components/infinite-list'
-import { ArrowUpDown } from 'lucide-react'
+import { ArrowUpDown, Loader2 } from 'lucide-react'
 
 interface Offer {
-  id: number
+  id: string
   trader: string
   trades: number
   type: 'buy' | 'sell'
@@ -29,6 +29,7 @@ interface Offer {
   amount: string
   price: number
   priceDisplay: string
+  currency: string
   minAmount: number
   maxAmount: number
   isPositive: boolean
@@ -38,75 +39,97 @@ interface Offer {
 type SortKey = 'price' | 'minAmount' | 'maxAmount'
 type SortDir = 'asc' | 'desc'
 
-const generateOffer = (index: number): Offer => {
-  const tokens = ['ETH', 'BTC', 'USDC', 'USDT', 'DAI']
-  const types: ('buy' | 'sell')[] = ['buy', 'sell']
-  const token = tokens[index % tokens.length]
-  const type = types[index % 2]
-  const isPositive = index % 3 !== 2
-  const basePrice = token === 'BTC' ? 52000 : token === 'ETH' ? 2800 : 1
-  const price = basePrice + (Math.random() * 100 - 50)
-  const hex = () => Math.floor(Math.random() * 16).toString(16)
-  const trader = `0x${Array.from({ length: 16 }, hex).join('')}`
-  const trades = Math.floor(Math.random() * 300)
-  const minAmount = Math.floor(Math.random() * 500) + 10
-  const maxAmount = minAmount + Math.floor(Math.random() * 5000) + 100
+const CURRENCY_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
+const currencySymbol = (code: string) => CURRENCY_SYMBOLS[code] ?? `${code} `
 
-  // Mock seller data
-  const names = ['CryptoKing', 'FastTrader', 'TrustSeller', 'QuickSwap', 'SafeTrade']
-  const ratings = [4.5, 4.7, 4.9, 4.95, 5.0]
-  const completionRates = ['95%', '98%', '100%', '100%', '99%']
-  const tagsOptions = [
-    ['Fast', 'Verified'],
-    ['No KYC', 'Trusted'],
-    ['Instant'],
-    ['Fast', 'No KYC'],
-    ['Verified'],
-  ]
+// Shape returned by getActiveOffers() (select * + joined seller). NUMERIC
+// columns arrive as strings from PostgREST, so they are coerced with Number().
+interface OfferRow {
+  id: string
+  type: 'buy' | 'sell'
+  crypto_token: string
+  crypto_amount: number | string
+  fiat_currency: string
+  price_per_unit: number | string
+  min_amount: number | string
+  max_amount: number | string
+  tags?: string[] | null
+  seller?: {
+    wallet_address?: string
+    nickname?: string | null
+    avatar_url?: string | null
+    total_trades?: number
+    avg_rating?: number | string | null
+  } | null
+}
 
-  const seller: SellerPreview = {
-    name: names[index % names.length],
-    address: trader,
-    rating: ratings[index % ratings.length],
-    totalTrades: trades,
-    completionRate: completionRates[index % completionRates.length],
-    tags: tagsOptions[index % tagsOptions.length],
-  }
-
+function mapOfferRow(o: OfferRow): Offer {
+  const price = Number(o.price_per_unit) || 0
+  const sellerAddr = o.seller?.wallet_address ?? '0x0'
+  const symbol = currencySymbol(o.fiat_currency)
   return {
-    id: index + 1,
-    trader,
-    trades,
-    type,
-    token,
-    amount: token === 'BTC' ? (Math.random() * 2).toFixed(3) : token === 'ETH' ? (Math.random() * 10).toFixed(2) : Math.floor(Math.random() * 50000).toString(),
+    id: o.id,
+    trader: sellerAddr,
+    trades: o.seller?.total_trades ?? 0,
+    type: o.type,
+    token: o.crypto_token,
+    amount: String(o.crypto_amount ?? 0),
     price,
-    priceDisplay: token === 'USDC' || token === 'USDT' || token === 'DAI' ? '$1.00' : `$${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-    minAmount,
-    maxAmount,
-    isPositive,
-    seller,
+    priceDisplay: `${symbol}${price.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`,
+    currency: symbol,
+    minAmount: Number(o.min_amount) || 0,
+    maxAmount: Number(o.max_amount) || 0,
+    isPositive: o.type === 'buy',
+    seller: {
+      name: o.seller?.nickname ?? sellerAddr,
+      address: sellerAddr,
+      avatar: o.seller?.avatar_url ?? undefined,
+      rating: Number(o.seller?.avg_rating) || 0,
+      totalTrades: o.seller?.total_trades ?? 0,
+      completionRate: '—',
+      tags: o.tags ?? [],
+    },
   }
 }
 
 const PAGE_SIZE = 10
-const INITIAL_OFFERS = Array.from({ length: PAGE_SIZE }, (_, i) => generateOffer(i))
 
-function generateMoreOffers(offset: number, count: number): Offer[] {
-  return Array.from({ length: count }, (_, i) => generateOffer(offset + i))
+function SortableHeader({
+  label,
+  sortField,
+  sortKey,
+  onToggle,
+}: {
+  label: string
+  sortField: SortKey
+  sortKey: SortKey | null
+  onToggle: (key: SortKey) => void
+}) {
+  return (
+    <button
+      onClick={() => onToggle(sortField)}
+      className="inline-flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer"
+    >
+      {label}
+      <ArrowUpDown className={`w-3.5 h-3.5 ${sortKey === sortField ? 'text-foreground' : 'text-muted-foreground/50'}`} />
+    </button>
+  )
 }
 
 export function OffersPage() {
   const navigate = useNavigate()
+  const { data, isLoading, isError } = useOffers()
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [tokenFilter, setTokenFilter] = useState('all')
   const [paymentFilter, setPaymentFilter] = useState('all')
-  const [offers, setOffers] = useState<Offer[]>(INITIAL_OFFERS)
-  const [isPending, startTransition] = useTransition()
+  const offers = useMemo<Offer[]>(() => (data ?? []).map(mapOfferRow), [data])
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>('asc')
-  const list = useInfiniteList({ pageSize: PAGE_SIZE, initialItems: INITIAL_OFFERS })
+  const list = useInfiniteList({ pageSize: PAGE_SIZE })
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -140,21 +163,7 @@ export function OffersPage() {
 
   const loadMore = () => {
     list.nextPage()
-    startTransition(() => {
-      const newOffers = generateMoreOffers(list.offset, PAGE_SIZE)
-      setOffers((prev) => [...prev, ...newOffers])
-    })
   }
-
-  const SortableHeader = ({ label, sortField }: { label: string; sortField: SortKey }) => (
-    <button
-      onClick={() => toggleSort(sortField)}
-      className="inline-flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer"
-    >
-      {label}
-      <ArrowUpDown className={`w-3.5 h-3.5 ${sortKey === sortField ? 'text-foreground' : 'text-muted-foreground/50'}`} />
-    </button>
-  )
 
   return (
     <section>
@@ -223,22 +232,42 @@ export function OffersPage() {
                     <TableHead>Type</TableHead>
                     <TableHead>Token</TableHead>
                     <TableHead className="text-right">
-                      <SortableHeader label="Price" sortField="price" />
+                      <SortableHeader label="Price" sortField="price" sortKey={sortKey} onToggle={toggleSort} />
                     </TableHead>
                     <TableHead className="text-right">
-                      <SortableHeader label="Min Amount" sortField="minAmount" />
+                      <SortableHeader label="Min Amount" sortField="minAmount" sortKey={sortKey} onToggle={toggleSort} />
                     </TableHead>
                     <TableHead className="text-right">
-                      <SortableHeader label="Max Amount" sortField="maxAmount" />
+                      <SortableHeader label="Max Amount" sortField="maxAmount" sortKey={sortKey} onToggle={toggleSort} />
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  {isLoading ? (
+                    <TableRow className="border-b border-border/50">
+                      <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                        <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />
+                        Loading offers…
+                      </TableCell>
+                    </TableRow>
+                  ) : isError ? (
+                    <TableRow className="border-b border-border/50">
+                      <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                        Couldn’t load offers. Please try again.
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredOffers.length === 0 ? (
+                    <TableRow className="border-b border-border/50">
+                      <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                        No offers match your filters.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
                   <MaskedList {...list}>
                     {filteredOffers.map((offer) => (
                       <TableRow
                         key={offer.id}
-                        onClick={() => navigate(`/app/trade/${offer.id}`)}
+                        onClick={() => navigate(`/app/offer/${offer.id}`)}
                         className="hover:bg-muted/50 transition-colors border-b border-border/50 cursor-pointer"
                       >
                         <TableCell>
@@ -270,11 +299,12 @@ export function OffersPage() {
                         </TableCell>
                         <TableCell className="font-medium">{offer.token}</TableCell>
                         <TableCell className="text-right font-mono">{offer.priceDisplay}</TableCell>
-                        <TableCell className="text-right font-mono">${offer.minAmount.toLocaleString()}</TableCell>
-                        <TableCell className="text-right font-mono">${offer.maxAmount.toLocaleString()}</TableCell>
+                        <TableCell className="text-right font-mono">{offer.currency}{offer.minAmount.toLocaleString()}</TableCell>
+                        <TableCell className="text-right font-mono">{offer.currency}{offer.maxAmount.toLocaleString()}</TableCell>
                       </TableRow>
                     ))}
                   </MaskedList>
+                  )}
                 </TableBody>
               </Table>
             </OffersTableWrapper>
@@ -284,14 +314,15 @@ export function OffersPage() {
               <div className="text-sm text-muted-foreground">
                 Showing {Math.min(list.displayLimit, filteredOffers.length)} of {filteredOffers.length} offers
               </div>
-              <Button
-                onClick={loadMore}
-                disabled={isPending}
-                variant="outline"
-                className="rounded-full shadow-none"
-              >
-                {isPending ? 'Loading...' : 'Load More'}
-              </Button>
+              {list.displayLimit < filteredOffers.length && (
+                <Button
+                  onClick={loadMore}
+                  variant="outline"
+                  className="rounded-full shadow-none"
+                >
+                  Load More
+                </Button>
+              )}
             </div>
           </section>
   )

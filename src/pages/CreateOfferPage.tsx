@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAccount } from 'wagmi'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
@@ -13,7 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
 import { Check, ChevronDown, Loader2 } from 'lucide-react'
-import { createOffer, supabase } from '@/lib/supabase'
+import { createOffer, upsertUser } from '@/lib/supabase'
 
 interface OfferForm {
   type: 'buy' | 'sell'
@@ -30,6 +32,7 @@ interface OfferForm {
 
 export function CreateOfferPage() {
   const navigate = useNavigate()
+  const { address, isConnected } = useAccount()
   const [formData, setFormData] = useState<OfferForm>({
     type: 'buy',
     token: 'EUR',
@@ -47,20 +50,26 @@ export function CreateOfferPage() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+
+    // This app is wallet-based (no Supabase Auth session for wallet users),
+    // so we resolve the seller from the connected wallet: upsert (idempotent
+    // sync, also covers the connect-time sync) returns the user row with id.
+    if (!isConnected || !address) {
+      toast.error('Connect your wallet to create an offer.')
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
-      // Get user ID from session
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.user) {
-        throw new Error('User not authenticated. Please sign in first.')
-      }
-
-      const userId = session.user.id
+      const me = await upsertUser(address)
 
       // Prepare offer data
+      // NOTE: available_regions is CHAR(2)[] (ISO country codes), so map the
+      // human-readable location. grace_period_hours has no DB column, so it is
+      // intentionally not sent (the form field stays for future use).
       const offerData = {
-        seller_id: userId,
+        seller_id: me.id,
         type: formData.type,
         crypto_token: formData.token,
         crypto_amount: formData.maxAmount, // Using max amount for now
@@ -70,25 +79,25 @@ export function CreateOfferPage() {
         min_amount: formData.minAmount,
         max_amount: formData.maxAmount,
         payment_methods: [formData.paymentMethod],
-        available_regions: formData.location === 'Global' ? [] : [formData.location],
+        available_regions:
+          formData.location === 'Global' ? [] : [REGION_CODES[formData.location] ?? formData.location.slice(0, 2).toUpperCase()],
         platform_fee_bps: 50, // 0.5%
         network_fee: 0,
         tags: [formData.location],
         featured: false,
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // Expires in 7 days
-        grace_period_hours: formData.gracePeriod
       }
 
       // Create offer in database
-      const createdOffer = await createOffer(offerData)
-      console.log('Offer created successfully:', createdOffer)
+      await createOffer(offerData)
 
-      // Show success message and navigate
-      alert('Offer created successfully!')
+      toast.success('Offer created successfully!')
       navigate('/app/offers')
     } catch (error) {
       console.error('Error creating offer:', error)
-      alert(error instanceof Error ? error.message : 'Failed to create offer. Please try again.')
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to create offer. Please try again.'
+      )
     } finally {
       setIsSubmitting(false)
     }
@@ -105,6 +114,13 @@ export function CreateOfferPage() {
     'Cash'
   ]
   const locations = ['Italy', 'Germany', 'France', 'Spain', 'Global']
+  // offers.available_regions is CHAR(2)[] (ISO 3166-1 alpha-2 country codes).
+  const REGION_CODES: Record<string, string> = {
+    Italy: 'IT',
+    Germany: 'DE',
+    France: 'FR',
+    Spain: 'ES',
+  }
 
   return (
       <div className="w-full max-w-xl mx-auto">

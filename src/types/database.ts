@@ -205,6 +205,10 @@ export interface Trade {
   id: string
   trade_id: string
   offer_id: string | null
+  status: TradeStatus
+
+  buyer_id: string
+  seller_id: string
 
   // Trading details
   crypto_token: string
@@ -220,7 +224,7 @@ export interface Trade {
   payment_details: Record<string, any>
 
   // Escrow contract details
-  escrow_contract_addr: string
+  escrow_contract_addr: string | null
   escrow_tx_hash: string | null
   escrow_status: EscrowStatus
 
@@ -247,6 +251,28 @@ export interface Trade {
   completed_at: string | null
   cancelled_at: string | null
   disputed_at: string | null
+}
+
+/**
+ * Input for creating a trade from an offer. `crypto_amount` is derived from the
+ * entered `fiat_amount` and the offer's `price_per_unit`; the DB recomputes
+ * `crypto_total` via its generated column.
+ */
+export interface CreateTradeInput {
+  offer_id: string | null
+  buyer_id: string
+  seller_id: string
+  crypto_token: string
+  crypto_amount: number
+  crypto_price_per_unit: number
+  fiat_currency: string
+  fiat_amount: number
+  payment_method: string
+  payment_details?: Record<string, unknown>
+  platform_fee_bps: number
+  treasury_address?: string | null
+  /** Role of the user opening the trade — used for the offer_accepted event. */
+  taker_role: 'buyer' | 'seller'
 }
 
 export interface TradeRating {

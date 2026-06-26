@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { WagmiProvider } from 'wagmi'
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit'
+import { Toaster } from 'sonner'
 import '@rainbow-me/rainbowkit/styles.css'
 import { config } from './wagmi'
 import { LandingPage } from './pages/LandingPage'
@@ -43,6 +44,8 @@ function App() {
               </Route>
             </Routes>
           </BrowserRouter>
+          {/* Single, app-wide toast host. Use `toast` from 'sonner' anywhere. */}
+          <Toaster theme="dark" position="bottom-right" richColors closeButton />
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

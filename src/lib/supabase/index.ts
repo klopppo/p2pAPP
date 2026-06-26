@@ -3,8 +3,8 @@
  * @packageDocumentation
  */
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import type { User, Offer, KYCApplication, Dispute, TradeRating } from '@/types/database'
+import { createClient } from '@supabase/supabase-js'
+import type { User, Offer, KYCApplication, Dispute, TradeRating, CreateTradeInput } from '@/types/database'
 
 // Environment variables (these should be set in .env.local)
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
@@ -175,7 +175,7 @@ export async function getActiveOffers(limit = 50, offset = 0) {
     .from('offers')
     .select(`
       *,
-      seller:user!offers_seller_id_fkey (nickname, avatar_url, verification_level)
+      seller:user!offers_seller_id_fkey (wallet_address, nickname, avatar_url, verification_level, total_trades, avg_rating)
     `)
     .eq('status', OfferStatus.ACTIVE)
     .gte('expires_at', new Date().toISOString())
@@ -218,6 +218,42 @@ export async function getOffersBySeller(sellerId: string, status?: OfferStatus) 
 }
 
 /**
+ * Generate a client-side unique `offer_id`.
+ *
+ * offers.offer_id is VARCHAR(40) NOT NULL UNIQUE with no DB default, and the
+ * planned generate_offer_id() SQL function isn't deployed, so we mint one here.
+ * Format: OFF-<base36 timestamp><random> (~18 chars, well within 40).
+ */
+export function generateOfferId(): string {
+  return `OFF-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`.toUpperCase()
+}
+
+/**
+ * Get a single offer by its primary key (the `:id` route param), with the
+ * seller profile joined so TradePage / OpenOfferPage can render trader info.
+ */
+export async function getOfferById(id: string) {
+  const { data, error } = await supabase
+    .from('offers')
+    .select(`
+      *,
+      seller:user!offers_seller_id_fkey (wallet_address, nickname, avatar_url, verification_level, total_trades, avg_rating)
+    `)
+    .eq('id', id)
+    .single()
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return null
+    }
+    console.error('Error fetching offer:', error)
+    throw error
+  }
+
+  return data
+}
+
+/**
  * Create new offer
  */
 export async function createOffer(offerData: Partial<Offer>) {
@@ -225,6 +261,7 @@ export async function createOffer(offerData: Partial<Offer>) {
     .from('offers')
     .insert({
       ...offerData,
+      offer_id: offerData.offer_id ?? generateOfferId(),
       status: OfferStatus.ACTIVE,
       published_at: new Date().toISOString(),
     })
@@ -242,6 +279,17 @@ export async function createOffer(offerData: Partial<Offer>) {
 // =================================================================
 // TRADE QUERIES
 // =================================================================
+
+/**
+ * Generate a client-side unique `trade_id`.
+ *
+ * trades.trade_id is VARCHAR(40) NOT NULL UNIQUE with no DB default (same
+ * situation as offers.offer_id), so we mint one here.
+ * Format: TRD-<base36 timestamp><random> (~18 chars, well within 40).
+ */
+export function generateTradeId(): string {
+  return `TRD-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`.toUpperCase()
+}
 
 /**
  * Get active trades by buyer
@@ -319,6 +367,54 @@ export async function getTradeByTradeId(tradeId: string) {
 }
 
 /**
+ * Create a new trade from an offer.
+ *
+ * Escrow is DB-managed for now (no smart contract): escrow_contract_addr stays
+ * null and escrow_status starts at awaiting_deposit. The buyer/seller roles are
+ * resolved by the caller based on offer.type (the taker is the opposite party).
+ * Logs an `offer_accepted` event using the inserted row's UUID `id` (note:
+ * trade_events.trade_id is the UUID primary key, NOT the varchar trade_id).
+ */
+export async function createTrade(input: CreateTradeInput) {
+  const { data, error } = await supabase
+    .from('trades')
+    .insert({
+      trade_id: generateTradeId(),
+      offer_id: input.offer_id,
+      status: TradeStatus.ACTIVE,
+      buyer_id: input.buyer_id,
+      seller_id: input.seller_id,
+      crypto_token: input.crypto_token,
+      crypto_amount: input.crypto_amount,
+      crypto_price_per_unit: input.crypto_price_per_unit,
+      fiat_currency: input.fiat_currency,
+      fiat_amount: input.fiat_amount,
+      payment_method: input.payment_method,
+      payment_details: input.payment_details ?? {},
+      escrow_contract_addr: null,
+      escrow_status: EscrowStatus.AWAITING_DEPOSIT,
+      platform_fee_bps: input.platform_fee_bps,
+      treasury_address: input.treasury_address ?? null,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error creating trade:', error)
+    throw error
+  }
+
+  await logTradeEvent(
+    data.id,
+    'offer_accepted',
+    input.taker_role,
+    `Trade opened by ${input.taker_role}`
+  )
+
+  return data
+}
+
+/**
  * Update trade escrow status
  */
 export async function updateTradeEscrowStatus(
@@ -326,7 +422,7 @@ export async function updateTradeEscrowStatus(
   status: EscrowStatus,
   txHash?: string
 ) {
-  const updates: any = {
+  const updates: { escrow_status: EscrowStatus; escrow_tx_hash?: string } = {
     escrow_status: status,
   }
 
@@ -360,12 +456,12 @@ export async function logTradeEvent(
   eventType: string,
   actor: string,
   description?: string,
-  metadata?: any
+  metadata?: Record<string, unknown>
 ) {
   const { error } = await supabase.from('trade_events').insert({
     trade_id: tradeId,
-    type: eventType as any,
-    actor: actor as any,
+    type: eventType,
+    actor: actor,
     description: description || null,
     metadata: metadata || {},
   })

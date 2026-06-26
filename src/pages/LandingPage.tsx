@@ -214,10 +214,13 @@ export function LandingPage() {
                   <p className="text-base leading-relaxed text-muted-foreground mb-4">
                     Funds are locked in smart contracts, not our servers. Full control over your assets.
                   </p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="rounded-lg p-3 aspect-video bg-muted/40 border" />
-                    ))}
+                  <div className="rounded-xl overflow-hidden border bg-white flex items-center justify-center p-4">
+                    <img
+                      src="/non-custodial.jpg"
+                      alt="Your wallet locks funds directly in a smart-contract escrow — no custodian holds them"
+                      className="block w-auto max-w-full max-h-48 object-contain"
+                      loading="lazy"
+                    />
                   </div>
                 </Card>
 

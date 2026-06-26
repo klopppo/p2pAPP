@@ -18,9 +18,27 @@ export function WalletConnectButton() {
   const formatAddress = (addr: string) =>
     `${addr.slice(0, 6)}...${addr.slice(-4)}`
 
-  const copyAddress = () => {
-    if (address) {
-      navigator.clipboard.writeText(address)
+  const copyAddress = async () => {
+    if (!address) return
+    try {
+      // Async Clipboard API requires a secure context (HTTPS) and isn't
+      // available in every browser, so fall back to execCommand for the
+      // non-secure / older-browser cases.
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(address)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = address
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.focus()
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+      }
+    } catch {
+      // Swallow clipboard errors — copying is best-effort.
     }
   }
 
