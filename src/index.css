@@ -140,7 +140,7 @@ body {
   50% { transform: translateY(-8px); }
 }
 @keyframes ncg-flow-dash {
-  to { stroke-dashoffset: -32; }
+  to { stroke-dashoffset: -40; }
 }
 @keyframes ncg-pulse-slow {
   0%, 100% { opacity: 0.75; }
