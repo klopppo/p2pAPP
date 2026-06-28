@@ -133,3 +133,24 @@ body {
     @apply font-sans;
     }
 }
+
+/* Non-custodial graphic animations (see NonCustodialGraphic.tsx) */
+@keyframes ncg-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes ncg-flow-dash {
+  to { stroke-dashoffset: -32; }
+}
+@keyframes ncg-pulse-slow {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
+.ncg-float { animation: ncg-float 4s ease-in-out infinite; }
+.ncg-flow-dash { animation: ncg-flow-dash 1.2s linear infinite; }
+.ncg-pulse-slow { animation: ncg-pulse-slow 3s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .ncg-float,
+  .ncg-flow-dash,
+  .ncg-pulse-slow { animation: none; }
+}

@@ -5,6 +5,7 @@ import { Navbar } from '@/components/layout/Navbar'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { TypingEffect } from '@/components/ui/typing-effect'
 import InteractiveHoverButton from '@/components/ui/interactive-hover-button'
+import { NonCustodialGraphic } from '@/components/custom/NonCustodialGraphic'
 import {
   Shield,
   Users,
@@ -214,13 +215,8 @@ export function LandingPage() {
                   <p className="text-base leading-relaxed text-muted-foreground mb-4">
                     Funds are locked in smart contracts, not our servers. Full control over your assets.
                   </p>
-                  <div className="rounded-xl overflow-hidden border bg-white flex items-center justify-center p-4">
-                    <img
-                      src="/non-custodial.jpg"
-                      alt="Your wallet locks funds directly in a smart-contract escrow — no custodian holds them"
-                      className="block w-auto max-w-full max-h-48 object-contain"
-                      loading="lazy"
-                    />
+                  <div className="rounded-xl overflow-hidden border border-border bg-background flex items-center justify-center p-4">
+                    <NonCustodialGraphic className="block w-full max-w-md text-foreground" />
                   </div>
                 </Card>
 
