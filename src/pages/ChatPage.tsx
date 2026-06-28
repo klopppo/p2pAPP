@@ -73,7 +73,8 @@ export function ChatPage() {
   }, [])
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = messagesContainerRef.current
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }
 
   const selectPartner = (partner: ChatPartner) => {
@@ -131,8 +132,8 @@ export function ChatPage() {
   }
 
   return (
-    <section className="py-8">
-      <div className="flex h-[700px] max-h-[80vh]">
+    <section className="flex-1 flex flex-col min-h-0 -mb-8">
+      <div className="flex flex-1 min-h-0">
         {/* Left Sidebar - Identified by subtle background color, NO border */}
         <div className={`w-[380px] flex-shrink-0 bg-muted/60 backdrop-blur-sm ${selectedPartner ? 'hidden md:block' : 'w-full md:w-80'}`}>
           <div className="p-4">

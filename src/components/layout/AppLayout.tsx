@@ -18,7 +18,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       </div>*/}
 
       <Navbar showTabs />
-      <main className="flex-1">
+      <main className="flex-1 flex flex-col min-h-0">
         <PageContainer type="app">
           {children || <Outlet />}
         </PageContainer>

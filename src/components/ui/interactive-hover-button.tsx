@@ -37,7 +37,7 @@ export default function InteractiveHoverButton({
   return (
     <motion.button
       className={cn(
-        'group bg-background relative flex min-w-40 items-center justify-center overflow-hidden rounded-full border p-2 px-6 font-semibold',
+        'group bg-white relative flex min-w-34 items-center justify-center overflow-hidden rounded-full border p-2 px-4 font-semibold',
         status === 'loading' && 'px-2', // Circle shape when loading
         classes
       )}

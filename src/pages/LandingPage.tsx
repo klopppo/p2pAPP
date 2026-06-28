@@ -66,7 +66,7 @@ export function LandingPage() {
             </div>
             <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
               <Link to="/app/offers">
-                <InteractiveHoverButton text="Open App" classes="bg-primary text-primary-foreground" />
+                <InteractiveHoverButton text="Open App" classes="text-foreground" />
               </Link>
             </div>
           </div>
