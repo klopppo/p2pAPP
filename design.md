@@ -98,6 +98,24 @@ Default `variant="body"`.
 - Stat card pattern: eyebrow label (`variant="small" uppercase tracking-wider text-muted-foreground`) + big value (`variant="h3"`).
 - Key-value rows inside cards: `<div className="flex justify-between"><span className="text-muted-foreground">Label</span><span>Value</span></div>`, grouped in `space-y-3`.
 
+### Form cards (CreateOfferPage / EditProfilePage / DisputePage)
+Form/detail pages stack one or more cards inside `<div className="max-w-xl mx-auto">`. Tight, scannable rhythm — NOT the loose `space-y-6`/`mb-4` spacing.
+
+**Spacing map (all values):**
+- **Card ↔ card:** `space-y-3` (12px) on the wrapping `<form>`.
+- **Card padding:** `p-6` (24px) via the card className (overrides the bare `Card`). The `Card` component itself supplies `py-(--card-spacing)` (24px) + internal `gap-3` (12px) between direct children.
+- **Card title (`h4`) → next block:** `mb-2` (8px). Same `mb-2` whether or not a helper line follows — keep it consistent across cards.
+- **Helper line under title:** `<p className="text-sm text-muted-foreground mb-2">…</p>` (8px below).
+- **Field blocks inside a card:** wrap in `space-y-4` (16px between blocks).
+- **Two-up fields:** `grid grid-cols-1 md:grid-cols-2 gap-4` (16px).
+- **Label → control:** `<Label className="text-base font-semibold mb-2 block">` (8px). Never `mb-4`.
+- **Counter / hint under a control:** `<p className="text-sm text-muted-foreground mt-1">…</p>` (4px).
+- **Split sections inside one card:** `<Separator />` between `space-y-4` groups (owns the full-width divider; no extra margin needed).
+
+**Card class:** `bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl`.
+
+**Inputs:** pill `rounded-full border border-border`; textareas `border border-border min-h-[Npx] resize-none`.
+
 ### Tables
 [`src/components/ui/table.tsx`](src/components/ui/table.tsx) + [`OffersTableWrapper`](src/components/custom/OffersTableWrapper.tsx).
 - Header row: `border-b border-border/50 bg-muted/50 -mx-6 md:-mx-8 px-6 md:px-8` (negative margins bleed to wrapper edges).

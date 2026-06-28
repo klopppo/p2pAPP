@@ -13,6 +13,7 @@ import { ChatPage } from './pages/ChatPage'
 import { CreateOfferPage } from './pages/CreateOfferPage'
 import { OpenOfferPage } from './pages/OpenOfferPage'
 import { TradePage } from './pages/TradePage'
+import { DisputePage } from './pages/DisputePage'
 import { AppLayout } from './components/layout/AppLayout'
 import { UserSync } from './hooks/useSyncUser'
 import { TrustlessFlowOverlay } from './components/custom/TrustlessFlow'
@@ -40,7 +41,8 @@ function App() {
                 <Route path="messages/:userId" element={<ChatPage />} />
                 <Route path="create-offer" element={<CreateOfferPage />} />
                 <Route path="offer/:id" element={<OpenOfferPage />} />
-        <Route path="trade/:id" element={<TradePage />} />
+                <Route path="trade/:id" element={<TradePage />} />
+                <Route path="dispute" element={<DisputePage />} />
               </Route>
             </Routes>
           </BrowserRouter>
