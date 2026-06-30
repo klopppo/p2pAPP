@@ -130,7 +130,6 @@ export function CreateOfferPage() {
           subtitle="Browse and create trade offers"
           variant="centered"
           onBack={() => navigate(-1)}
-          className="mb-8"
         />
 
         {/* Centered Card */}

@@ -75,7 +75,6 @@ export function EditProfilePage() {
           subtitle="Update your public and private information"
           variant="centered"
           onBack={() => navigate(-1)}
-          className="mb-4"
         />
 
         <form onSubmit={handleSubmit} className="space-y-4">

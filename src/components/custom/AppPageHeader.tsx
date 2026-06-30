@@ -23,7 +23,7 @@ export function AppPageHeader({
 }: AppPageHeaderProps) {
   if (variant === 'centered') {
     return (
-      <div className={`relative flex items-center ${className}`}>
+      <div className={`relative flex items-center mb-8 ${className}`}>
         {onBack && (
           <Button
             variant="ghost"
