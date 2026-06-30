@@ -175,7 +175,7 @@ export async function getActiveOffers(limit = 50, offset = 0) {
     .from('offers')
     .select(`
       *,
-      seller:user!offers_seller_id_fkey (wallet_address, nickname, avatar_url, verification_level, total_trades, avg_rating)
+      seller:users!offers_seller_id_fkey (wallet_address, nickname, avatar_url, verification_level, total_trades, avg_rating)
     `)
     .eq('status', OfferStatus.ACTIVE)
     .gte('expires_at', new Date().toISOString())
@@ -198,7 +198,7 @@ export async function getOffersBySeller(sellerId: string, status?: OfferStatus) 
     .from('offers')
     .select(`
       *,
-      seller:user!offers_seller_id_fkey (nickname, avatar_url, verification_level)
+      seller:users!offers_seller_id_fkey (nickname, avatar_url, verification_level)
     `)
     .eq('seller_id', sellerId)
     .order('created_at', { ascending: false })
@@ -237,7 +237,7 @@ export async function getOfferById(id: string) {
     .from('offers')
     .select(`
       *,
-      seller:user!offers_seller_id_fkey (wallet_address, nickname, avatar_url, verification_level, total_trades, avg_rating)
+      seller:users!offers_seller_id_fkey (wallet_address, nickname, avatar_url, verification_level, total_trades, avg_rating)
     `)
     .eq('id', id)
     .single()
@@ -301,7 +301,7 @@ export async function getActiveTradesByBuyer(buyerId: string) {
       *,
       offer:offers(*),
       buyer:user!trades_buyer_id_fkey (nickname, avatar_url, verification_level),
-      seller:user!trades_seller_id_fkey (nickname, avatar_url, verification_level)
+      seller:users!trades_seller_id_fkey (nickname, avatar_url, verification_level)
     `)
     .eq('buyer_id', buyerId)
     .eq('status', TradeStatus.ACTIVE)
@@ -325,7 +325,7 @@ export async function getActiveTradesBySeller(sellerId: string) {
       *,
       offer:offers(*),
       buyer:user!trades_buyer_id_fkey (nickname, avatar_url, verification_level),
-      seller:user!trades_seller_id_fkey (nickname, avatar_url, verification_level)
+      seller:users!trades_seller_id_fkey (nickname, avatar_url, verification_level)
     `)
     .eq('seller_id', sellerId)
     .eq('status', TradeStatus.ACTIVE)
@@ -349,7 +349,7 @@ export async function getTradeByTradeId(tradeId: string) {
       *,
       offer:offers(*),
       buyer:user!trades_buyer_id_fkey (nickname, avatar_url, verification_level),
-      seller:user!trades_seller_id_fkey (nickname, avatar_url, verification_level),
+      seller:users!trades_seller_id_fkey (nickname, avatar_url, verification_level),
       ratings:trade_ratings(*)
     `)
     .eq('trade_id', tradeId)
@@ -573,7 +573,7 @@ export async function getDisputesByUser(userId: string) {
       *,
       trade:trades(trade_id, crypto_token, crypto_amount),
       buyer:user!disputes_buyer_id_fkey (nickname, avatar_url),
-      seller:user!disputes_seller_id_fkey (nickname, avatar_url)
+      seller:users!disputes_seller_id_fkey (nickname, avatar_url)
     `)
     .in('buyer_id', [userId, '???']) // Get disputes where user is buyer or seller
     .order('created_at', { ascending: false })
