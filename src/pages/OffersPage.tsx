@@ -140,6 +140,18 @@ export function OffersPage() {
     }
   }
 
+  // Derive payment methods from actual offers for filter options
+  const availablePaymentMethods = useMemo(() => {
+    const methods = new Set<string>()
+    offers.forEach((o) => {
+      const offer = data?.find((d: any) => d.id === o.id)
+      if (offer?.payment_methods) {
+        (offer.payment_methods as string[]).forEach((m: string) => methods.add(m.toLowerCase()))
+      }
+    })
+    return Array.from(methods)
+  }, [offers, data])
+
   const filteredOffers = useMemo(() => {
     const filtered = offers.filter((offer) => {
       const matchesSearch =
@@ -147,7 +159,17 @@ export function OffersPage() {
         offer.token.toLowerCase().includes(searchQuery.toLowerCase())
       const matchesType = typeFilter === 'all' || offer.type === typeFilter
       const matchesToken = tokenFilter === 'all' || offer.token === tokenFilter
-      return matchesSearch && matchesType && matchesToken
+      // Payment filter - check if any offer payment method contains the filter value
+      const matchesPayment =
+        paymentFilter === 'all' ||
+        (() => {
+          const offer = data?.find((d: any) => d.id === offer.id)
+          if (!offer?.payment_methods) return true
+          return (offer.payment_methods as string[]).some(
+            (m: string) => m.toLowerCase().includes(paymentFilter.toLowerCase())
+          )
+        })()
+      return matchesSearch && matchesType && matchesToken && matchesPayment
     })
 
     if (sortKey) {

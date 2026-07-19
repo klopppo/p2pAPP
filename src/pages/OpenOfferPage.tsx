@@ -143,6 +143,16 @@ export function OpenOfferPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Description */}
+              {offer.description && (
+                <div className="mt-6">
+                  <Text variant="small" className="text-muted-foreground mb-2">Description</Text>
+                  <Text variant="body" className="whitespace-pre-wrap">
+                    {offer.description}
+                  </Text>
+                </div>
+              )}
             </CardContent>
           </Card>
 

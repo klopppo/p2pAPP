@@ -187,6 +187,7 @@ export interface Offer {
   premium_multiplier: number | null
   tags: string[]
   featured: boolean
+  description: string | null
 
   published_at: string
   expires_at: string | null

@@ -4,6 +4,7 @@ import { useAccount } from 'wagmi'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import {
@@ -26,6 +27,7 @@ interface OfferForm {
   paymentMethod: string
   location: string
   gracePeriod: number
+  description: string
   isPrivate: boolean
   targetUser: string
 }
@@ -42,6 +44,7 @@ export function CreateOfferPage() {
     paymentMethod: 'SEPA Instant',
     location: 'Italy',
     gracePeriod: 24,
+    description: '',
     isPrivate: false,
     targetUser: ''
   })
@@ -79,6 +82,7 @@ export function CreateOfferPage() {
         min_amount: formData.minAmount,
         max_amount: formData.maxAmount,
         payment_methods: [formData.paymentMethod],
+        description: formData.description.trim() || null,
         available_regions:
           formData.location === 'Global' ? [] : [REGION_CODES[formData.location] ?? formData.location.slice(0, 2).toUpperCase()],
         platform_fee_bps: 50, // 0.5%
@@ -321,6 +325,26 @@ export function CreateOfferPage() {
                     <p className="text-sm text-muted-foreground mt-2">
                       Time for the counterparty to accept the offer
                     </p>
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <Label htmlFor="description" className="text-base font-semibold mb-2 block">
+                      Description
+                    </Label>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Optional. Share anything the counterparty should know: preferred
+                      meeting window, accepted banks, KYC requirements, etc.
+                    </p>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      className="border border-border min-h-[120px] resize-none rounded-xl"
+                      placeholder="e.g. SEPA only — no instant transfers. Trades over €10k require ID verification."
+                      maxLength={1000}
+                    />
+                    <p className="text-sm text-muted-foreground mt-1">{formData.description.length}/1000</p>
                   </div>
 
                   {/* Private Offer */}
