@@ -33,60 +33,67 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 // TYPES
 // =================================================================
 
-export enum EscrowStatus {
-  AWAITING_DEPOSIT = 'awaiting_deposit',
-  DEPOSITED = 'deposited',
-  PENDING_RELEASE = 'pending_release',
-  DISPUTED = 'disputed',
-  RELEASED = 'released',
-  REFUNDED = 'refunded',
-}
+export const EscrowStatus = {
+  AWAITING_DEPOSIT: 'awaiting_deposit',
+  DEPOSITED: 'deposited',
+  PENDING_RELEASE: 'pending_release',
+  DISPUTED: 'disputed',
+  RELEASED: 'released',
+  REFUNDED: 'refunded',
+} as const
+export type EscrowStatus = typeof EscrowStatus[keyof typeof EscrowStatus]
 
-export enum OfferStatus {
-  ACTIVE = 'active',
-  PAUSED = 'paused',
-  COMPLETED = 'completed',
-  CANCELLED = 'cancelled',
-  EXPIRED = 'expired',
-}
+export const OfferStatus = {
+  ACTIVE: 'active',
+  PAUSED: 'paused',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
+  EXPIRED: 'expired',
+} as const
+export type OfferStatus = typeof OfferStatus[keyof typeof OfferStatus]
 
-export enum KYCStatus {
-  PENDING = 'pending',
-  APPROVED = 'approved',
-  REJECTED = 'rejected',
-  EXPIRED = 'expired',
-}
+export const KYCStatus = {
+  PENDING: 'pending',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+  EXPIRED: 'expired',
+} as const
+export type KYCStatus = typeof KYCStatus[keyof typeof KYCStatus]
 
-export enum VerificationLevel {
-  UNVERIFIED = 'unverified',
-  VERIFIED = 'verified',
-  TRUSTED = 'trusted',
-  SUSPICIOUS = 'suspicious',
-}
+export const VerificationLevel = {
+  UNVERIFIED: 'unverified',
+  VERIFIED: 'verified',
+  TRUSTED: 'trusted',
+  SUSPICIOUS: 'suspicious',
+} as const
+export type VerificationLevel = typeof VerificationLevel[keyof typeof VerificationLevel]
 
-export enum UserRole {
-  USER = 'user',
-  ADMIN = 'admin',
-  MEDIATOR = 'mediator',
-  SUPPORT = 'support',
-}
+export const UserRole = {
+  USER: 'user',
+  ADMIN: 'admin',
+  MEDIATOR: 'mediator',
+  SUPPORT: 'support',
+} as const
+export type UserRole = typeof UserRole[keyof typeof UserRole]
 
-export enum TradeStatus {
-  PENDING = 'pending',
-  ACTIVE = 'active',
-  COMPLETED = 'completed',
-  CANCELLED = 'cancelled',
-  DISPUTED = 'disputed',
-  REFUNDED = 'refunded',
-}
+export const TradeStatus = {
+  PENDING: 'pending',
+  ACTIVE: 'active',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
+  DISPUTED: 'disputed',
+  REFUNDED: 'refunded',
+} as const
+export type TradeStatus = typeof TradeStatus[keyof typeof TradeStatus]
 
-export enum DisputeStatus {
-  OPEN = 'open',
-  IN_REVIEW = 'in_review',
-  RESOLVED = 'resolved',
-  ESCALATED = 'escalated',
-  CLOSED = 'closed',
-}
+export const DisputeStatus = {
+  OPEN: 'open',
+  IN_REVIEW: 'in_review',
+  RESOLVED: 'resolved',
+  ESCALATED: 'escalated',
+  CLOSED: 'closed',
+} as const
+export type DisputeStatus = typeof DisputeStatus[keyof typeof DisputeStatus]
 
 // =================================================================
 // USER QUERIES
@@ -300,7 +307,7 @@ export async function getActiveTradesByBuyer(buyerId: string) {
     .select(`
       *,
       offer:offers(*),
-      buyer:user!trades_buyer_id_fkey (nickname, avatar_url, verification_level),
+      buyer:users!trades_buyer_id_fkey (nickname, avatar_url, verification_level),
       seller:users!trades_seller_id_fkey (nickname, avatar_url, verification_level)
     `)
     .eq('buyer_id', buyerId)
@@ -324,7 +331,7 @@ export async function getActiveTradesBySeller(sellerId: string) {
     .select(`
       *,
       offer:offers(*),
-      buyer:user!trades_buyer_id_fkey (nickname, avatar_url, verification_level),
+      buyer:users!trades_buyer_id_fkey (nickname, avatar_url, verification_level),
       seller:users!trades_seller_id_fkey (nickname, avatar_url, verification_level)
     `)
     .eq('seller_id', sellerId)
@@ -348,7 +355,7 @@ export async function getTradeByTradeId(tradeId: string) {
     .select(`
       *,
       offer:offers(*),
-      buyer:user!trades_buyer_id_fkey (nickname, avatar_url, verification_level),
+      buyer:users!trades_buyer_id_fkey (nickname, avatar_url, verification_level),
       seller:users!trades_seller_id_fkey (nickname, avatar_url, verification_level),
       ratings:trade_ratings(*)
     `)
@@ -572,7 +579,7 @@ export async function getDisputesByUser(userId: string) {
     .select(`
       *,
       trade:trades(trade_id, crypto_token, crypto_amount),
-      buyer:user!disputes_buyer_id_fkey (nickname, avatar_url),
+      buyer:users!disputes_buyer_id_fkey (nickname, avatar_url),
       seller:users!disputes_seller_id_fkey (nickname, avatar_url)
     `)
     .in('buyer_id', [userId, '???']) // Get disputes where user is buyer or seller

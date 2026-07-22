@@ -37,7 +37,7 @@ export function CreateOfferPage() {
   const { address, isConnected } = useAccount()
   const [formData, setFormData] = useState<OfferForm>({
     type: 'buy',
-    token: 'EUR',
+    token: 'BTC',
     price: 52340,
     minAmount: 5000,
     maxAmount: 50000,
@@ -59,6 +59,20 @@ export function CreateOfferPage() {
     // sync, also covers the connect-time sync) returns the user row with id.
     if (!isConnected || !address) {
       toast.error('Connect your wallet to create an offer.')
+      return
+    }
+
+    // Form validation
+    if (formData.price <= 0) {
+      toast.error('Price must be greater than 0.')
+      return
+    }
+    if (formData.minAmount <= 0) {
+      toast.error('Minimum amount must be greater than 0.')
+      return
+    }
+    if (formData.maxAmount < formData.minAmount) {
+      toast.error('Maximum amount must be greater than or equal to minimum amount.')
       return
     }
 
@@ -107,7 +121,7 @@ export function CreateOfferPage() {
     }
   }
 
-  const tokens = ['EUR', 'USD', 'GBP', 'BTC', 'ETH', 'USDC', 'USDT']
+  const tokens = ['BTC', 'ETH', 'USDC', 'USDT', 'DAI', 'EUR', 'USD', 'GBP']
   const paymentMethods = [
     'SEPA Instant',
     'Bank Transfer',
@@ -141,7 +155,7 @@ export function CreateOfferPage() {
                 <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Type Selection */}
                   <div>
-                    <Label className="text-base font-semibold mb-4">Offer Type</Label>
+                    <Label className="text-base font-semibold mb-2">Offer Type</Label>
                     <div className="flex justify-center gap-4">
                       <Button
                         type="button"

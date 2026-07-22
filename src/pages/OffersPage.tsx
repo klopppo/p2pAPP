@@ -34,6 +34,7 @@ interface Offer {
   maxAmount: number
   isPositive: boolean
   seller: SellerPreview
+  paymentMethods: string[]
 }
 
 type SortKey = 'price' | 'minAmount' | 'maxAmount'
@@ -53,6 +54,7 @@ interface OfferRow {
   price_per_unit: number | string
   min_amount: number | string
   max_amount: number | string
+  payment_methods?: string[] | null
   tags?: string[] | null
   seller?: {
     wallet_address?: string
@@ -92,6 +94,7 @@ function mapOfferRow(o: OfferRow): Offer {
       completionRate: '—',
       tags: o.tags ?? [],
     },
+    paymentMethods: o.payment_methods ?? [],
   }
 }
 
@@ -140,18 +143,6 @@ export function OffersPage() {
     }
   }
 
-  // Derive payment methods from actual offers for filter options
-  const availablePaymentMethods = useMemo(() => {
-    const methods = new Set<string>()
-    offers.forEach((o) => {
-      const offer = data?.find((d: any) => d.id === o.id)
-      if (offer?.payment_methods) {
-        (offer.payment_methods as string[]).forEach((m: string) => methods.add(m.toLowerCase()))
-      }
-    })
-    return Array.from(methods)
-  }, [offers, data])
-
   const filteredOffers = useMemo(() => {
     const filtered = offers.filter((offer) => {
       const matchesSearch =
@@ -162,13 +153,9 @@ export function OffersPage() {
       // Payment filter - check if any offer payment method contains the filter value
       const matchesPayment =
         paymentFilter === 'all' ||
-        (() => {
-          const offer = data?.find((d: any) => d.id === offer.id)
-          if (!offer?.payment_methods) return true
-          return (offer.payment_methods as string[]).some(
-            (m: string) => m.toLowerCase().includes(paymentFilter.toLowerCase())
-          )
-        })()
+        offer.paymentMethods.some((m: string) =>
+          m.toLowerCase().includes(paymentFilter.toLowerCase())
+        )
       return matchesSearch && matchesType && matchesToken && matchesPayment
     })
 
@@ -249,7 +236,7 @@ export function OffersPage() {
             <OffersTableWrapper>
               <Table>
                 <TableHeader>
-                  <TableRow className="border-b border-border/50 bg-muted/50 -mx-6 md:-mx-8 px-6 md:px-8">
+                  <TableRow className="border-b border-border/50 bg-muted/50 -mx-3 md:-mx-4 px-3 md:px-4">
                     <TableHead>Trader</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Token</TableHead>

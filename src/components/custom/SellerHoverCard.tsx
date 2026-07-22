@@ -2,6 +2,8 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Text } from '@/components/ui/text'
+import { Button } from '@/components/ui/button'
+import { Copy, ExternalLink } from 'lucide-react'
 
 export interface SellerPreview {
   name: string
@@ -20,6 +22,26 @@ interface SellerHoverCardProps {
 
 export function SellerHoverCard({ seller, children }: SellerHoverCardProps) {
   const formatAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`
+
+  const onCopy = async (addr: string) => {
+    try {
+      await navigator.clipboard.writeText(addr)
+    } catch (e) {
+      // fallback
+      const ta = document.createElement('textarea')
+      ta.value = addr
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      ta.remove()
+    }
+  }
+
+  const onOpen = (addr: string) => {
+    const base = 'https://blockscan.com/token/'
+    const url = `${base}${addr}`
+    window.open(url, '_blank', 'noopener')
+  }
 
   return (
     <HoverCard openDelay={200} closeDelay={100}>
@@ -40,9 +62,19 @@ export function SellerHoverCard({ seller, children }: SellerHoverCardProps) {
             </Avatar>
             <div className="min-w-0">
               <Text variant="h4" className="truncate">{seller.name}</Text>
-              <Text variant="small" className="font-mono text-muted-foreground">
-                {formatAddress(seller.address)}
-              </Text>
+              <div className="flex items-center gap-2">
+                <Text variant="small" className="font-mono text-muted-foreground">
+                  {formatAddress(seller.address)}
+                </Text>
+                <div className="ml-auto flex items-center gap-1">
+                  <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); onCopy(seller.address) }} title="Copia indirizzo">
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); onOpen(seller.address) }} title="Apri su Blockscan">
+                    <ExternalLink className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
 

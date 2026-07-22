@@ -8,60 +8,67 @@
 // CORE ENUMS
 // =================================================================
 
-export enum EscrowStatus {
-  AWAITING_DEPOSIT = 'awaiting_deposit',
-  DEPOSITED = 'deposited',
-  PENDING_RELEASE = 'pending_release',
-  DISPUTED = 'disputed',
-  RELEASED = 'released',
-  REFUNDED = 'refunded',
-}
+export const EscrowStatus = {
+  AWAITING_DEPOSIT: 'awaiting_deposit',
+  DEPOSITED: 'deposited',
+  PENDING_RELEASE: 'pending_release',
+  DISPUTED: 'disputed',
+  RELEASED: 'released',
+  REFUNDED: 'refunded',
+} as const
+export type EscrowStatus = typeof EscrowStatus[keyof typeof EscrowStatus]
 
-export enum OfferStatus {
-  ACTIVE = 'active',
-  PAUSED = 'paused',
-  COMPLETED = 'completed',
-  CANCELLED = 'cancelled',
-  EXPIRED = 'expired',
-}
+export const OfferStatus = {
+  ACTIVE: 'active',
+  PAUSED: 'paused',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
+  EXPIRED: 'expired',
+} as const
+export type OfferStatus = typeof OfferStatus[keyof typeof OfferStatus]
 
-export enum KYCStatus {
-  PENDING = 'pending',
-  APPROVED = 'approved',
-  REJECTED = 'rejected',
-  EXPIRED = 'expired',
-}
+export const KYCStatus = {
+  PENDING: 'pending',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+  EXPIRED: 'expired',
+} as const
+export type KYCStatus = typeof KYCStatus[keyof typeof KYCStatus]
 
-export enum VerificationLevel {
-  UNVERIFIED = 'unverified',
-  VERIFIED = 'verified',
-  TRUSTED = 'trusted',
-  SUSPICIOUS = 'suspicious',
-}
+export const VerificationLevel = {
+  UNVERIFIED: 'unverified',
+  VERIFIED: 'verified',
+  TRUSTED: 'trusted',
+  SUSPICIOUS: 'suspicious',
+} as const
+export type VerificationLevel = typeof VerificationLevel[keyof typeof VerificationLevel]
 
-export enum UserRole {
-  USER = 'user',
-  ADMIN = 'admin',
-  MEDIATOR = 'mediator',
-  SUPPORT = 'support',
-}
+export const UserRole = {
+  USER: 'user',
+  ADMIN: 'admin',
+  MEDIATOR: 'mediator',
+  SUPPORT: 'support',
+} as const
+export type UserRole = typeof UserRole[keyof typeof UserRole]
 
-export enum TradeStatus {
-  PENDING = 'pending',
-  ACTIVE = 'active',
-  COMPLETED = 'completed',
-  CANCELLED = 'cancelled',
-  DISPUTED = 'disputed',
-  REFUNDED = 'refunded',
-}
+export const TradeStatus = {
+  PENDING: 'pending',
+  ACTIVE: 'active',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
+  DISPUTED: 'disputed',
+  REFUNDED: 'refunded',
+} as const
+export type TradeStatus = typeof TradeStatus[keyof typeof TradeStatus]
 
-export enum DisputeStatus {
-  OPEN = 'open',
-  IN_REVIEW = 'in_review',
-  RESOLVED = 'resolved',
-  ESCALATED = 'escalated',
-  CLOSED = 'closed',
-}
+export const DisputeStatus = {
+  OPEN: 'open',
+  IN_REVIEW: 'in_review',
+  RESOLVED: 'resolved',
+  ESCALATED: 'escalated',
+  CLOSED: 'closed',
+} as const
+export type DisputeStatus = typeof DisputeStatus[keyof typeof DisputeStatus]
 
 // =================================================================
 // USER TYPES
@@ -119,12 +126,13 @@ export interface UserPrivate {
 // KYC TYPES
 // =================================================================
 
-export enum KYCDocType {
-  PASSPORT = 'passport',
-  ID_CARD = 'id_card',
-  DRIVING_LICENSE = 'driving_license',
-  NATIONAL_ID = 'national_id',
-}
+export const KYCDocType = {
+  PASSPORT: 'passport',
+  ID_CARD: 'id_card',
+  DRIVING_LICENSE: 'driving_license',
+  NATIONAL_ID: 'national_id',
+} as const
+export type KYCDocType = typeof KYCDocType[keyof typeof KYCDocType]
 
 export interface KYCApplication {
   id: string
