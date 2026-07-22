@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import { Copy, ExternalLink } from 'lucide-react'
+import { toast } from 'sonner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   Table,
@@ -132,7 +134,17 @@ export function ProfilePage({ isOwn = false }: { isOwn?: boolean }) {
                   <Text variant="h2">{PROFILE_DATA.name}</Text>
                   <Badge className="bg-green-500 text-white hover:bg-green-600 text-sm">{PROFILE_DATA.lastOnline}</Badge>
                 </div>
-                <Text variant="small" className="font-mono text-muted-foreground">{PROFILE_DATA.address}</Text>
+                <div className="flex items-center gap-2">
+                  <Text variant="small" className="font-mono text-muted-foreground">{PROFILE_DATA.address.slice(0,6)}...{PROFILE_DATA.address.slice(-4)}</Text>
+                  <div className="ml-1 flex items-center gap-1">
+                    <Button size="icon" variant="ghost" onClick={() => { navigator.clipboard.writeText(PROFILE_DATA.address); toast.success('Indirizzo copiato') }} title="Copia indirizzo">
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" onClick={() => window.open(`https://blockscan.com/token/${PROFILE_DATA.address}`, '_blank', 'noopener')} title="Apri su Blockscan">
+                      <ExternalLink className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
               </div>
               {isOwn ? (
                 <Button onClick={() => navigate('/app/profile/edit')}>Edit Profile</Button>

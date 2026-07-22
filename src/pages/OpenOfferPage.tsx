@@ -107,31 +107,17 @@ export function OpenOfferPage() {
                     </div>
                     <div>{(seller?.total_trades ?? 0).toLocaleString()} trades</div>
                     {sellerAddr && (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <button className="font-mono text-xs text-muted-foreground hover:text-foreground cursor-pointer">
-                            {formatAddress(sellerAddr)}
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-1" align="start">
-                          <div className="flex flex-col gap-1">
-                            <button
-                              onClick={() => copyAddress(sellerAddr)}
-                              className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent rounded-lg cursor-pointer"
-                            >
-                              <Copy className="w-4 h-4" />
-                              Copy address
-                            </button>
-                            <button
-                              onClick={() => openAddress(sellerAddr)}
-                              className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent rounded-lg cursor-pointer"
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                              View on Etherscan
-                            </button>
-                          </div>
-                        </PopoverContent>
-                      </Popover>
+                      <div className="flex items-center gap-2">
+                        <Text variant="small" className="font-mono text-xs text-muted-foreground">{formatAddress(sellerAddr)}</Text>
+                        <div className="ml-1 flex items-center gap-1">
+                          <Button size="icon" variant="ghost" onClick={() => { navigator.clipboard.writeText(sellerAddr); toast.success('Indirizzo copiato') }} title="Copia indirizzo">
+                            <Copy className="w-4 h-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={() => window.open(`https://blockscan.com/token/${sellerAddr}`, '_blank', 'noopener')} title="Apri su Blockscan">
+                            <ExternalLink className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
