@@ -292,6 +292,16 @@ export function generateTradeId(): string {
 }
 
 /**
+ * Generate a client-side unique `dispute_id` for the `disputes.dispute_id`
+ * varchar column. Same shape as `generateOfferId`/`generateTradeId`:
+ * 3-letter prefix + base36 timestamp + 6 random chars (~18 chars, fits the
+ * 40-char varchar).
+ */
+export function generateDisputeId(): string {
+  return `DSP-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`.toUpperCase()
+}
+
+/**
  * Get active trades by buyer
  */
 export async function getActiveTradesByBuyer(buyerId: string) {
@@ -564,7 +574,9 @@ export async function getDisputesByTrade(tradeId: string) {
 }
 
 /**
- * Get disputes by user
+ * Get disputes where the user is either buyer or seller (via the
+ * joined trade.buyer_id / trade.seller_id columns on `disputes`). Uses
+ * PostgREST `.or()` so a single round-trip returns both sides.
  */
 export async function getDisputesByUser(userId: string) {
   const { data, error } = await supabase
@@ -575,11 +587,43 @@ export async function getDisputesByUser(userId: string) {
       buyer:user!disputes_buyer_id_fkey (nickname, avatar_url),
       seller:users!disputes_seller_id_fkey (nickname, avatar_url)
     `)
-    .in('buyer_id', [userId, '???']) // Get disputes where user is buyer or seller
+    .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
     .order('created_at', { ascending: false })
 
   if (error) {
     console.error('Error fetching user disputes:', error)
+    throw error
+  }
+
+  return data
+}
+
+/**
+ * Get a single dispute by its primary UUID `id` (the `:id` route param on
+ * the dispute detail viewer). Joins the trade, both parties, and all evidence
+ * rows so the detail page can render without N+1 follow-ups.
+ */
+export async function getDisputeById(id: string) {
+  const { data, error } = await supabase
+    .from('disputes')
+    .select(`
+      *,
+      trade:trades(
+        trade_id, crypto_token, crypto_amount, fiat_currency, fiat_amount,
+        status, payment_method, escrow_status, escrow_contract_addr,
+        buyer:users!trades_buyer_id_fkey (wallet_address, nickname, avatar_url),
+        seller:users!trades_seller_id_fkey (wallet_address, nickname, avatar_url)
+      ),
+      buyer:user!disputes_buyer_id_fkey (wallet_address, nickname, avatar_url, verification_level),
+      seller:users!disputes_seller_id_fkey (wallet_address, nickname, avatar_url, verification_level),
+      evidence:dispute_evidence(*)
+    `)
+    .eq('id', id)
+    .single()
+
+  if (error) {
+    if (error.code === 'PGRST116') return null
+    console.error('Error fetching dispute:', error)
     throw error
   }
 

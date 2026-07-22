@@ -14,6 +14,8 @@ import { CreateOfferPage } from './pages/CreateOfferPage'
 import { OpenOfferPage } from './pages/OpenOfferPage'
 import { TradePage } from './pages/TradePage'
 import { DisputePage } from './pages/DisputePage'
+import { DisputesListPage } from './pages/DisputesListPage'
+import { DisputeDetailPage } from './pages/DisputeDetailPage'
 import { AppLayout } from './components/layout/AppLayout'
 import { UserSync } from './hooks/useSyncUser'
 import { TrustlessFlowOverlay } from './components/custom/TrustlessFlow'
@@ -43,6 +45,8 @@ function App() {
                 <Route path="offer/:id" element={<OpenOfferPage />} />
                 <Route path="trade/:id" element={<TradePage />} />
                 <Route path="dispute" element={<DisputePage />} />
+                <Route path="disputes" element={<DisputesListPage />} />
+                <Route path="disputes/:id" element={<DisputeDetailPage />} />
               </Route>
             </Routes>
           </BrowserRouter>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Tag,
@@ -13,6 +13,7 @@ import {
   DollarSign,
   MoreHorizontal,
   User,
+  ShieldAlert,
 } from 'lucide-react'
 import { WalletConnectButton } from '@/components/custom/WalletConnectButton'
 import {
@@ -87,10 +88,16 @@ const NAV_LINKS = [
   { label: 'Profile', to: '/app/profile' as const, icon: User },
 ]
 
-const RESOURCE_LINKS = [
+const RESOURCE_LINKS: ReadonlyArray<
+  | { label: string; to: string; icon: typeof ShieldAlert }
+  | { label: string; href: string; icon: typeof ShieldAlert }
+> = [
+  // Internal route — uses `to`, rendered with <Link> for client-side nav.
+  { label: 'Disputes', to: '/app/disputes', icon: ShieldAlert },
+  // External links — use `href` + target="_blank".
   { label: 'Docs', href: 'https://docs.example.com', icon: BookOpen },
   { label: 'Discord', href: 'https://discord.gg/example', icon: MessageCircle },
-]
+] as const
 
 const LANGUAGES = ['English', 'Español', 'Français', 'Deutsch', '中文']
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'ETH']
@@ -107,6 +114,7 @@ export function Navbar({ showTabs = false }: NavbarProps) {
   const [language, setLanguage] = useState('English')
   const [currency, setCurrency] = useState('USD')
   const location = useLocation()
+  const navigate = useNavigate()
   const currentPath = location.pathname
 
   return (
@@ -161,18 +169,39 @@ export function Navbar({ showTabs = false }: NavbarProps) {
                   sideOffset={8}
                 >
                   <DropdownMenuGroup>
-                    {RESOURCE_LINKS.map((r) => (
-                      <DropdownMenuItem key={r.label} asChild>
-                        <a
-                          href={r.href}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                    {RESOURCE_LINKS.map((r) => {
+                      const Icon = r.icon
+                      return 'to' in r ? (
+                        // Internal route — client-side navigation via <Link>.
+                        <DropdownMenuItem
+                          key={r.label}
+                          asChild
+                          // Tell Radix to close the menu after the click; the
+                          // dropdown would otherwise stay open through the
+                          // route transition.
+                          onSelect={(e) => {
+                            e.preventDefault()
+                            navigate(r.to)
+                          }}
                         >
-                          <r.icon className="w-4 h-4" />
-                          {r.label}
-                        </a>
-                      </DropdownMenuItem>
-                    ))}
+                          <Link to={r.to}>
+                            <Icon className="w-4 h-4" />
+                            {r.label}
+                          </Link>
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem key={r.label} asChild>
+                          <a
+                            href={r.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Icon className="w-4 h-4" />
+                            {r.label}
+                          </a>
+                        </DropdownMenuItem>
+                      )
+                    })}
                   </DropdownMenuGroup>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -341,19 +370,33 @@ export function Navbar({ showTabs = false }: NavbarProps) {
                   <p className="px-3 py-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                     Resources
                   </p>
-                  {RESOURCE_LINKS.map((r) => (
-                    <a
-                      key={r.label}
-                      href={r.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => setMobileOpen(false)}
-                      className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                    >
-                      <r.icon className="w-4 h-4" />
-                      {r.label}
-                    </a>
-                  ))}
+                  {RESOURCE_LINKS.map((r) => {
+                    const Icon = r.icon
+                    return 'to' in r ? (
+                      // Internal route — client-side navigation; close menu on click.
+                      <Link
+                        key={r.label}
+                        to={r.to}
+                        onClick={() => setMobileOpen(false)}
+                        className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      >
+                        <Icon className="w-4 h-4" />
+                        {r.label}
+                      </Link>
+                    ) : (
+                      <a
+                        key={r.label}
+                        href={r.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setMobileOpen(false)}
+                        className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      >
+                        <Icon className="w-4 h-4" />
+                        {r.label}
+                      </a>
+                    )
+                  })}
                 </div>
               )}
               <div className="mt-3 border-t border-border pt-3">
