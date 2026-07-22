@@ -6,8 +6,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Text } from '@/components/ui/text'
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Clock, Shield, Loader2 } from 'lucide-react'
+import { Clock, Shield, Loader2, Copy, ExternalLink } from 'lucide-react'
 import { useOffer } from '@/hooks/useOffers'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { toast } from 'sonner'
 
 const CURRENCY_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
 const currencySymbol = (code: string) => CURRENCY_SYMBOLS[code] ?? ''
@@ -56,6 +58,15 @@ export function OpenOfferPage() {
   const sellerAddr = seller?.wallet_address ?? ''
   const formatAddress = (addr: string) =>
     addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : ''
+
+  const copyAddress = (addr: string) => {
+    navigator.clipboard.writeText(addr)
+    toast.success('Address copied to clipboard')
+  }
+
+  const openAddress = (addr: string) => {
+    window.open(`https://etherscan.io/address/${addr}`, '_blank')
+  }
   const regions = (offer.available_regions ?? [])
     .map((r: string) => REGION_NAMES[r] ?? r)
     .join(', ') || 'Global'
@@ -75,16 +86,16 @@ export function OpenOfferPage() {
         {/* Offer Details */}
         <div className="lg:col-span-2 space-y-6">
           <Card className="glass-panel rounded-2xl">
-            <CardContent className="p-6 md:p-8">
+            <CardContent className="px-6 py-0">
               {/* Trader Info */}
               <div className="flex items-center gap-4 mb-6">
                 <Avatar className="h-12 w-12">
                   <AvatarImage src={seller?.avatar_url ?? undefined} />
                   <AvatarFallback>{sellerName.slice(0, 2).toUpperCase()}</AvatarFallback>
                 </Avatar>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <Text variant="h4">{sellerName}</Text>
+                    <Text variant="h4" className="truncate">{sellerName}</Text>
                     <Badge variant={seller?.verification_level === 'verified' || seller?.verification_level === 'trusted' ? 'default' : 'secondary'}>
                       {seller?.verification_level ?? 'unverified'}
                     </Badge>
@@ -96,7 +107,31 @@ export function OpenOfferPage() {
                     </div>
                     <div>{(seller?.total_trades ?? 0).toLocaleString()} trades</div>
                     {sellerAddr && (
-                      <div className="font-mono text-xs text-muted-foreground">{formatAddress(sellerAddr)}</div>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className="font-mono text-xs text-muted-foreground hover:text-foreground cursor-pointer">
+                            {formatAddress(sellerAddr)}
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-1" align="start">
+                          <div className="flex flex-col gap-1">
+                            <button
+                              onClick={() => copyAddress(sellerAddr)}
+                              className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent rounded-lg cursor-pointer"
+                            >
+                              <Copy className="w-4 h-4" />
+                              Copy address
+                            </button>
+                            <button
+                              onClick={() => openAddress(sellerAddr)}
+                              className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent rounded-lg cursor-pointer"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                              View on Etherscan
+                            </button>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     )}
                   </div>
                 </div>
@@ -158,7 +193,7 @@ export function OpenOfferPage() {
 
           {/* Acceptance Terms */}
           <Card className="glass-panel rounded-2xl">
-            <CardContent className="p-6 md:p-8">
+            <CardContent className="px-6 py-0">
               <Text variant="h4" className="font-semibold mb-4">Acceptance Terms</Text>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>• The amount must be within the specified range ({symbol}{minAmount.toLocaleString()} – {symbol}{maxAmount.toLocaleString()})</li>
