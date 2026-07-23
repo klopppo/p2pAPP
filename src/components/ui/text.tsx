@@ -22,7 +22,7 @@ const Text = React.forwardRef<
     h3: "scroll-m-20 text-2xl font-semibold tracking-tight",
     h4: "scroll-m-20 text-xl font-semibold tracking-tight",
     subtitle: "text-lg text-muted-foreground",
-    body: "leading-7 [&:not(:first-child)]:mt-6",
+    body: "leading-7",
     muted: "text-sm text-muted-foreground",
     small: "text-sm font-medium leading-none",
   }

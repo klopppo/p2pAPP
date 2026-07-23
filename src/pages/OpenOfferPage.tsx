@@ -152,13 +152,11 @@ export function OpenOfferPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Text variant="small" className="text-muted-foreground">Amount Range</Text>
-                  {/* mt-0 overrides Text body's built-in `mt-6` so the gap is
-                      just our space-y-1.5 (6px) instead of 30px. */}
-                  <Text variant="body" className="mt-0">{symbol}{minAmount.toLocaleString()} – {symbol}{maxAmount.toLocaleString()}</Text>
+                  <Text variant="body">{symbol}{minAmount.toLocaleString()} – {symbol}{maxAmount.toLocaleString()}</Text>
                 </div>
                 <div className="space-y-1.5">
                   <Text variant="small" className="text-muted-foreground">Location</Text>
-                  <Text variant="body" className="mt-0">{regions}</Text>
+                  <Text variant="body">{regions}</Text>
                 </div>
               </div>
 
@@ -176,10 +174,7 @@ export function OpenOfferPage() {
               {offer.description && (
                 <div className="mt-4">
                   <Text variant="small" className="text-muted-foreground mb-1.5">Description</Text>
-                  {/* mt-0 + leading-6 keeps the body compact; without this
-                      override the body's built-in mt-6 (24px) stacks on top
-                      of the label's mb-1.5 (6px) for ~30px of dead space. */}
-                  <Text variant="body" className="mt-0 leading-6 whitespace-pre-wrap">
+                  <Text variant="body" className="leading-6 whitespace-pre-wrap">
                     {offer.description}
                   </Text>
                 </div>
