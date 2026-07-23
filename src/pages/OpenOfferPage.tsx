@@ -35,7 +35,7 @@ export function OpenOfferPage() {
     return (
       <section>
         <AppPageHeader title="Offer not found" variant="split" onBack={() => navigate(-1)} />
-        <Card className="glass-panel rounded-2xl">
+        <Card className="glass-panel rounded-2xl p-6">
           <CardContent className="p-6">
             <Text variant="body" className="text-muted-foreground">
               This offer couldn’t be loaded. It may have been removed or expired.
@@ -85,7 +85,7 @@ export function OpenOfferPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Offer Details */}
         <div className="lg:col-span-2 space-y-4">
-          <Card className="glass-panel rounded-2xl">
+          <Card className="glass-panel rounded-2xl p-6">
             <CardContent className="px-6 py-0">
               {/* Trader Info */}
               <div className="flex items-center gap-4 mb-3">
@@ -183,7 +183,7 @@ export function OpenOfferPage() {
           </Card>
 
           {/* Acceptance Terms */}
-          <Card className="glass-panel rounded-2xl">
+          <Card className="glass-panel rounded-2xl p-6">
             <CardContent className="px-6 py-0">
               <Text variant="h4" className="font-semibold mb-2">Acceptance Terms</Text>
               <ul className="space-y-1.5 text-sm text-muted-foreground">
@@ -198,7 +198,7 @@ export function OpenOfferPage() {
 
         {/* Actions Sidebar */}
         <div className="space-y-4">
-          <Card className="glass-panel rounded-2xl">
+          <Card className="glass-panel rounded-2xl p-6">
             <CardContent className="p-6">
               <div className="space-y-3">
                 <div className="text-center">
@@ -218,7 +218,7 @@ export function OpenOfferPage() {
             </CardContent>
           </Card>
 
-          <Card className="glass-panel rounded-2xl">
+          <Card className="glass-panel rounded-2xl p-6">
             <CardContent className="p-6">
               <Text variant="h4" className="font-semibold mb-2">Security Note</Text>
               <div className="flex items-start gap-3">

@@ -20,11 +20,11 @@ export function MetricCard({ label, value, change, isPositive, children }: Metri
       {change && (
         <div className="flex items-center text-sm font-semibold">
           {isPositive ? (
-            <TrendingUp className="h-4 w-4 mr-2 text-[#22c55e]" />
+            <TrendingUp className="h-4 w-4 mr-2 text-success" />
           ) : (
-            <TrendingDown className="h-4 w-4 mr-2 text-[#ef4444]" />
+            <TrendingDown className="h-4 w-4 mr-2 text-danger" />
           )}
-          <span className={isPositive ? 'text-[#22c55e]' : 'text-[#ef4444]'}>
+          <span className={isPositive ? 'text-success' : 'text-danger'}>
             {change}
           </span>
         </div>

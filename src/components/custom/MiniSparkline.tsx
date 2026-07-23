@@ -5,7 +5,7 @@ interface MiniSparklineProps {
   color?: string
 }
 
-export function MiniSparkline({ data, color = '#22c55e' }: MiniSparklineProps) {
+export function MiniSparkline({ data, color = 'var(--success)' }: MiniSparklineProps) {
   const chartData = data.map((value) => ({ value }))
 
   return (

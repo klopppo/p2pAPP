@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
  */
 function TrustlessFlow() {
   return (
-    <div className="flex flex-col items-center justify-center p-8 bg-[#131313] rounded-3xl border border-white/5 shadow-2xl overflow-hidden group">
+    <div className="flex flex-col items-center justify-center p-8 bg-card rounded-3xl border border-white/5 shadow-2xl overflow-hidden group">
       <div className="relative w-full max-w-[600px] aspect-[2/1]">
         <svg
           viewBox="0 0 800 400"
@@ -21,22 +21,22 @@ function TrustlessFlow() {
               fill="#1C1C1C"
               stroke="white"
               strokeWidth="2"
-              className="transition-all duration-500 group-hover:stroke-[#FF00C7]"
+              className="transition-all duration-500 group-hover:stroke-brand-accent"
             />
             <path d="M10 40 L10 100 L110 140 L110 80 Z" fill="#1C1C1C" stroke="white" strokeWidth="2" />
             <path d="M110 140 L160 110 L160 50 L110 80 Z" fill="#1C1C1C" stroke="white" strokeWidth="2" />
             <path d="M130 65 L160 80 L160 100 L130 85 Z" fill="#1C1C1C" stroke="white" strokeWidth="2" />
 
             {/* Key Icon with Neon Glow */}
-            <circle cx="65" cy="85" r="10" stroke="#FF00C7" strokeWidth="2" fill="none">
+            <circle cx="65" cy="85" r="10" stroke="var(--brand-accent)" strokeWidth="2" fill="none">
               <animate attributeName="r" values="9;11;9" dur="3s" repeatCount="indefinite" />
             </circle>
             <path
               d="M75 85 L95 85 L95 95 M85 85 L85 90"
-              stroke="#FF00C7"
+              stroke="var(--brand-accent)"
               strokeWidth="2"
               fill="none"
-              className="drop-shadow-[0_0_8px_#FF00C7]"
+              className="drop-shadow-[0_0_8px_var(--brand-accent)]"
             />
           </g>
 
@@ -45,7 +45,7 @@ function TrustlessFlow() {
             {/* Top Flow: Wallet to Contract */}
             <path
               d="M280 180 Q400 130 520 180"
-              stroke="#FF00C7"
+              stroke="var(--brand-accent)"
               strokeWidth="2"
               fill="none"
               strokeDasharray="8 8"
@@ -53,21 +53,21 @@ function TrustlessFlow() {
             />
             <path
               d="M510 170 L525 182 L510 190"
-              stroke="#FF00C7"
+              stroke="var(--brand-accent)"
               strokeWidth="2"
               fill="none"
-              className="drop-shadow-[0_0_5px_#FF00C7]"
+              className="drop-shadow-[0_0_5px_var(--brand-accent)]"
             />
 
             {/* Bottom Flow: Return/Feedback */}
             <path
               d="M280 260 Q400 310 520 260"
-              stroke="#FF00C7"
+              stroke="var(--brand-accent)"
               strokeWidth="2"
               fill="none"
               className="drop-shadow-[0_0_10px_rgba(255,0,199,0.3)]"
             />
-            <path d="M290 250 L275 258 L290 270" stroke="#FF00C7" strokeWidth="2" fill="none" />
+            <path d="M290 250 L275 258 L290 270" stroke="var(--brand-accent)" strokeWidth="2" fill="none" />
           </g>
 
           {/* Smart Contract Section (Right) */}
@@ -81,14 +81,14 @@ function TrustlessFlow() {
             <g className="animate-pulse-slow">
               <path
                 d="M40 55 L70 40 L100 55 L70 70 Z"
-                fill="#FF00C7"
+                fill="var(--brand-accent)"
                 fillOpacity="0.2"
-                stroke="#FF00C7"
+                stroke="var(--brand-accent)"
                 strokeWidth="2"
-                className="drop-shadow-[0_0_15px_#FF00C7]"
+                className="drop-shadow-[0_0_15px_var(--brand-accent)]"
               />
-              <path d="M40 55 L40 85 L70 100 L70 70 Z" fill="#FF00C7" fillOpacity="0.2" stroke="#FF00C7" strokeWidth="2" />
-              <path d="M70 100 L100 85 L100 55 L70 70 Z" fill="#FF00C7" fillOpacity="0.2" stroke="#FF00C7" strokeWidth="2" />
+              <path d="M40 55 L40 85 L70 100 L70 70 Z" fill="var(--brand-accent)" fillOpacity="0.2" stroke="var(--brand-accent)" strokeWidth="2" />
+              <path d="M70 100 L100 85 L100 55 L70 70 Z" fill="var(--brand-accent)" fillOpacity="0.2" stroke="var(--brand-accent)" strokeWidth="2" />
             </g>
           </g>
         </svg>

@@ -202,7 +202,7 @@ export function LandingPage() {
             <div className="max-w-5xl mx-auto">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-3">
                 {/* Card 1 - Large, spans 2 cols + 2 rows */}
-                <Card className="md:col-span-2 md:row-span-2 group relative overflow-hidden rounded-3xl border p-4 md:p-5 shadow-none min-h-[280px]">
+                <Card className="md:col-span-2 md:row-span-2 group relative overflow-hidden rounded-3xl border p-4 md:p-6 shadow-none min-h-[280px]">
                   <div className="flex flex-row items-start justify-between pb-3">
                     <div className="space-y-1">
                       <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Non-Custodial</p>
@@ -221,7 +221,7 @@ export function LandingPage() {
                 </Card>
 
                 {/* Card 2 - Top right */}
-                <Card className="rounded-3xl border p-4 md:p-5 shadow-none min-h-[120px]">
+                <Card className="rounded-3xl border p-4 md:p-6 shadow-none min-h-[120px]">
                   <div className="flex flex-row items-start justify-between pb-3">
                     <div className="space-y-1">
                       <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">P2P</p>
@@ -237,7 +237,7 @@ export function LandingPage() {
                 </Card>
 
                 {/* Card 3 - Bottom right */}
-                <Card className="rounded-3xl border p-4 md:p-5 shadow-none min-h-[120px]">
+                <Card className="rounded-3xl border p-4 md:p-6 shadow-none min-h-[120px]">
                   <div className="flex flex-row items-start justify-between pb-3">
                     <div className="space-y-1">
                       <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Cost</p>
@@ -253,7 +253,7 @@ export function LandingPage() {
                 </Card>
 
                 {/* Card 4 - Full width bottom */}
-                <Card className="md:col-span-3 rounded-3xl border p-4 md:p-5 shadow-none">
+                <Card className="md:col-span-3 rounded-3xl border p-4 md:p-6 shadow-none">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-3">
                     <div className="space-y-1">
                       <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Code</p>

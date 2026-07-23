@@ -132,7 +132,7 @@ export function ProfilePage({ isOwn = false }: { isOwn?: boolean }) {
               <div className="flex-1">
                 <div className="flex items-center gap-3">
                   <Text variant="h2">{PROFILE_DATA.name}</Text>
-                  <Badge className="bg-green-500 text-white hover:bg-green-600 text-sm">{PROFILE_DATA.lastOnline}</Badge>
+                  <Badge className="bg-success text-success-foreground hover:bg-success/90 text-sm">{PROFILE_DATA.lastOnline}</Badge>
                 </div>
                 <div className="flex items-center gap-2">
                   <Text variant="small" className="font-mono text-muted-foreground">{PROFILE_DATA.address.slice(0,6)}...{PROFILE_DATA.address.slice(-4)}</Text>

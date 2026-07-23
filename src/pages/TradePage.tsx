@@ -241,7 +241,7 @@ export function TradePage() {
 
           {/* Trade input card */}
           <Card>
-            <CardContent className="space-y-5">
+            <CardContent className="space-y-4">
               {/* Amount input */}
               <div className="space-y-2">
                 <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground">

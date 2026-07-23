@@ -54,7 +54,7 @@ export function OfferRow({
               </AvatarFallback>
             </Avatar>
             <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-surface-deep ${
-              isPositive ? 'bg-[#22c55e]' : 'border-outline'
+              isPositive ? 'bg-success' : 'border-outline'
             }`} />
           </div>
           <div>
@@ -94,7 +94,7 @@ export function OfferRow({
         {/* Price Column */}
         <div className="md:col-span-2">
           <div className={`text-2xl font-bold ${
-            isPositive ? 'text-[#22c55e]' : 'text-foreground'
+            isPositive ? 'text-success' : 'text-foreground'
           }`}>
             {price} <span className="text-sm opacity-70">{currency}</span>
           </div>
