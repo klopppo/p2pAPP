@@ -27,6 +27,12 @@
     --color-destructive: var(--destructive);
     --color-accent-foreground: var(--accent-foreground);
     --color-accent: var(--accent);
+    --color-success: var(--success);
+    --color-success-foreground: var(--success-foreground);
+    --color-danger: var(--danger);
+    --color-danger-foreground: var(--danger-foreground);
+    --color-brand-accent: var(--brand-accent);
+    --color-brand-accent-foreground: var(--brand-accent-foreground);
     --color-muted-foreground: var(--muted-foreground);
     --color-muted: var(--muted);
     --color-secondary-foreground: var(--secondary-foreground);
@@ -76,6 +82,15 @@
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.708 0 0);
+
+    /* Semantic status colors (positive / negative / brand accent).
+       Used in price-change indicators, online badges, brand graphics. */
+    --success: #16a34a;
+    --success-foreground: oklch(0.985 0 0);
+    --danger: #dc2626;
+    --danger-foreground: oklch(0.985 0 0);
+    --brand-accent: #FF00C7;
+    --brand-accent-foreground: oklch(0.985 0 0);
 }
 
 .dark {
@@ -103,6 +118,14 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
+
+    /* Dark-mode overrides for the semantic status tokens. */
+    --success: #22c55e;
+    --success-foreground: oklch(0.145 0 0);
+    --danger: #ef4444;
+    --danger-foreground: oklch(0.145 0 0);
+    --brand-accent: #FF00C7;
+    --brand-accent-foreground: oklch(0.985 0 0);
 }
 
 @layer base {
@@ -132,6 +155,16 @@ body {
   html {
     @apply font-sans;
     }
+}
+
+/* Glass-panel utility: canonical surface treatment for cards in the
+   design system. Defined as a real class (was previously referenced but
+   never declared, leaving 8 components unstyled). Pair with `rounded-2xl`,
+   `p-6`, and any per-card overrides (transitions, layout). */
+@layer components {
+  .glass-panel {
+    @apply bg-background/50 backdrop-blur-xl shadow-xl border border-border/50;
+  }
 }
 
 /* Non-custodial graphic animations (see NonCustodialGraphic.tsx) */
