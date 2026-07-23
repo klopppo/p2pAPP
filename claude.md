@@ -84,6 +84,8 @@ Defined in [`src/index.css`](src/index.css) as CSS vars, surfaced to Tailwind vi
 
 Default `variant="body"`.
 
+> **Exception — `LandingPage` hero typography.** The marketing landing page uses raw responsive classes (`text-4xl sm:text-5xl md:text-6xl lg:text-7xl`) on `<h1>`/`<h2>`/`<h3>` elements because `<Text>` variants are fixed-size and don't support responsive breakpoints. This is intentional — keep raw classes there. The reusable `SectionHeader` component ([`src/components/ui/section-header.tsx`](src/components/ui/section-header.tsx)) provides the same responsive sizing for in-app section headings; prefer it over hand-rolled classes.
+
 ---
 
 ## Components

@@ -185,7 +185,7 @@ export function CreateOfferPage() {
                   {/* Token and Price */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="token" className="text-base font-semibold mb-4">
+                      <Label htmlFor="token" className="text-base font-semibold mb-2 block">
                         Token/Currency
                       </Label>
                       <DropdownMenu>
@@ -215,7 +215,7 @@ export function CreateOfferPage() {
                       </DropdownMenu>
                     </div>
                     <div>
-                      <Label htmlFor="price" className="text-base font-semibold mb-4">
+                      <Label htmlFor="price" className="text-base font-semibold mb-2 block">
                         Price Per Unit
                       </Label>
                       <Input
@@ -232,7 +232,7 @@ export function CreateOfferPage() {
                   {/* Amount Range */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="minAmount" className="text-base font-semibold mb-4">
+                      <Label htmlFor="minAmount" className="text-base font-semibold mb-2 block">
                         Minimum Amount
                       </Label>
                       <Input
@@ -245,7 +245,7 @@ export function CreateOfferPage() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="maxAmount" className="text-base font-semibold mb-4">
+                      <Label htmlFor="maxAmount" className="text-base font-semibold mb-2 block">
                         Maximum Amount
                       </Label>
                       <Input
@@ -262,7 +262,7 @@ export function CreateOfferPage() {
                   {/* Payment and Location */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="paymentMethod" className="text-base font-semibold mb-4">
+                      <Label htmlFor="paymentMethod" className="text-base font-semibold mb-2 block">
                         Payment Method
                       </Label>
                       <DropdownMenu>
@@ -292,7 +292,7 @@ export function CreateOfferPage() {
                       </DropdownMenu>
                     </div>
                     <div>
-                      <Label htmlFor="location" className="text-base font-semibold mb-4">
+                      <Label htmlFor="location" className="text-base font-semibold mb-2 block">
                         Location
                       </Label>
                       <DropdownMenu>
@@ -325,7 +325,7 @@ export function CreateOfferPage() {
 
                   {/* Grace Period */}
                   <div>
-                    <Label htmlFor="gracePeriod" className="text-base font-semibold mb-4">
+                    <Label htmlFor="gracePeriod" className="text-base font-semibold mb-2 block">
                       Grace Period (hours)
                     </Label>
                     <Input
@@ -377,7 +377,7 @@ export function CreateOfferPage() {
                     </div>
                     {formData.isPrivate && (
                       <div className="mt-4">
-                        <Label htmlFor="targetUser" className="text-base font-semibold mb-4">
+                        <Label htmlFor="targetUser" className="text-base font-semibold mb-2 block">
                           Target User Address
                         </Label>
                         <Input
