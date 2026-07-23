@@ -134,28 +134,27 @@ export function OpenOfferPage() {
               )}
 
               {/* Offer Details
-                  Horizontal label/value rows (flex justify-between) instead of
-                  vertical stacking. This matches the design system pattern for
-                  key-value rows in cards and keeps row heights consistent
-                  regardless of value font size — previously a tall `h3` price
-                  in one cell stretched its row and pushed the next row's labels
-                  visually far below the row gap, breaking the rhythm. */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-                <div className="flex items-center justify-between gap-3">
+                  Vertical label-on-top / value-below per the design system
+                  (`mb-2` rhythm for label → content in form/detail cards).
+                  `items-start` on the grid keeps each cell at its content
+                  height instead of stretching to the row's tallest cell, so
+                  the row gap stays consistent regardless of value size. */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 items-start">
+                <div className="space-y-1.5">
                   <Text variant="small" className="text-muted-foreground">Type</Text>
                   <Badge variant={offer.type === 'buy' ? 'default' : 'secondary'} className="rounded-full">
                     {offer.type} {offer.crypto_token}
                   </Badge>
                 </div>
-                <div className="flex items-baseline justify-between gap-3">
+                <div className="space-y-1.5">
                   <Text variant="small" className="text-muted-foreground">Price per {offer.crypto_token}</Text>
                   <Text variant="h3">{symbol}{price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                 </div>
-                <div className="flex items-baseline justify-between gap-3">
+                <div className="space-y-1.5">
                   <Text variant="small" className="text-muted-foreground">Amount Range</Text>
                   <Text variant="body">{symbol}{minAmount.toLocaleString()} – {symbol}{maxAmount.toLocaleString()}</Text>
                 </div>
-                <div className="flex items-baseline justify-between gap-3">
+                <div className="space-y-1.5">
                   <Text variant="small" className="text-muted-foreground">Location</Text>
                   <Text variant="body">{regions}</Text>
                 </div>
