@@ -133,23 +133,29 @@ export function OpenOfferPage() {
                 </Alert>
               )}
 
-              {/* Offer Details */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-3">
+              {/* Offer Details
+                  Horizontal label/value rows (flex justify-between) instead of
+                  vertical stacking. This matches the design system pattern for
+                  key-value rows in cards and keeps row heights consistent
+                  regardless of value font size — previously a tall `h3` price
+                  in one cell stretched its row and pushed the next row's labels
+                  visually far below the row gap, breaking the rhythm. */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                <div className="flex items-center justify-between gap-3">
                   <Text variant="small" className="text-muted-foreground">Type</Text>
                   <Badge variant={offer.type === 'buy' ? 'default' : 'secondary'} className="rounded-full">
                     {offer.type} {offer.crypto_token}
                   </Badge>
                 </div>
-                <div className="space-y-3">
+                <div className="flex items-baseline justify-between gap-3">
                   <Text variant="small" className="text-muted-foreground">Price per {offer.crypto_token}</Text>
                   <Text variant="h3">{symbol}{price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                 </div>
-                <div className="space-y-3">
+                <div className="flex items-baseline justify-between gap-3">
                   <Text variant="small" className="text-muted-foreground">Amount Range</Text>
                   <Text variant="body">{symbol}{minAmount.toLocaleString()} – {symbol}{maxAmount.toLocaleString()}</Text>
                 </div>
-                <div className="space-y-3">
+                <div className="flex items-baseline justify-between gap-3">
                   <Text variant="small" className="text-muted-foreground">Location</Text>
                   <Text variant="body">{regions}</Text>
                 </div>
