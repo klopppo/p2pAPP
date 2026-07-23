@@ -82,13 +82,13 @@ export function OpenOfferPage() {
         onBack={() => navigate(-1)}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Offer Details */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4">
           <Card className="glass-panel rounded-2xl">
             <CardContent className="px-6 py-0">
               {/* Trader Info */}
-              <div className="flex items-center gap-4 mb-6">
+              <div className="flex items-center gap-4 mb-3">
                 <Avatar className="h-12 w-12">
                   <AvatarImage src={seller?.avatar_url ?? undefined} />
                   <AvatarFallback>{sellerName.slice(0, 2).toUpperCase()}</AvatarFallback>
@@ -125,7 +125,7 @@ export function OpenOfferPage() {
 
               {/* Expiry */}
               {expiresAt && (
-                <Alert className="mb-6">
+                <Alert className="mb-3">
                   <Clock className="h-4 w-4" />
                   <AlertDescription>
                     Offer expires {expiresAt.toLocaleString()}
@@ -139,7 +139,7 @@ export function OpenOfferPage() {
                   `items-start` on the grid keeps each cell at its content
                   height instead of stretching to the row's tallest cell, so
                   the row gap stays consistent regardless of value size. */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 items-start">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 items-start">
                 <div className="space-y-1.5">
                   <Text variant="small" className="text-muted-foreground">Type</Text>
                   <Badge variant={offer.type === 'buy' ? 'default' : 'secondary'} className="rounded-full">
@@ -152,17 +152,19 @@ export function OpenOfferPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Text variant="small" className="text-muted-foreground">Amount Range</Text>
-                  <Text variant="body">{symbol}{minAmount.toLocaleString()} – {symbol}{maxAmount.toLocaleString()}</Text>
+                  {/* mt-0 overrides Text body's built-in `mt-6` so the gap is
+                      just our space-y-1.5 (6px) instead of 30px. */}
+                  <Text variant="body" className="mt-0">{symbol}{minAmount.toLocaleString()} – {symbol}{maxAmount.toLocaleString()}</Text>
                 </div>
                 <div className="space-y-1.5">
                   <Text variant="small" className="text-muted-foreground">Location</Text>
-                  <Text variant="body">{regions}</Text>
+                  <Text variant="body" className="mt-0">{regions}</Text>
                 </div>
               </div>
 
               {/* Payment Methods */}
-              <div className="mt-6">
-                <Text variant="small" className="text-muted-foreground mb-2">Payment Method</Text>
+              <div className="mt-4">
+                <Text variant="small" className="text-muted-foreground mb-1.5">Payment Method</Text>
                 <div className="flex items-center flex-wrap gap-2">
                   {(offer.payment_methods ?? []).map((m: string) => (
                     <Badge key={m} className="rounded-full">{m}</Badge>
@@ -172,9 +174,12 @@ export function OpenOfferPage() {
 
               {/* Description */}
               {offer.description && (
-                <div className="mt-6">
-                  <Text variant="small" className="text-muted-foreground mb-2">Description</Text>
-                  <Text variant="body" className="whitespace-pre-wrap">
+                <div className="mt-4">
+                  <Text variant="small" className="text-muted-foreground mb-1.5">Description</Text>
+                  {/* mt-0 + leading-6 keeps the body compact; without this
+                      override the body's built-in mt-6 (24px) stacks on top
+                      of the label's mb-1.5 (6px) for ~30px of dead space. */}
+                  <Text variant="body" className="mt-0 leading-6 whitespace-pre-wrap">
                     {offer.description}
                   </Text>
                 </div>
@@ -185,8 +190,8 @@ export function OpenOfferPage() {
           {/* Acceptance Terms */}
           <Card className="glass-panel rounded-2xl">
             <CardContent className="px-6 py-0">
-              <Text variant="h4" className="font-semibold mb-4">Acceptance Terms</Text>
-              <ul className="space-y-2 text-sm text-muted-foreground">
+              <Text variant="h4" className="font-semibold mb-2">Acceptance Terms</Text>
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
                 <li>• The amount must be within the specified range ({symbol}{minAmount.toLocaleString()} – {symbol}{maxAmount.toLocaleString()})</li>
                 <li>• The payment method must match one specified in the offer</li>
                 <li>• You must verify the trader’s identity before making payment</li>
@@ -197,10 +202,10 @@ export function OpenOfferPage() {
         </div>
 
         {/* Actions Sidebar */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           <Card className="glass-panel rounded-2xl">
             <CardContent className="p-6">
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="text-center">
                   <Text variant="h4">Ready to Trade?</Text>
                   <Text variant="muted" className="text-sm mt-1">
@@ -220,7 +225,7 @@ export function OpenOfferPage() {
 
           <Card className="glass-panel rounded-2xl">
             <CardContent className="p-6">
-              <Text variant="h4" className="font-semibold mb-4">Security Note</Text>
+              <Text variant="h4" className="font-semibold mb-2">Security Note</Text>
               <div className="flex items-start gap-3">
                 <Shield className="h-5 w-5 text-green-500 mt-0.5" />
                 <div>
