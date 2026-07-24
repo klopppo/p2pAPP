@@ -40,7 +40,7 @@ function App() {
                 <Route path="profile" element={<ProfilePage />} />
                 <Route path="profile/edit" element={<EditProfilePage />} />
                 <Route path="messages" element={<ChatPage />} />
-                <Route path="messages/:userId" element={<ChatPage />} />
+                <Route path="messages/:conversationId" element={<ChatPage />} />
                 <Route path="create-offer" element={<CreateOfferPage />} />
                 <Route path="offer/:id" element={<OpenOfferPage />} />
                 <Route path="trade/:id" element={<TradePage />} />

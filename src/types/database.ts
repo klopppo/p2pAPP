@@ -387,6 +387,146 @@ export interface LoginSession {
 }
 
 // =================================================================
+// CHAT TYPES (conversations + messages, see migration 20260724000004)
+// =================================================================
+
+export const ConversationStatus = {
+  OPEN: 'open',
+  ARCHIVED: 'archived',
+  LOCKED: 'locked',
+} as const
+export type ConversationStatus = typeof ConversationStatus[keyof typeof ConversationStatus]
+
+export const ParticipantRole = {
+  BUYER: 'buyer',
+  SELLER: 'seller',
+  MEDIATOR: 'mediator',
+  OBSERVER: 'observer',
+} as const
+export type ParticipantRole = typeof ParticipantRole[keyof typeof ParticipantRole]
+
+export const MessageKind = {
+  TEXT: 'text',
+  SYSTEM: 'system',
+  PAYMENT_HINT: 'payment_hint',
+} as const
+export type MessageKind = typeof MessageKind[keyof typeof MessageKind]
+
+export interface Conversation {
+  id: string
+  trade_id: string | null
+  status: ConversationStatus
+  last_message_at: string | null
+  last_message_preview: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ConversationParticipant {
+  conversation_id: string
+  user_id: string
+  role: ParticipantRole
+  last_read_message_id: string | null
+  muted: boolean
+  joined_at: string
+}
+
+export interface Message {
+  id: string
+  conversation_id: string
+  sender_id: string
+  body: string
+  kind: MessageKind
+  created_at: string
+}
+
+export interface MessageAttachment {
+  id: string
+  storage_path: string
+  mime: string
+  size_bytes: number
+  sha256: string | null
+  uploaded_by: string
+  created_at: string
+}
+
+/**
+ * Conversation joined with participants + the other party's profile, the
+ * linked trade summary, and the current user's unread count. This is the
+ * shape the UI consumes — keep server functions returning this so the
+ * frontend never has to do its own N+1 joins.
+ */
+export interface ConversationView extends Conversation {
+  participants: ConversationWithParticipant[]
+  trade: {
+    id: string
+    trade_id: string
+    status: TradeStatus
+    escrow_status: EscrowStatus
+    crypto_token: string
+    crypto_amount: number
+    fiat_currency: string
+    fiat_amount: number
+  } | null
+  unread_count: number
+  last_read_message_id: string | null
+}
+
+export interface ConversationWithParticipant extends ConversationParticipant {
+  user: Pick<
+    User,
+    'id' | 'wallet_address' | 'nickname' | 'avatar_url' | 'verification_level' | 'last_active_at'
+  >
+}
+
+export interface MessageWithSender extends Message {
+  sender: Pick<
+    User,
+    'id' | 'wallet_address' | 'nickname' | 'avatar_url' | 'verification_level'
+  >
+}
+
+// =================================================================
+// NOTIFICATION TYPES (see migration 20260724000005)
+// =================================================================
+
+export const NotificationKind = {
+  MESSAGE: 'message',
+  TRADE_UPDATE: 'trade_update',
+  DISPUTE_UPDATE: 'dispute_update',
+  SYSTEM: 'system',
+} as const
+export type NotificationKind = typeof NotificationKind[keyof typeof NotificationKind]
+
+export const NotificationChannel = {
+  INAPP: 'inapp',
+  EMAIL: 'email',
+} as const
+export type NotificationChannel = typeof NotificationChannel[keyof typeof NotificationChannel]
+
+export interface Notification {
+  id: string
+  user_id: string
+  kind: NotificationKind
+  conversation_id: string | null
+  message_id: string | null
+  trade_id: string | null
+  title: string
+  body: string
+  payload: Record<string, any>
+  read_at: string | null
+  created_at: string
+}
+
+export interface NotificationPreferences {
+  user_id: string
+  channel: NotificationChannel
+  enabled: boolean
+  email_address: string | null
+  updated_at: string
+}
+
+// =================================================================
 // STUDIO-SAFE MOCKS (for development)
 // =================================================================
 

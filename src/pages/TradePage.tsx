@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import { ShieldCheck, Clock, Globe, Tag, Loader2 } from 'lucide-react'
 import { useOffer } from '@/hooks/useOffers'
-import { createTrade, upsertUser } from '@/lib/supabase'
+import { createTrade, getConversationByTradeId, upsertUser } from '@/lib/supabase'
 
 const CURRENCY_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
 const currencySymbol = (code: string) => CURRENCY_SYMBOLS[code] ?? ''
@@ -109,7 +109,7 @@ export function TradePage() {
       const buyerId = isMakerBuyer ? offer.seller_id : me.id
       const sellerId = isMakerBuyer ? me.id : offer.seller_id
 
-      await createTrade({
+      const trade = await createTrade({
         offer_id: offer.id,
         buyer_id: buyerId,
         seller_id: sellerId,
@@ -125,7 +125,19 @@ export function TradePage() {
       })
 
       toast.success('Trade opened!')
-      navigate('/app/offers')
+
+      // The `create_conversation_for_trade` trigger already created the chat
+      // thread. Fetch its id and send the user straight into it.
+      try {
+        const conv = await getConversationByTradeId(trade.id)
+        if (conv?.id) {
+          navigate(`/app/messages/${conv.id}`)
+          return
+        }
+      } catch (lookupErr) {
+        console.warn('Could not resolve conversation for new trade:', lookupErr)
+      }
+      navigate('/app/messages')
     } catch (error) {
       console.error('Error opening trade:', error)
       toast.error(

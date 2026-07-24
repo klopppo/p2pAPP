@@ -4,14 +4,37 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
-import type { User, Offer, KYCApplication, Dispute, TradeRating, CreateTradeInput } from '@/types/database'
+import type {
+  User,
+  Offer,
+  KYCApplication,
+  Dispute,
+  TradeRating,
+  CreateTradeInput,
+  ConversationView,
+  ConversationWithParticipant,
+  MessageKind,
+  MessageWithSender,
+  Notification,
+  NotificationChannel,
+  NotificationPreferences,
+} from '@/types/database'
 
 // Environment variables (these should be set in .env.local)
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
+// Prefer the new publishable key format (sb_publishable_*) when present;
+// fall back to the legacy anon JWT (VITE_SUPABASE_ANON_KEY) for older
+// projects. Both are safe to ship to the browser.
+const SUPABASE_ANON_KEY =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_PUBLISHABLE_KEY ||
+  process.env.SUPABASE_ANON_KEY
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  throw new Error('Missing Supabase credentials. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY')
+  throw new Error(
+    'Missing Supabase credentials. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY).'
+  )
 }
 
 /**
@@ -685,6 +708,402 @@ export async function getRatingsForTrade(tradeId: string) {
 }
 
 // =================================================================
+// CHAT QUERIES (see migration 20260724000004)
+// =================================================================
+
+const USER_SELECT =
+  'id, wallet_address, nickname, avatar_url, verification_level, last_active_at'
+
+/**
+ * Find a conversation by the linked trade's primary UUID. Trades get a
+ * conversation auto-created by the `create_conversation_for_trade` trigger,
+ * so this is the canonical entry point after `createTrade()` returns.
+ */
+export async function getConversationByTradeId(tradeId: string) {
+  const { data, error } = await supabase
+    .from('conversations')
+    .select(`
+      *,
+      trade:trades(
+        id, trade_id, status, escrow_status,
+        crypto_token, crypto_amount, fiat_currency, fiat_amount
+      ),
+      participants:conversation_participants(
+        conversation_id, user_id, role, last_read_message_id, muted, joined_at,
+        user:users!conversation_participants_user_id_fkey (${USER_SELECT})
+      )
+    `)
+    .eq('trade_id', tradeId)
+    .single()
+
+  if (error) {
+    if (error.code === 'PGRST116') return null
+    console.error('Error fetching conversation by trade:', error)
+    throw error
+  }
+
+  return data as ConversationView & {
+    participants: Array<ConversationWithParticipant>
+  }
+}
+
+/**
+ * List the current user's conversations (those they're a participant in),
+ * sorted newest-first by last_message_at.
+ *
+ * Each row carries the other party's profile and the linked trade summary
+ * so the chat sidebar can render without extra round-trips.
+ */
+export async function listConversations(userId: string) {
+  // First get the user's conversation ids (cheap). The result has nested
+  // arrays from PostgREST joins; we flatten + shape them below.
+  const { data: rows, error } = await supabase
+    .from('conversation_participants')
+    .select(
+      `conversation_id, role, last_read_message_id, muted,
+       conversation:conversations(
+         id, trade_id, status, last_message_at, last_message_preview,
+         created_at, updated_at,
+         trade:trades(
+           id, trade_id, status, escrow_status,
+           crypto_token, crypto_amount, fiat_currency, fiat_amount
+         ),
+         participants:conversation_participants(
+           conversation_id, user_id, role, last_read_message_id, muted, joined_at,
+           user:users!conversation_participants_user_id_fkey (${USER_SELECT})
+         )
+       )`
+    )
+    .eq('user_id', userId)
+    .order('joined_at', { ascending: false })
+
+  if (error) {
+    console.error('Error listing conversations:', error)
+    throw error
+  }
+
+  // Flatten the nested shape into ConversationView[] and compute unread counts.
+  const out: ConversationView[] = []
+  for (const row of (rows ?? []) as unknown as Array<{
+    conversation: ConversationView | null
+  }>) {
+    const conv = row.conversation
+    if (!conv) continue
+
+    const participants = (conv.participants ?? []) as ConversationWithParticipant[]
+    const me = participants.find((p) => p.user_id === userId)
+    const lastReadId = me?.last_read_message_id ?? null
+
+    // Count messages strictly newer than the user's last_read_message_id
+    // (and not authored by the user). One cheap query per conversation.
+    let q = supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('conversation_id', conv.id)
+      .neq('sender_id', userId)
+    if (lastReadId) {
+      const cursor = await getMessageCreatedAt(lastReadId)
+      q = q.gt('created_at', cursor)
+    }
+    const { count } = await q
+    const unread = count ?? 0
+
+    out.push({
+      ...conv,
+      participants,
+      trade: conv.trade ?? null,
+      unread_count: unread,
+      last_read_message_id: lastReadId,
+    })
+  }
+
+  // Sort newest-activity first.
+  out.sort((a, b) => {
+    const at = a.last_message_at ? new Date(a.last_message_at).getTime() : 0
+    const bt = b.last_message_at ? new Date(b.last_message_at).getTime() : 0
+    return bt - at
+  })
+
+  return out
+}
+
+/**
+ * Helper: created_at of a message by id. Used for the unread-count query
+ * inside listConversations; cached at the module level is overkill for now.
+ */
+async function getMessageCreatedAt(messageId: string): Promise<string> {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('created_at')
+    .eq('id', messageId)
+    .single()
+  if (error || !data) return '1970-01-01T00:00:00Z'
+  return (data as { created_at: string }).created_at
+}
+
+/**
+ * Fetch a single conversation with everything the right pane needs.
+ */
+export async function getConversation(conversationId: string, userId: string) {
+  const { data, error } = await supabase
+    .from('conversations')
+    .select(`
+      *,
+      trade:trades(
+        id, trade_id, status, escrow_status,
+        crypto_token, crypto_amount, fiat_currency, fiat_amount
+      ),
+      participants:conversation_participants(
+        conversation_id, user_id, role, last_read_message_id, muted, joined_at,
+        user:users!conversation_participants_user_id_fkey (${USER_SELECT})
+      )
+    `)
+    .eq('id', conversationId)
+    .single()
+
+  if (error) {
+    if (error.code === 'PGRST116') return null
+    console.error('Error fetching conversation:', error)
+    throw error
+  }
+
+  const conv = data as ConversationView
+  const me = conv.participants.find((p) => p.user_id === userId)
+  return { ...conv, last_read_message_id: me?.last_read_message_id ?? null }
+}
+
+/**
+ * Page a conversation's messages (oldest→newest). `before` is a message id;
+ * when set, only messages older than that one are returned.
+ */
+export async function listMessages(
+  conversationId: string,
+  options: { limit?: number; before?: string } = {}
+) {
+  const limit = options.limit ?? 50
+
+  let query = supabase
+    .from('messages')
+    .select(
+      `id, conversation_id, sender_id, body, kind, created_at,
+       sender:users!messages_sender_id_fkey (${USER_SELECT})`
+    )
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (options.before) {
+    const ts = await getMessageCreatedAt(options.before)
+    query = query.lt('created_at', ts)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('Error listing messages:', error)
+    throw error
+  }
+
+  // PostgREST returns nested joins as arrays; the FK guarantees a single
+  // sender row, so we collapse to a single object for the UI shape.
+  const flat = ((data ?? []) as Array<
+    Omit<MessageWithSender, 'sender'> & { sender: MessageWithSender['sender'] | MessageWithSender['sender'][] }
+  >).map((row) => {
+    const sender = Array.isArray(row.sender) ? row.sender[0] ?? null : row.sender ?? null
+    return { ...row, sender } as MessageWithSender
+  })
+
+  // Reverse so callers get ascending order out of the box.
+  return flat.reverse()
+}
+
+/**
+ * Insert a new chat message. The `notify_conversation_message` trigger
+ * automatically writes an in-app notification row per recipient.
+ */
+export async function sendMessage(input: {
+  conversationId: string
+  senderId: string
+  body: string
+  kind?: MessageKind
+}) {
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({
+      conversation_id: input.conversationId,
+      sender_id: input.senderId,
+      body: input.body.trim(),
+      kind: input.kind ?? 'text',
+    })
+    .select(`
+      id, conversation_id, sender_id, body, kind, created_at,
+      sender:users!messages_sender_id_fkey (${USER_SELECT})
+    `)
+    .single()
+
+  if (error) {
+    console.error('Error sending message:', error)
+    throw error
+  }
+
+  // PostgREST returns the joined sender as an array; collapse to a single
+  // object to match the MessageWithSender shape used by the UI.
+  const raw = data as Omit<MessageWithSender, 'sender'> & {
+    sender: MessageWithSender['sender'] | MessageWithSender['sender'][]
+  }
+  const sender = Array.isArray(raw.sender) ? raw.sender[0] ?? null : raw.sender ?? null
+  return { ...raw, sender }
+}
+
+/**
+ * Mark the given message as the user's last-read pointer for this
+ * conversation. Drives the unread badge in the sidebar.
+ */
+export async function markConversationRead(input: {
+  conversationId: string
+  userId: string
+  messageId: string
+}) {
+  const { error } = await supabase
+    .from('conversation_participants')
+    .update({ last_read_message_id: input.messageId })
+    .eq('conversation_id', input.conversationId)
+    .eq('user_id', input.userId)
+
+  if (error) {
+    console.error('Error marking conversation read:', error)
+    throw error
+  }
+}
+
+// =================================================================
+// NOTIFICATION QUERIES (see migration 20260724000005)
+// =================================================================
+
+/**
+ * Newest-first notifications for a user. Unread first, then by created_at.
+ */
+export async function listNotifications(userId: string, limit = 50) {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    console.error('Error listing notifications:', error)
+    throw error
+  }
+
+  return (data ?? []) as Notification[]
+}
+
+/**
+ * Unread count for the navbar bell badge.
+ */
+export async function getUnreadNotificationCount(userId: string) {
+  const { count, error } = await supabase
+    .from('notifications')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .is('read_at', null)
+
+  if (error) {
+    console.error('Error counting notifications:', error)
+    throw error
+  }
+
+  return count ?? 0
+}
+
+export async function markNotificationRead(notificationId: string) {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read_at: new Date().toISOString() })
+    .eq('id', notificationId)
+
+  if (error) {
+    console.error('Error marking notification read:', error)
+    throw error
+  }
+}
+
+export async function markAllNotificationsRead(userId: string) {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .is('read_at', null)
+
+  if (error) {
+    console.error('Error marking all notifications read:', error)
+    throw error
+  }
+}
+
+export async function getNotificationPreferences(userId: string) {
+  const { data, error } = await supabase
+    .from('notification_preferences')
+    .select('*')
+    .eq('user_id', userId)
+
+  if (error) {
+    console.error('Error fetching notification preferences:', error)
+    throw error
+  }
+
+  return (data ?? []) as NotificationPreferences[]
+}
+
+/**
+ * Upsert one preference row. Used by a future settings screen; called with
+ * defaults on first user sync so dispatcher decisions have something to read.
+ */
+export async function upsertNotificationPreference(input: {
+  userId: string
+  channel: NotificationChannel
+  enabled: boolean
+  emailAddress?: string | null
+}) {
+  const { error } = await supabase
+    .from('notification_preferences')
+    .upsert(
+      {
+        user_id: input.userId,
+        channel: input.channel,
+        enabled: input.enabled,
+        email_address: input.emailAddress ?? null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id,channel' }
+    )
+
+  if (error) {
+    console.error('Error upserting notification preference:', error)
+    throw error
+  }
+}
+
+/**
+ * Ensure a user has both channel rows (inapp + email) on file so the
+ * dispatcher can always read prefs without hitting the "missing row" path.
+ * Called from useSyncUser.
+ */
+export async function ensureDefaultNotificationPreferences(userId: string) {
+  const rows: Array<{ user_id: string; channel: NotificationChannel; enabled: boolean }> = [
+    { user_id: userId, channel: 'inapp', enabled: true },
+    { user_id: userId, channel: 'email', enabled: false },
+  ]
+  const { error } = await supabase
+    .from('notification_preferences')
+    .upsert(rows, { onConflict: 'user_id,channel', ignoreDuplicates: true })
+  if (error) {
+    console.error('Error ensuring default notification preferences:', error)
+  }
+}
+
+// =================================================================
 // AUTH UTILITIES
 // =================================================================
 
@@ -769,3 +1188,4 @@ await updateTradeEscrowStatus(tradeId, 'deposited', '0xabc123...')
 // Example: Get active offers
 const offers = await getActiveOffers(50, 0)
 */
+

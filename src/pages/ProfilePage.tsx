@@ -160,11 +160,11 @@ export function ProfilePage({ isOwn = false }: { isOwn?: boolean }) {
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => navigate(`/app/messages/${PROFILE_DATA.address}`)}
+                    onClick={() => navigate('/app/messages')}
                     className="rounded-full border-border shadow-none"
                   >
                     <MessageCircle className="w-4 h-4" />
-                    Chat
+                    Messages
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

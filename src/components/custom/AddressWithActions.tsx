@@ -1,4 +1,3 @@
-import React from 'react'
 import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
 import { Copy, ExternalLink } from 'lucide-react'

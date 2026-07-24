@@ -16,6 +16,8 @@ import {
   ShieldAlert,
 } from 'lucide-react'
 import { WalletConnectButton } from '@/components/custom/WalletConnectButton'
+import { NotificationsBell } from '@/components/custom/NotificationsBell'
+import { NotificationDispatcherHost } from '@/components/custom/NotificationDispatcherHost'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -211,6 +213,12 @@ export function Navbar({ showTabs = false }: NavbarProps) {
 
         {/* Right: Preferences + Connect */}
         <div className="hidden md:flex items-center gap-2">
+          {showTabs && (
+            <>
+              <NotificationsBell />
+              <NotificationDispatcherHost />
+            </>
+          )}
           {showTabs && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
