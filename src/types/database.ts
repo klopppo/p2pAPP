@@ -280,6 +280,9 @@ export interface CreateTradeInput {
   payment_details?: Record<string, unknown>
   platform_fee_bps: number
   treasury_address?: string | null
+  /** Deployed KlerosEsc clone address; set when the trade is created via
+   *  KlerosEscrowFactory.createEscrow(). See src/lib/contracts.ts. */
+  escrow_contract_addr?: string | null
   /** Role of the user opening the trade — used for the offer_accepted event. */
   taker_role: 'buyer' | 'seller'
 }

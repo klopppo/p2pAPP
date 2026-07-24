@@ -24,6 +24,7 @@ import {
   KlerosEscState,
   KlerosEscStateLabel,
   RULING_LABEL,
+  type KlerosEscStateValue,
   type RulingValue,
 } from '@/lib/contracts'
 import { useDispute, useEscrowState } from '@/hooks/useDisputes'
@@ -251,9 +252,9 @@ export function DisputeDetailPage() {
         ? Number(escrowState.currentRuling)
         : null
 
-  const liveEscrowStateValue =
+  const liveEscrowStateValue: KlerosEscStateValue | null =
     escrowState?.state != null
-      ? (Number(escrowState.state) as keyof typeof KlerosEscState)
+      ? (escrowState.state as KlerosEscStateValue)
       : null
 
   const handleExecuteRuling = async () => {

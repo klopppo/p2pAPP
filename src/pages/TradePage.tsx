@@ -15,6 +15,13 @@ import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import { ShieldCheck, Clock, Globe, Tag, Loader2 } from 'lucide-react'
 import { useOffer } from '@/hooks/useOffers'
 import { createTrade, upsertUser } from '@/lib/supabase'
+import {
+  KLEROS_ESCROW_FACTORY_ABI,
+  KLEROS_ESCROW_FACTORY_ADDRESS,
+  DEFAULT_GRACE_PERIOD_SECONDS,
+  DEFAULT_SECURITY_DEPOSIT_BPS,
+  isFactoryConfigured,
+} from '@/lib/contracts'
 
 const CURRENCY_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
 const currencySymbol = (code: string) => CURRENCY_SYMBOLS[code] ?? ''
@@ -125,7 +132,80 @@ export function TradePage() {
       const buyerId = isMakerBuyer ? offer.seller_id : me.id
       const sellerId = isMakerBuyer ? me.id : offer.seller_id
 
-      await createTrade({
+      // Resolve buyer/seller wallet addresses for the on-chain escrow. The
+      // maker's wallet is on the offer row; the taker's wallet is the
+      // connected address.
+      const buyerWallet = isMakerBuyer ? sellerAddr : address
+      const sellerWallet = isMakerBuyer ? address : sellerAddr
+
+      const cryptoAmount = amountNum / price // human-units → token base units
+
+      // Deploy a KlerosEsc clone via the factory. Default grace period is
+      // 7 days, default security deposit is 10% (within KlerosEsc's MIN/MAX).
+      setStage('mining')
+      const txHash = await writeContractAsync({
+        address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
+        abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
+        functionName: 'createEscrow',
+        args: [
+          buyerWallet as `0x${string}`,
+          sellerWallet as `0x${string}`,
+          DEFAULT_GRACE_PERIOD_SECONDS,
+          BigInt(Math.floor(cryptoAmount)),
+          DEFAULT_SECURITY_DEPOSIT_BPS,
+        ],
+      })
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash: txHash,
+      })
+      // Decode the EscrowCreated event to extract the deployed clone address.
+      const { decodeEventLog } = await import('viem')
+      let deployedAddress: `0x${string}` | null = null
+      const factoryAbi = KLEROS_ESCROW_FACTORY_ABI as Abi
+      for (const log of receipt.logs) {
+        try {
+          const decoded = decodeEventLog({
+            abi: factoryAbi,
+            data: log.data,
+            topics: log.topics,
+          })
+          if (decoded.eventName === 'EscrowCreated') {
+            const args = decoded.args as { escrowAddress?: string }
+            if (args.escrowAddress) {
+              deployedAddress = args.escrowAddress as `0x${string}`
+            }
+          }
+        } catch {
+          // Not an EscrowCreated log; skip.
+        }
+      }
+
+      if (!deployedAddress) {
+        // Fallback: read the factory's clones map for the latest escrow
+        // registered to the buyer (cheaper than waiting for indexers).
+        const cloneCount = (await publicClient.readContract({
+          address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
+          abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
+          functionName: 'escrowCountByBuyer',
+          args: [buyerWallet as `0x${string}`],
+        })) as bigint
+        if (cloneCount > 0n) {
+          deployedAddress = (await publicClient.readContract({
+            address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
+            abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
+            functionName: 'escrowByBuyer',
+            args: [buyerWallet as `0x${string}`, cloneCount - 1n],
+          })) as `0x${string}`
+        }
+      }
+
+      if (!deployedAddress) {
+        throw new Error('Failed to resolve the deployed escrow address.')
+      }
+
+      // Persist the trade to Supabase with on-chain metadata.
+      setStage('saving')
+      const trade = await createTrade({
         offer_id: offer.id,
         buyer_id: buyerId,
         seller_id: sellerId,
@@ -142,8 +222,8 @@ export function TradePage() {
         escrow_contract_addr: deployedAddress,
       })
 
-      toast.success('Trade opened!')
-      navigate('/app/offers')
+      toast.success('Escrow deployed — fund the trade to continue.')
+      navigate(`/app/trades/${trade.id}`)
     } catch (error) {
       console.error('Error opening trade:', error)
       toast.error(

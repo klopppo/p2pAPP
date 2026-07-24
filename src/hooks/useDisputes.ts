@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAccount, usePublicClient } from 'wagmi'
+import type { Log } from 'viem'
 import {
   getDisputeById,
   getDisputesByUser,
@@ -10,6 +11,7 @@ import {
   KLEROS_ESCROW_FACTORY_ABI,
   KLEROS_ESCROW_FACTORY_ADDRESS,
   encodeKlerosExtraData,
+  type KlerosEscStateValue,
 } from '@/lib/contracts'
 import type { Abi } from 'viem'
 
@@ -124,32 +126,46 @@ export function useEscrowState(escrowAddress: `0x${string}` | undefined) {
         buyer,
         seller,
         klerosCourt,
+        klerosExtraDataPart1,
+        klerosExtraDataPart2,
         gracePeriod,
         feeBps,
         tradeAmount,
         securityDepositPct,
+        securityDepositAmount,
         state,
+        buyerSecurityDeposited,
+        sellerSecurityDeposited,
+        fundsLocked,
         disputeCreated,
         klerosDisputeID,
         currentRuling,
         rulingReceivedTime,
         disputeTimestamp,
+        disputer,
         evidenceGroupID,
       ] = await Promise.all([
         read<`0x${string}`>('token'),
         read<`0x${string}`>('buyer'),
         read<`0x${string}`>('seller'),
         read<`0x${string}`>('klerosCourt'),
+        read<`0x${string}`>('klerosExtraDataPart1'),
+        read<`0x${string}`>('klerosExtraDataPart2'),
         read<bigint>('gracePeriod'),
         read<bigint>('feeBps'),
         read<bigint>('tradeAmount'),
         read<bigint>('securityDepositPct'),
+        read<bigint>('securityDepositAmount'),
         read<number>('state'),
+        read<boolean>('buyerSecurityDeposited'),
+        read<boolean>('sellerSecurityDeposited'),
+        read<boolean>('fundsLocked'),
         read<boolean>('disputeCreated'),
         read<bigint>('klerosDisputeID'),
         read<bigint>('currentRuling'),
         read<bigint>('rulingReceivedTime'),
         read<bigint>('disputeTimestamp'),
+        read<`0x${string}`>('disputer'),
         read<bigint>('evidenceGroupID'),
       ])
 
@@ -158,16 +174,23 @@ export function useEscrowState(escrowAddress: `0x${string}` | undefined) {
         buyer,
         seller,
         klerosCourt,
+        klerosExtraDataPart1,
+        klerosExtraDataPart2,
         gracePeriod,
         feeBps,
         tradeAmount,
         securityDepositPct,
-        state,
+        securityDepositAmount,
+        state: state as KlerosEscStateValue,
+        buyerSecurityDeposited,
+        sellerSecurityDeposited,
+        fundsLocked,
         disputeCreated,
         klerosDisputeID,
         currentRuling,
         rulingReceivedTime,
         disputeTimestamp,
+        disputer,
         evidenceGroupID,
       }
     },
@@ -223,9 +246,6 @@ export function useArbitrationCost(escrowAddress: `0x${string}` | undefined) {
 /**
  * Subscribe to a KlerosEsc clone's relevant dispute events. Used by the
  * detail viewer to refresh when a new ruling lands.
- *
- * Returns the latest event timestamp seen so consumers can decide whether to
- * re-read state.
  */
 export function useEscrowEventWatcher(
   escrowAddress: `0x${string}` | undefined,
@@ -233,30 +253,31 @@ export function useEscrowEventWatcher(
 ) {
   const publicClient = usePublicClient()
   useEffect(() => {
-    if (!publicClient || !escrowAddress) return
+    if (!publicClient || !escrowAddress || !onEvent) return
     const c = publicClient
     let cancelled = false
-    const handler = (logs: Array<{
-      eventName?: string
-      args?: Record<string, unknown>
-    }>) => {
+    // wagmi v2 types `onLogs` strictly per declared `events`; for our union
+    // of event names we widen with a runtime duck-type check.
+    const handler = (logs: Log[]) => {
       if (cancelled) return
       for (const log of logs) {
-        if (log.eventName && onEvent) onEvent(log.eventName, log.args ?? {})
+        const eventName = (log as unknown as { eventName?: string }).eventName
+        if (eventName) {
+          const args = (log as unknown as { args?: Record<string, unknown> })
+            .args ?? {}
+          onEvent(eventName, args)
+        }
       }
     }
     const unwatch = c.watchContractEvent({
       address: escrowAddress,
       abi: KLEROS_ESC_ABI as Abi,
-      onLogs: handler,
-      events: [
-        'DisputeRaised',
-        'RulingReceived',
-        'RulingExecuted',
-        'Finalized',
-        'Evidence',
-        'DisputeTimedOut',
-      ],
+      onLogs: handler as unknown as Parameters<
+        typeof c.watchContractEvent
+      >[0]['onLogs'],
+      // No `eventName` filter — wagmi v2's strict types don't accept a union
+      // here, so we subscribe to every event on the contract and dispatch
+      // by name in the handler.
     })
     return () => {
       cancelled = true

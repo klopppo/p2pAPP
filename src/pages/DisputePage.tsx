@@ -111,7 +111,7 @@ export function DisputePage() {
   // escrow once the user's escrows load.
   const queryEscrow = searchParams.get('escrowAddress') as `0x${string}` | null
 
-  const [escrowAddress, setEscrowAddress] = useState<`0x${string}`>('')
+  const [escrowAddress, setEscrowAddress] = useState<`0x${string}` | ''>('')
   const [reason, setReason] = useState(DISPUTE_REASONS[0])
   const [severity, setSeverity] = useState<SeverityLabel>(SEVERITY[1])
   const [description, setDescription] = useState('')
@@ -273,7 +273,7 @@ const effectiveEscrow =
       //    Buyer or seller only — enforced by the contract. May also be called
       //    later by either party via the detail page.
       setStage('submitting-evidence')
-      let evidenceTxHash: string | null = null
+      let evidenceTxHash: `0x${string}` | null = null
       try {
         evidenceTxHash = await writeContractAsync({
           address: effectiveEscrow,

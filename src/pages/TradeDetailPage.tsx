@@ -31,6 +31,7 @@ import {
   KLEROS_ESC_ABI,
   KlerosEscState,
   KlerosEscStateLabel,
+  type KlerosEscStateValue,
 } from '@/lib/contracts'
 import { useEscrowState } from '@/hooks/useDisputes'
 import { getTradeById, upsertTradeEscrowStatus } from '@/lib/supabase'
@@ -118,10 +119,10 @@ export function TradeDetailPage() {
     !!address && !!escrowState && address.toLowerCase() === escrowState.seller.toLowerCase()
 
   const onChainState = escrowState?.state
-  const liveState =
-    typeof onChainState === 'number'
-      ? (onChainState as keyof typeof KlerosEscState)
-      : null
+  // escrowState.state is typed as KlerosEscStateValue (already narrowed in
+  // the hook). Guard the lookup so TS doesn't try to index with `undefined`.
+  const liveState: KlerosEscStateValue | null =
+    onChainState != null ? (onChainState as KlerosEscStateValue) : null
   const stateLabel =
     liveState != null ? KlerosEscStateLabel[liveState] : 'Loading…'
 
