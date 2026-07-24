@@ -23,6 +23,13 @@ interface ChatPartner {
   unread: number
 }
 
+// MOCK DATA — commented off per request. The legacy ChatPage used hardcoded
+// demo partners/messages and a fake auto-reply. The real chat system now
+// lives in src/hooks/useConversations.ts + useMessages.ts and the
+// ChatLayout component. Keep these arrays around for reference / to roll
+// back easily, but the page initialises with empty state so the UI is
+// driven by real data only.
+/*
 const mockPartners: ChatPartner[] = [
   { id: '1', name: 'CryptoKing', avatar: 'https://images.unsplash.com/photo-1472099645745-095597429a3b?auto=format&fit=crop&q=80&w=100&h=100', lastMessage: 'Yes, I can do that for 52,400', online: true, unread: 2 },
   { id: '2', name: 'trade84', avatar: '', lastMessage: 'Thanks for the trade!', online: false, unread: 0 },
@@ -38,13 +45,14 @@ const mockMessages: Record<string, Message[]> = {
     { id: 4, senderId: '1', content: 'Yes, I can do that for 52,400', timestamp: new Date(Date.now() - 1800000), isOwn: false },
   ],
 }
+*/
 
 export function ChatPage() {
   const { userId } = useParams<{ userId: string }>()
   const [selectedPartner, setSelectedPartner] = useState<ChatPartner | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [inputValue, setInputValue] = useState('')
-  const [partners, setPartners] = useState<ChatPartner[]>(mockPartners)
+  const [partners, setPartners] = useState<ChatPartner[]>([]) // was: mockPartners — see mocked block above
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
 
@@ -79,7 +87,9 @@ export function ChatPage() {
 
   const selectPartner = (partner: ChatPartner) => {
     setSelectedPartner(partner)
-    setMessages(mockMessages[partner.id] || [])
+    // Messages are loaded by the real chat hooks (useMessages / useConversations).
+    // Previously: setMessages(mockMessages[partner.id] || [])
+    setMessages([])
     setPartners(prev => prev.map(p =>
       p.id === partner.id ? { ...p, unread: 0 } : p
     ))
@@ -109,7 +119,10 @@ export function ChatPage() {
     // Scroll to bottom after sending
     setTimeout(() => scrollToBottom(), 100)
 
-    // Simulate reply after short delay
+    // MOCKED auto-reply — commented off. Previously simulated a fake reply
+    // 1.5s after the user sent a message. Real replies come from the
+    // partner's client via useMessages subscription.
+    /*
     setTimeout(() => {
       const reply: Message = {
         id: messages.length + 2,
@@ -122,9 +135,9 @@ export function ChatPage() {
       setPartners(prev => prev.map(p =>
         p.id === selectedPartner.id ? { ...p, lastMessage: 'Received. I will get back to you shortly.' } : p
       ))
-      // Scroll to bottom after receiving reply
       setTimeout(() => scrollToBottom(), 100)
     }, 1500)
+    */
   }
 
   const formatTime = (date: Date) => {
