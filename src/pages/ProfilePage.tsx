@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAccount } from 'wagmi'
 import { Button } from '@/components/ui/button'
-import { Copy, ExternalLink } from 'lucide-react'
+import { Copy, ExternalLink, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -23,293 +24,354 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { OffersTableWrapper } from '@/components/custom/OffersTableWrapper'
+import { AppPageHeader } from '@/components/custom/AppPageHeader'
+import { FullDropdown } from '@/components/custom/FullDropdown'
 import { Text } from '@/components/ui/text'
 import { ArrowUpDown, MoreVertical, UserPlus, MessageCircle, Flag, BellOff, ShieldAlert } from 'lucide-react'
+import { useUserProfile, useOffersBySeller } from '@/hooks/useOffers'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
+import type { Offer } from '@/hooks/useOffers'
 
-interface Offer {
-  id: number
-  trader: string
-  type: 'buy' | 'sell'
-  token: string
-  price: number
-  priceDisplay: string
-  minAmount: number
-  maxAmount: number
+type SortKey = 'price' | 'minAmount' | 'maxAmount'
+type SortDir = 'asc' | 'desc'
+
+const CURRENCY_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
+const currencySymbol = (code: string) => CURRENCY_SYMBOLS[code] ?? `${code} `
+
+function formatNumber(n: number | string | null | undefined): string {
+  const num = Number(n) || 0
+  return num.toLocaleString()
 }
 
-interface ProfileData {
-  name: string
-  address: string
-  memberSince: string
-  lastOnline: string
-  timezone: string
-  languages: string[]
-  blockedBy: number
-  trustedBy: number
-  following: number
-  rating: number
-  totalTrades: number
-  uniqueTraders: number
-  importedTrades: number
-  importedVolume: string
-  totalVolume: string
-  last30dTrades: number
-  last30dVolume: string
-  completionRate: string
-  avatar: string
+function formatVolume(n: number | string | null | undefined): string {
+  const num = Number(n) || 0
+  if (num >= 1_000_000) return `$${(num / 1_000_000).toFixed(1)}M`
+  if (num >= 1_000) return `$${(num / 1_000).toFixed(1)}K`
+  return `$${num.toLocaleString()}`
 }
 
-const generateUserOffers = (): Offer[] => [
-  { id: 1, trader: '0x1234567890abcdef', type: 'sell', token: 'ETH', price: 2847.50, priceDisplay: '$2,847.50', minAmount: 100, maxAmount: 5000 },
-  { id: 2, trader: '0x1234567890abcdef', type: 'buy', token: 'BTC', price: 52340.00, priceDisplay: '$52,340.00', minAmount: 5000, maxAmount: 50000 },
-  { id: 3, trader: '0x1234567890abcdef', type: 'sell', token: 'USDC', price: 1.00, priceDisplay: '$1.00', minAmount: 100, maxAmount: 10000 },
-]
-
-const PROFILE_DATA: ProfileData = {
-  name: 'CryptoKing',
-  address: '0xabcdef1234567890abcdef1234567890abcdef1234',
-  memberSince: 'Feb 25, 2021',
-  lastOnline: 'Online',
-  timezone: 'Europe/Madrid',
-  languages: ['English'],
-  blockedBy: 9,
-  trustedBy: 2103,
-  following: 42,
-  rating: 4.96,
-  totalTrades: 29006,
-  uniqueTraders: 5801,
-  importedTrades: 3000,
-  importedVolume: '$4,200,000.00+ USD',
-  totalVolume: '$32,052,954.00 USD',
-  last30dTrades: 913,
-  last30dVolume: '$799,386.00 USD',
-  completionRate: '100%',
-  avatar: 'https://images.unsplash.com/photo-1472099645745-095597429a3b?auto=format&fit=crop&q=80&w=100&h=100',
+function formatAddress(addr: string): string {
+  return addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : ''
 }
 
-const SortableHeader = ({ label, sortField, activeKey, onClick }: { label: string; sortField: string; activeKey: string | null; onClick: () => void }) => (
-  <button
-    onClick={onClick}
-    className="inline-flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer"
-  >
-    {label}
-    <ArrowUpDown className={`w-3.5 h-3.5 ${activeKey === sortField ? 'text-foreground' : 'text-muted-foreground/50'}`} />
-  </button>
-)
+function SortableHeader({
+  label,
+  sortField,
+  sortKey,
+  onToggle,
+}: {
+  label: string
+  sortField: SortKey
+  sortKey: SortKey | null
+  onToggle: (key: SortKey) => void
+}) {
+  return (
+    <button
+      onClick={() => onToggle(sortField)}
+      className="inline-flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer"
+    >
+      {label}
+      <ArrowUpDown className={`w-3.5 h-3.5 ${sortKey === sortField ? 'text-foreground' : 'text-muted-foreground/50'}`} />
+    </button>
+  )
+}
 
-export function ProfilePage({ isOwn = false }: { isOwn?: boolean }) {
+export function ProfilePage() {
   const navigate = useNavigate()
-  const [sortKey, setSortKey] = useState<string | null>(null)
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
-  const [isFollowing, setIsFollowing] = useState(false)
-  const [userOffers] = useState<Offer[]>(generateUserOffers())
+  const { address, isConnected } = useAccount()
+  const { data: currentUser } = useCurrentUser()
+  const { data: profile, isLoading: profileLoading, isError: profileError } = useUserProfile(address)
+  const { data: offers, isLoading: offersLoading } = useOffersBySeller(currentUser?.id)
 
-  const toggleSort = (key: string) => {
-    if (sortKey === key) setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
+  const [sortKey, setSortKey] = useState<SortKey | null>(null)
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [isFollowing, setIsFollowing] = useState(false)
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     else { setSortKey(key); setSortDir('asc') }
   }
 
+  const mappedOffers = useMemo(() => {
+    if (!offers) return []
+    return offers.map((o: any) => {
+      const price = Number(o.price_per_unit) || 0
+      const symbol = currencySymbol(o.fiat_currency)
+      const sellerAddr = o.seller?.wallet_address ?? '0x0'
+      return {
+        id: o.id,
+        trader: sellerAddr,
+        trades: o.seller?.total_trades ?? 0,
+        type: o.type,
+        token: o.crypto_token,
+        amount: String(o.crypto_amount ?? 0),
+        price,
+        priceDisplay: `${symbol}${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        currency: symbol,
+        minAmount: Number(o.min_amount) || 0,
+        maxAmount: Number(o.max_amount) || 0,
+        isPositive: o.type === 'buy',
+        seller: {
+          name: o.seller?.nickname ?? sellerAddr,
+          address: sellerAddr,
+          avatar: o.seller?.avatar_url ?? undefined,
+          rating: Number(o.seller?.avg_rating) || 0,
+          totalTrades: o.seller?.total_trades ?? 0,
+          completionRate: '—',
+          tags: o.tags ?? [],
+        },
+        paymentMethods: o.payment_methods ?? [],
+      } as Offer
+    })
+  }, [offers])
+
   const filteredOffers = useMemo(() => {
-    const sorted = [...userOffers]
+    let sorted = [...mappedOffers]
     if (sortKey) {
       sorted.sort((a, b) => {
-        const aVal = a[sortKey as keyof Offer] as number
-        const bVal = b[sortKey as keyof Offer] as number
+        const aVal = a[sortKey]
+        const bVal = b[sortKey]
         return sortDir === 'asc' ? aVal - bVal : bVal - aVal
       })
     }
     return sorted
-  }, [userOffers, sortKey, sortDir])
+  }, [mappedOffers, sortKey, sortDir])
+
+  if (!isConnected || !address) {
+    return (
+      <section className="max-w-xl mx-auto space-y-6 text-center">
+        <AppPageHeader title="Profile" variant="centered" onBack={() => navigate(-1)} />
+        <Card>
+          <CardContent className="p-6 space-y-4">
+            <Text variant="h4">Connect your wallet</Text>
+            <Text variant="muted" className="text-muted-foreground">
+              Connect a wallet to view your profile, stats, and offers.
+            </Text>
+          </CardContent>
+        </Card>
+      </section>
+    )
+  }
+
+  if (profileLoading) {
+    return (
+      <section className="flex items-center justify-center py-20 text-muted-foreground">
+        <Loader2 className="w-5 h-5 animate-spin mr-2" />
+        Loading profile…
+      </section>
+    )
+  }
+
+  if (profileError || !profile) {
+    return (
+      <section className="max-w-xl mx-auto space-y-6">
+        <AppPageHeader title="Profile" variant="centered" onBack={() => navigate(-1)} />
+        <Card>
+          <CardContent className="p-6 space-y-4">
+            <Text variant="body" className="text-destructive">
+              Couldn't load profile. Please try again.
+            </Text>
+            <Button className="rounded-full" onClick={() => window.location.reload()}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
+    )
+  }
+
+  const nickname = profile.nickname ?? 'Anonymous'
+  const walletAddr = profile.wallet_address ?? address
+  const avatarUrl = profile.avatar_url ?? undefined
+  const rating = Number(profile.avg_rating) || 0
+  const totalTrades = profile.total_trades ?? 0
+  const completedTrades = profile.completed_trades ?? 0
+  const cancelledTrades = profile.cancelled_trades ?? 0
+  const disputeCount = profile.dispute_count ?? 0
+  const completionRate = totalTrades > 0 ? `${Math.round((completedTrades / totalTrades) * 100)}%` : '—'
+  const lastActive = profile.last_active_at ? new Date(profile.last_active_at).toLocaleDateString() : '—'
+  const memberSince = profile.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
   return (
     <section className="space-y-8">
-            {/* Profile Header */}
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-              <Avatar className="h-24 w-24">
-                <AvatarImage src={PROFILE_DATA.avatar} />
-                <AvatarFallback>{PROFILE_DATA.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <div className="flex items-center gap-3">
-                  <Text variant="h2">{PROFILE_DATA.name}</Text>
-                  <Badge className="bg-success text-success-foreground hover:bg-success/90 text-sm">{PROFILE_DATA.lastOnline}</Badge>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Text variant="small" className="font-mono text-muted-foreground">{PROFILE_DATA.address.slice(0,6)}...{PROFILE_DATA.address.slice(-4)}</Text>
-                  <div className="ml-1 flex items-center gap-1">
-                    <Button size="icon" variant="ghost" onClick={() => { navigator.clipboard.writeText(PROFILE_DATA.address); toast.success('Indirizzo copiato') }} title="Copia indirizzo">
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" onClick={() => window.open(`https://blockscan.com/token/${PROFILE_DATA.address}`, '_blank', 'noopener')} title="Apri su Blockscan">
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
+      {/* Profile Header */}
+      <AppPageHeader
+        title="Profile"
+        subtitle={profile.bio ?? 'Your P2P trading profile'}
+        variant="split"
+        action={
+          <Button onClick={() => navigate('/app/profile/edit')} className="rounded-full shadow-none">
+            Edit Profile
+          </Button>
+        }
+      />
+
+      <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+        <Avatar className="h-24 w-24">
+          <AvatarImage src={avatarUrl} />
+          <AvatarFallback>{nickname.slice(0, 2).toUpperCase()}</AvatarFallback>
+        </Avatar>
+        <div className="flex-1">
+          <div className="flex items-center gap-3">
+            <Text variant="h2">{nickname}</Text>
+            <Badge className="bg-success text-success-foreground hover:bg-success/90 text-sm">
+              {lastActive === '—' ? 'Offline' : 'Online'}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <Text variant="small" className="font-mono text-muted-foreground">{formatAddress(walletAddr)}</Text>
+            <div className="ml-1 flex items-center gap-1">
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => {
+                  navigator.clipboard.writeText(walletAddr)
+                  toast.success('Address copied')
+                }}
+                title="Copy address"
+              >
+                <Copy className="w-4 h-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => window.open(`https://blockscan.com/token/${walletAddr}`, '_blank', 'noopener')}
+                title="Open on Blockscan"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Grid (bento boxes) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Left column */}
+        <div className="flex flex-col gap-4">
+          {/* Trader Details */}
+          <Card>
+            <CardContent className="p-6 space-y-3">
+              <Text variant="h4" className="font-bold">Trader Details</Text>
+              <div className="space-y-3">
+                <div className="flex justify-between"><span className="text-muted-foreground">Member since</span><span>{memberSince}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Total Trades</span><span>{formatNumber(totalTrades)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Completed</span><span>{formatNumber(completedTrades)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Cancelled</span><span>{formatNumber(cancelledTrades)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Disputes</span><span>{formatNumber(disputeCount)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Completion rate</span><span>{completionRate}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Verification</span><span className="capitalize">{profile.verification_level ?? 'unverified'}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Reputation</span><span>{profile.reputation_score ?? 0}</span></div>
               </div>
-              {isOwn ? (
-                <Button onClick={() => navigate('/app/profile/edit')}>Edit Profile</Button>
+            </CardContent>
+          </Card>
+
+          {/* Ratings & Feedback */}
+          <Card>
+            <CardContent className="p-6 space-y-3">
+              <Text variant="h4" className="font-bold">Ratings & Feedback</Text>
+              <div className="space-y-3">
+                <div className="flex justify-between"><span className="text-muted-foreground">Rating</span><span className="font-mono">{rating.toFixed(2)} <span className="text-primary">★</span></span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Unique traders</span><span>{profile.unique_traders ?? 0}</span></div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right column */}
+        <div className="flex flex-col gap-4">
+          {/* Total Trades */}
+          <Card>
+            <CardContent className="p-6">
+              <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">Total Trades</Text>
+              <Text variant="h3" className="mt-1">{formatNumber(totalTrades)}</Text>
+            </CardContent>
+          </Card>
+
+          {/* Total Volume */}
+          <Card>
+            <CardContent className="p-6">
+              <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">Total Volume</Text>
+              <Text variant="h3" className="mt-1">{formatVolume(profile.total_volume)}</Text>
+            </CardContent>
+          </Card>
+
+          {/* Last 30d Stats */}
+          <Card>
+            <CardContent className="p-6 space-y-3">
+              <Text variant="h4" className="font-bold">Last 30 Days</Text>
+              <div className="space-y-3">
+                <div className="flex justify-between"><span className="text-muted-foreground">Trades</span><span>{profile.last_30d_trades ?? 0}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Volume</span><span>{formatVolume(profile.last_30d_volume)}</span></div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* User's Offers Table */}
+      <div>
+        <Text variant="h4" className="mb-4">Your active offers</Text>
+        <OffersTableWrapper>
+          <Table>
+            <TableHeader>
+              <TableRow className="border-b border-border/50 bg-muted/50 -mx-3 md:-mx-4 px-3 md:px-4">
+                <TableHead>Type</TableHead>
+                <TableHead>Token</TableHead>
+                <TableHead className="text-right">
+                  <SortableHeader label="Price" sortField="price" sortKey={sortKey} onToggle={toggleSort} />
+                </TableHead>
+                <TableHead className="text-right">
+                  <SortableHeader label="Min Amount" sortField="minAmount" sortKey={sortKey} onToggle={toggleSort} />
+                </TableHead>
+                <TableHead className="text-right">
+                  <SortableHeader label="Max Amount" sortField="maxAmount" sortKey={sortKey} onToggle={toggleSort} />
+                </TableHead>
+                <TableHead>Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {offersLoading ? (
+                <TableRow className="border-b border-border/50">
+                  <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                    <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />
+                    Loading offers…
+                  </TableCell>
+                </TableRow>
+              ) : filteredOffers.length === 0 ? (
+                <TableRow className="border-b border-border/50">
+                  <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                    No active offers. <Button className="rounded-full shadow-none ml-2" onClick={() => navigate('/app/create-offer')}>Create one</Button>
+                  </TableCell>
+                </TableRow>
               ) : (
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant={isFollowing ? 'secondary' : 'default'}
-                    onClick={() => setIsFollowing((f) => !f)}
-                    className="rounded-full shadow-none"
+                filteredOffers.map((offer) => (
+                  <TableRow
+                    key={offer.id}
+                    onClick={() => navigate(`/app/offer/${offer.id}`)}
+                    className="hover:bg-muted/50 transition-colors border-b border-border/50 cursor-pointer"
                   >
-                    <UserPlus className="w-4 h-4" />
-                    {isFollowing ? 'Following' : 'Follow'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => navigate('/app/messages')}
-                    className="rounded-full border-border shadow-none"
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                    Messages
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="icon" className="rounded-full border-border shadow-none">
-                        <MoreVertical className="w-4 h-4" />
+                    <TableCell>
+                      <Badge variant={offer.type === 'buy' ? 'default' : 'secondary'} className="rounded-full">
+                        {offer.type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">{offer.token}</TableCell>
+                    <TableCell className="text-right font-mono">{offer.priceDisplay}</TableCell>
+                    <TableCell className="text-right font-mono">{offer.currency}{offer.minAmount.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-mono">{offer.currency}{offer.maxAmount.toLocaleString()}</TableCell>
+                    <TableCell>
+                      <Button size="sm" className="rounded-full shadow-none" onClick={(e) => { e.stopPropagation(); navigate(`/app/offer/${offer.id}/edit`) }}>
+                        Edit
                       </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      <DropdownMenuGroup>
-                        <DropdownMenuItem onSelect={() => setIsFollowing((f) => !f)}>
-                          <UserPlus className="w-4 h-4" />
-                          {isFollowing ? 'Unfollow' : 'Follow'}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <BellOff className="w-4 h-4" />
-                          Mute notifications
-                        </DropdownMenuItem>
-                      </DropdownMenuGroup>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuGroup>
-                        <DropdownMenuItem variant="destructive">
-                          <Flag className="w-4 h-4" />
-                          Report user
-                        </DropdownMenuItem>
-                        <DropdownMenuItem variant="destructive">
-                          <ShieldAlert className="w-4 h-4" />
-                          Block user
-                        </DropdownMenuItem>
-                      </DropdownMenuGroup>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
-            </div>
-
-            {/* Stats Grid (bento boxes) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Left column */}
-              <div className="flex flex-col gap-4">
-                {/* Trader Details */}
-                <Card>
-                  <CardContent className="px-6 py-0">
-                    <Text variant="h4" className="font-bold mb-4">Trader Details</Text>
-                    <div className="space-y-3">
-                      <div className="flex justify-between"><span className="text-muted-foreground">Member since</span><span>{PROFILE_DATA.memberSince}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Timezone</span><span>{PROFILE_DATA.timezone}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Languages</span><span>{PROFILE_DATA.languages.join(', ')}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Blocked by</span><span>{PROFILE_DATA.blockedBy} traders</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Trusted by</span><span>{PROFILE_DATA.trustedBy.toLocaleString()} traders</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Following</span><button className="text-primary">{PROFILE_DATA.following} — View list</button></div>
-                    </div>
-                  </CardContent>
-                </Card>
-                {/* Ratings & Feedback */}
-                <Card>
-                  <CardContent className="px-4 py-0">
-                    <Text variant="h4" className="font-bold mb-4">Ratings & Feedback</Text>
-                    <div className="space-y-3">
-                      <div className="flex justify-between"><span className="text-muted-foreground">Rating</span><button className="text-primary">{PROFILE_DATA.rating} — View feedback</button></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Unique traders</span><span>{PROFILE_DATA.uniqueTraders.toLocaleString()}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Completion rate</span><span>{PROFILE_DATA.completionRate}</span></div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Right column */}
-              <div className="flex flex-col gap-4">
-                {/* Total Trades */}
-                <Card>
-                  <CardContent className="px-4 py-0">
-                    <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">Total Trades</Text>
-                    <Text variant="h3" className="mt-1">{PROFILE_DATA.totalTrades.toLocaleString()}</Text>
-                  </CardContent>
-                </Card>
-                {/* Total Volume */}
-                <Card>
-                  <CardContent className="px-4 py-0">
-                    <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">Total Volume</Text>
-                    <Text variant="h3" className="mt-1">{PROFILE_DATA.totalVolume}</Text>
-                  </CardContent>
-                </Card>
-                {/* Activity stats */}
-                <Card>
-                  <CardContent className="px-4 py-0">
-                    <Text variant="h4" className="font-bold mb-4">Activity</Text>
-                    <div className="space-y-3">
-                      <div className="flex justify-between"><span className="text-muted-foreground">Imported trades</span><span>{PROFILE_DATA.importedTrades}+</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Imported volume</span><span>{PROFILE_DATA.importedVolume}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Last 30d Trades</span><span>{PROFILE_DATA.last30dTrades}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Last 30d Volume</span><span>{PROFILE_DATA.last30dVolume}</span></div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-
-            {/* User's Offers Table */}
-            <div>
-              <Text variant="h4" className="mb-4">{isOwn ? 'Your active offers' : `${PROFILE_DATA.name}'s offers`}</Text>
-              <OffersTableWrapper>
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-b border-border/50 bg-muted/50 -mx-3 md:-mx-4 px-3 md:px-4">
-                      <TableHead>Type</TableHead>
-                      <TableHead>Token</TableHead>
-                      <TableHead className="text-right">
-                        <SortableHeader label="Price" sortField="price" activeKey={sortKey} onClick={() => toggleSort('price')} />
-                      </TableHead>
-                      <TableHead className="text-right">
-                        <SortableHeader label="Min Amount" sortField="minAmount" activeKey={sortKey} onClick={() => toggleSort('minAmount')} />
-                      </TableHead>
-                      <TableHead className="text-right">
-                        <SortableHeader label="Max Amount" sortField="maxAmount" activeKey={sortKey} onClick={() => toggleSort('maxAmount')} />
-                      </TableHead>
-                      {isOwn && <TableHead>Action</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredOffers.map((offer) => (
-                      <TableRow
-                        key={offer.id}
-                        className="hover:bg-muted/50 transition-colors border-b border-border/50"
-                      >
-                        <TableCell>
-                          <Badge
-                            variant={offer.type === 'buy' ? 'default' : 'secondary'}
-                            className="rounded-full"
-                          >
-                            {offer.type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="font-medium">{offer.token}</TableCell>
-                        <TableCell className="text-right font-mono">{offer.priceDisplay}</TableCell>
-                        <TableCell className="text-right font-mono">${offer.minAmount.toLocaleString()}</TableCell>
-                        <TableCell className="text-right font-mono">${offer.maxAmount.toLocaleString()}</TableCell>
-                        {isOwn && (
-                          <TableCell><Button size="sm" className="rounded-full shadow-none">Edit</Button></TableCell>
-                        )}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </OffersTableWrapper>
-            </div>
-          </section>
+            </TableBody>
+          </Table>
+        </OffersTableWrapper>
+      </div>
+    </section>
   )
 }
