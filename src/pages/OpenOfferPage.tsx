@@ -5,11 +5,11 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Text } from '@/components/ui/text'
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
+import { AddressWithActions } from '@/components/custom/AddressWithActions'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Clock, Shield, Loader2, Copy, ExternalLink } from 'lucide-react'
+import { Clock, Shield, Loader2 } from 'lucide-react'
 import { useOffer } from '@/hooks/useOffers'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { toast } from 'sonner'
+
 
 const CURRENCY_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
 const currencySymbol = (code: string) => CURRENCY_SYMBOLS[code] ?? ''
@@ -56,17 +56,8 @@ export function OpenOfferPage() {
   const seller = offer.seller
   const sellerName = seller?.nickname ?? (seller?.wallet_address ?? 'Trader')
   const sellerAddr = seller?.wallet_address ?? ''
-  const formatAddress = (addr: string) =>
-    addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : ''
+  const middleTruncate = (addr: string) => (addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : '')
 
-  const copyAddress = (addr: string) => {
-    navigator.clipboard.writeText(addr)
-    toast.success('Address copied to clipboard')
-  }
-
-  const openAddress = (addr: string) => {
-    window.open(`https://etherscan.io/address/${addr}`, '_blank')
-  }
   const regions = (offer.available_regions ?? [])
     .map((r: string) => REGION_NAMES[r] ?? r)
     .join(', ') || 'Global'
@@ -95,7 +86,14 @@ export function OpenOfferPage() {
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <Text variant="h4" className="truncate">{sellerName}</Text>
+                    {sellerAddr && sellerName === sellerAddr ? (
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Text variant="h4" className="truncate">{middleTruncate(sellerAddr)}</Text>
+                        <AddressWithActions address={sellerAddr} explorerBase="https://blockscan.com/token/" showText={false} />
+                      </div>
+                    ) : (
+                      <Text variant="h4" className="truncate">{sellerName}</Text>
+                    )}
                     <Badge variant={seller?.verification_level === 'verified' || seller?.verification_level === 'trusted' ? 'default' : 'secondary'}>
                       {seller?.verification_level ?? 'unverified'}
                     </Badge>
@@ -107,17 +105,7 @@ export function OpenOfferPage() {
                     </div>
                     <div>{(seller?.total_trades ?? 0).toLocaleString()} trades</div>
                     {sellerAddr && (
-                      <div className="flex items-center gap-2">
-                        <Text variant="small" className="font-mono text-xs text-muted-foreground">{formatAddress(sellerAddr)}</Text>
-                        <div className="ml-1 flex items-center gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => { navigator.clipboard.writeText(sellerAddr); toast.success('Indirizzo copiato') }} title="Copia indirizzo">
-                            <Copy className="w-4 h-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" onClick={() => window.open(`https://blockscan.com/token/${sellerAddr}`, '_blank', 'noopener')} title="Apri su Blockscan">
-                            <ExternalLink className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
+                      <AddressWithActions address={sellerAddr} explorerBase="https://blockscan.com/token/" />
                     )}
                   </div>
                 </div>
