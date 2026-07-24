@@ -60,7 +60,7 @@ export function TradePage() {
       <section className="max-w-xl mx-auto space-y-6">
         <AppPageHeader title="Offer not found" variant="centered" onBack={() => navigate(-1)} />
         <Card>
-          <CardContent className="p-6 space-y-4">
+          <CardContent className="space-y-4">
             <Text variant="body" className="text-muted-foreground">
               This offer couldn’t be loaded. It may have been removed or expired.
             </Text>

@@ -318,7 +318,7 @@ export function TradeDetailPage() {
     return (
       <div className="w-full max-w-xl mx-auto">
         <Card className="glass-panel rounded-2xl">
-          <CardContent className="p-6 space-y-4">
+          <CardContent className="space-y-4">
             <Text variant="h4">Trade not found</Text>
             <Text variant="muted" className="text-sm">
               {error instanceof Error

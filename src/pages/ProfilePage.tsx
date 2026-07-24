@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { Button } from '@/components/ui/button'
-import { Copy, ExternalLink, Loader2 } from 'lucide-react'
+import { Copy, ExternalLink, Loader2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -15,22 +15,40 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { OffersTableWrapper } from '@/components/custom/OffersTableWrapper'
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
-import { FullDropdown } from '@/components/custom/FullDropdown'
 import { Text } from '@/components/ui/text'
-import { ArrowUpDown, MoreVertical, UserPlus, MessageCircle, Flag, BellOff, ShieldAlert } from 'lucide-react'
+import { ArrowUpDown } from 'lucide-react'
 import { useUserProfile, useOffersBySeller } from '@/hooks/useOffers'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
-import type { Offer } from '@/hooks/useOffers'
+
+// Local UI shape for the offers table. Mirrors what OffersTableWrapper expects;
+// kept here because the data comes from useOffersBySeller (which returns the DB
+// row) and needs to be reshaped before being passed down.
+interface Offer {
+  id: string
+  trader: string
+  trades: number
+  type: 'buy' | 'sell'
+  token: string
+  amount: string
+  price: number
+  priceDisplay: string
+  currency: string
+  minAmount: number
+  maxAmount: number
+  isPositive: boolean
+  seller: {
+    name: string
+    address: string
+    avatar?: string
+    rating: number
+    totalTrades: number
+    completionRate: string
+    tags: string[]
+  }
+  paymentMethods: string[]
+}
 
 type SortKey = 'price' | 'minAmount' | 'maxAmount'
 type SortDir = 'asc' | 'desc'
@@ -85,48 +103,67 @@ export function ProfilePage() {
 
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>('asc')
-  const [isFollowing, setIsFollowing] = useState(false)
-
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     else { setSortKey(key); setSortDir('asc') }
   }
 
-  const mappedOffers = useMemo(() => {
+  const mappedOffers = useMemo<Offer[]>(() => {
     if (!offers) return []
-    return offers.map((o: any) => {
-      const price = Number(o.price_per_unit) || 0
-      const symbol = currencySymbol(o.fiat_currency)
-      const sellerAddr = o.seller?.wallet_address ?? '0x0'
+    // useOffersBySeller returns the joined offer+user shape from Supabase;
+    // cast through unknown for the loose mapping into the table-friendly shape.
+    return offers.map((o) => {
+      const row = o as unknown as {
+        id: string
+        price_per_unit: number | string
+        fiat_currency: string
+        type: 'buy' | 'sell'
+        crypto_token: string
+        crypto_amount: number | string
+        min_amount: number | string
+        max_amount: number | string
+        tags?: string[]
+        payment_methods?: string[]
+        seller?: {
+          wallet_address?: string
+          nickname?: string | null
+          avatar_url?: string | null
+          avg_rating?: number | string
+          total_trades?: number
+        }
+      }
+      const price = Number(row.price_per_unit) || 0
+      const symbol = currencySymbol(row.fiat_currency)
+      const sellerAddr = row.seller?.wallet_address ?? '0x0'
       return {
-        id: o.id,
+        id: row.id,
         trader: sellerAddr,
-        trades: o.seller?.total_trades ?? 0,
-        type: o.type,
-        token: o.crypto_token,
-        amount: String(o.crypto_amount ?? 0),
+        trades: row.seller?.total_trades ?? 0,
+        type: row.type,
+        token: row.crypto_token,
+        amount: String(row.crypto_amount ?? 0),
         price,
         priceDisplay: `${symbol}${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
         currency: symbol,
-        minAmount: Number(o.min_amount) || 0,
-        maxAmount: Number(o.max_amount) || 0,
-        isPositive: o.type === 'buy',
+        minAmount: Number(row.min_amount) || 0,
+        maxAmount: Number(row.max_amount) || 0,
+        isPositive: row.type === 'buy',
         seller: {
-          name: o.seller?.nickname ?? sellerAddr,
+          name: row.seller?.nickname ?? sellerAddr,
           address: sellerAddr,
-          avatar: o.seller?.avatar_url ?? undefined,
-          rating: Number(o.seller?.avg_rating) || 0,
-          totalTrades: o.seller?.total_trades ?? 0,
+          avatar: row.seller?.avatar_url ?? undefined,
+          rating: Number(row.seller?.avg_rating) || 0,
+          totalTrades: row.seller?.total_trades ?? 0,
           completionRate: '—',
-          tags: o.tags ?? [],
+          tags: row.tags ?? [],
         },
-        paymentMethods: o.payment_methods ?? [],
-      } as Offer
+        paymentMethods: row.payment_methods ?? [],
+      }
     })
   }, [offers])
 
   const filteredOffers = useMemo(() => {
-    let sorted = [...mappedOffers]
+    const sorted = [...mappedOffers]
     if (sortKey) {
       sorted.sort((a, b) => {
         const aVal = a[sortKey]
@@ -142,7 +179,7 @@ export function ProfilePage() {
       <section className="max-w-xl mx-auto space-y-6 text-center">
         <AppPageHeader title="Profile" variant="centered" onBack={() => navigate(-1)} />
         <Card>
-          <CardContent className="p-6 space-y-4">
+          <CardContent className="space-y-4">
             <Text variant="h4">Connect your wallet</Text>
             <Text variant="muted" className="text-muted-foreground">
               Connect a wallet to view your profile, stats, and offers.
@@ -167,7 +204,7 @@ export function ProfilePage() {
       <section className="max-w-xl mx-auto space-y-6">
         <AppPageHeader title="Profile" variant="centered" onBack={() => navigate(-1)} />
         <Card>
-          <CardContent className="p-6 space-y-4">
+          <CardContent className="space-y-4">
             <Text variant="body" className="text-destructive">
               Couldn't load profile. Please try again.
             </Text>
@@ -194,29 +231,26 @@ export function ProfilePage() {
 
   return (
     <section className="space-y-8">
-      {/* Profile Header */}
-      <AppPageHeader
-        title="Profile"
-        subtitle={profile.bio ?? 'Your P2P trading profile'}
-        variant="split"
-        action={
-          <Button onClick={() => navigate('/app/profile/edit')} className="rounded-full shadow-none">
-            Edit Profile
-          </Button>
-        }
-      />
-
       <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
         <Avatar className="h-24 w-24">
           <AvatarImage src={avatarUrl} />
           <AvatarFallback>{nickname.slice(0, 2).toUpperCase()}</AvatarFallback>
         </Avatar>
         <div className="flex-1">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Text variant="h2">{nickname}</Text>
             <Badge className="bg-success text-success-foreground hover:bg-success/90 text-sm">
               {lastActive === '—' ? 'Offline' : 'Online'}
             </Badge>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => navigate('/app/profile/edit')}
+              className="rounded-full shadow-none"
+            >
+              <Pencil className="w-3.5 h-3.5 mr-1" />
+              Edit Profile
+            </Button>
           </div>
           <div className="flex items-center gap-2 mt-1">
             <Text variant="small" className="font-mono text-muted-foreground">{formatAddress(walletAddr)}</Text>
@@ -242,6 +276,9 @@ export function ProfilePage() {
               </Button>
             </div>
           </div>
+          {profile.bio && (
+            <Text variant="muted" className="mt-2 max-w-2xl">{profile.bio}</Text>
+          )}
         </div>
       </div>
 
@@ -251,7 +288,7 @@ export function ProfilePage() {
         <div className="flex flex-col gap-4">
           {/* Trader Details */}
           <Card>
-            <CardContent className="p-6 space-y-3">
+            <CardContent className="space-y-3">
               <Text variant="h4" className="font-bold">Trader Details</Text>
               <div className="space-y-3">
                 <div className="flex justify-between"><span className="text-muted-foreground">Member since</span><span>{memberSince}</span></div>
@@ -268,7 +305,7 @@ export function ProfilePage() {
 
           {/* Ratings & Feedback */}
           <Card>
-            <CardContent className="p-6 space-y-3">
+            <CardContent className="space-y-3">
               <Text variant="h4" className="font-bold">Ratings & Feedback</Text>
               <div className="space-y-3">
                 <div className="flex justify-between"><span className="text-muted-foreground">Rating</span><span className="font-mono">{rating.toFixed(2)} <span className="text-primary">★</span></span></div>
@@ -282,7 +319,7 @@ export function ProfilePage() {
         <div className="flex flex-col gap-4">
           {/* Total Trades */}
           <Card>
-            <CardContent className="p-6">
+            <CardContent>
               <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">Total Trades</Text>
               <Text variant="h3" className="mt-1">{formatNumber(totalTrades)}</Text>
             </CardContent>
@@ -290,7 +327,7 @@ export function ProfilePage() {
 
           {/* Total Volume */}
           <Card>
-            <CardContent className="p-6">
+            <CardContent>
               <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">Total Volume</Text>
               <Text variant="h3" className="mt-1">{formatVolume(profile.total_volume)}</Text>
             </CardContent>
@@ -298,7 +335,7 @@ export function ProfilePage() {
 
           {/* Last 30d Stats */}
           <Card>
-            <CardContent className="p-6 space-y-3">
+            <CardContent className="space-y-3">
               <Text variant="h4" className="font-bold">Last 30 Days</Text>
               <div className="space-y-3">
                 <div className="flex justify-between"><span className="text-muted-foreground">Trades</span><span>{profile.last_30d_trades ?? 0}</span></div>

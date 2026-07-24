@@ -4,6 +4,7 @@ import { useAccount } from 'wagmi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Text } from '@/components/ui/text'
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import { Label } from '@/components/ui/label'
@@ -96,7 +97,7 @@ export function EditProfilePage() {
       <section className="max-w-xl mx-auto space-y-6 text-center">
         <AppPageHeader title="Edit Profile" variant="centered" onBack={() => navigate(-1)} />
         <Card>
-          <CardContent className="p-6 space-y-4">
+          <CardContent className="space-y-4">
             <Text variant="h4">Connect your wallet</Text>
             <Text variant="muted" className="text-muted-foreground">
               Connect a wallet to edit your profile.
