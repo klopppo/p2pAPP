@@ -149,28 +149,30 @@ export async function getUserByWallet(walletAddress: string) {
  */
 export async function upsertUser(
   walletAddress: string,
-  nickname?: string | null,
-  avatarUrl?: string | null,
-  bio?: string | null,
-  location?: string | null,
-  website?: string | null,
-  twitterHandle?: string | null,
-  telegramHandle?: string | null,
-  githubHandle?: string | null,
+  data: {
+    nickname?: string | null
+    avatarUrl?: string | null
+    bio?: string | null
+    location?: string | null
+    website?: string | null
+    twitterHandle?: string | null
+    telegramHandle?: string | null
+    githubHandle?: string | null
+  } = {}
 ) {
-  const { data, error } = await supabase
+  const { data: result, error } = await supabase
     .from('users')
     .upsert(
       {
         wallet_address: walletAddress.toLowerCase(),
-        nickname: nickname || null,
-        avatar_url: avatarUrl || null,
-        bio: bio || null,
-        location: location || null,
-        website: website || null,
-        twitter_handle: twitterHandle || null,
-        telegram_handle: telegramHandle || null,
-        github_handle: githubHandle || null,
+        nickname: data.nickname ?? null,
+        avatar_url: data.avatarUrl ?? null,
+        bio: data.bio ?? null,
+        location: data.location ?? null,
+        website: data.website ?? null,
+        twitter_handle: data.twitterHandle ?? null,
+        telegram_handle: data.telegramHandle ?? null,
+        github_handle: data.githubHandle ?? null,
         last_active_at: new Date().toISOString(),
       },
       { onConflict: 'wallet_address' }
@@ -183,7 +185,7 @@ export async function upsertUser(
     throw error
   }
 
-  return data as User
+  return result as User
 }
 
 /**
