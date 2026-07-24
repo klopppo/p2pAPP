@@ -1,23 +1,33 @@
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
   ExternalLink,
   Image as ImageIcon,
   ShieldAlert,
   User,
+  Wallet,
+  Loader2,
+  Gavel,
+  Timer,
 } from 'lucide-react'
+import { toast } from 'sonner'
+import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
+import { formatEther, type Abi } from 'viem'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Text } from '@/components/ui/text'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { useDispute } from '@/hooks/useDisputes'
+import {
+  KLEROS_ESC_ABI,
+  KlerosEscState,
+  KlerosEscStateLabel,
+  RULING_LABEL,
+  type RulingValue,
+} from '@/lib/contracts'
+import { useDispute, useEscrowState } from '@/hooks/useDisputes'
 
-/**
- * Status enum values mirror `DisputeStatus` in `src/types/database.ts`. Defined
- * inline (instead of importing the enum) so the page typechecks under the
- * project's `erasableSyntaxOnly` + `verbatimModuleSyntax` flags.
- */
 type DisputeStatusValue =
   | 'open'
   | 'in_review'
@@ -25,8 +35,6 @@ type DisputeStatusValue =
   | 'resolved'
   | 'closed'
 
-// Skeleton fallback (the Skeleton ui primitive isn't installed; render a tiny
-// pulse placeholder so this file imports independently.)
 function PulseRow({ className = '' }: { className?: string }) {
   return <div className={`h-3 rounded bg-muted/60 animate-pulse ${className}`} />
 }
@@ -47,30 +55,33 @@ const STATUS_LABEL: Record<DisputeStatusValue, string> = {
   closed: 'Closed',
 }
 
-const GATEWAY = (import.meta.env.VITE_IPFS_GATEWAY ?? 'https://ipfs.io/ipfs/').replace(
-  /\/$/,
-  '',
-)
+const GATEWAY = (
+  import.meta.env.VITE_IPFS_GATEWAY ?? 'https://ipfs.io/ipfs/'
+).replace(/\/$/, '')
 
 interface ParsedDescription {
   userText: string
+  escrowAddress: string | null
   txHash: string | null
+  evidenceTxHash: string | null
   onChainDisputeId: string | null
   evidenceCid: string | null
+  arbitrationFeeWei: string | null
   evidence: Array<{ cid: string; url: string; name: string; size: number }>
 }
 
-/**
- * The create page embeds both the user's free-text and on-chain metadata into
- * a single description blob, separated by `--- on-chain ---`. This splits it
- * back apart so the detail view can render each piece in its own panel.
- */
+/** Split the dispute.description blob (user text + on-chain metadata) the
+ *  DisputePage writes at creation. Tolerates the old format (no `--- on-chain ---`
+ *  separator) so older rows still render. */
 function parseDescription(raw: string | null | undefined): ParsedDescription {
   const empty: ParsedDescription = {
     userText: '',
+    escrowAddress: null,
     txHash: null,
+    evidenceTxHash: null,
     onChainDisputeId: null,
     evidenceCid: null,
+    arbitrationFeeWei: null,
     evidence: [],
   }
   if (!raw) return empty
@@ -82,9 +93,12 @@ function parseDescription(raw: string | null | undefined): ParsedDescription {
   const userText = raw.slice(0, idx).trim()
   const meta = raw.slice(idx + sep.length)
 
+  const escrowMatch = meta.match(/escrow_address:\s*(0x[a-fA-F0-9]{40})/)
   const txMatch = meta.match(/tx_hash:\s*(0x[a-fA-F0-9]{64})/)
-  const idMatch = meta.match(/dispute_id:\s*(\S+)/)
+  const evTxMatch = meta.match(/tx_hash_evidence:\s*(0x[a-fA-F0-9]{64})/)
+  const idMatch = meta.match(/kleros_dispute_id:\s*(\S+)/)
   const cidMatch = meta.match(/evidence_cid:\s*(\S+)/)
+  const feeMatch = meta.match(/arbitration_fee_wei:\s*(\d+)/)
   const evMatch = meta.match(/evidence:\s*(\[[\s\S]*?\])(?:\n|$)/)
 
   let evidence: ParsedDescription['evidence'] = []
@@ -98,9 +112,16 @@ function parseDescription(raw: string | null | undefined): ParsedDescription {
 
   return {
     userText,
+    escrowAddress: escrowMatch?.[1] ?? null,
     txHash: txMatch?.[1] ?? null,
-    onChainDisputeId: idMatch && idMatch[1] !== '(event not decoded)' ? idMatch[1] : null,
+    evidenceTxHash:
+      evTxMatch?.[1] && !evTxMatch[1].includes('not submitted')
+        ? evTxMatch[1]
+        : null,
+    onChainDisputeId:
+      idMatch && idMatch[1] !== '(event not decoded)' ? idMatch[1] : null,
     evidenceCid: cidMatch?.[1] ?? null,
+    arbitrationFeeWei: feeMatch?.[1] ?? null,
     evidence,
   }
 }
@@ -131,7 +152,26 @@ export function DisputeDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { data: dispute, isLoading, isError } = useDispute(id)
+  const { address, isConnected } = useAccount()
+  const publicClient = usePublicClient()
+  const { writeContractAsync, isPending: isWritePending } = useWriteContract()
+
   const parsed = parseDescription(dispute?.description)
+  // Prefer the new DB column (`escrow_address`), fall back to the description
+  // blob for rows written before the column existed.
+  const escrowAddress = (dispute?.escrow_address ?? parsed.escrowAddress ?? '') as
+    | `0x${string}`
+    | ''
+
+  // Live chain reads. Both are disabled until we have an escrow address.
+  const { data: escrowState, refetch: refetchEscrowState } = useEscrowState(
+    escrowAddress || undefined,
+  )
+
+  const isFiler = isConnected && address && escrowState
+    ? address.toLowerCase() === escrowState.buyer.toLowerCase() ||
+      address.toLowerCase() === escrowState.seller.toLowerCase()
+    : false
 
   if (isLoading) {
     return (
@@ -180,14 +220,99 @@ export function DisputeDetailPage() {
     payment_method?: string
     escrow_status?: string
     escrow_contract_addr?: string | null
-    buyer?: { wallet_address: string; nickname?: string | null; avatar_url?: string | null } | null
-    seller?: { wallet_address: string; nickname?: string | null; avatar_url?: string | null } | null
+    buyer?: {
+      wallet_address: string
+      nickname?: string | null
+      avatar_url?: string | null
+    } | null
+    seller?: {
+      wallet_address: string
+      nickname?: string | null
+      avatar_url?: string | null
+    } | null
   }
   const buyer = dispute.buyer as
-    | { wallet_address: string; nickname?: string | null; avatar_url?: string | null; verification_level?: string }
+    | {
+        wallet_address: string
+        nickname?: string | null
+        avatar_url?: string | null
+        verification_level?: string
+      }
     | null
   const seller = dispute.seller as typeof buyer
   const evidenceRows = dispute.evidence as Array<Record<string, unknown>> | null
+
+  // Resolve the on-chain ruling: prefer the cached column from DB, fall back
+  // to the live escrow-state read.
+  const onChainRuling =
+    dispute.on_chain_ruling != null
+      ? Number(dispute.on_chain_ruling)
+      : escrowState?.currentRuling != null
+        ? Number(escrowState.currentRuling)
+        : null
+
+  const liveEscrowStateValue =
+    escrowState?.state != null
+      ? (Number(escrowState.state) as keyof typeof KlerosEscState)
+      : null
+
+  const handleExecuteRuling = async () => {
+    if (!escrowAddress || !publicClient) return
+    try {
+      const hash = await writeContractAsync({
+        address: escrowAddress,
+        abi: KLEROS_ESC_ABI as Abi,
+        functionName: 'executeRuling',
+      })
+      await publicClient.waitForTransactionReceipt({ hash })
+      toast.success('Ruling executed — funds distributed per Kleros.')
+      refetchEscrowState()
+    } catch (err) {
+      toast.error('Execute ruling failed: ' + (err as Error).message)
+    }
+  }
+
+  const handleFinalize = async () => {
+    if (!escrowAddress || !publicClient) return
+    try {
+      const hash = await writeContractAsync({
+        address: escrowAddress,
+        abi: KLEROS_ESC_ABI as Abi,
+        functionName: 'finalize',
+      })
+      await publicClient.waitForTransactionReceipt({ hash })
+      toast.success('Escrow finalized.')
+      refetchEscrowState()
+    } catch (err) {
+      toast.error('Finalize failed: ' + (err as Error).message)
+    }
+  }
+
+  const handleTimeoutDispute = async () => {
+    if (!escrowAddress || !publicClient) return
+    try {
+      const hash = await writeContractAsync({
+        address: escrowAddress,
+        abi: KLEROS_ESC_ABI as Abi,
+        functionName: 'timeoutDispute',
+      })
+      await publicClient.waitForTransactionReceipt({ hash })
+      toast.success('Dispute timed out — default rule applied.')
+      refetchEscrowState()
+    } catch (err) {
+      toast.error('Timeout failed: ' + (err as Error).message)
+    }
+  }
+
+  const canExecuteRuling =
+    liveEscrowStateValue === KlerosEscState.RULING_RECEIVED
+  const canFinalize =
+    liveEscrowStateValue === KlerosEscState.RULING_EXECUTED
+  // DISPUTE_TIMEOUT (30 days) check is best done in the contract; the UI just
+  // exposes the button and surfaces a revert if too early.
+  const canTimeout =
+    liveEscrowStateValue === KlerosEscState.AWAITING_RULING ||
+    liveEscrowStateValue === KlerosEscState.RULING_RECEIVED
 
   return (
     <div className="w-full max-w-xl mx-auto">
@@ -201,7 +326,10 @@ export function DisputeDetailPage() {
         >
           <ArrowLeft className="w-4 h-4" />
         </Button>
-        <Text variant="small" className="uppercase tracking-wider text-muted-foreground">
+        <Text
+          variant="small"
+          className="uppercase tracking-wider text-muted-foreground"
+        >
           {dispute.dispute_id}
         </Text>
         <span
@@ -216,16 +344,153 @@ export function DisputeDetailPage() {
       </Text>
       <Text variant="muted">Filed {formatDateTime(dispute.created_at)}</Text>
 
-      {/* Trade */}
+      {/* Escrow contract + live chain state */}
+      {escrowAddress && (
+        <Card className="glass-panel rounded-2xl p-6 mt-3">
+          <Text variant="h4" className="font-bold mb-2">
+            Escrow contract
+          </Text>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <code className="font-mono text-xs break-all">
+                {escrowAddress}
+              </code>
+              <a
+                href={`https://etherscan.io/address/${escrowAddress}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-primary hover:underline inline-flex items-center gap-1 shrink-0"
+              >
+                Etherscan <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+
+            {escrowState && (
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <Text variant="small" className="text-muted-foreground">
+                    Buyer
+                  </Text>
+                  <p className="font-mono">{formatAddress(escrowState.buyer)}</p>
+                </div>
+                <div>
+                  <Text variant="small" className="text-muted-foreground">
+                    Seller
+                  </Text>
+                  <p className="font-mono">{formatAddress(escrowState.seller)}</p>
+                </div>
+                <div>
+                  <Text variant="small" className="text-muted-foreground">
+                    Trade amount
+                  </Text>
+                  <p className="font-mono">
+                    {escrowState.tradeAmount.toString()}
+                  </p>
+                </div>
+                <div>
+                  <Text variant="small" className="text-muted-foreground">
+                    Kleros court
+                  </Text>
+                  <a
+                    href={`https://etherscan.io/address/${escrowState.klerosCourt}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-xs text-primary hover:underline inline-flex items-center gap-1"
+                  >
+                    {formatAddress(escrowState.klerosCourt)}
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {liveEscrowStateValue !== null && (
+              <div className="flex items-center gap-2 text-sm pt-1">
+                <Gavel className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-muted-foreground">On-chain state:</span>
+                <span className="font-mono">
+                  {KlerosEscStateLabel[liveEscrowStateValue as keyof typeof KlerosEscStateLabel]}
+                </span>
+                {escrowState?.klerosDisputeID != null &&
+                  escrowState.klerosDisputeID > 0n && (
+                    <span className="font-mono">
+                      · Kleros dispute #{escrowState.klerosDisputeID.toString()}
+                    </span>
+                  )}
+              </div>
+            )}
+
+            {onChainRuling != null && onChainRuling >= 0 && (
+              <div className="rounded-xl border border-border bg-background/60 px-3 py-2 text-sm">
+                <Text variant="small" className="text-muted-foreground mb-1">
+                  Kleros ruling
+                </Text>
+                <span className="font-mono">#{onChainRuling}</span>{' '}
+                <span className="text-muted-foreground">—</span>{' '}
+                <span>
+                  {RULING_LABEL[onChainRuling as RulingValue] ??
+                    'Unknown ruling'}
+                </span>
+              </div>
+            )}
+
+            {/* On-chain actions the connected wallet can take. */}
+            {isConnected && isFiler && (canExecuteRuling || canFinalize || canTimeout) && (
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-border/50">
+                {canExecuteRuling && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-full"
+                    disabled={isWritePending}
+                    onClick={handleExecuteRuling}
+                  >
+                    {isWritePending ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                    ) : (
+                      <Gavel className="w-3.5 h-3.5 mr-1" />
+                    )}
+                    Execute ruling
+                  </Button>
+                )}
+                {canFinalize && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-full"
+                    disabled={isWritePending}
+                    onClick={handleFinalize}
+                  >
+                    Finalize escrow
+                  </Button>
+                )}
+                {canTimeout && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-full"
+                    disabled={isWritePending}
+                    onClick={handleTimeoutDispute}
+                  >
+                    <Timer className="w-3.5 h-3.5 mr-1" />
+                    Timeout dispute (30d)
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {/* Trade (kept for back-compat with the Supabase trade join) */}
       {trade && (
-        <Card className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl mt-6">
-          <Text variant="h4" className="font-bold mb-2">Linked trade</Text>
+        <Card className="glass-panel rounded-2xl p-6 mt-3">
+          <Text variant="h4" className="font-bold mb-2">
+            Linked trade
+          </Text>
 
           <div className="space-y-3">
-            <Link
-              to={`/app/trade/${trade.trade_id}`}
-              className="flex items-center gap-3 rounded-xl border border-border bg-background/60 px-3 py-2 hover:border-primary/50 transition-colors"
-            >
+            <div className="flex items-center gap-3 rounded-xl border border-border bg-background/60 px-3 py-2">
               <div className="min-w-0 flex-1">
                 <Text variant="small" className="font-mono truncate">
                   {trade.trade_id}
@@ -239,8 +504,7 @@ export function DisputeDetailPage() {
                   {trade.crypto_amount} {trade.crypto_token}
                 </Text>
               )}
-              <ExternalLink className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-            </Link>
+            </div>
 
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
@@ -281,18 +545,24 @@ export function DisputeDetailPage() {
         </Card>
       )}
 
-      {/* Description */}
+      {/* Description (user text only) */}
       {parsed.userText && (
-        <Card className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl mt-3">
-          <Text variant="h4" className="font-bold mb-2">Filer’s account</Text>
-          <p className="text-sm whitespace-pre-wrap leading-7">{parsed.userText}</p>
+        <Card className="glass-panel rounded-2xl p-6 mt-3">
+          <Text variant="h4" className="font-bold mb-2">
+            Filer’s account
+          </Text>
+          <p className="text-sm whitespace-pre-wrap leading-7">
+            {parsed.userText}
+          </p>
         </Card>
       )}
 
       {/* Evidence (images from IPFS) */}
       {parsed.evidence.length > 0 && (
-        <Card className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl mt-3">
-          <Text variant="h4" className="font-bold mb-2">Proof</Text>
+        <Card className="glass-panel rounded-2xl p-6 mt-3">
+          <Text variant="h4" className="font-bold mb-2">
+            Proof
+          </Text>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {parsed.evidence.map((e, i) => (
               <a
@@ -321,15 +591,17 @@ export function DisputeDetailPage() {
         </Card>
       )}
 
-      {/* On-chain */}
-      {(parsed.txHash || parsed.onChainDisputeId || parsed.evidenceCid) && (
-        <Card className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl mt-3">
-          <Text variant="h4" className="font-bold mb-2">On-chain</Text>
+      {/* On-chain transactions (tx hashes from the description blob) */}
+      {(parsed.txHash || parsed.evidenceTxHash || parsed.onChainDisputeId || parsed.evidenceCid) && (
+        <Card className="glass-panel rounded-2xl p-6 mt-3">
+          <Text variant="h4" className="font-bold mb-2">
+            On-chain
+          </Text>
 
           <div className="space-y-3">
             {parsed.txHash && (
               <div className="flex justify-between gap-3 text-sm">
-                <span className="text-muted-foreground">Tx hash</span>
+                <span className="text-muted-foreground">raiseDispute tx</span>
                 <a
                   href={`https://etherscan.io/tx/${parsed.txHash}`}
                   target="_blank"
@@ -341,9 +613,23 @@ export function DisputeDetailPage() {
                 </a>
               </div>
             )}
+            {parsed.evidenceTxHash && (
+              <div className="flex justify-between gap-3 text-sm">
+                <span className="text-muted-foreground">submitEvidence tx</span>
+                <a
+                  href={`https://etherscan.io/tx/${parsed.evidenceTxHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-primary hover:underline inline-flex items-center gap-1"
+                >
+                  {parsed.evidenceTxHash.slice(0, 10)}…{parsed.evidenceTxHash.slice(-6)}
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            )}
             {parsed.onChainDisputeId && (
               <div className="flex justify-between gap-3 text-sm">
-                <span className="text-muted-foreground">Contract dispute id</span>
+                <span className="text-muted-foreground">Kleros dispute id</span>
                 <span className="font-mono">#{parsed.onChainDisputeId}</span>
               </div>
             )}
@@ -361,19 +647,30 @@ export function DisputeDetailPage() {
                 </a>
               </div>
             )}
+            {parsed.arbitrationFeeWei && (
+              <div className="flex justify-between gap-3 text-sm">
+                <span className="text-muted-foreground">Arbitration fee</span>
+                <span className="font-mono">
+                  {formatEther(BigInt(parsed.arbitrationFeeWei))} ETH
+                </span>
+              </div>
+            )}
             <Separator />
             <Text variant="muted" className="text-xs">
-              The on-chain record is the source of truth for arbitration; the
-              Supabase row mirrors it for fast querying.
+              The KlerosEsc clone and Kleros court are the source of truth. The
+              Supabase row mirrors the on-chain state for fast listing and to
+              store IPFS CIDs that don't fit on-chain.
             </Text>
           </div>
         </Card>
       )}
 
-      {/* Evidence from dispute_evidence table (when present) */}
+      {/* Evidence from dispute_evidence table (legacy / when present) */}
       {evidenceRows && evidenceRows.length > 0 && (
-        <Card className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl mt-3">
-          <Text variant="h4" className="font-bold mb-2">Submitted evidence</Text>
+        <Card className="glass-panel rounded-2xl p-6 mt-3">
+          <Text variant="h4" className="font-bold mb-2">
+            Submitted evidence (legacy table)
+          </Text>
           <ul className="space-y-2">
             {evidenceRows.map((row, i) => (
               <li
@@ -393,6 +690,16 @@ export function DisputeDetailPage() {
             ))}
           </ul>
         </Card>
+      )}
+
+      {/* Wallet-not-connected banner when an action is otherwise available. */}
+      {isConnected === false && escrowAddress && (
+        <Alert className="mt-3 rounded-2xl">
+          <Wallet className="w-4 h-4" />
+          <AlertDescription>
+            Connect the buyer or seller wallet to interact with this dispute.
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* Actions */}

@@ -149,7 +149,8 @@ export function DisputesListPage() {
         <ul className="space-y-3">
           {filtered.map((d) => {
             const status = d.status as DisputeStatusValue
-            const txHash = extractTxHash(d.description)
+            const txHash = d.tx_hash ?? extractTxHash(d.description)
+            const escrow = d.escrow_address
             const trade = d.trade as
               | { trade_id: string; crypto_token?: string; crypto_amount?: number }
               | null
@@ -205,6 +206,11 @@ export function DisputesListPage() {
                           <p className="text-xs text-muted-foreground font-mono pt-1 inline-flex items-center gap-1">
                             <ExternalLink className="w-3 h-3" />
                             tx {txHash.slice(0, 10)}…{txHash.slice(-6)}
+                          </p>
+                        )}
+                        {escrow && (
+                          <p className="text-xs text-muted-foreground font-mono pt-0.5 inline-flex items-center gap-1">
+                            Escrow {escrow.slice(0, 8)}…{escrow.slice(-6)}
                           </p>
                         )}
                       </div>

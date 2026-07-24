@@ -384,6 +384,62 @@ export async function getTradeByTradeId(tradeId: string) {
 }
 
 /**
+ * Get trade by its primary UUID `id` (the `:id` route param used by the
+ * trade detail viewer). Joins the offer + both parties so the page can render
+ * without N+1 follow-ups.
+ */
+export async function getTradeById(id: string) {
+  const { data, error } = await supabase
+    .from('trades')
+    .select(`
+      *,
+      offer:offers(*),
+      buyer:users!trades_buyer_id_fkey (wallet_address, nickname, avatar_url, verification_level),
+      seller:users!trades_seller_id_fkey (wallet_address, nickname, avatar_url, verification_level)
+    `)
+    .eq('id', id)
+    .single()
+
+  if (error) {
+    if (error.code === 'PGRST116') return null
+    console.error('Error fetching trade by id:', error)
+    throw error
+  }
+
+  return data
+}
+
+/**
+ * Update a trade's `escrow_status` + last-action tx hash. Mirror of the
+ * on-chain state for fast listing without an RPC round-trip. Caller passes the
+ * status string from the local enum (`EscrowStatus`); this function does NOT
+ * validate against the enum (it's a passthrough).
+ */
+export async function upsertTradeEscrowStatus(
+  tradeId: string,
+  escrowStatus: string,
+  txHash?: string,
+) {
+  const updates: Record<string, unknown> = {
+    escrow_status: escrowStatus,
+    updated_at: new Date().toISOString(),
+  }
+  if (txHash) updates.escrow_tx_hash = txHash
+  const { data, error } = await supabase
+    .from('trades')
+    .update(updates)
+    .eq('id', tradeId)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error updating trade escrow status:', error)
+    throw error
+  }
+  return data
+}
+
+/**
  * Create a new trade from an offer.
  *
  * Escrow is DB-managed for now (no smart contract): escrow_contract_addr stays

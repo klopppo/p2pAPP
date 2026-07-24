@@ -325,6 +325,24 @@ export interface Dispute {
   created_at: string
   updated_at: string
   resolved_at: string | null
+
+  // Kleros / on-chain mirrors. Optional because the columns may not exist
+  // in older deployments; the Supabase row is a cache of the on-chain
+  // KlerosEsc + Kleros Court state. See src/lib/contracts.ts.
+  /** Deployed KlerosEsc clone for the underlying trade. */
+  escrow_address?: string | null
+  /** Kleros dispute ID assigned by KlerosCourt.createDispute(). */
+  kleros_dispute_id?: string | null
+  /** Tx hash of the raiseDispute() call that created this dispute. */
+  tx_hash?: string | null
+  /** Tx hash of the submitEvidence() call (if any). */
+  tx_hash_evidence?: string | null
+  /** Cached KlerosCourt.DisputeStatus (0 Waiting, 1 Appealable, 2 Solved). */
+  kleros_dispute_status?: number | null
+  /** Cached KlerosEsc.State (uint8) at the time of the last update. */
+  escrow_state?: number | null
+  /** IPFS CID of the primary evidence image (for off-chain display). */
+  evidence_cid?: string | null
 }
 
 export interface DisputeEvidence {
