@@ -179,7 +179,7 @@ export function ProfilePage() {
       <section className="max-w-xl mx-auto space-y-6 text-center">
         <AppPageHeader title="Profile" variant="centered" onBack={() => navigate(-1)} />
         <Card>
-          <CardContent className="p-6 space-y-4">
+          <CardContent className="space-y-4">
             <Text variant="h4">Connect your wallet</Text>
             <Text variant="muted" className="text-muted-foreground">
               Connect a wallet to view your profile, stats, and offers.
@@ -204,7 +204,7 @@ export function ProfilePage() {
       <section className="max-w-xl mx-auto space-y-6">
         <AppPageHeader title="Profile" variant="centered" onBack={() => navigate(-1)} />
         <Card>
-          <CardContent className="p-6 space-y-4">
+          <CardContent className="space-y-4">
             <Text variant="body" className="text-destructive">
               Couldn't load profile. Please try again.
             </Text>
@@ -288,7 +288,7 @@ export function ProfilePage() {
         <div className="flex flex-col gap-4">
           {/* Trader Details */}
           <Card>
-            <CardContent className="p-6 space-y-3">
+            <CardContent className="space-y-3">
               <Text variant="h4" className="font-bold">Trader Details</Text>
               <div className="space-y-3">
                 <div className="flex justify-between"><span className="text-muted-foreground">Member since</span><span>{memberSince}</span></div>
@@ -305,7 +305,7 @@ export function ProfilePage() {
 
           {/* Ratings & Feedback */}
           <Card>
-            <CardContent className="p-6 space-y-3">
+            <CardContent className="space-y-3">
               <Text variant="h4" className="font-bold">Ratings & Feedback</Text>
               <div className="space-y-3">
                 <div className="flex justify-between"><span className="text-muted-foreground">Rating</span><span className="font-mono">{rating.toFixed(2)} <span className="text-primary">★</span></span></div>
@@ -319,7 +319,7 @@ export function ProfilePage() {
         <div className="flex flex-col gap-4">
           {/* Total Trades */}
           <Card>
-            <CardContent className="p-6">
+            <CardContent>
               <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">Total Trades</Text>
               <Text variant="h3" className="mt-1">{formatNumber(totalTrades)}</Text>
             </CardContent>
@@ -327,7 +327,7 @@ export function ProfilePage() {
 
           {/* Total Volume */}
           <Card>
-            <CardContent className="p-6">
+            <CardContent>
               <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">Total Volume</Text>
               <Text variant="h3" className="mt-1">{formatVolume(profile.total_volume)}</Text>
             </CardContent>
@@ -335,7 +335,7 @@ export function ProfilePage() {
 
           {/* Last 30d Stats */}
           <Card>
-            <CardContent className="p-6 space-y-3">
+            <CardContent className="space-y-3">
               <Text variant="h4" className="font-bold">Last 30 Days</Text>
               <div className="space-y-3">
                 <div className="flex justify-between"><span className="text-muted-foreground">Trades</span><span>{profile.last_30d_trades ?? 0}</span></div>

@@ -36,7 +36,7 @@ export function OpenOfferPage() {
       <section>
         <AppPageHeader title="Offer not found" variant="split" onBack={() => navigate(-1)} />
         <Card className="glass-panel rounded-2xl p-6">
-          <CardContent className="p-6">
+          <CardContent>
             <Text variant="body" className="text-muted-foreground">
               This offer couldn’t be loaded. It may have been removed or expired.
             </Text>
@@ -187,7 +187,7 @@ export function OpenOfferPage() {
         {/* Actions Sidebar */}
         <div className="space-y-4">
           <Card className="glass-panel rounded-2xl p-6">
-            <CardContent className="p-6">
+            <CardContent>
               <div className="space-y-3">
                 <div className="text-center">
                   <Text variant="h4">Ready to Trade?</Text>
@@ -207,7 +207,7 @@ export function OpenOfferPage() {
           </Card>
 
           <Card className="glass-panel rounded-2xl p-6">
-            <CardContent className="p-6">
+            <CardContent>
               <Text variant="h4" className="font-semibold mb-2">Security Note</Text>
               <div className="flex items-start gap-3">
                 <Shield className="h-5 w-5 text-green-500 mt-0.5" />
