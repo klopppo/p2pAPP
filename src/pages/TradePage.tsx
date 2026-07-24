@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useAccount } from 'wagmi'
+import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
+import { type Abi } from 'viem'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -13,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import { ShieldCheck, Clock, Globe, Tag, Loader2 } from 'lucide-react'
 import { useOffer } from '@/hooks/useOffers'
-import { createTrade, getConversationByTradeId, upsertUser } from '@/lib/supabase'
+import { createTrade, upsertUser } from '@/lib/supabase'
 
 const CURRENCY_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
 const currencySymbol = (code: string) => CURRENCY_SYMBOLS[code] ?? ''
@@ -22,15 +23,22 @@ const REGION_NAMES: Record<string, string> = {
   IT: 'Italy', DE: 'Germany', FR: 'France', ES: 'Spain',
 }
 
+type Stage = 'idle' | 'creating-escrow' | 'mining' | 'saving'
+
 export function TradePage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { address, isConnected } = useAccount()
+  const publicClient = usePublicClient()
+  const { writeContractAsync } = useWriteContract()
   const { data: offer, isLoading, isError } = useOffer(id)
 
   const [amount, setAmount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<string>('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [stage, setStage] = useState<Stage>('idle')
+
+  const isSubmitting = stage !== 'idle'
+  const factoryReady = isFactoryConfigured()
 
   if (isLoading) {
     return (
@@ -84,6 +92,12 @@ export function TradePage() {
       toast.error('Connect your wallet to open a trade.')
       return
     }
+    if (!factoryReady) {
+      toast.error(
+        'Factory address not configured (VITE_KLEROS_ESCROW_FACTORY). Set it in .env to enable on-chain escrow deployment.',
+      )
+      return
+    }
     if (!amountValid) {
       toast.error(`Enter an amount between ${symbol}${minAmount.toLocaleString()} and ${symbol}${maxAmount.toLocaleString()}.`)
       return
@@ -92,29 +106,31 @@ export function TradePage() {
       toast.error('Select a payment method.')
       return
     }
+    if (!publicClient) {
+      toast.error('Public RPC client not ready. Try again.')
+      return
+    }
 
-    setIsSubmitting(true)
+    setStage('creating-escrow')
     try {
       const me = await upsertUser(address)
-
       if (me.id === offer.seller_id) {
         toast.error("You can’t trade your own offer.")
+        setStage('idle')
         return
       }
 
-      // The taker (connected user) is the opposite party of the offer maker.
-      // A "sell" offer (maker sells crypto) → taker is the buyer.
-      // A "buy" offer (maker buys crypto)  → taker is the seller.
+      // Determine taker role + buyer/seller IDs.
       const isMakerBuyer = offer.type === 'buy'
       const buyerId = isMakerBuyer ? offer.seller_id : me.id
       const sellerId = isMakerBuyer ? me.id : offer.seller_id
 
-      const trade = await createTrade({
+      await createTrade({
         offer_id: offer.id,
         buyer_id: buyerId,
         seller_id: sellerId,
         crypto_token: token,
-        crypto_amount: amountNum / price,
+        crypto_amount: cryptoAmount,
         crypto_price_per_unit: price,
         fiat_currency: offer.fiat_currency,
         fiat_amount: amountNum,
@@ -122,29 +138,19 @@ export function TradePage() {
         payment_details: {},
         platform_fee_bps: Number(offer.platform_fee_bps) || 50,
         taker_role: isMakerBuyer ? 'seller' : 'buyer',
+        // The Trade type already has `escrow_contract_addr` (string | null).
+        escrow_contract_addr: deployedAddress,
       })
 
       toast.success('Trade opened!')
-
-      // The `create_conversation_for_trade` trigger already created the chat
-      // thread. Fetch its id and send the user straight into it.
-      try {
-        const conv = await getConversationByTradeId(trade.id)
-        if (conv?.id) {
-          navigate(`/app/messages/${conv.id}`)
-          return
-        }
-      } catch (lookupErr) {
-        console.warn('Could not resolve conversation for new trade:', lookupErr)
-      }
-      navigate('/app/messages')
+      navigate('/app/offers')
     } catch (error) {
       console.error('Error opening trade:', error)
       toast.error(
-        error instanceof Error ? error.message : 'Failed to open trade. Please try again.'
+        error instanceof Error ? error.message : 'Failed to open trade. Please try again.',
       )
     } finally {
-      setIsSubmitting(false)
+      setStage('idle')
     }
   }
 

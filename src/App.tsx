@@ -13,6 +13,7 @@ import { ChatPage } from './pages/ChatPage'
 import { CreateOfferPage } from './pages/CreateOfferPage'
 import { OpenOfferPage } from './pages/OpenOfferPage'
 import { TradePage } from './pages/TradePage'
+import { TradeDetailPage } from './pages/TradeDetailPage'
 import { DisputePage } from './pages/DisputePage'
 import { DisputesListPage } from './pages/DisputesListPage'
 import { DisputeDetailPage } from './pages/DisputeDetailPage'
@@ -44,6 +45,7 @@ function App() {
                 <Route path="create-offer" element={<CreateOfferPage />} />
                 <Route path="offer/:id" element={<OpenOfferPage />} />
                 <Route path="trade/:id" element={<TradePage />} />
+                <Route path="trades/:id" element={<TradeDetailPage />} />
                 <Route path="dispute" element={<DisputePage />} />
                 <Route path="disputes" element={<DisputesListPage />} />
                 <Route path="disputes/:id" element={<DisputeDetailPage />} />
