@@ -100,6 +100,14 @@ export interface User {
   dispute_count: number
   avg_rating: number
   last_active_at: string | null
+
+  // Denormalized stats — optional because older rows may not have them yet.
+  // Populated by server-side aggregation; the UI gracefully renders 0/— when
+  // null. Mirror the column names in supabase migrations if you add/rename any.
+  unique_traders?: number
+  total_volume?: number | null
+  last_30d_trades?: number
+  last_30d_volume?: number | null
 }
 
 export interface UserPrivate {

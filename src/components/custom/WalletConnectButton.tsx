@@ -1,5 +1,6 @@
 import { useAccount, useDisconnect } from 'wagmi'
 import { useConnectModal } from '@rainbow-me/rainbowkit'
+import { useNavigate } from 'react-router-dom'
 import MotionButton from '@/components/ui/motion-button'
 import {
   DropdownMenu,
@@ -8,12 +9,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Loader2 } from 'lucide-react'
+import { Loader2, User, Copy, ExternalLink } from 'lucide-react'
 
 export function WalletConnectButton() {
   const { openConnectModal, connectModalOpen } = useConnectModal()
   const { address, isConnected } = useAccount()
   const { disconnect } = useDisconnect()
+  const navigate = useNavigate()
 
   const formatAddress = (addr: string) =>
     `${addr.slice(0, 6)}...${addr.slice(-4)}`
@@ -69,10 +71,20 @@ export function WalletConnectButton() {
       </DropdownMenuTrigger>
       <DropdownMenuContent className="bg-card border-border shadow-none rounded-2xl">
         <DropdownMenuItem onClick={copyAddress} className="rounded-xl">
+          <Copy className="w-4 h-4" />
           Copy Address
         </DropdownMenuItem>
         <DropdownMenuItem className="rounded-xl">
+          <ExternalLink className="w-4 h-4" />
           View Explorer
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={() => navigate('/app/profile/edit')}
+          className="rounded-xl"
+        >
+          <User className="w-4 h-4" />
+          Edit Profile
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem

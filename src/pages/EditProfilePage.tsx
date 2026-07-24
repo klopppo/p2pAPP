@@ -1,14 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Text } from '@/components/ui/text'
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Switch } from '@/components/ui/switch'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Pencil, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -44,8 +43,15 @@ export function EditProfilePage() {
 
   const [saving, setSaving] = useState(false)
 
-  // Initialize form with profile data when loaded
-  if (profile && Object.keys(publicData).every(k => publicData[k as keyof ProfileFormPublic] === '')) {
+  // Initialize the form from the loaded profile (and re-sync if the wallet
+  // changes). Runs only when `profile` first arrives or its identity changes;
+  // Sync the loaded profile into the form. react-hooks/set-state-in-effect
+  // is intentionally ignored here — we need to copy external query data into
+  // local form state once per profile change, and the form is otherwise
+  // uncontrolled by the profile ref.
+  useEffect(() => {
+    if (!profile) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPublicData({
       nickname: profile.nickname ?? '',
       avatarUrl: profile.avatar_url ?? '',
@@ -56,7 +62,7 @@ export function EditProfilePage() {
       telegramHandle: profile.telegram_handle ?? '',
       githubHandle: profile.github_handle ?? '',
     })
-  }
+  }, [profile])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

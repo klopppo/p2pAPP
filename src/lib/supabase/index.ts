@@ -149,10 +149,14 @@ export async function getUserByWallet(walletAddress: string) {
  */
 export async function upsertUser(
   walletAddress: string,
-  nickname?: string,
-  avatarUrl?: string,
-  bio?: string,
-  location?: string
+  nickname?: string | null,
+  avatarUrl?: string | null,
+  bio?: string | null,
+  location?: string | null,
+  website?: string | null,
+  twitterHandle?: string | null,
+  telegramHandle?: string | null,
+  githubHandle?: string | null,
 ) {
   const { data, error } = await supabase
     .from('users')
@@ -163,6 +167,10 @@ export async function upsertUser(
         avatar_url: avatarUrl || null,
         bio: bio || null,
         location: location || null,
+        website: website || null,
+        twitter_handle: twitterHandle || null,
+        telegram_handle: telegramHandle || null,
+        github_handle: githubHandle || null,
         last_active_at: new Date().toISOString(),
       },
       { onConflict: 'wallet_address' }
