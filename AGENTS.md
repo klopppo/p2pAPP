@@ -106,25 +106,59 @@ Default `variant="body"`.
 - Sizes: `default`, `sm`, `lg`, `icon`.
 
 ### Cards (`Card` / `CardContent`)
-- Bento-style stat boxes (ProfilePage): grid `md:grid-cols-2 gap-4`, two columns each `flex flex-col gap-4`.
-- Stat card pattern: eyebrow label (`variant="small" uppercase tracking-wider text-muted-foreground`) + big value (`variant="h3"`).
-- Key-value rows inside cards: `<div className="flex justify-between"><span className="text-muted-foreground">Label</span><span>Value</span></div>`, grouped in `space-y-3`.
 
-### Form cards (CreateOfferPage / EditProfilePage / DisputePage)
-Form/detail pages stack one or more cards inside `<div className="max-w-xl mx-auto">`. Tight, scannable rhythm — NOT the loose `space-y-6`/`mb-4` spacing.
+The Card primitive already supplies **24px vertical padding** via baked-in `py-(--card-spacing)`. CardContent's default class supplies **24px horizontal padding** via `px-(--card-spacing)`. Together they give 24px all around — the design spec.
 
-**Spacing map (all values):**
-- **Card ↔ card:** `space-y-3` (12px) on the wrapping `<form>`.
-- **Card padding:** `p-6` (24px) via the card className (overrides the bare `Card`). The `Card` component itself supplies `py-(--card-spacing)` (24px) + internal `gap-3` (12px) between direct children.
-- **Card title (`h4`) → next block:** `mb-2` (8px). Same `mb-2` whether or not a helper line follows — keep it consistent across cards.
+**Canonical pattern** — padding on `<Card>`, NOT on `<CardContent>`:
+
+```tsx
+<Card className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl">
+  <CardContent className="space-y-3">   {/* no p-6 here! */}
+    <Text variant="h4" className="font-bold">Trader Details</Text>
+    <div className="space-y-3">
+      <div className="flex justify-between">
+        <span className="text-muted-foreground">Member since</span>
+        <span>Jan 2024</span>
+      </div>
+      {/* ... */}
+    </div>
+  </CardContent>
+</Card>
+```
+
+**NEVER do this** — `<CardContent className="p-6">` doubles the padding:
+
+```tsx
+// WRONG — renders ~60px vertical padding, not 24px
+<Card>
+  <CardContent className="p-6">...</CardContent>
+</Card>
+```
+
+Math: `Card.py-(--card-spacing) = 24px` + `gap-3 = 12px` (between Card and CardContent flex children) + `CardContent.p-6 = 24px` = **60px** per card. Symptom in screenshots: cards look "puffy" / detached from their siblings.
+
+**Card class string** (canonical — combine with `rounded-2xl`):
+
+```
+bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl
+```
+
+Shorthand: when `glass-panel` is already declared in `index.css`, the short form `glass-panel rounded-2xl p-6` is equivalent.
+
+- **Card ↔ card:** `space-y-3` (12px) on the wrapping `<form>` or vertical column.
+- **Card ↔ card (within a wrapping `<form>`):** `space-y-3`.
+- **Card title (`h4`) → next block:** `mb-2` (8px). Same `mb-2` whether or not a helper line follows.
 - **Helper line under title:** `<p className="text-sm text-muted-foreground mb-2">…</p>` (8px below).
 - **Field blocks inside a card:** wrap in `space-y-4` (16px between blocks).
 - **Two-up fields:** `grid grid-cols-1 md:grid-cols-2 gap-4` (16px).
 - **Label → control:** `<Label className="text-base font-semibold mb-2 block">` (8px). Never `mb-4`.
 - **Counter / hint under a control:** `<p className="text-sm text-muted-foreground mt-1">…</p>` (4px).
-- **Split sections inside one card:** `<Separator />` between `space-y-4` groups (owns the full-width divider; no extra margin needed).
+- **Split sections inside one card:** `<Separator />` between `space-y-4` groups.
+- **Bento-style stat boxes (ProfilePage):** outer grid `md:grid-cols-2 gap-4`, two columns each `flex flex-col gap-4`.
+- **Stat card pattern:** eyebrow label (`variant="small" uppercase tracking-wider text-muted-foreground`) + big value (`variant="h3"`).
+- **Key-value rows inside cards:** `<div className="flex justify-between"><span className="text-muted-foreground">Label</span><span>Value</span></div>`, grouped in `space-y-3`.
 
-**Card class:** `bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl`.
+**Form cards** (CreateOfferPage / EditProfilePage / DisputePage): stack one or more cards inside `<div className="max-w-xl mx-auto">`. Tight, scannable rhythm — NOT the loose `space-y-6`/`mb-4` spacing. Same Card class + spacing map above.
 
 **Inputs:** pill `rounded-full border border-border`; textareas `border border-border min-h-[Npx] resize-none`.
 
