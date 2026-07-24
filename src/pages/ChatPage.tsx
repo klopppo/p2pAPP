@@ -6,12 +6,20 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Text } from '@/components/ui/text'
 import { Send, ArrowLeft } from 'lucide-react'
 
+interface MessageLink {
+  label: string
+  url: string
+}
+
 interface Message {
   id: number
   senderId: string
   content: string
   timestamp: Date
   isOwn: boolean
+  /** Optional clickable links rendered after `content`. Used by the
+   *  ourTeam welcome message to surface the Discord invite. */
+  links?: MessageLink[]
 }
 
 interface ChatPartner {
@@ -47,12 +55,46 @@ const mockMessages: Record<string, Message[]> = {
 }
 */
 
+// ─── Default chat from the website ──────────────────────────────────────────
+// A persistent system contact that every user sees in their conversation list
+// with a one-shot welcome message. This is NOT a mock of peer-to-peer chat —
+// the `ourTeam` thread is a permanent channel from the platform team to the
+// user (think: Telegram's "Telegram" bot, or Slack's "Slackbot" DM). The
+// Discord link is a placeholder — replace with the real invite when known.
+const OUR_TEAM_ID = 'ourTeam'
+const OUR_TEAM_DISCORD = 'https://discord.gg/p2p-escrow'
+const OUR_TEAM_PARTNER: ChatPartner = {
+  id: OUR_TEAM_ID,
+  name: 'ourTeam',
+  avatar: '',
+  lastMessage: 'Welcome aboard!',
+  online: true,
+  unread: 1,
+}
+
+/** Welcome message shown when the user opens the `ourTeam` thread. Edit
+ *  freely; the IDs are stable so user replies (id >= 2) won't collide. */
+const OUR_TEAM_WELCOME: Message = {
+  id: 1,
+  senderId: OUR_TEAM_ID,
+  content:
+    `👋 Welcome to P2P Escrow! You can contact us from here for any ` +
+    `issues, questions, or support requests — replies usually land within a ` +
+    `few hours. We're here to help, and for live community support see ` +
+    `Discord below.`,
+  timestamp: new Date(),
+  isOwn: false,
+  links: [
+    { label: 'Open Discord', url: OUR_TEAM_DISCORD },
+  ],
+}
+
 export function ChatPage() {
   const { userId } = useParams<{ userId: string }>()
   const [selectedPartner, setSelectedPartner] = useState<ChatPartner | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [inputValue, setInputValue] = useState('')
-  const [partners, setPartners] = useState<ChatPartner[]>([]) // was: mockPartners — see mocked block above
+  const [partners, setPartners] = useState<ChatPartner[]>([OUR_TEAM_PARTNER]) // was: mockPartners — see mocked block above
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
 
@@ -87,9 +129,14 @@ export function ChatPage() {
 
   const selectPartner = (partner: ChatPartner) => {
     setSelectedPartner(partner)
-    // Messages are loaded by the real chat hooks (useMessages / useConversations).
-    // Previously: setMessages(mockMessages[partner.id] || [])
-    setMessages([])
+    // The `ourTeam` thread is a system welcome channel — seed it with the
+    // greeting message. Real peer-to-peer chats use the chat hooks
+    // (useMessages / useConversations) which skip this branch.
+    if (partner.id === OUR_TEAM_ID) {
+      setMessages([OUR_TEAM_WELCOME])
+    } else {
+      setMessages([])
+    }
     setPartners(prev => prev.map(p =>
       p.id === partner.id ? { ...p, unread: 0 } : p
     ))
@@ -235,7 +282,22 @@ export function ChatPage() {
                           : 'bg-muted text-foreground rounded-tl-none'
                       }`}
                     >
-                      <p className="text-sm">{message.content}</p>
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      {message.links && message.links.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {message.links.map((link) => (
+                            <a
+                              key={link.url}
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
+                            >
+                              {link.label}
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <span className={`text-xs text-muted-foreground mt-1 ${
                       message.isOwn ? 'text-right' : 'text-left'
