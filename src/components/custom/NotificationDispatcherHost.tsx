@@ -46,9 +46,8 @@ export function NotificationDispatcherHost() {
                 prefs.data.map((p) => [p.channel, p.email_address])
               )
             : {}
-          if (!contacts.email) {
-            // No email configured in notification preferences — leave empty
-            // so the email channel is skipped (wallet-only users have no email).
+          if (!contacts.email && user.email) {
+            contacts.email = user.email
           }
 
           await dispatchNotification({
