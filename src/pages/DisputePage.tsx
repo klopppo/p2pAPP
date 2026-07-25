@@ -36,7 +36,7 @@ import {
   createDispute,
   generateDisputeId,
   getUserByWallet,
-  upsertUser,
+  ensureUser,
 } from '@/lib/supabase'
 import { useUserEscrows, useArbitrationCost } from '@/hooks/useDisputes'
 
@@ -232,7 +232,7 @@ const effectiveEscrow =
 
       // 2) Resolve the filer's Supabase user id (create-if-missing) so the DB
       //    row satisfies the foreign key on disputes.buyer_id.
-      await upsertUser(address)
+      await ensureUser(address)
       const user = await getUserByWallet(address)
       if (!user) throw new Error('Could not resolve Supabase user for this wallet.')
 

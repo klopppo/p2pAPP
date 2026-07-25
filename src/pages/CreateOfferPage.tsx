@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
 import { Check, ChevronDown, Loader2 } from 'lucide-react'
-import { createOffer, upsertUser } from '@/lib/supabase'
+import { createOffer, ensureUser } from '@/lib/supabase'
 
 interface OfferForm {
   type: 'buy' | 'sell'
@@ -79,7 +79,7 @@ export function CreateOfferPage() {
     setIsSubmitting(true)
 
     try {
-      const me = await upsertUser(address)
+      const me = await ensureUser(address)
 
       // Prepare offer data
       // NOTE: available_regions is CHAR(2)[] (ISO country codes), so map the

@@ -73,7 +73,9 @@ export function useMessages(conversationId: string | null | undefined) {
     ])
   }
 
-  return { ...query, loadOlder }
+  const hasMore = (query.data?.length ?? 0) >= 50
+
+  return { ...query, loadOlder, hasMore }
 }
 
 /**

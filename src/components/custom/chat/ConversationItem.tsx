@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { ConversationView, ConversationWithParticipant } from '@/types/database'
-import { cn } from '@/lib/utils'
+import { cn, shortAddress } from '@/lib/utils'
 
 interface Props {
   conversation: ConversationView
@@ -55,11 +55,6 @@ export function ConversationItem({ conversation, active, locallyRead, onSelect }
       )}
     </button>
   )
-}
-
-function shortAddress(addr: string): string {
-  if (!addr) return 'Unknown'
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`
 }
 
 function Avatar({ name, avatarUrl }: { name: string; avatarUrl: string | null }) {

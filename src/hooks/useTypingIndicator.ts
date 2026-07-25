@@ -44,7 +44,7 @@ export function useTypingIndicator(
       })
       .on('broadcast', { event: 'stop_typing' }, (msg: { payload: unknown }) => {
         const payload = msg.payload as { user_id: string }
-        if (!payload?.user_id) return
+        if (!payload?.user_id || payload.user_id === identity?.userId) return
         setTypingUsers((prev) => prev.filter((u) => u.user_id !== payload.user_id))
       })
       .subscribe()
@@ -58,11 +58,15 @@ export function useTypingIndicator(
     }
   }, [conversationId, identity?.userId])
 
-  // Auto-clear stale typing entries after 4s of silence.
+  // Auto-clear stale typing entries after 4s of silence per user.
   useEffect(() => {
     if (typingUsers.length === 0) return
-    const t = setTimeout(() => setTypingUsers([]), 4000)
-    return () => clearTimeout(t)
+    const timers = typingUsers.map((u) =>
+      setTimeout(() => {
+        setTypingUsers((prev) => prev.filter((p) => p.user_id !== u.user_id))
+      }, 4000)
+    )
+    return () => timers.forEach(clearTimeout)
   }, [typingUsers])
 
   const notifyTyping = useCallback(() => {

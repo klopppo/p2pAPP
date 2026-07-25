@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
 import { getActiveOffers, getOfferById, getOffersBySeller } from '@/lib/supabase'
-import type { User } from '@/types/database'
 
 /**
  * Active offers list (first page). react-query is already mounted in App.tsx
@@ -38,17 +37,16 @@ export function useOffersBySeller(sellerId: string | undefined) {
 }
 
 /**
- * User profile by wallet address (or user_id if already known).
- * Fetches the full users row including cached stats.
+ * User profile by wallet address.
+ * Uses `ensureUser` which reads from cache first, then DB.
  */
 export function useUserProfile(walletAddress: string | undefined) {
   return useQuery({
     queryKey: ['user-profile', walletAddress],
     queryFn: async () => {
       if (!walletAddress) throw new Error('No wallet address')
-      // Use getUserByWallet which upserts and returns the user
-      const { getUserByWallet } = await import('@/lib/supabase')
-      return getUserByWallet(walletAddress)
+      const { ensureUser } = await import('@/lib/supabase')
+      return ensureUser(walletAddress)
     },
     enabled: !!walletAddress,
   })

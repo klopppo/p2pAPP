@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAccount } from 'wagmi'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent } from '@/components/ui/card'
 import { Card, CardContent } from '@/components/ui/card'
 import { Text } from '@/components/ui/text'
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Pencil, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useUserProfile } from '@/hooks/useOffers'
-import { upsertUser } from '@/lib/supabase'
+import { updateUserProfile } from '@/lib/supabase'
 
 interface ProfileForm {
   nickname: string
@@ -41,6 +41,7 @@ export function EditProfilePage() {
   const navigate = useNavigate()
   const { address, isConnected } = useAccount()
   const { data: profile, isLoading } = useUserProfile(address)
+  const qc = useQueryClient()
 
   const [form, setForm] = useState<ProfileForm>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
@@ -72,7 +73,7 @@ export function EditProfilePage() {
     }
     setSaving(true)
     try {
-      await upsertUser(address, {
+      await updateUserProfile(address, {
         nickname: form.nickname || null,
         avatarUrl: form.avatarUrl || null,
         bio: form.bio || null,
@@ -83,6 +84,8 @@ export function EditProfilePage() {
         githubHandle: form.githubHandle || null,
       })
       toast.success('Profile saved')
+      qc.invalidateQueries({ queryKey: ['current-user', address] })
+      qc.invalidateQueries({ queryKey: ['user-profile', address] })
       navigate(-1)
     } catch (err) {
       console.error('Error saving profile:', err)

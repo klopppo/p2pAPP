@@ -9,6 +9,7 @@ interface Props {
   partnerAvatarUrl: string | null
   partnerInitial: string
   loading: boolean
+  hasMore: boolean
   onLoadOlder: () => void
 }
 
@@ -23,6 +24,7 @@ export function MessageThread({
   partnerAvatarUrl,
   partnerInitial,
   loading,
+  hasMore,
   onLoadOlder,
 }: Props) {
   const endRef = useRef<HTMLDivElement>(null)
@@ -39,7 +41,7 @@ export function MessageThread({
 
   return (
     <div ref={containerRef} className="flex-1 overflow-y-auto space-y-4 min-h-0">
-      {messages.length > 0 && (
+      {messages.length > 0 && hasMore && (
         <div className="flex justify-center">
           <button
             type="button"

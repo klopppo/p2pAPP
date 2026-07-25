@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   useConversations,
@@ -16,6 +16,7 @@ import { MessageComposer } from './MessageComposer'
 import { TypingIndicator } from './TypingIndicator'
 import { EmptyState } from './EmptyState'
 import { Loader2 } from 'lucide-react'
+import { matchCommand, type ChatCommand } from '@/lib/chat/commands'
 
 interface Props {
   /**
@@ -55,7 +56,10 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   const messages = useMessages(activeId)
   const send = useSendMessage(activeId)
   const markRead = useMarkRead(activeId)
-  const identity = user ? { userId: user.id, nickname: user.nickname } : null
+  const identity = useMemo(
+    () => (user ? { userId: user.id, nickname: user.nickname } : null),
+    [user]
+  )
   const typing = useTypingIndicator(activeId, identity)
   const online = useConversationPresence(activeId, identity)
 
@@ -67,23 +71,58 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
 
   const partnerOnline = !!partner && online.some((o) => o.user_id === partner.user_id)
 
+  // Track last-read message id to avoid redundant markRead calls.
+  const lastReadIdRef = useRef<string | null>(null)
+
   // Once messages render, mark the conversation read so the badge clears.
   useEffect(() => {
     if (!activeId || !user || !messages.data || messages.data.length === 0) return
     const last = messages.data[messages.data.length - 1]
-    if (!last) return
+    if (!last || last.id === lastReadIdRef.current) return
+    lastReadIdRef.current = last.id
     mark(activeId)
     markRead(last.id)
   }, [activeId, user, messages.data, mark, markRead])
 
   const [draft, setDraft] = useState('')
 
-  const handleSend = () => {
+  const handleCommand = useCallback(
+    (cmd: ChatCommand) => {
+      const result = cmd.execute({
+        conversation: convQuery.data ?? null,
+        currentUserId: user.id,
+      })
+      if (result.kind === 'message') {
+        send.mutate(
+          { body: result.body, kind: 'system' },
+          { onSettled: () => setDraft('') }
+        )
+      } else if (result.kind === 'navigate') {
+        navigate(result.path)
+      }
+      setDraft('')
+    },
+    [convQuery.data, user, send, navigate]
+  )
+
+  const handleSend = useCallback(() => {
     const body = draft.trim()
     if (!body) return
-    send.mutate({ body })
-    setDraft('')
-  }
+    // Check if the input is a slash command
+    const cmd = matchCommand(body)
+    if (cmd) {
+      handleCommand(cmd)
+      setDraft('')
+      return
+    }
+    send.mutate(
+      { body },
+      {
+        onError: () => {},
+        onSettled: () => setDraft(''),
+      }
+    )
+  }, [draft, send, handleCommand])
 
   const handleBack = () => {
     setPinnedId(null)
@@ -126,6 +165,9 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
             <ConversationList
               activeId={activeId}
               locallyReadIds={readIds}
+              conversations={conversations.data}
+              isLoading={conversations.isLoading}
+              isError={conversations.isError}
               onSelect={handleSelect}
             />
           </div>
@@ -158,6 +200,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
                   '??'
                 }
                 loading={messages.isLoading}
+                hasMore={messages.hasMore}
                 onLoadOlder={messages.loadOlder}
               />
               {typing.typingUsers.length > 0 && (
@@ -167,6 +210,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
                 value={draft}
                 onChange={setDraft}
                 onSend={handleSend}
+                onCommand={handleCommand}
                 onTyping={typing.notifyTyping}
                 onStopTyping={typing.notifyStopTyping}
                 disabled={convQuery.data.status === 'locked' || send.isPending}

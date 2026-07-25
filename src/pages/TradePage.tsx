@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import { ShieldCheck, Clock, Globe, Tag, Loader2 } from 'lucide-react'
 import { useOffer } from '@/hooks/useOffers'
-import { createTrade, upsertUser } from '@/lib/supabase'
+import { createTrade, ensureUser } from '@/lib/supabase'
 import {
   KLEROS_ESCROW_FACTORY_ABI,
   KLEROS_ESCROW_FACTORY_ADDRESS,
@@ -120,7 +120,7 @@ export function TradePage() {
 
     setStage('creating-escrow')
     try {
-      const me = await upsertUser(address)
+      const me = await ensureUser(address)
       if (me.id === offer.seller_id) {
         toast.error("You can’t trade your own offer.")
         setStage('idle')

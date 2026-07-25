@@ -144,12 +144,76 @@ export async function getUserByWallet(walletAddress: string) {
   return data as User
 }
 
+import { getCachedUser, setCachedUser, invalidateUserCache, clearAllUserCache } from '@/lib/userCache'
+
 /**
- * Create or update user profile
+ * Ensure a user row exists for the given wallet address.
+ *
+ * This is the "sync" path — called on every wallet connect. It only inserts
+ * a new row if one doesn't exist, and updates `last_active_at`. It does
+ * NOT touch profile fields (nickname, bio, etc.) so existing profiles are
+ * never overwritten.
+ *
+ * Reads from cache first; writes cache after DB read.
  */
-export async function upsertUser(
+export async function ensureUser(walletAddress: string): Promise<User> {
+  const addr = walletAddress.toLowerCase()
+
+  // 1. Check cache first
+  const cached = getCachedUser(addr)
+  if (cached) return cached
+
+  // 2. Try to read existing row
+  const { data: existing, error: readErr } = await supabase
+    .from('users')
+    .select('*')
+    .eq('wallet_address', addr)
+    .maybeSingle()
+
+  if (readErr) {
+    console.error('[ensureUser] read error:', readErr)
+    throw readErr
+  }
+
+  if (existing) {
+    // 3a. Row exists — just touch last_active_at (fire-and-forget, don't block)
+    supabase
+      .from('users')
+      .update({ last_active_at: new Date().toISOString() })
+      .eq('wallet_address', addr)
+      .then(({ error }) => {
+        if (error) console.warn('[ensureUser] last_active_at update failed:', error)
+      })
+
+    const user = existing as User
+    setCachedUser(user)
+    return user
+  }
+
+  // 3b. New user — insert with defaults
+  const { data: inserted, error: insertErr } = await supabase
+    .from('users')
+    .insert({ wallet_address: addr, last_active_at: new Date().toISOString() })
+    .select()
+    .single()
+
+  if (insertErr) {
+    console.error('[ensureUser] insert error:', insertErr)
+    throw insertErr
+  }
+
+  const user = inserted as User
+  setCachedUser(user)
+  return user
+}
+
+/**
+ * Update profile fields on the user row. Called ONLY from EditProfilePage.
+ * Writes through to DB, then invalidates + refreshes the cache.
+ */
+export async function updateUserProfile(
   walletAddress: string,
-  data: {
+  profile: {
     nickname?: string | null
     avatarUrl?: string | null
     bio?: string | null
@@ -158,22 +222,23 @@ export async function upsertUser(
     twitterHandle?: string | null
     telegramHandle?: string | null
     githubHandle?: string | null
-  } = {}
-) {
-  const { data: result, error } = await supabase
+  }
+): Promise<User> {
+  const addr = walletAddress.toLowerCase()
+
+  const { data, error } = await supabase
     .from('users')
     .upsert(
       {
-        wallet_address: walletAddress.toLowerCase(),
-        nickname: data.nickname ?? null,
-        avatar_url: data.avatarUrl ?? null,
-        bio: data.bio ?? null,
-        location: data.location ?? null,
-        website: data.website ?? null,
-        twitter_handle: data.twitterHandle ?? null,
-        telegram_handle: data.telegramHandle ?? null,
-        github_handle: data.githubHandle ?? null,
-        last_active_at: new Date().toISOString(),
+        wallet_address: addr,
+        nickname: profile.nickname ?? null,
+        avatar_url: profile.avatarUrl ?? null,
+        bio: profile.bio ?? null,
+        location: profile.location ?? null,
+        website: profile.website ?? null,
+        twitter_handle: profile.twitterHandle ?? null,
+        telegram_handle: profile.telegramHandle ?? null,
+        github_handle: profile.githubHandle ?? null,
       },
       { onConflict: 'wallet_address' }
     )
@@ -181,11 +246,36 @@ export async function upsertUser(
     .single()
 
   if (error) {
-    console.error('Error upserting user:', error)
+    console.error('[updateUserProfile] error:', error)
     throw error
   }
 
-  return result as User
+  const user = data as User
+  invalidateUserCache(addr)
+  setCachedUser(user)
+  return user
+}
+
+/**
+ * @deprecated Use `ensureUser` (sync) or `updateUserProfile` (edit).
+ */
+export async function upsertUser(
+  walletAddress: string,
+  profile?: {
+    nickname?: string | null
+    avatarUrl?: string | null
+    bio?: string | null
+    location?: string | null
+    website?: string | null
+    twitterHandle?: string | null
+    telegramHandle?: string | null
+    githubHandle?: string | null
+  }
+) {
+  if (profile && Object.values(profile).some((v) => v !== undefined && v !== null)) {
+    return updateUserProfile(walletAddress, profile)
+  }
+  return ensureUser(walletAddress)
 }
 
 /**
@@ -1204,6 +1294,7 @@ export async function signInWithWallet(walletAddress: string) {
  * Sign out
  */
 export async function signOut() {
+  clearAllUserCache()
   const { error } = await supabase.auth.signOut()
   if (error) {
     console.error('Error signing out:', error)

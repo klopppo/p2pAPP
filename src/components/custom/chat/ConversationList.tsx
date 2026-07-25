@@ -1,5 +1,5 @@
+import type { ConversationView } from '@/types/database'
 import { MessageCircle } from 'lucide-react'
-import { useConversations } from '@/hooks/useConversations'
 import { ConversationItem } from './ConversationItem'
 import { Text } from '@/components/ui/text'
 import { Skeleton } from './Skeleton'
@@ -7,6 +7,9 @@ import { Skeleton } from './Skeleton'
 interface Props {
   activeId: string | null
   locallyReadIds: Set<string>
+  conversations: ConversationView[] | undefined
+  isLoading: boolean
+  isError: boolean
   onSelect: (id: string) => void
 }
 
@@ -15,8 +18,7 @@ interface Props {
  * in, sorted by last_message_at desc. Hidden on mobile when a conversation is
  * selected (the right pane takes over).
  */
-export function ConversationList({ activeId, locallyReadIds, onSelect }: Props) {
-  const { data, isLoading, isError } = useConversations()
+export function ConversationList({ activeId, locallyReadIds, conversations: data, isLoading, isError, onSelect }: Props) {
 
   return (
     <div className="w-[380px] flex-shrink-0 bg-muted/60 backdrop-blur-sm flex flex-col min-h-0">
