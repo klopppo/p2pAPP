@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import type { ConversationView, ConversationWithParticipant } from '@/types/database'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Text } from '@/components/ui/text'
-import { shortAddress } from '@/lib/utils'
 import { TradeSummaryPill } from './TradeSummaryPill'
 
 interface Props {
@@ -71,3 +70,7 @@ export function ChatHeader({ conversation, currentUserId, online, onBack }: Prop
   )
 }
 
+function shortAddress(addr: string): string {
+  if (!addr) return ''
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`
+}
