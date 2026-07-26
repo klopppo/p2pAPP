@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
 import { type Abi } from 'viem'
 import { toast } from 'sonner'
@@ -250,12 +250,16 @@ export function TradePage() {
               {/* Seller header */}
               <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-12 w-12">
-                    <AvatarImage src={seller?.avatar_url ?? undefined} />
-                    <AvatarFallback>{sellerName.slice(0, 2).toUpperCase()}</AvatarFallback>
-                  </Avatar>
+                  <Link to={`/app/profile/${sellerAddr}`}>
+                    <Avatar className="h-12 w-12 hover:opacity-80 transition-opacity">
+                      <AvatarImage src={seller?.avatar_url ?? undefined} />
+                      <AvatarFallback>{sellerName.slice(0, 2).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                  </Link>
                   <div className="min-w-0">
-                    <Text variant="h4" className="truncate">{sellerName}</Text>
+                    <Link to={`/app/profile/${sellerAddr}`}>
+                      <Text variant="h4" className="truncate hover:underline">{sellerName}</Text>
+                    </Link>
                     {sellerAddr && (
                       <Text variant="small" className="font-mono text-muted-foreground">
                         {formatAddress(sellerAddr)}

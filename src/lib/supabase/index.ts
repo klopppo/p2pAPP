@@ -863,6 +863,47 @@ export async function getRatingsForTrade(tradeId: string) {
   return data
 }
 
+/**
+ * Get all ratings where a specific user was the rated party (for profile page).
+ */
+export async function getRatingsByUser(userId: string) {
+  const { data, error } = await supabase
+    .from('trade_ratings')
+    .select(`
+      *,
+      rater:user!trade_ratings_rater_id_fkey (nickname, avatar_url),
+      trade:trades (trade_id, crypto_token, fiat_amount, fiat_currency)
+    `)
+    .eq('rated_id', userId)
+    .order('submitted_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching user ratings:', error)
+    throw error
+  }
+
+  return data
+}
+
+/**
+ * Check if a user has already rated a specific trade.
+ */
+export async function hasUserRatedTrade(tradeId: string, userId: string) {
+  const { data, error } = await supabase
+    .from('trade_ratings')
+    .select('id')
+    .eq('trade_id', tradeId)
+    .eq('rater_id', userId)
+    .maybeSingle()
+
+  if (error) {
+    console.error('Error checking rating:', error)
+    throw error
+  }
+
+  return !!data
+}
+
 // =================================================================
 // CHAT QUERIES (see migration 20260724000004)
 // =================================================================

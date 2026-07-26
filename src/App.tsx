@@ -39,6 +39,7 @@ function App() {
               <Route path="/app" element={<AppLayout><Outlet /></AppLayout>}>
                 <Route path="offers" element={<OffersPage />} />
                 <Route path="profile" element={<ProfilePage />} />
+                <Route path="profile/:walletAddress" element={<ProfilePage />} />
                 <Route path="profile/edit" element={<EditProfilePage />} />
                 <Route path="messages" element={<ChatPage />} />
                 <Route path="messages/:conversationId" element={<ChatPage />} />

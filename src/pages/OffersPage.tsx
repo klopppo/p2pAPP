@@ -281,7 +281,11 @@ export function OffersPage() {
                       >
                         <TableCell>
                           <SellerHoverCard seller={offer.seller}>
-                            <div className="flex items-center gap-2">
+                            <Link
+                              to={`/app/profile/${offer.trader}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                            >
                               <Avatar className="h-8 w-8">
                                 <AvatarFallback>
                                   {offer.trader.slice(2, 4).toUpperCase()}
@@ -295,7 +299,7 @@ export function OffersPage() {
                                   {offer.trades} trades
                                 </div>
                               </div>
-                            </div>
+                            </Link>
                           </SellerHoverCard>
                         </TableCell>
                         <TableCell>

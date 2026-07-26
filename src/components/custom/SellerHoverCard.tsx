@@ -3,7 +3,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Text } from '@/components/ui/text'
 import { Button } from '@/components/ui/button'
-import { Copy, ExternalLink } from 'lucide-react'
+import { Copy, ExternalLink, User } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 export interface SellerPreview {
   name: string
@@ -26,7 +27,7 @@ export function SellerHoverCard({ seller, children }: SellerHoverCardProps) {
   const onCopy = async (addr: string) => {
     try {
       await navigator.clipboard.writeText(addr)
-    } catch (e) {
+    } catch {
       // fallback
       const ta = document.createElement('textarea')
       ta.value = addr
@@ -98,6 +99,19 @@ export function SellerHoverCard({ seller, children }: SellerHoverCardProps) {
               ))}
             </div>
           )}
+
+          {/* View Profile link */}
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="rounded-full w-full justify-center"
+          >
+            <Link to={`/app/profile/${seller.address}`}>
+              <User className="w-3.5 h-3.5 mr-1.5" />
+              View Profile
+            </Link>
+          </Button>
         </div>
       </HoverCardContent>
     </HoverCard>

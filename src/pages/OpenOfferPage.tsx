@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -80,19 +80,25 @@ export function OpenOfferPage() {
             <CardContent className="px-6 py-0">
               {/* Trader Info */}
               <div className="flex items-center gap-4 mb-3">
-                <Avatar className="h-12 w-12">
-                  <AvatarImage src={seller?.avatar_url ?? undefined} />
-                  <AvatarFallback>{sellerName.slice(0, 2).toUpperCase()}</AvatarFallback>
-                </Avatar>
+                <Link to={`/app/profile/${sellerAddr}`}>
+                  <Avatar className="h-12 w-12 hover:opacity-80 transition-opacity">
+                    <AvatarImage src={seller?.avatar_url ?? undefined} />
+                    <AvatarFallback>{sellerName.slice(0, 2).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                </Link>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     {sellerAddr && sellerName === sellerAddr ? (
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <Text variant="h4" className="truncate">{middleTruncate(sellerAddr)}</Text>
+                        <Link to={`/app/profile/${sellerAddr}`}>
+                          <Text variant="h4" className="truncate hover:underline">{middleTruncate(sellerAddr)}</Text>
+                        </Link>
                         <AddressWithActions address={sellerAddr} explorerBase="https://blockscan.com/token/" showText={false} />
                       </div>
                     ) : (
-                      <Text variant="h4" className="truncate">{sellerName}</Text>
+                      <Link to={`/app/profile/${sellerAddr}`}>
+                        <Text variant="h4" className="truncate hover:underline">{sellerName}</Text>
+                      </Link>
                     )}
                     <Badge variant={seller?.verification_level === 'verified' || seller?.verification_level === 'trusted' ? 'default' : 'secondary'}>
                       {seller?.verification_level ?? 'unverified'}

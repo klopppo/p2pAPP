@@ -35,6 +35,10 @@ import {
 } from '@/lib/contracts'
 import { useEscrowState } from '@/hooks/useDisputes'
 import { getTradeById, upsertTradeEscrowStatus } from '@/lib/supabase'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useTradeRatings, useHasRated } from '@/hooks/useReviews'
+import { ReviewForm } from '@/components/custom/ReviewForm'
+import { StarRating } from '@/components/custom/StarRating'
 
 type TxStage = 'idle' | 'approving' | 'depositing' | 'confirming' | 'mining'
 
@@ -306,6 +310,30 @@ export function TradeDetailPage() {
       liveState === KlerosEscState.CONFIRMED_PENDING) &&
     (isBuyer || isSeller)
 
+  // ── Rating section ─────────────────────────────────────────────────────
+  const { data: currentUser } = useCurrentUser()
+  const myId = currentUser?.id
+
+  const myRole: 'buyer' | 'seller' | null =
+    myId === trade?.buyer_id ? 'buyer' :
+    myId === trade?.seller_id ? 'seller' : null
+
+  const ratedId = myRole === 'buyer' ? trade?.seller_id : trade?.buyer_id
+  const ratingDirection = myRole === 'buyer' ? 'seller' as const : 'buyer' as const
+
+  const showRatingForm =
+    liveState === KlerosEscState.RELEASED &&
+    isConnected && !!myId && !!myRole && !!ratedId
+
+  const { data: hasRated = false } = useHasRated(
+    showRatingForm ? trade?.id : undefined,
+    myId,
+  )
+
+  const { data: tradeRatings = [] } = useTradeRatings(
+    liveState === KlerosEscState.RELEASED ? trade?.id : undefined,
+  )
+
   if (isLoading) {
     return (
       <section className="flex items-center justify-center py-20 text-muted-foreground">
@@ -410,13 +438,17 @@ export function TradeDetailPage() {
                   <Text variant="small" className="text-muted-foreground">
                     Buyer
                   </Text>
-                  <p className="font-mono">{formatAddress(escrowState.buyer)}</p>
+                  <Link to={`/app/profile/${escrowState.buyer}`} className="font-mono hover:underline text-foreground">
+                    {formatAddress(escrowState.buyer)}
+                  </Link>
                 </div>
                 <div>
                   <Text variant="small" className="text-muted-foreground">
                     Seller
                   </Text>
-                  <p className="font-mono">{formatAddress(escrowState.seller)}</p>
+                  <Link to={`/app/profile/${escrowState.seller}`} className="font-mono hover:underline text-foreground">
+                    {formatAddress(escrowState.seller)}
+                  </Link>
                 </div>
                 <div>
                   <Text variant="small" className="text-muted-foreground">
@@ -590,6 +622,43 @@ export function TradeDetailPage() {
                 Connect your wallet to take action.
               </p>
             )}
+          </div>
+        </Card>
+      )}
+
+      {/* Rating form — shown after escrow RELEASED, only for trade participants who haven't rated yet */}
+      {showRatingForm && !hasRated && (
+        <ReviewForm
+          tradeId={trade.id}
+          ratedUserId={ratedId!}
+          direction={ratingDirection}
+        />
+      )}
+
+      {/* Existing trade ratings */}
+      {tradeRatings.length > 0 && (
+        <Card className="glass-panel rounded-2xl p-6 mt-3">
+          <Text variant="h4" className="font-bold mb-3">
+            Trade Ratings
+          </Text>
+          <div className="space-y-3">
+            {tradeRatings.map((r) => (
+              <div key={r.id} className="flex items-start gap-3 py-2">
+                <StarRating value={r.score} readonly size="sm" />
+                <div className="min-w-0 flex-1">
+                  <Text variant="small" className="font-medium">
+                    {r.anonymous
+                      ? 'Anonymous'
+                      : (r.rater as { nickname?: string | null })?.nickname ?? 'Trader'}
+                  </Text>
+                  {r.comment && (
+                    <Text variant="muted" className="text-sm mt-0.5">
+                      {r.comment}
+                    </Text>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
       )}

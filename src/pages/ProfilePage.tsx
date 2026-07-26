@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { Button } from '@/components/ui/button'
 import { Copy, ExternalLink, Loader2, Pencil } from 'lucide-react'
@@ -20,7 +20,7 @@ import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import { Text } from '@/components/ui/text'
 import { ArrowUpDown } from 'lucide-react'
 import { useUserProfile, useOffersBySeller } from '@/hooks/useOffers'
-import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { ReviewList } from '@/components/custom/ReviewList'
 
 // Local UI shape for the offers table. Mirrors what OffersTableWrapper expects;
 // kept here because the data comes from useOffersBySeller (which returns the DB
@@ -96,10 +96,15 @@ function SortableHeader({
 
 export function ProfilePage() {
   const navigate = useNavigate()
-  const { address, isConnected } = useAccount()
-  const { data: currentUser } = useCurrentUser()
-  const { data: profile, isLoading: profileLoading, isError: profileError } = useUserProfile(address)
-  const { data: offers, isLoading: offersLoading } = useOffersBySeller(currentUser?.id)
+  const { walletAddress: urlWalletAddress } = useParams()
+  const { address: connectedAddress, isConnected } = useAccount()
+
+  // Target = URL param if present, else connected wallet
+  const targetAddress = urlWalletAddress ?? connectedAddress
+  const isOwnProfile = !urlWalletAddress || (targetAddress === connectedAddress)
+
+  const { data: profile, isLoading: profileLoading, isError: profileError } = useUserProfile(targetAddress)
+  const { data: offers, isLoading: offersLoading } = useOffersBySeller(profile?.id)
 
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>('asc')
@@ -174,7 +179,7 @@ export function ProfilePage() {
     return sorted
   }, [mappedOffers, sortKey, sortDir])
 
-  if (!isConnected || !address) {
+  if (!isConnected && isOwnProfile) {
     return (
       <section className="max-w-xl mx-auto space-y-6 text-center">
         <AppPageHeader title="Profile" variant="centered" onBack={() => navigate(-1)} />
@@ -218,9 +223,8 @@ export function ProfilePage() {
   }
 
   const nickname = profile.nickname ?? 'Anonymous'
-  const walletAddr = profile.wallet_address ?? address
+  const walletAddr = profile.wallet_address ?? targetAddress
   const avatarUrl = profile.avatar_url ?? undefined
-  const rating = Number(profile.avg_rating) || 0
   const totalTrades = profile.total_trades ?? 0
   const completedTrades = profile.completed_trades ?? 0
   const cancelledTrades = profile.cancelled_trades ?? 0
@@ -242,15 +246,17 @@ export function ProfilePage() {
             <Badge className="bg-success text-success-foreground hover:bg-success/90 text-sm">
               {lastActive === '—' ? 'Offline' : 'Online'}
             </Badge>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => navigate('/app/profile/edit')}
-              className="rounded-full shadow-none"
-            >
-              <Pencil className="w-3.5 h-3.5 mr-1" />
-              Edit Profile
-            </Button>
+            {isOwnProfile && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => navigate('/app/profile/edit')}
+                className="rounded-full shadow-none"
+              >
+                <Pencil className="w-3.5 h-3.5 mr-1" />
+                Edit Profile
+              </Button>
+            )}
           </div>
           <div className="flex items-center gap-2 mt-1">
             <Text variant="small" className="font-mono text-muted-foreground">{formatAddress(walletAddr)}</Text>
@@ -304,15 +310,7 @@ export function ProfilePage() {
           </Card>
 
           {/* Ratings & Feedback */}
-          <Card>
-            <CardContent className="space-y-3">
-              <Text variant="h4" className="font-bold">Ratings & Feedback</Text>
-              <div className="space-y-3">
-                <div className="flex justify-between"><span className="text-muted-foreground">Rating</span><span className="font-mono">{rating.toFixed(2)} <span className="text-primary">★</span></span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Unique traders</span><span>{profile.unique_traders ?? 0}</span></div>
-              </div>
-            </CardContent>
-          </Card>
+          <ReviewList userId={profile.id} />
         </div>
 
         {/* Right column */}
@@ -348,7 +346,7 @@ export function ProfilePage() {
 
       {/* User's Offers Table */}
       <div>
-        <Text variant="h4" className="mb-4">Your active offers</Text>
+        <Text variant="h4" className="mb-4">{isOwnProfile ? 'Your active offers' : 'Active offers'}</Text>
         <OffersTableWrapper>
           <Table>
             <TableHeader>
@@ -378,7 +376,7 @@ export function ProfilePage() {
               ) : filteredOffers.length === 0 ? (
                 <TableRow className="border-b border-border/50">
                   <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                    No active offers. <Button className="rounded-full shadow-none ml-2" onClick={() => navigate('/app/create-offer')}>Create one</Button>
+                    No active offers.{isOwnProfile && <Button className="rounded-full shadow-none ml-2" onClick={() => navigate('/app/create-offer')}>Create one</Button>}
                   </TableCell>
                 </TableRow>
               ) : (
