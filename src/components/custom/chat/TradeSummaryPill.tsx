@@ -6,6 +6,9 @@ const ESCROW_LABELS: Record<
   { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }
 > = {
   awaiting_deposit: { label: 'Awaiting deposit', variant: 'outline' },
+  buyer_deposited: { label: 'Buyer deposited', variant: 'secondary' },
+  seller_deposited: { label: 'Seller locked', variant: 'secondary' },
+  confirmed: { label: 'Confirmed', variant: 'default' },
   deposited: { label: 'Deposited', variant: 'secondary' },
   pending_release: { label: 'Pending release', variant: 'default' },
   disputed: { label: 'Disputed', variant: 'destructive' },

@@ -31,14 +31,20 @@ import {
   KLEROS_ESC_ABI,
   KlerosEscState,
   KlerosEscStateLabel,
+  Ruling,
   type KlerosEscStateValue,
 } from '@/lib/contracts'
 import { useEscrowState } from '@/hooks/useDisputes'
-import { getTradeById, upsertTradeEscrowStatus } from '@/lib/supabase'
+import {
+  getTradeById,
+  upsertTradeEscrowStatus,
+  updateTradeStatus,
+} from '@/lib/supabase'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useTradeRatings, useHasRated } from '@/hooks/useReviews'
 import { ReviewForm } from '@/components/custom/ReviewForm'
 import { StarRating } from '@/components/custom/StarRating'
+import { EscrowStatus } from '@/types/database'
 
 type TxStage = 'idle' | 'approving' | 'depositing' | 'confirming' | 'mining'
 
@@ -172,8 +178,8 @@ export function TradeDetailPage() {
       // filter by `escrow_status` without a re-read.
       const newStatus =
         which === 'buyer'
-          ? 'buyer_deposited'
-          : 'seller_deposited'
+          ? EscrowStatus.BUYER_DEPOSITED
+          : EscrowStatus.SELLER_DEPOSITED
       await upsertTradeEscrowStatus(
         trade!.id,
         newStatus,
@@ -249,7 +255,7 @@ export function TradeDetailPage() {
       })
       setTxStage('mining')
       await publicClient!.waitForTransactionReceipt({ hash: txHash })
-      await upsertTradeEscrowStatus(trade!.id, 'confirmed', txHash).catch(
+      await upsertTradeEscrowStatus(trade!.id, EscrowStatus.CONFIRMED, txHash).catch(
         () => undefined,
       )
       toast.success('Payment confirmed. Grace period started.')
@@ -272,10 +278,50 @@ export function TradeDetailPage() {
       })
       setTxStage('mining')
       await publicClient!.waitForTransactionReceipt({ hash: txHash })
+      // Mirror the terminal outcome: funds delivered to buyer.
+      await updateTradeStatus(trade!.id, 'completed', {
+        escrowStatus: 'released',
+        txHash,
+      }).catch(() => {
+        /* non-fatal — the chain tx already happened */
+      })
       toast.success('Trade released — funds distributed.')
       refetchEscrow()
     } catch (err) {
       toast.error('Release failed: ' + (err as Error).message)
+    } finally {
+      setTxStage('idle')
+    }
+  }
+
+  // ── Action: execute a received Kleros ruling ─────────────────────────────
+  const handleExecuteRuling = async () => {
+    if (!escrowAddress) return
+    try {
+      setTxStage('confirming')
+      const txHash = await writeContractAsync({
+        address: escrowAddress,
+        abi: KLEROS_ESC_ABI as Abi,
+        functionName: 'executeRuling',
+      })
+      setTxStage('mining')
+      await publicClient!.waitForTransactionReceipt({ hash: txHash })
+      // Rulings 1/3 award the crypto to the buyer (refund); 0/2/4 leave it
+      // with the seller (completed release). Mirror accordingly.
+      const ruling = escrowState?.currentRuling
+      const buyerWins =
+        ruling === Ruling.AWARD_BUYER_PENALTY_SELLER ||
+        ruling === Ruling.AWARD_BUYER_RETURN_DEPOSITS
+      await updateTradeStatus(trade!.id, buyerWins ? 'refunded' : 'completed', {
+        escrowStatus: buyerWins ? 'refunded' : 'released',
+        txHash,
+      }).catch(() => {
+        /* non-fatal — the chain tx already happened */
+      })
+      toast.success('Ruling executed — trade resolved.')
+      refetchEscrow()
+    } catch (err) {
+      toast.error('Execute ruling failed: ' + (err as Error).message)
     } finally {
       setTxStage('idle')
     }
@@ -305,6 +351,8 @@ export function TradeDetailPage() {
   }, [escrowState, liveState])
   const showRelease =
     liveState === KlerosEscState.CONFIRMED_PENDING
+  const showExecuteRuling =
+    liveState === KlerosEscState.RULING_RECEIVED
   const showRaiseDispute =
     (liveState === KlerosEscState.FUNDED ||
       liveState === KlerosEscState.CONFIRMED_PENDING) &&
@@ -599,6 +647,21 @@ export function TradeDetailPage() {
                 {graceEnd && (
                   <Timer className="w-3.5 h-3.5 ml-2 text-muted-foreground" />
                 )}
+              </Button>
+            )}
+
+            {showExecuteRuling && (
+              <Button
+                onClick={handleExecuteRuling}
+                disabled={isTxBusy}
+                className="rounded-full"
+              >
+                {isTxBusy ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                )}
+                {isTxBusy ? TX_LABEL[txStage] : 'Execute Kleros ruling'}
               </Button>
             )}
 

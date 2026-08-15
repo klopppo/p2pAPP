@@ -58,6 +58,9 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 export const EscrowStatus = {
   AWAITING_DEPOSIT: 'awaiting_deposit',
+  BUYER_DEPOSITED: 'buyer_deposited',
+  SELLER_DEPOSITED: 'seller_deposited',
+  CONFIRMED: 'confirmed',
   DEPOSITED: 'deposited',
   PENDING_RELEASE: 'pending_release',
   DISPUTED: 'disputed',
@@ -559,6 +562,67 @@ export async function upsertTradeEscrowStatus(
     console.error('Error updating trade escrow status:', error)
     throw error
   }
+
+  await logTradeEvent(
+    data.id,
+    'escrow_status_updated',
+    'system',
+    `Escrow status → ${escrowStatus}`,
+    { escrow_status: escrowStatus, tx_hash: txHash ?? null },
+  ).catch(() => {
+    /* non-fatal — the status mirror already landed */
+  })
+
+  return data
+}
+
+/**
+ * Update a trade's high-level lifecycle `status` (pending/active/completed/
+ * cancelled/disputed/refunded) plus the matching timestamp column. Mirrors the
+ * terminal on-chain outcome into Supabase so listing pages can filter without
+ * an RPC round-trip. Logs a `trade_status_updated` event.
+ */
+export async function updateTradeStatus(
+  tradeId: string,
+  status: string,
+  options?: { escrowStatus?: string; txHash?: string },
+) {
+  const now = new Date().toISOString()
+  const updates: Record<string, unknown> = {
+    status,
+    updated_at: now,
+  }
+  if (options?.escrowStatus) updates.escrow_status = options.escrowStatus
+  if (options?.txHash) updates.escrow_tx_hash = options.txHash
+  if (status === 'completed') updates.completed_at = now
+  if (status === 'cancelled') updates.cancelled_at = now
+  if (status === 'disputed') {
+    updates.disputed_at = now
+    updates.has_dispute = true
+  }
+
+  const { data, error } = await supabase
+    .from('trades')
+    .update(updates)
+    .eq('id', tradeId)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error updating trade status:', error)
+    throw error
+  }
+
+  await logTradeEvent(
+    data.id,
+    'trade_status_updated',
+    'system',
+    `Trade status → ${status}`,
+    { status, escrow_status: options?.escrowStatus ?? null, tx_hash: options?.txHash ?? null },
+  ).catch(() => {
+    /* non-fatal — the status mirror already landed */
+  })
+
   return data
 }
 
@@ -611,37 +675,47 @@ export async function createTrade(input: CreateTradeInput) {
 }
 
 /**
- * Update trade escrow status
+ * All trades where the user is buyer OR seller, newest first, with the
+ * counterparty + offer joined so the trades list page renders without N+1.
  */
-export async function updateTradeEscrowStatus(
-  tradeId: string,
-  status: EscrowStatus,
-  txHash?: string
-) {
-  const updates: { escrow_status: EscrowStatus; escrow_tx_hash?: string } = {
-    escrow_status: status,
-  }
-
-  if (txHash) {
-    updates.escrow_tx_hash = txHash
-  }
-
+export async function getTradesByUser(userId: string) {
   const { data, error } = await supabase
     .from('trades')
-    .update(updates)
-    .eq('trade_id', tradeId)
-    .select()
-    .single()
+    .select(`
+      *,
+      offer:offers(*),
+      buyer:users!trades_buyer_id_fkey (wallet_address, nickname, avatar_url, verification_level),
+      seller:users!trades_seller_id_fkey (wallet_address, nickname, avatar_url, verification_level)
+    `)
+    .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
+    .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error updating trade status:', error)
+    console.error('Error fetching user trades:', error)
     throw error
   }
 
-  // Log trade event
-  await logTradeEvent(tradeId, 'escrow_status_updated', 'system', `Status changed to ${status}`)
-
   return data
+}
+
+/**
+ * Find a trade by its deployed escrow contract address. Used when wiring a
+ * dispute to its trade: the dispute row needs the uuid `trade_id` plus both
+ * parties' user ids, but the app only has the escrow address to go on.
+ */
+export async function getTradeByEscrowAddress(escrowAddress: string) {
+  const { data, error } = await supabase
+    .from('trades')
+    .select('id, buyer_id, seller_id')
+    .eq('escrow_contract_addr', escrowAddress)
+    .maybeSingle()
+
+  if (error) {
+    console.error('Error fetching trade by escrow:', error)
+    throw error
+  }
+
+  return data as { id: string; buyer_id: string; seller_id: string } | null
 }
 
 /**
@@ -1381,7 +1455,7 @@ const offer = await createOffer({
 })
 
 // Example: Update escrow status
-await updateTradeEscrowStatus(tradeId, 'deposited', '0xabc123...')
+await upsertTradeEscrowStatus(tradeId, 'confirmed', '0xabc123...')
 
 // Example: Get active offers
 const offers = await getActiveOffers(50, 0)

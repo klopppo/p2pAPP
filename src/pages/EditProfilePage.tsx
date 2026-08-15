@@ -46,10 +46,12 @@ export function EditProfilePage() {
   const [form, setForm] = useState<ProfileForm>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const hydrated = useRef(false)
+  const wasOnboarding = useRef(false)
 
   useEffect(() => {
     if (!profile || hydrated.current) return
     hydrated.current = true
+    if (!profile.nickname) wasOnboarding.current = true
     setForm({
       nickname: profile.nickname ?? '',
       avatarUrl: profile.avatar_url ?? '',
@@ -86,7 +88,11 @@ export function EditProfilePage() {
       toast.success('Profile saved')
       qc.invalidateQueries({ queryKey: ['current-user', address] })
       qc.invalidateQueries({ queryKey: ['user-profile', address] })
-      navigate(-1)
+      if (wasOnboarding.current) {
+        navigate('/app/profile', { replace: true })
+      } else {
+        navigate(-1)
+      }
     } catch (err) {
       console.error('Error saving profile:', err)
       toast.error('Failed to save profile')

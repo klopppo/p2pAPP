@@ -10,6 +10,9 @@
 
 export const EscrowStatus = {
   AWAITING_DEPOSIT: 'awaiting_deposit',
+  BUYER_DEPOSITED: 'buyer_deposited',
+  SELLER_DEPOSITED: 'seller_deposited',
+  CONFIRMED: 'confirmed',
   DEPOSITED: 'deposited',
   PENDING_RELEASE: 'pending_release',
   DISPUTED: 'disputed',

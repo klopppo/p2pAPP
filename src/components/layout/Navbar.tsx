@@ -14,6 +14,7 @@ import {
   MoreHorizontal,
   User,
   ShieldAlert,
+  ArrowLeftRight,
 } from 'lucide-react'
 import { WalletConnectButton } from '@/components/custom/WalletConnectButton'
 import { NotificationsBell } from '@/components/custom/NotificationsBell'
@@ -86,6 +87,7 @@ const SocialLinks = ({ className = '' }: { className?: string }) => (
 
 const NAV_LINKS = [
   { label: 'Messages', to: '/app/messages' as const, icon: MessageCircle },
+  { label: 'Trades', to: '/app/trades' as const, icon: ArrowLeftRight },
   { label: 'Offers', to: '/app/offers' as const, icon: Tag },
   { label: 'Profile', to: '/app/profile' as const, icon: User },
 ]

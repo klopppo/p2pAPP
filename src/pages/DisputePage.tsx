@@ -37,6 +37,8 @@ import {
   generateDisputeId,
   getUserByWallet,
   ensureUser,
+  getTradeByEscrowAddress,
+  updateTradeStatus,
 } from '@/lib/supabase'
 import { useUserEscrows, useArbitrationCost } from '@/hooks/useDisputes'
 
@@ -236,6 +238,18 @@ const effectiveEscrow =
       const user = await getUserByWallet(address)
       if (!user) throw new Error('Could not resolve Supabase user for this wallet.')
 
+      // 2b) Resolve the linked trade (escrow address → trades.escrow_contract_addr)
+      //     so the dispute references the real trade uuid and the actual
+      //     counterparty — not the filer twice, and not a 0x address in a
+      //     uuid FK column.
+      const linkedTrade = await getTradeByEscrowAddress(effectiveEscrow)
+      if (!linkedTrade) {
+        toast.error(
+          'No trade found for this escrow. Open a trade from an offer first.',
+        )
+        throw new Error(`No trade linked to escrow ${effectiveEscrow}`)
+      }
+
       // 3) Raise the dispute on-chain. raiseDispute() forwards ETH to the
       //    Kleros court internally; we only need to attach the fee.
       setStage('raising')
@@ -303,12 +317,9 @@ const effectiveEscrow =
       )
       const dispute = await createDispute({
         dispute_id: generateDisputeId(),
-        // TODO: map escrowAddress -> trades.trade_id (DB join) once trades
-        // store the deployed escrow address. For now, fall back to a string
-        // identifier so the FK doesn't block.
-        trade_id: escrowAddress,
-        buyer_id: user.id,
-        seller_id: user.id, // placeholder — real flow resolves counterparty from escrow.buyer() / escrow.seller()
+        trade_id: linkedTrade.id,
+        buyer_id: linkedTrade.buyer_id,
+        seller_id: linkedTrade.seller_id,
         reason,
         reason_category: reason,
         description: [
@@ -331,6 +342,16 @@ const effectiveEscrow =
         tx_hash_evidence: evidenceTxHash,
         evidence_cid: primaryCid,
         escrow_state: KlerosEscState.AWAITING_RULING,
+      })
+
+      // 6b) Mirror the trade into `disputed` so the trades list stops showing
+      //     it as a funding/active trade. Non-fatal — the dispute row is the
+      //     source of truth for listing.
+      await updateTradeStatus(linkedTrade.id, 'disputed', {
+        escrowStatus: 'disputed',
+        txHash,
+      }).catch(() => {
+        /* non-fatal — the dispute row already landed */
       })
 
       toast.success('Dispute filed on Kleros.')

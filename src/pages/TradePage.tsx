@@ -18,10 +18,12 @@ import { createTrade, ensureUser } from '@/lib/supabase'
 import {
   KLEROS_ESCROW_FACTORY_ABI,
   KLEROS_ESCROW_FACTORY_ADDRESS,
+  ERC20_ABI,
   DEFAULT_GRACE_PERIOD_SECONDS,
   DEFAULT_SECURITY_DEPOSIT_BPS,
   isFactoryConfigured,
 } from '@/lib/contracts'
+import { parseUnits } from 'viem'
 
 const CURRENCY_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
 const currencySymbol = (code: string) => CURRENCY_SYMBOLS[code] ?? ''
@@ -41,6 +43,9 @@ export function TradePage() {
   const { data: offer, isLoading, isError } = useOffer(id)
 
   const [amount, setAmount] = useState('')
+  const [depositRate, setDepositRate] = useState(
+    String(Number(DEFAULT_SECURITY_DEPOSIT_BPS) / 100),
+  )
   const [paymentMethod, setPaymentMethod] = useState<string>('')
   const [stage, setStage] = useState<Stage>('idle')
 
@@ -92,6 +97,17 @@ export function TradePage() {
   const amountValid = !!amount && !Number.isNaN(amountNum) && amountNum >= minAmount && amountNum <= maxAmount
   const cryptoEstimate = amountValid && price > 0 ? amountNum / price : null
 
+  // Deposit rate in percent (0–15). On-chain it's bps; the contract accepts
+  // exactly 0 or ≥ MIN_SECURITY_DEPOSIT_BPS (1%).
+  const depositRateNum = Number(depositRate)
+  const depositValid =
+    !Number.isNaN(depositRateNum) &&
+    depositRateNum >= 0 &&
+    depositRateNum <= 15 &&
+    (depositRateNum === 0 || depositRateNum >= 1)
+  const depositBps =
+    depositRateNum === 0 ? 0n : BigInt(Math.round(depositRateNum * 100))
+
   const expiresAt = offer.expires_at ? new Date(offer.expires_at) : null
 
   const handleOpenTrade = async () => {
@@ -111,6 +127,10 @@ export function TradePage() {
     }
     if (!paymentMethod) {
       toast.error('Select a payment method.')
+      return
+    }
+    if (!depositValid) {
+      toast.error('Deposit rate must be 0% or between 1% and 15%.')
       return
     }
     if (!publicClient) {
@@ -138,7 +158,28 @@ export function TradePage() {
       const buyerWallet = isMakerBuyer ? sellerAddr : address
       const sellerWallet = isMakerBuyer ? address : sellerAddr
 
-      const cryptoAmount = amountNum / price // human-units → token base units
+      const cryptoAmount = amountNum / price // human-units (e.g. 1.5 ETH)
+
+      // Read the escrow token + its decimals so the on-chain amount is exact.
+      // The factory pins a single token; the escrow holds tradeAmount in base
+      // units (wei-equivalent). Without this, amounts < 1 token were floored
+      // to 0 / integers and every trade under-collateralized the escrow.
+      const tokenAddress = (await publicClient.readContract({
+        address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
+        abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
+        functionName: 'token',
+      })) as `0x${string}`
+      const decimals = (await publicClient.readContract({
+        address: tokenAddress,
+        abi: ERC20_ABI as Abi,
+        functionName: 'decimals',
+        args: [],
+      })) as number
+      const safeDecimals = Math.min(Math.max(decimals, 0), 18)
+      const cryptoBaseUnits = parseUnits(
+        cryptoAmount.toFixed(safeDecimals),
+        safeDecimals,
+      )
 
       // Deploy a KlerosEsc clone via the factory. Default grace period is
       // 7 days, default security deposit is 10% (within KlerosEsc's MIN/MAX).
@@ -151,8 +192,8 @@ export function TradePage() {
           buyerWallet as `0x${string}`,
           sellerWallet as `0x${string}`,
           DEFAULT_GRACE_PERIOD_SECONDS,
-          BigInt(Math.floor(cryptoAmount)),
-          DEFAULT_SECURITY_DEPOSIT_BPS,
+          cryptoBaseUnits,
+          depositBps,
         ],
       })
       const receipt = await publicClient.waitForTransactionReceipt({
@@ -367,6 +408,32 @@ export function TradePage() {
                       Must be between {symbol}{minAmount.toLocaleString()} and {symbol}{maxAmount.toLocaleString()}
                     </Text>
                   )
+                )}
+              </div>
+
+              {/* Deposit rate input */}
+              <div className="space-y-2">
+                <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground">
+                  Deposit rate (%)
+                </Text>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={15}
+                  step={0.5}
+                  value={depositRate}
+                  onChange={(e) => setDepositRate(e.target.value.replace(/[^0-9.]/g, ''))}
+                  className="rounded-full"
+                />
+                <Text variant="small" className="text-muted-foreground">
+                  Deposit is what both parties have to pay in the contract to secure it
+                  (like Bisq's deposit implementation).
+                </Text>
+                {depositRate !== '' && !depositValid && (
+                  <Text variant="small" className="text-destructive">
+                    Must be 0% or between 1% and 15%
+                  </Text>
                 )}
               </div>
 
