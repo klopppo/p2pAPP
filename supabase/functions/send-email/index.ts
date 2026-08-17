@@ -5,7 +5,7 @@
 //
 // Required secrets (set with `supabase secrets set`):
 //   RESEND_API_KEY   - API key from https://resend.com/api-keys
-//   EMAIL_FROM       - Sender address, e.g. "P2P Escrow <noreply@yourdomain.com>"
+//   EMAIL_FROM       - Sender address, e.g. "CofferNode <noreply@yourdomain.com>"
 //
 // Deploy:
 //   supabase functions deploy send-email --no-verify-jwt

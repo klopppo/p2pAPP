@@ -1,5 +1,5 @@
 /**
- * Supabase Integration for P2P Crypto Platform
+ * Supabase Integration for CofferNode P2P Crypto Platform
  * @packageDocumentation
  */
 

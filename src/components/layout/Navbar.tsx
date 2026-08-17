@@ -19,6 +19,7 @@ import {
 import { WalletConnectButton } from '@/components/custom/WalletConnectButton'
 import { NotificationsBell } from '@/components/custom/NotificationsBell'
 import { NotificationDispatcherHost } from '@/components/custom/NotificationDispatcherHost'
+import { CofferNodeLogo } from '@/components/custom/CofferNodeLogo'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -132,7 +133,7 @@ export function Navbar({ showTabs = false }: NavbarProps) {
         {/* Left: Logo + nav links */}
         <div className="flex items-center gap-6">
           <Link to="/" className="text-xl font-bold text-foreground">
-            P2P Escrow
+            <CofferNodeLogo variant="icon" className="h-8 w-8" />
           </Link>
 
           {/* Desktop nav */}

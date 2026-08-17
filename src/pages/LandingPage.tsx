@@ -57,7 +57,7 @@ export function LandingPage() {
                   className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground"
                 />
                 <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground tracking-tight ml-2">
-                  P2P Crypto
+                  CofferNode
                 </h1>
               </div>
               <p className="text-lg md:text-xl max-w-2xl mx-auto leading-relaxed text-muted-foreground">

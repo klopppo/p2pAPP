@@ -29,11 +29,11 @@ if (!projectId) {
 }
 
 export const config = getDefaultConfig({
-  appName: 'P2P Crypto',
+  appName: 'CofferNode',
   // Non-empty placeholder keeps getDefaultConfig from throwing when the env var
   // is unset. Replace with a real id to enable WalletConnect/mobile/QR flows.
   projectId: projectId || 'demo-project-id',
-  appDescription: 'P2P Crypto — peer-to-peer crypto trading',
+  appDescription: 'CofferNode — trustless peer-to-peer crypto exchange',
   appUrl: import.meta.env.VITE_APP_URL ?? 'http://localhost:5173',
   chains: [mainnet, sepolia],
   transports: {

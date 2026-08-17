@@ -1,5 +1,5 @@
 /**
- * Database Types - P2P Crypto Platform
+ * Database Types - CofferNode P2P Crypto Platform
  * Based on the PostgreSQL schema
  * @packageDocumentation
  */

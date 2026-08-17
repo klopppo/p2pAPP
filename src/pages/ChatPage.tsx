@@ -62,7 +62,7 @@ const mockMessages: Record<string, Message[]> = {
 // user (think: Telegram's "Telegram" bot, or Slack's "Slackbot" DM). The
 // Discord link is a placeholder — replace with the real invite when known.
 const OUR_TEAM_ID = 'ourTeam'
-const OUR_TEAM_DISCORD = 'https://discord.gg/p2p-escrow'
+const OUR_TEAM_DISCORD = 'https://discord.gg/coffernode'
 const OUR_TEAM_PARTNER: ChatPartner = {
   id: OUR_TEAM_ID,
   name: 'ourTeam',
@@ -78,7 +78,7 @@ const OUR_TEAM_WELCOME: Message = {
   id: 1,
   senderId: OUR_TEAM_ID,
   content:
-    `👋 Welcome to P2P Escrow! You can contact us from here for any ` +
+    `👋 Welcome to CofferNode! You can contact us from here for any ` +
     `issues, questions, or support requests — replies usually land within a ` +
     `few hours. We're here to help, and for live community support see ` +
     `Discord below.`,
