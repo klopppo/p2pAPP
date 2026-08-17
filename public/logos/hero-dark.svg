@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 80" fill="none">
+  <rect width="520" height="80" rx="14" fill="#080C14"/>
+  <defs>
+    <linearGradient id="cup" x1="22" y1="16" x2="58" y2="62">
+      <stop offset="0%" stop-color="#00E5FF"/>
+      <stop offset="50%" stop-color="#00FF87"/>
+      <stop offset="100%" stop-color="#C8F31E"/>
+    </linearGradient>
+    <linearGradient id="liq" x1="22" y1="48" x2="58" y2="48">
+      <stop offset="0%" stop-color="#00E5FF" stop-opacity="0.45"/>
+      <stop offset="50%" stop-color="#00FF87" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#C8F31E" stop-opacity="0.25"/>
+    </linearGradient>
+    <radialGradient id="eye" cx="50%" cy="50%">
+      <stop offset="0%" stop-color="#FBBF24" stopOpacity="0.95"/>
+      <stop offset="60%" stop-color="#F59E0B" stopOpacity="0.6"/>
+      <stop offset="100%" stop-color="#D97706" stopOpacity="0.15"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%">
+      <stop offset="0%" stop-color="#FBBF24" stopOpacity="0.35"/>
+      <stop offset="100%" stop-color="#FBBF24" stopOpacity="0"/>
+    </radialGradient>
+    <clipPath id="cp"><path d="M22 16C22 16 24.5 28 27 35C30 43 36.5 50 40 53C43.5 50 50 43 53 35C55.5 28 58 16 58 16Z"/></clipPath>
+  </defs>
+
+  <g transform="translate(16, 0)">
+    <!-- Handle -->
+    <path d="M58 30C67 30 69 42 69 47C69 52 64 59 55 56" stroke="url(#cup)" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+    <!-- Cup -->
+    <path d="M22 16C22 16 24.5 28 27 35C30 43 36.5 50 40 53C43.5 50 50 43 53 35C55.5 28 58 16 58 16Z" stroke="url(#cup)" stroke-width="2.6" stroke-linejoin="round" fill="none"/>
+    <!-- Liquid -->
+    <g clip-path="url(#cp)">
+      <path d="M22 44C29 41 51 41 58 44L58 60C58 60 51 62 40 62C29 62 22 60 22 60Z" fill="url(#liq)"/>
+      <path d="M22 45C29 43 51 43 58 45" stroke="#00FF87" stroke-width="0.7" fill="none" opacity="0.4"/>
+    </g>
+    <!-- Highlight -->
+    <path d="M27 22C28.5 28 30 38 31.5 47" stroke="#FFF" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.25"/>
+    <!-- Rim -->
+    <path d="M19 16L61 16" stroke="url(#cup)" stroke-width="2.6" stroke-linecap="round"/>
+    <!-- Eye — warm gold -->
+    <g clip-path="url(#cp)">
+      <circle cx="40" cy="50" r="5.5" fill="url(#glow)"/>
+      <path d="M30 50C35 44 45 44 50 50C45 56 35 56 30 50Z" stroke="#FBBF24" stroke-width="1.4" fill="none"/>
+      <path d="M40 46.5C41.8 48.3 41.8 51.7 40 53.5C38.2 51.7 38.2 48.3 40 46.5Z" fill="url(#eye)"/>
+    </g>
+    <!-- Stem + Base -->
+    <path d="M40 53L40 59" stroke="url(#cup)" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M31 59L49 59" stroke="url(#cup)" stroke-width="2.6" stroke-linecap="round"/>
+    <!-- P2P lines -->
+    <line x1="34" y1="11" x2="40" y2="6" stroke="#C8F31E" stroke-width="0.7" opacity="0.4"/>
+    <line x1="46" y1="11" x2="40" y2="6" stroke="#C8F31E" stroke-width="0.7" opacity="0.4"/>
+    <line x1="34" y1="11" x2="46" y2="11" stroke="#C8F31E" stroke-width="0.7" opacity="0.4"/>
+    <!-- Nodes -->
+    <circle cx="34" cy="11" r="2" fill="#C8F31E"/>
+    <circle cx="46" cy="11" r="2" fill="#C8F31E"/>
+    <circle cx="40" cy="6" r="1.8" fill="#C8F31E"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="106" y="44" font-family="Inter,system-ui,-apple-system,sans-serif" font-size="36" font-weight="800" letter-spacing="-1" fill="#F8FAFC">
+    Coffer<tspan fill="#00E5FF">Node</tspan>
+  </text>
+
+  <!-- Tagline -->
+  <text x="108" y="62" font-family="Inter,system-ui,-apple-system,sans-serif" font-size="9.5" font-weight="600" letter-spacing="3.5" fill="#64748B">
+    NON-CUSTODIAL EXCHANGE
+  </text>
+</svg>

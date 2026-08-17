@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <path d="M18 14C18 14 20 24 22 30 24.5 38 30 44 32 47 34 44 39.5 38 42 30 44 24 46 14 46 14Z" stroke="#0F172A" stroke-width="1.8" stroke-linejoin="round" fill="none" opacity="0.3"/>
+  <path d="M16 14L48 14" stroke="#0F172A" stroke-width="1.8" stroke-linecap="round" opacity="0.3"/>
+  <text x="32" y="38" text-anchor="middle" font-family="Inter,system-ui,-apple-system,sans-serif" font-size="17" font-weight="800" letter-spacing="-0.5" fill="#0F172A">CN</text>
+  <circle cx="28" cy="9" r="1.8" fill="#0F172A"/>
+  <circle cx="36" cy="9" r="1.8" fill="#0F172A"/>
+</svg>

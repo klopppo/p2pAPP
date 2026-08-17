@@ -133,7 +133,7 @@ export function Navbar({ showTabs = false }: NavbarProps) {
         {/* Left: Logo + nav links */}
         <div className="flex items-center gap-6">
           <Link to="/" className="text-xl font-bold text-foreground">
-            <CofferNodeLogo variant="icon" className="h-8 w-8" />
+            <CofferNodeLogo variant="full" theme="gray" className="h-8" />
           </Link>
 
           {/* Desktop nav */}
