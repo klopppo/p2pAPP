@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" fill="none">
+  <defs>
+    <linearGradient id="g" x1="100" y1="100" x2="400" y2="500">
+      <stop offset="0%" stop-color="#00E5FF"/>
+      <stop offset="50%" stop-color="#00FF87"/>
+      <stop offset="100%" stop-color="#C8F31E"/>
+    </linearGradient>
+    <radialGradient id="eye" cx="50%" cy="50%">
+      <stop offset="0%" stop-color="#00FFCC" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#00C9A7" stop-opacity="0.4"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%">
+      <stop offset="0%" stop-color="#C8F31E" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#C8F31E" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bg" cx="50%" cy="50%">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="675" fill="url(#bg)"/>
+
+  <!-- Subtle grid pattern -->
+  <g opacity="0.03">
+    <line x1="0" y1="0" x2="0" y2="675" stroke="#F8FAFC" stroke-width="1"/>
+    <line x1="100" y1="0" x2="100" y2="675" stroke="#F8FAFC" stroke-width="1"/>
+    <line x1="200" y1="0" x2="200" y2="675" stroke="#F8FAFC" stroke-width="1"/>
+    <line x1="300" y1="0" x2="300" y2="675" stroke="#F8FAFC" stroke-width="1"/>
+    <line x1="400" y1="0" x2="400" y2="675" stroke="#F8FAFC" stroke-width="1"/>
+    <line x1="500" y1="0" x2="500" y2="675" stroke="#F8FAFC" stroke-width="1"/>
+    <line x1="600" y1="0" x2="600" y2="675" stroke="#F8FAFC" stroke-width="1"/>
+    <line x1="700" y1="0" x2="700" y2="675" stroke="#F8FAFC" stroke-width="1"/>
+    <line x1="800" y1="0" x2="800" y2="675" stroke="#F8FAFC" stroke-width="1"/>
+    <line x1="900" y1="0" x2="900" y2="675" stroke="#F8FAFC" stroke-width="1"/>
+    <line x1="1000" y1="0" x2="1000" y2="675" stroke="#F8FAFC" stroke-width="1"/>
+    <line x1="1100" y1="0" x2="1100" y2="675" stroke="#F8FAFC" stroke-width="1"/>
+    <line x1="1200" y1="0" x2="1200" y2="675" stroke="#F8FAFC" stroke-width="1"/>
+    <line x1="0" y1="0" x2="1200" y2="0" stroke="#F8FAFC" stroke-width="1"/>
+    <line x1="0" y1="100" x2="1200" y2="100" stroke="#F8FAFC" stroke-width="1"/>
+    <line x1="0" y1="200" x2="1200" y2="200" stroke="#F8FAFC" stroke-width="1"/>
+    <line x1="0" y1="300" x2="1200" y2="300" stroke="#F8FAFC" stroke-width="1"/>
+    <line x1="0" y1="400" x2="1200" y2="400" stroke="#F8FAFC" stroke-width="1"/>
+    <line x1="0" y1="500" x2="1200" y2="500" stroke="#F8FAFC" stroke-width="1"/>
+    <line x1="0" y1="600" x2="1200" y2="600" stroke="#F8FAFC" stroke-width="1"/>
+  </g>
+
+  <!-- C mark — centered, large -->
+  <g transform="translate(420, 120) scale(6)">
+    <path
+      d="M44 16C36 16 28 22 24 32C20 42 24 50 32 54"
+      stroke="url(#g)"
+      stroke-width="5"
+      stroke-linecap="round"
+      fill="none"
+    />
+    <circle cx="32" cy="36" r="5" fill="url(#eye)"/>
+    <circle cx="32" cy="36" r="8" fill="url(#glow)"/>
+    <circle cx="32" cy="8" r="2.5" fill="#C8F31E"/>
+    <circle cx="22" cy="12" r="2" fill="#C8F31E" opacity="0.6"/>
+    <circle cx="42" cy="12" r="2" fill="#C8F31E" opacity="0.6"/>
+    <line x1="32" y1="8" x2="22" y2="12" stroke="#C8F31E" stroke-width="0.8" opacity="0.4"/>
+    <line x1="32" y1="8" x2="42" y2="12" stroke="#C8F31E" stroke-width="0.8" opacity="0.4"/>
+    <line x1="22" y1="12" x2="42" y2="12" stroke="#C8F31E" stroke-width="0.8" opacity="0.4"/>
+  </g>
+
+  <!-- Brand Name -->
+  <text
+    x="600" y="520"
+    text-anchor="middle"
+    font-family="Inter,system-ui,-apple-system,sans-serif"
+    font-size="72"
+    font-weight="800"
+    letter-spacing="-2"
+    fill="#F8FAFC"
+  >
+    Coffer<tspan fill="#00E5FF">Node</tspan>
+  </text>
+
+  <!-- Tagline -->
+  <text
+    x="600" y="580"
+    text-anchor="middle"
+    font-family="Inter,system-ui,-apple-system,sans-serif"
+    font-size="24"
+    font-weight="600"
+    letter-spacing="8"
+    fill="#94A3B8"
+  >
+    P2P TRADING NETWORK
+  </text>
+</svg>

@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 500" fill="none">
+  <defs>
+    <linearGradient id="g" x1="100" y1="50" x2="400" y2="400">
+      <stop offset="0%" stop-color="#00E5FF"/>
+      <stop offset="50%" stop-color="#00FF87"/>
+      <stop offset="100%" stop-color="#C8F31E"/>
+    </linearGradient>
+    <radialGradient id="eye" cx="50%" cy="50%">
+      <stop offset="0%" stop-color="#00FFCC" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#00C9A7" stop-opacity="0.4"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%">
+      <stop offset="0%" stop-color="#C8F31E" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#C8F31E" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bg" cx="50%" cy="50%">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1500" height="500" fill="url(#bg)"/>
+
+  <!-- C mark — left side -->
+  <g transform="translate(100, 50) scale(5)">
+    <path
+      d="M44 16C36 16 28 22 24 32C20 42 24 50 32 54"
+      stroke="url(#g)"
+      stroke-width="5"
+      stroke-linecap="round"
+      fill="none"
+    />
+    <circle cx="32" cy="36" r="5" fill="url(#eye)"/>
+    <circle cx="32" cy="36" r="8" fill="url(#glow)"/>
+    <circle cx="32" cy="8" r="2.5" fill="#C8F31E"/>
+    <circle cx="22" cy="12" r="2" fill="#C8F31E" opacity="0.6"/>
+    <circle cx="42" cy="12" r="2" fill="#C8F31E" opacity="0.6"/>
+    <line x1="32" y1="8" x2="22" y2="12" stroke="#C8F31E" stroke-width="0.8" opacity="0.4"/>
+    <line x1="32" y1="8" x2="42" y2="12" stroke="#C8F31E" stroke-width="0.8" opacity="0.4"/>
+    <line x1="22" y1="12" x2="42" y2="12" stroke="#C8F31E" stroke-width="0.8" opacity="0.4"/>
+  </g>
+
+  <!-- Brand Name — right of mark -->
+  <text
+    x="420" y="280"
+    font-family="Inter,system-ui,-apple-system,sans-serif"
+    font-size="80"
+    font-weight="800"
+    letter-spacing="-2"
+    fill="#F8FAFC"
+  >
+    Coffer<tspan fill="#00E5FF">Node</tspan>
+  </text>
+
+  <!-- Tagline -->
+  <text
+    x="422" y="340"
+    font-family="Inter,system-ui,-apple-system,sans-serif"
+    font-size="20"
+    font-weight="600"
+    letter-spacing="6"
+    fill="#94A3B8"
+  >
+    P2P TRADING NETWORK
+  </text>
+</svg>
