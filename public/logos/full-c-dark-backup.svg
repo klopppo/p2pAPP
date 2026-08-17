@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 64" fill="none">
+  <!-- C mark — clean geometric -->
+  <g transform="translate(8, 0) scale(0.9)">
+    <path
+      d="M44 16C36 16 28 22 24 32C20 42 24 50 32 54"
+      stroke="#F8FAFC"
+      stroke-width="5"
+      stroke-linecap="round"
+      fill="none"
+    />
+    <circle cx="32" cy="36" r="5" fill="#F8FAFC" opacity="0.8"/>
+    <circle cx="32" cy="36" r="8" fill="#F8FAFC" opacity="0.2"/>
+    <circle cx="32" cy="8" r="2.5" fill="#F8FAFC"/>
+    <circle cx="22" cy="12" r="2" fill="#F8FAFC" opacity="0.6"/>
+    <circle cx="42" cy="12" r="2" fill="#F8FAFC" opacity="0.6"/>
+    <line x1="32" y1="8" x2="22" y2="12" stroke="#F8FAFC" stroke-width="0.8" opacity="0.4"/>
+    <line x1="32" y1="8" x2="42" y2="12" stroke="#F8FAFC" stroke-width="0.8" opacity="0.4"/>
+    <line x1="22" y1="12" x2="42" y2="12" stroke="#F8FAFC" stroke-width="0.8" opacity="0.4"/>
+  </g>
+
+  <!-- Brand Name -->
+  <text
+    x="80" y="40"
+    font-family="Inter,system-ui,-apple-system,sans-serif"
+    font-size="31"
+    font-weight="800"
+    letter-spacing="-0.8"
+    fill="#F8FAFC"
+  >
+    Coffer<tspan fill="#F8FAFC">Node</tspan>
+  </text>
+</svg>
