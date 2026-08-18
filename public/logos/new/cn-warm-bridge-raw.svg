@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- CofferNode — The Bridge Raw (transparent) -->
+  <rect x="10" y="28" width="28" height="44" rx="14" fill="#2C2522"/>
+  <rect x="62" y="28" width="28" height="44" rx="14" fill="#2C2522"/>
+  <rect x="32" y="40" width="36" height="20" rx="10" fill="#2C2522"/>
+  <circle cx="50" cy="50" r="5" fill="#FFFFFF"/>
+</svg>

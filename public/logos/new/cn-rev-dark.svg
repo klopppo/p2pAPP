@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="512" height="512">
+  <!-- Dark, minimal, premium: CN inside an open vault (cup) with cat-eye and 3 orbital nodes -->
+  <rect width="120" height="120" rx="24" fill="#0F172A"/>
+  <!-- subtle base line -->
+  <path d="M18 86h84" stroke="#000" stroke-opacity="0.18" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Cup / vault outline (subtle, forms C shape) -->
+  <path d="M24 58c0-10 12-18 36-18s36 8 36 18v8c0 10-12 18-36 18S24 76 24 66v-8z" fill="none" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- CN monogram, bold and minimal -->
+  <g transform="translate(18,18)">
+    <text x="6" y="62" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="44" font-weight="800" fill="#FFFFFF" letter-spacing="-1">C</text>
+    <text x="44" y="62" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="44" font-weight="800" fill="#FFFFFF" letter-spacing="-1">N</text>
+  </g>
+
+  <!-- Liquid surface (thin) overlapping CN to hint at vault content; slight blur feel via opacity -->
+  <path d="M30 66c8-4 20-4 30-2 8 1.8 18 4 30 6" fill="none" stroke="#FFFFFF" stroke-opacity="0.06" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Cat-eye guardian: refined iris + vertical-slit pupil -->
+  <defs>
+    <radialGradient id="irisDark" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#C8F31E"/>
+      <stop offset="60%" stop-color="#84CC16"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="60" cy="66" rx="10" ry="6" fill="url(#irisDark)" opacity="0.98"/>
+  <!-- vertical rounded slit pupil -->
+  <path d="M58.5 60c0-1.6 0.9-3 1.5-3 0.6 0 1.5 1.4 1.5 3s-0.9 3-1.5 3c-0.6 0-1.5-1.4-1.5-3z" fill="#000"/>
+  <path d="M61.7 62c0 0.45 0.3 0.8 0.66 0.8s0.66-0.35 0.66-0.8-0.3-0.8-0.66-0.8-0.66 0.35-0.66 0.8z" fill="#FFF" opacity="0.9"/>
+
+  <!-- Orbital nodes (three) and thin arcs to imply network -->
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="42" cy="30" r="3" fill="#94A3B8"/>
+    <circle cx="60" cy="22" r="3" fill="#C8F31E"/>
+    <circle cx="78" cy="30" r="3" fill="#60A5FA"/>
+    <path d="M44 32 C54 20,66 20,76 32" stroke="#94A3B8" stroke-opacity="0.12" stroke-width="1.8" fill="none"/>
+    <path d="M40 34 C52 18,68 18,80 34" stroke="#60A5FA" stroke-opacity="0.08" stroke-width="1.2" fill="none"/>
+  </g>
+
+  <!-- Small CN badge balanced with vault (subtle reflection) -->
+  <g transform="translate(74,86)">
+    <rect x="0" y="0" width="32" height="18" rx="4" fill="#FFFFFF" opacity="0.04"/>
+    <text x="6" y="13" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Space Mono', monospace" font-size="10" font-weight="800" fill="#FFFFFF">CN</text>
+  </g>
+</svg>

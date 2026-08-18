@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 120" fill="none">
+  <!-- CofferNode Wordmark — Charcoal + r-N Connection Bridge -->
+  <!-- A subtle amber line bridges the "r" to the "N" — the connection between coffer and node -->
+  <rect width="600" height="120" fill="#FFFFFF"/>
+  <text x="300" y="70" text-anchor="middle"
+        font-family="'Inter', 'DM Sans', 'Plus Jakarta Sans', 'Nunito Sans', 'Poppins', system-ui, -apple-system, sans-serif"
+        font-size="52" font-weight="600" letter-spacing="0.025em"
+        fill="#2C2522">CofferNode</text>
+  <!-- Bridge line — connects the tail of "r" to the stem of "N" -->
+  <!-- Approximate position: adjust if font shifts the glyphs -->
+  <line x1="322" y1="65" x2="338" y2="65" stroke="#CA9A5A" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

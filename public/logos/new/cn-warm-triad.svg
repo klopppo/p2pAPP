@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- CofferNode — The Triad: three nodes in a triangular network, negative space at center -->
+  <rect width="100" height="100" rx="16" fill="#FFFFFF"/>
+  <!-- Three nodes -->
+  <circle cx="50" cy="24" r="13" fill="#2C2522"/>
+  <circle cx="28" cy="64" r="13" fill="#2C2522"/>
+  <circle cx="72" cy="64" r="13" fill="#2C2522"/>
+  <!-- Three connections -->
+  <line x1="50" y1="37" x2="34" y2="55" stroke="#2C2522" stroke-width="8" stroke-linecap="round"/>
+  <line x1="50" y1="37" x2="66" y2="55" stroke="#2C2522" stroke-width="8" stroke-linecap="round"/>
+  <line x1="35" y1="64" x2="65" y2="64" stroke="#2C2522" stroke-width="8" stroke-linecap="round"/>
+  <!-- Central negative space — the network hub -->
+  <circle cx="50" cy="52" r="5.5" fill="#FFFFFF"/>
+</svg>

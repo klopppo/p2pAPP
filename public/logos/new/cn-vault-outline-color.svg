@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="256" height="256">
+  <defs>
+    <linearGradient id="g2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00B8D9"/>
+      <stop offset="100%" stop-color="#00A676"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="12" fill="#FBFEFF"/>
+  <!-- Outline vault: single continuous stroke forms cup and open top -->
+  <path d="M14 34c6-6 20-6 36 0" fill="none" stroke="url(#g2)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M18 34v6c0 6 6 10 14 10s14-4 14-10v-6" fill="none" stroke="#0F172A" stroke-opacity="0.06" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Eye inside: simple ring with pupil -->
+  <circle cx="32" cy="34" r="5" stroke="#0F172A" stroke-width="2" fill="#00E5FF" fill-opacity="0.06"/>
+  <circle cx="32" cy="34" r="2" fill="#C8F31E"/>
+  <!-- Orbital nodes -->
+  <circle cx="24" cy="14" r="2.2" fill="#00B8D9"/>
+  <circle cx="32" cy="10" r="2.2" fill="#C8F31E"/>
+  <circle cx="40" cy="14" r="2.2" fill="#00A676"/>
+  <path d="M24 16 C30 8,34 8,40 16" fill="none" stroke="#00B8D9" stroke-opacity="0.22" stroke-width="1.4" stroke-linecap="round"/>
+</svg>

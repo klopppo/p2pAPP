@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="512" height="512">
+  <!-- Light, minimal: CN with cat-eye and orbital nodes, crisp black/gray -->
+  <rect width="120" height="120" rx="24" fill="#FFFFFF"/>
+
+  <!-- Cup / vault outline (very thin) -->
+  <path d="M24 58c0-10 12-18 36-18s36 8 36 18v8c0 10-12 18-36 18S24 76 24 66v-8z" fill="none" stroke="#0F172A" stroke-opacity="0.06" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- CN monogram -->
+  <g transform="translate(18,18)">
+    <text x="6" y="62" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="44" font-weight="800" fill="#0F172A" letter-spacing="-1">C</text>
+    <text x="44" y="62" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="44" font-weight="800" fill="#0F172A" letter-spacing="-1">N</text>
+  </g>
+
+  <!-- Liquid hint (subtle gray line) -->
+  <path d="M30 66c8-4 20-4 30-2 8 1.8 18 4 30 6" fill="none" stroke="#0F172A" stroke-opacity="0.04" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Cat-eye guardian: refined iris + vertical-slit pupil -->
+  <defs>
+    <radialGradient id="irisLight" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#C8F31E"/>
+      <stop offset="60%" stop-color="#84CC16"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="60" cy="66" rx="10" ry="6" fill="url(#irisLight)" opacity="0.98"/>
+  <path d="M58.5 60c0-1.6 0.9-3 1.5-3 0.6 0 1.5 1.4 1.5 3s-0.9 3-1.5 3c-0.6 0-1.5-1.4-1.5-3z" fill="#0F172A"/>
+  <path d="M61.7 62c0 0.45 0.3 0.8 0.66 0.8s0.66-0.35 0.66-0.8-0.3-0.8-0.66-0.8-0.66 0.35-0.66 0.8z" fill="#FFF" opacity="0.9"/>
+
+  <!-- Orbital nodes -->
+  <g>
+    <circle cx="42" cy="30" r="3" fill="#94A3B8"/>
+    <circle cx="60" cy="22" r="3" fill="#C8F31E"/>
+    <circle cx="78" cy="30" r="3" fill="#60A5FA"/>
+    <path d="M44 32 C54 20,66 20,76 32" stroke="#94A3B8" stroke-opacity="0.12" stroke-width="1.8" fill="none"/>
+  </g>
+
+  <!-- CN micro-badge -->
+  <g transform="translate(74,86)">
+    <rect x="0" y="0" width="32" height="18" rx="4" fill="#0F172A" opacity="0.04"/>
+    <text x="6" y="13" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Space Mono', monospace" font-size="10" font-weight="800" fill="#0F172A">CN</text>
+  </g>
+</svg>

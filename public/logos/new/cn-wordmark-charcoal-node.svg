@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 120" fill="none">
+  <!-- CofferNode Wordmark — Charcoal + Node Detail -->
+  <!-- The "o" in "Node" carries a small amber dot — the node lives inside the word -->
+  <rect width="600" height="120" fill="#FFFFFF"/>
+  <text x="300" y="70" text-anchor="middle"
+        font-family="'Inter', 'DM Sans', 'Plus Jakarta Sans', 'Nunito Sans', 'Poppins', system-ui, -apple-system, sans-serif"
+        font-size="52" font-weight="600" letter-spacing="0.025em"
+        fill="#2C2522">CofferNode</text>
+  <!-- Node dot — positioned inside the counter of the "o" in "Node" -->
+  <!-- Approximate center: adjust cx/cy if font shifts the glyph -->
+  <circle cx="393" cy="62" r="3" fill="#CA9A5A"/>
+</svg>

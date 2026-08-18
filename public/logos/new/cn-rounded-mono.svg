@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" rx="12" fill="#FFFFFF"/>
+  <g transform="translate(10,12)">
+    <text x="0" y="34" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="32" font-weight="800" fill="#0F172A" style="letter-spacing: -2px">C</text>
+    <text x="22" y="34" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="32" font-weight="800" fill="#0F172A" style="letter-spacing: -2px">N</text>
+  </g>
+</svg>

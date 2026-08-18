@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- CofferNode — The Bridge: two peer shapes connected by a rounded passage -->
+  <rect width="100" height="100" rx="16" fill="#FFFFFF"/>
+  <rect x="10" y="28" width="28" height="44" rx="14" fill="#2C2522"/>
+  <rect x="62" y="28" width="28" height="44" rx="14" fill="#2C2522"/>
+  <rect x="32" y="40" width="36" height="20" rx="10" fill="#2C2522"/>
+  <!-- Negative space in the bridge center — the trustless connection point -->
+  <circle cx="50" cy="50" r="5" fill="#FFFFFF"/>
+</svg>

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512">
+  <!-- CofferNode CN Mark — abs-3: Vault-CN -->
+  <!-- Solid vault (rounded rect) with C and N carved as negative space -->
+  <rect width="100" height="100" rx="18" fill="#0B0F12"/>
+  <!-- Vault body -->
+  <rect x="10" y="14" width="80" height="72" rx="14" fill="#FFFFFF"/>
+  <!-- C cutout: circular notch on left + gap opening right -->
+  <circle cx="30" cy="50" r="18" fill="#0B0F12"/>
+  <rect x="40" y="38" width="12" height="24" fill="#0B0F12"/>
+  <!-- N cutout: two vertical notches + diagonal -->
+  <rect x="56" y="22" width="4" height="56" rx="1" fill="#0B0F12"/>
+  <rect x="76" y="22" width="4" height="56" rx="1" fill="#0B0F12"/>
+  <path d="M60 22 L80 78" stroke="#0B0F12" stroke-width="4" stroke-linecap="round"/>
+</svg>

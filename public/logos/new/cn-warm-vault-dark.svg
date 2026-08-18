@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- CofferNode — The Soft Vault Dark -->
+  <rect width="100" height="100" rx="16" fill="#2C2522"/>
+  <rect x="16" y="16" width="68" height="68" rx="18" fill="#FFFFFF"/>
+  <circle cx="34" cy="50" r="10" fill="#2C2522"/>
+  <circle cx="66" cy="50" r="10" fill="#2C2522"/>
+</svg>

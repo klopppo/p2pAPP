@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512">
+  <!-- Minimal negative-space mark 2: rotated chevrons form an arrow/lock in the center -->
+  <rect width="100" height="100" fill="#FFFFFF"/>
+  <g fill="#000000" transform="translate(0,0)">
+    <path d="M20 32 L50 12 L80 32 L68 44 L50 28 L32 44 Z"/>
+    <rect x="36" y="44" width="28" height="38" rx="6"/>
+    <!-- subtract central diamond to create negative vault mouth -->
+    <path d="M50 28 L58 36 L50 44 L42 36 Z" fill="#FFFFFF"/>
+  </g>
+</svg>
