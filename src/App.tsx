@@ -19,6 +19,14 @@ import { DisputePage } from './pages/DisputePage'
 import { DisputesListPage } from './pages/DisputesListPage'
 import { DisputeDetailPage } from './pages/DisputeDetailPage'
 import { AppLayout } from './components/layout/AppLayout'
+import { DocsLayout } from './pages/docs/DocsLayout'
+import DocsIndex from './pages/docs/index'
+import DocsGettingStarted from './pages/docs/GettingStarted'
+import DocsHowTradingWorks from './pages/docs/HowTradingWorks'
+import DocsEscrowAndSecurity from './pages/docs/EscrowAndSecurity'
+import DocsCreatingOffers from './pages/docs/CreatingOffers'
+import DocsDisputes from './pages/docs/Disputes'
+import DocsFAQ from './pages/docs/FAQ'
 import { UserSync } from './hooks/useSyncUser'
 import { TrustlessFlowOverlay } from './components/custom/TrustlessFlow'
 
@@ -52,6 +60,15 @@ function App() {
                 <Route path="dispute" element={<DisputePage />} />
                 <Route path="disputes" element={<DisputesListPage />} />
                 <Route path="disputes/:id" element={<DisputeDetailPage />} />
+              </Route>
+              <Route path="/docs" element={<DocsLayout />}>
+                <Route index element={<DocsIndex />} />
+                <Route path="getting-started" element={<DocsGettingStarted />} />
+                <Route path="how-trading-works" element={<DocsHowTradingWorks />} />
+                <Route path="escrow-and-security" element={<DocsEscrowAndSecurity />} />
+                <Route path="creating-offers" element={<DocsCreatingOffers />} />
+                <Route path="disputes" element={<DocsDisputes />} />
+                <Route path="faq" element={<DocsFAQ />} />
               </Route>
             </Routes>
           </BrowserRouter>

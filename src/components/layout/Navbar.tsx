@@ -99,8 +99,8 @@ const RESOURCE_LINKS: ReadonlyArray<
 > = [
   // Internal route — uses `to`, rendered with <Link> for client-side nav.
   { label: 'Disputes', to: '/app/disputes', icon: ShieldAlert },
+  { label: 'Docs', to: '/docs', icon: BookOpen },
   // External links — use `href` + target="_blank".
-  { label: 'Docs', href: 'https://docs.example.com', icon: BookOpen },
   { label: 'Discord', href: 'https://discord.gg/example', icon: MessageCircle },
 ] as const
 

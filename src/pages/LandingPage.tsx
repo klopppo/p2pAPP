@@ -61,7 +61,7 @@ export function LandingPage() {
                 </h1>
               </div>
               <p className="text-lg md:text-xl max-w-2xl mx-auto leading-relaxed text-muted-foreground">
-                Trade cryptocurrency peer-to-peer with smart contract escrow.
+                Trade vaults peer-to-peer with smart contract escrow.
                 Non-custodial, secure, and permissionless.
               </p>
             </div>

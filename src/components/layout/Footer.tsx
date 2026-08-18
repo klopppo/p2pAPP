@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { Separator } from '@/components/ui/separator'
 
 export function Footer() {
@@ -6,7 +7,7 @@ export function Footer() {
       <Separator className="mb-4" />
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <p className="text-sm text-muted-foreground">
-          © 2024 CofferNode. All rights reserved.
+          © 2026 CofferNode. All rights reserved.
         </p>
         <div className="flex gap-4">
           <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -15,9 +16,9 @@ export function Footer() {
           <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             Privacy
           </a>
-          <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <Link to="/docs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             Docs
-          </a>
+          </Link>
         </div>
       </div>
     </footer>

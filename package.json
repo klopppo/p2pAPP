@@ -88,5 +88,9 @@
   "repository": {
     "type": "git",
     "url": ""
+  },
+  "main": "eslint.config.js",
+  "directories": {
+    "doc": "docs"
   }
 }
