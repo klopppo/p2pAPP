@@ -108,6 +108,7 @@ const LANGUAGES: { label: string; code: string }[] = [
   { label: 'Español', code: 'es' },
   { label: 'Français', code: 'fr' },
   { label: '中文', code: 'zh' },
+  { label: 'Türkçe', code: 'tr' },
 ]
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'ETH']
 
