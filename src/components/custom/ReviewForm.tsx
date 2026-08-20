@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Star, Send, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -28,6 +29,7 @@ export function ReviewForm({
   const [comment, setComment] = useState('')
   const [anonymous, setAnonymous] = useState(false)
 
+  const { t } = useTranslation()
   const { data: currentUser } = useCurrentUser()
   const { mutateAsync: submitRating, isPending } = useSubmitRating()
 
@@ -47,13 +49,13 @@ export function ReviewForm({
         anonymous,
       })
 
-      toast.success('Rating submitted')
+      toast.success(t('tradeDetail.ratingSubmitted'))
       setScore(0)
       setComment('')
       setAnonymous(false)
       onSubmitted?.()
     } catch (err) {
-      toast.error('Failed to submit rating: ' + (err as Error).message)
+      toast.error(t('tradeDetail.ratingFailed', { message: (err as Error).message }))
     }
   }
 
@@ -63,25 +65,25 @@ export function ReviewForm({
         <div className="flex items-center gap-2">
           <Star className="w-5 h-5 text-primary" />
           <Text variant="h4" className="font-bold">
-            Rate this trade
+            {t('tradeDetail.rateThisTrade')}
           </Text>
         </div>
 
         <Text variant="muted" className="text-sm">
-          How was your experience trading with the {direction === 'buyer' ? 'buyer' : 'seller'}?
+          {t('tradeDetail.rateExperience', { role: direction === 'buyer' ? 'buyer' : 'seller' })}
         </Text>
 
         <div className="space-y-2">
-          <Label className="text-base font-semibold">Rating</Label>
+          <Label className="text-base font-semibold">{t('tradeDetail.rating')}</Label>
           <StarRating value={score} onChange={setScore} size="md" />
         </div>
 
         <div className="space-y-2">
-          <Label className="text-base font-semibold">Comment (optional)</Label>
+          <Label className="text-base font-semibold">{t('tradeDetail.commentOptional')}</Label>
           <Textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="Share your experience..."
+            placeholder={t('tradeDetail.commentPlaceholder')}
             maxLength={1000}
             className="border border-border min-h-[80px] resize-none"
           />
@@ -99,7 +101,7 @@ export function ReviewForm({
               onCheckedChange={setAnonymous}
             />
             <Label htmlFor="anonymous" className="text-sm font-normal cursor-pointer">
-              Submit anonymously
+              {t('tradeDetail.submitAnonymously')}
             </Label>
           </div>
         </div>
@@ -114,7 +116,7 @@ export function ReviewForm({
           ) : (
             <Send className="w-4 h-4 mr-2" />
           )}
-          {isPending ? 'Submitting...' : 'Submit rating'}
+          {isPending ? t('tradeDetail.submitting') : t('tradeDetail.submitRating')}
         </Button>
       </div>
     </Card>

@@ -9,6 +9,7 @@ import {
   FileEdit,
   Gavel,
   HelpCircle,
+  FileText,
   Menu,
   X,
 } from 'lucide-react'
@@ -24,6 +25,7 @@ const DOCS_SECTIONS = [
   { label: 'Creating Offers', to: '/docs/creating-offers', icon: FileEdit },
   { label: 'Disputes', to: '/docs/disputes', icon: Gavel },
   { label: 'FAQ', to: '/docs/faq', icon: HelpCircle },
+  { label: 'Terms of Service', to: '/docs/terms-of-service', icon: FileText },
 ]
 
 export function DocsLayout() {

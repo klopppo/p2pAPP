@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -48,12 +49,15 @@ import { EscrowStatus } from '@/types/database'
 
 type TxStage = 'idle' | 'approving' | 'depositing' | 'confirming' | 'mining'
 
-const TX_LABEL: Record<TxStage, string> = {
-  idle: 'Continue',
-  approving: 'Approving token…',
-  depositing: 'Confirm deposit…',
-  confirming: 'Confirm action…',
-  mining: 'Waiting for confirmation…',
+function getTxLabel(t: (key: string) => string, stage: TxStage): string {
+  const labels: Record<TxStage, string> = {
+    idle: t('tradeDetail.continue'),
+    approving: t('tradeDetail.approvingToken'),
+    depositing: t('tradeDetail.confirmingDeposit'),
+    confirming: t('tradeDetail.confirmingAction'),
+    mining: t('tradeDetail.waitingConfirmation'),
+  }
+  return labels[stage]
 }
 
 const CURRENCY_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
@@ -69,6 +73,7 @@ function formatAddress(addr: string | null | undefined) {
 }
 
 export function TradeDetailPage() {
+  const { t } = useTranslation()
   const { id } = useParams()
   const navigate = useNavigate()
   const { address, isConnected } = useAccount()
@@ -134,7 +139,7 @@ export function TradeDetailPage() {
   const liveState: KlerosEscStateValue | null =
     onChainState != null ? (onChainState as KlerosEscStateValue) : null
   const stateLabel =
-    liveState != null ? KlerosEscStateLabel[liveState] : 'Loading…'
+    liveState != null ? KlerosEscStateLabel[liveState] : t('tradeDetail.loadingTrade')
 
   // ── Action: approve + deposit (buyer OR seller path) ─────────────────────
   const fundEscrow = async (
@@ -190,14 +195,16 @@ export function TradeDetailPage() {
 
       toast.success(
         which === 'buyer'
-          ? 'Security deposit posted.'
-          : 'Funds locked.',
+          ? t('tradeDetail.depositPostedSuccess')
+          : t('tradeDetail.fundsLockedSuccess'),
       )
       refetchEscrow()
     } catch (err) {
       console.error('[TradeDetailPage] fund failed:', err)
       toast.error(
-        `${which === 'buyer' ? 'Deposit' : 'Lock'} failed: ${(err as Error).message}`,
+        which === 'buyer'
+          ? t('tradeDetail.depositFailed', { message: (err as Error).message })
+          : t('tradeDetail.lockFailed', { message: (err as Error).message }),
       )
     } finally {
       setTxStage('idle')
@@ -258,10 +265,10 @@ export function TradeDetailPage() {
       await upsertTradeEscrowStatus(trade!.id, EscrowStatus.CONFIRMED, txHash).catch(
         () => undefined,
       )
-      toast.success('Payment confirmed. Grace period started.')
+      toast.success(t('tradeDetail.confirmSuccess'))
       refetchEscrow()
     } catch (err) {
-      toast.error('Confirm failed: ' + (err as Error).message)
+      toast.error(t('tradeDetail.confirmFailed', { message: (err as Error).message }))
     } finally {
       setTxStage('idle')
     }
@@ -285,10 +292,10 @@ export function TradeDetailPage() {
       }).catch(() => {
         /* non-fatal — the chain tx already happened */
       })
-      toast.success('Trade released — funds distributed.')
+      toast.success(t('tradeDetail.releaseSuccess'))
       refetchEscrow()
     } catch (err) {
-      toast.error('Release failed: ' + (err as Error).message)
+      toast.error(t('tradeDetail.releaseFailed', { message: (err as Error).message }))
     } finally {
       setTxStage('idle')
     }
@@ -308,7 +315,7 @@ export function TradeDetailPage() {
       await publicClient!.waitForTransactionReceipt({ hash: txHash })
       // Rulings 1/3 award the crypto to the buyer (refund); 0/2/4 leave it
       // with the seller (completed release). Mirror accordingly.
-      const ruling = escrowState?.currentRuling
+      const ruling = escrowState?.currentRuling != null ? Number(escrowState.currentRuling) : undefined
       const buyerWins =
         ruling === Ruling.AWARD_BUYER_PENALTY_SELLER ||
         ruling === Ruling.AWARD_BUYER_RETURN_DEPOSITS
@@ -318,10 +325,10 @@ export function TradeDetailPage() {
       }).catch(() => {
         /* non-fatal — the chain tx already happened */
       })
-      toast.success('Ruling executed — trade resolved.')
+      toast.success(t('tradeDetail.rulingExecutedSuccess'))
       refetchEscrow()
     } catch (err) {
-      toast.error('Execute ruling failed: ' + (err as Error).message)
+      toast.error(t('tradeDetail.rulingExecutedFailed', { message: (err as Error).message }))
     } finally {
       setTxStage('idle')
     }
@@ -370,7 +377,7 @@ export function TradeDetailPage() {
   const ratingDirection = myRole === 'buyer' ? 'seller' as const : 'buyer' as const
 
   const showRatingForm =
-    liveState === KlerosEscState.RELEASED &&
+    liveState === KlerosEscState.COMPLETED &&
     isConnected && !!myId && !!myRole && !!ratedId
 
   const { data: hasRated = false } = useHasRated(
@@ -379,13 +386,13 @@ export function TradeDetailPage() {
   )
 
   const { data: tradeRatings = [] } = useTradeRatings(
-    liveState === KlerosEscState.RELEASED ? trade?.id : undefined,
+    liveState === KlerosEscState.COMPLETED ? trade?.id : undefined,
   )
 
   if (isLoading) {
     return (
       <section className="flex items-center justify-center py-20 text-muted-foreground">
-        <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading trade…
+        <Loader2 className="w-5 h-5 animate-spin mr-2" />         {t('tradeDetail.loadingTrade')}
       </section>
     )
   }
@@ -395,18 +402,18 @@ export function TradeDetailPage() {
       <div className="w-full max-w-xl mx-auto">
         <Card className="glass-panel rounded-2xl">
           <CardContent className="space-y-4">
-            <Text variant="h4">Trade not found</Text>
+            <Text variant="h4">{t('tradeDetail.tradeNotFound')}</Text>
             <Text variant="muted" className="text-sm">
               {error instanceof Error
                 ? error.message
-                : 'This trade may have been removed or you don’t have access.'}
+                : t('tradeDetail.tradeRemovedOrNoAccess')}
             </Text>
             <Button
               variant="outline"
               className="rounded-full"
               onClick={() => navigate('/app/offers')}
             >
-              Back to offers
+              {t('tradeDetail.backToOffers')}
             </Button>
           </CardContent>
         </Card>
@@ -421,7 +428,7 @@ export function TradeDetailPage() {
           variant="ghost"
           size="icon"
           onClick={() => navigate(-1)}
-          aria-label="Back"
+          aria-label={t('tradeDetail.back')}
           className="rounded-full"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -440,7 +447,7 @@ export function TradeDetailPage() {
       </div>
 
       <Text as="h2" variant="h2" className="mb-1">
-        Trade {trade.crypto_token}
+        {t('tradeDetail.trade')} {trade.crypto_token}
       </Text>
       <Text variant="muted">
         {trade.crypto_amount} {trade.crypto_token} ·{' '}
@@ -453,7 +460,7 @@ export function TradeDetailPage() {
         <Alert className="mt-3 rounded-2xl">
           <Wallet className="w-4 h-4" />
           <AlertDescription>
-            Connect your wallet to interact with this trade.
+            {t('tradeDetail.connectWallet')}
           </AlertDescription>
         </Alert>
       )}
@@ -462,7 +469,7 @@ export function TradeDetailPage() {
       {escrowAddress && (
         <Card className="glass-panel rounded-2xl p-6 mt-3">
           <Text variant="h4" className="font-bold mb-2">
-            Escrow contract
+            {t('tradeDetail.escrowContract')}
           </Text>
 
           <div className="space-y-3">
@@ -484,7 +491,7 @@ export function TradeDetailPage() {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <Text variant="small" className="text-muted-foreground">
-                    Buyer
+                    {t('trades.buyerLabel')}
                   </Text>
                   <Link to={`/app/profile/${escrowState.buyer}`} className="font-mono hover:underline text-foreground">
                     {formatAddress(escrowState.buyer)}
@@ -492,7 +499,7 @@ export function TradeDetailPage() {
                 </div>
                 <div>
                   <Text variant="small" className="text-muted-foreground">
-                    Seller
+                    {t('trades.sellerLabel')}
                   </Text>
                   <Link to={`/app/profile/${escrowState.seller}`} className="font-mono hover:underline text-foreground">
                     {formatAddress(escrowState.seller)}
@@ -500,7 +507,7 @@ export function TradeDetailPage() {
                 </div>
                 <div>
                   <Text variant="small" className="text-muted-foreground">
-                    Trade amount
+                    {t('tradeDetail.tradeAmount')}
                   </Text>
                   <p className="font-mono">
                     {formatTokenAmount(escrowState.tradeAmount, decimals, symbol)}
@@ -508,7 +515,7 @@ export function TradeDetailPage() {
                 </div>
                 <div>
                   <Text variant="small" className="text-muted-foreground">
-                    Security deposit
+                    {t('tradeDetail.securityDeposit')}
                   </Text>
                   <p className="font-mono">
                     {formatTokenAmount(
@@ -520,7 +527,7 @@ export function TradeDetailPage() {
                 </div>
                 <div>
                   <Text variant="small" className="text-muted-foreground">
-                    Fee
+                    {t('tradeDetail.fee')}
                   </Text>
                   <p className="font-mono">
                     {(Number(escrowState.feeBps) / 100).toFixed(2)}%
@@ -528,7 +535,7 @@ export function TradeDetailPage() {
                 </div>
                 <div>
                   <Text variant="small" className="text-muted-foreground">
-                    Grace period
+                    {t('tradeDetail.gracePeriod')}
                   </Text>
                   <p className="font-mono">
                     {(Number(escrowState.gracePeriod) / 86400).toFixed(0)}d
@@ -544,24 +551,26 @@ export function TradeDetailPage() {
       {escrowState && (
         <Card className="glass-panel rounded-2xl p-6 mt-3">
           <Text variant="h4" className="font-bold mb-2">
-            Funding
+            {t('tradeDetail.funding')}
           </Text>
 
           <div className="space-y-3 text-sm">
             <FundingRow
-              label={`Buyer deposit (${formatTokenAmount(escrowState.securityDepositAmount, decimals, symbol)})`}
+              label={`${t('tradeDetail.buyerDeposit')} (${formatTokenAmount(escrowState.securityDepositAmount, decimals, symbol)})`}
               done={escrowState.buyerSecurityDeposited}
               who="buyer"
               isMe={isBuyer}
+              t={t}
             />
             <FundingRow
-              label={`Seller lock (${formatTokenAmount(escrowState.tradeAmount + escrowState.securityDepositAmount, decimals, symbol)})`}
+              label={`${t('tradeDetail.sellerLock')} (${formatTokenAmount(escrowState.tradeAmount + escrowState.securityDepositAmount, decimals, symbol)})`}
               done={escrowState.sellerSecurityDeposited && escrowState.fundsLocked}
               who="seller"
               isMe={isSeller}
+              t={t}
               subDone={
                 escrowState.sellerSecurityDeposited && !escrowState.fundsLocked
-                  ? 'Deposit posted · awaiting lockFunds()'
+                  ? t('tradeDetail.depositPosted') + ' · lockFunds()'
                   : undefined
               }
             />
@@ -582,7 +591,7 @@ export function TradeDetailPage() {
                 ) : (
                   <ShieldCheck className="w-4 h-4 mr-2" />
                 )}
-                {isTxBusy ? TX_LABEL[txStage] : 'Approve + post security deposit'}
+                {isTxBusy ? getTxLabel(t, txStage) : t('tradeDetail.approveAndPostDeposit')}
               </Button>
             )}
 
@@ -597,7 +606,7 @@ export function TradeDetailPage() {
                 ) : (
                   <Coins className="w-4 h-4 mr-2" />
                 )}
-                {isTxBusy ? TX_LABEL[txStage] : 'Approve + post security deposit'}
+                {isTxBusy ? getTxLabel(t, txStage) : t('tradeDetail.approveAndPostDeposit')}
               </Button>
             )}
 
@@ -612,7 +621,7 @@ export function TradeDetailPage() {
                 ) : (
                   <Coins className="w-4 h-4 mr-2" />
                 )}
-                {isTxBusy ? TX_LABEL[txStage] : 'Approve + lock crypto in escrow'}
+                {isTxBusy ? getTxLabel(t, txStage) : t('tradeDetail.approveAndLock')}
               </Button>
             )}
 
@@ -627,7 +636,7 @@ export function TradeDetailPage() {
                 ) : (
                   <CheckCircle2 className="w-4 h-4 mr-2" />
                 )}
-                {isTxBusy ? TX_LABEL[txStage] : 'I sent the fiat — confirm payment'}
+                {isTxBusy ? getTxLabel(t, txStage) : t('tradeDetail.confirmPayment')}
               </Button>
             )}
 
@@ -643,7 +652,7 @@ export function TradeDetailPage() {
                 ) : (
                   <Send className="w-4 h-4 mr-2" />
                 )}
-                {isTxBusy ? TX_LABEL[txStage] : 'Release crypto to buyer'}
+                {isTxBusy ? getTxLabel(t, txStage) : t('tradeDetail.releaseCrypto')}
                 {graceEnd && (
                   <Timer className="w-3.5 h-3.5 ml-2 text-muted-foreground" />
                 )}
@@ -661,7 +670,7 @@ export function TradeDetailPage() {
                 ) : (
                   <CheckCircle2 className="w-4 h-4 mr-2" />
                 )}
-                {isTxBusy ? TX_LABEL[txStage] : 'Execute Kleros ruling'}
+                {isTxBusy ? getTxLabel(t, txStage) : t('tradeDetail.executeRuling')}
               </Button>
             )}
 
@@ -675,14 +684,14 @@ export function TradeDetailPage() {
                   to={`/app/dispute?tradeId=${trade.id}&escrowAddress=${escrowAddress ?? ''}`}
                 >
                   <ShieldAlert className="w-4 h-4 mr-2" />
-                  Raise a Kleros dispute
+                  {t('tradeDetail.raiseDispute')}
                 </Link>
               </Button>
             )}
 
             {!isConnected && (
               <p className="text-xs text-muted-foreground text-center">
-                Connect your wallet to take action.
+                {t('tradeDetail.connectWalletAction')}
               </p>
             )}
           </div>
@@ -702,7 +711,7 @@ export function TradeDetailPage() {
       {tradeRatings.length > 0 && (
         <Card className="glass-panel rounded-2xl p-6 mt-3">
           <Text variant="h4" className="font-bold mb-3">
-            Trade Ratings
+            {t('tradeDetail.tradeRatings')}
           </Text>
           <div className="space-y-3">
             {tradeRatings.map((r) => (
@@ -711,8 +720,8 @@ export function TradeDetailPage() {
                 <div className="min-w-0 flex-1">
                   <Text variant="small" className="font-medium">
                     {r.anonymous
-                      ? 'Anonymous'
-                      : (r.rater as { nickname?: string | null })?.nickname ?? 'Trader'}
+                      ? t('tradeDetail.anonymous')
+                      : (r.rater as { nickname?: string | null })?.nickname ?? t('tradeDetail.trader')}
                   </Text>
                   {r.comment && (
                     <Text variant="muted" className="text-sm mt-0.5">
@@ -735,12 +744,14 @@ function FundingRow({
   who,
   isMe,
   subDone,
+  t,
 }: {
   label: string
   done: boolean
   who: 'buyer' | 'seller'
   isMe: boolean
   subDone?: string
+  t: (key: string, opts?: Record<string, string>) => string
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
@@ -752,13 +763,13 @@ function FundingRow({
         )}
         <span>{label}</span>
         {isMe && (
-          <span className="text-xs text-muted-foreground">(you)</span>
+          <span className="text-xs text-muted-foreground">({t('tradeDetail.you')})</span>
         )}
       </div>
       <span
         className={`text-xs ${done ? 'text-success' : 'text-muted-foreground'}`}
       >
-        {done ? (subDone ?? 'Done') : `Waiting for ${who}`}
+        {done ? (subDone ?? t('tradeDetail.done')) : t(`tradeDetail.waitingFor${who === 'buyer' ? 'Buyer' : 'Seller'}`)}
       </span>
     </div>
   )

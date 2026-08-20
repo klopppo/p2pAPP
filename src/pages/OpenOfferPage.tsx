@@ -1,4 +1,5 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -21,12 +22,13 @@ const REGION_NAMES: Record<string, string> = {
 export function OpenOfferPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const { data: offer, isLoading, isError } = useOffer(id)
 
   if (isLoading) {
     return (
       <section className="flex items-center justify-center py-20 text-muted-foreground">
-        <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading offer…
+        <Loader2 className="w-5 h-5 animate-spin mr-2" /> {t('openOffer.loadingOffer')}
       </section>
     )
   }
@@ -34,14 +36,14 @@ export function OpenOfferPage() {
   if (isError || !offer) {
     return (
       <section>
-        <AppPageHeader title="Offer not found" variant="split" onBack={() => navigate(-1)} />
+        <AppPageHeader title={t('openOffer.offerNotFound')} variant="split" onBack={() => navigate(-1)} />
         <Card className="glass-panel rounded-2xl p-6">
           <CardContent>
             <Text variant="body" className="text-muted-foreground">
-              This offer couldn’t be loaded. It may have been removed or expired.
+              {t('openOffer.offerNotFoundDescription')}
             </Text>
             <Button className="rounded-full mt-4" onClick={() => navigate('/app/offers')}>
-              Back to offers
+              {t('openOffer.backToOffers')}
             </Button>
           </CardContent>
         </Card>
@@ -67,8 +69,8 @@ export function OpenOfferPage() {
   return (
     <section>
       <AppPageHeader
-        title="View Offer"
-        subtitle="Review the offer details and decide if you want to accept"
+        title={t('openOffer.viewOffer')}
+        subtitle={t('openOffer.subtitle')}
         variant="split"
         onBack={() => navigate(-1)}
       />
@@ -101,7 +103,7 @@ export function OpenOfferPage() {
                       </Link>
                     )}
                     <Badge variant={seller?.verification_level === 'verified' || seller?.verification_level === 'trusted' ? 'default' : 'secondary'}>
-                      {seller?.verification_level ?? 'unverified'}
+                      {seller?.verification_level ?? t('openOffer.unverified')}
                     </Badge>
                   </div>
                   <div className="flex items-center gap-4 text-sm">
@@ -109,7 +111,7 @@ export function OpenOfferPage() {
                       <span className="text-yellow-500">★</span>
                       <span>{Number(seller?.avg_rating) || '—'}</span>
                     </div>
-                    <div>{(seller?.total_trades ?? 0).toLocaleString()} trades</div>
+                     <div>{(seller?.total_trades ?? 0).toLocaleString()} {t('openOffer.trades')}</div>
                     {sellerAddr && (
                       <AddressWithActions address={sellerAddr} explorerBase="https://blockscan.com/token/" />
                     )}
@@ -122,7 +124,7 @@ export function OpenOfferPage() {
                 <Alert className="mb-3">
                   <Clock className="h-4 w-4" />
                   <AlertDescription>
-                    Offer expires {expiresAt.toLocaleString()}
+                    {t('openOffer.offerExpires', { date: expiresAt.toLocaleString() })}
                   </AlertDescription>
                 </Alert>
               )}
@@ -135,28 +137,28 @@ export function OpenOfferPage() {
                   the row gap stays consistent regardless of value size. */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 items-start">
                 <div className="space-y-1.5">
-                  <Text variant="small" className="text-muted-foreground">Type</Text>
+                   <Text variant="small" className="text-muted-foreground">{t('openOffer.type')}</Text>
                   <Badge variant={offer.type === 'buy' ? 'default' : 'secondary'} className="rounded-full">
                     {offer.type} {offer.crypto_token}
                   </Badge>
                 </div>
                 <div className="space-y-1.5">
-                  <Text variant="small" className="text-muted-foreground">Price per {offer.crypto_token}</Text>
+                   <Text variant="small" className="text-muted-foreground">{t('openOffer.pricePerUnit', { token: offer.crypto_token })}</Text>
                   <Text variant="h3">{symbol}{price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                 </div>
                 <div className="space-y-1.5">
-                  <Text variant="small" className="text-muted-foreground">Amount Range</Text>
+                   <Text variant="small" className="text-muted-foreground">{t('openOffer.amountRange')}</Text>
                   <Text variant="body">{symbol}{minAmount.toLocaleString()} – {symbol}{maxAmount.toLocaleString()}</Text>
                 </div>
                 <div className="space-y-1.5">
-                  <Text variant="small" className="text-muted-foreground">Location</Text>
+                   <Text variant="small" className="text-muted-foreground">{t('openOffer.location')}</Text>
                   <Text variant="body">{regions}</Text>
                 </div>
               </div>
 
               {/* Payment Methods */}
               <div className="mt-4">
-                <Text variant="small" className="text-muted-foreground mb-1.5">Payment Method</Text>
+                 <Text variant="small" className="text-muted-foreground mb-1.5">{t('openOffer.paymentMethod')}</Text>
                 <div className="flex items-center flex-wrap gap-2">
                   {(offer.payment_methods ?? []).map((m: string) => (
                     <Badge key={m} className="rounded-full">{m}</Badge>
@@ -167,7 +169,7 @@ export function OpenOfferPage() {
               {/* Description */}
               {offer.description && (
                 <div className="mt-4">
-                  <Text variant="small" className="text-muted-foreground mb-1.5">Description</Text>
+                   <Text variant="small" className="text-muted-foreground mb-1.5">{t('openOffer.description')}</Text>
                   <Text variant="body" className="leading-6 whitespace-pre-wrap">
                     {offer.description}
                   </Text>
@@ -179,12 +181,12 @@ export function OpenOfferPage() {
           {/* Acceptance Terms */}
           <Card className="glass-panel rounded-2xl p-6">
             <CardContent className="px-6 py-0">
-              <Text variant="h4" className="font-semibold mb-2">Acceptance Terms</Text>
+              <Text variant="h4" className="font-semibold mb-2">{t('openOffer.acceptanceTerms')}</Text>
               <ul className="space-y-1.5 text-sm text-muted-foreground">
-                <li>• The amount must be within the specified range ({symbol}{minAmount.toLocaleString()} – {symbol}{maxAmount.toLocaleString()})</li>
-                <li>• The payment method must match one specified in the offer</li>
-                <li>• You must verify the trader’s identity before making payment</li>
-                <li>• Escrow will hold funds until the trade is confirmed as completed</li>
+                <li>• {t('openOffer.termRange', { min: `${symbol}${minAmount.toLocaleString()}`, max: `${symbol}${maxAmount.toLocaleString()}` })}</li>
+                <li>• {t('openOffer.termPayment')}</li>
+                <li>• {t('openOffer.termVerify')}</li>
+                <li>• {t('openOffer.termEscrow')}</li>
               </ul>
             </CardContent>
           </Card>
@@ -196,9 +198,9 @@ export function OpenOfferPage() {
             <CardContent>
               <div className="space-y-3">
                 <div className="text-center">
-                  <Text variant="h4">Ready to Trade?</Text>
+                  <Text variant="h4">{t('openOffer.readyToTrade')}</Text>
                   <Text variant="muted" className="text-sm mt-1">
-                    Continue to set your amount and open the trade
+                    {t('openOffer.readyToTradeSubtitle')}
                   </Text>
                 </div>
                 <Button
@@ -206,7 +208,7 @@ export function OpenOfferPage() {
                   size="lg"
                   onClick={() => navigate(`/app/trade/${offer.id}`)}
                 >
-                  Continue to Trade
+                  {t('openOffer.continueToTrade')}
                 </Button>
               </div>
             </CardContent>
@@ -214,14 +216,14 @@ export function OpenOfferPage() {
 
           <Card className="glass-panel rounded-2xl p-6">
             <CardContent>
-              <Text variant="h4" className="font-semibold mb-2">Security Note</Text>
+              <Text variant="h4" className="font-semibold mb-2">{t('openOffer.securityNote')}</Text>
               <div className="flex items-start gap-3">
                 <Shield className="h-5 w-5 text-green-500 mt-0.5" />
                 <div>
-                  <Text variant="small" className="font-semibold mb-1">Escrow Protection</Text>
-                  <p className="text-xs text-muted-foreground">
-                    All trades are protected by our escrow system. Funds are only released after both parties confirm the trade.
-                  </p>
+                   <Text variant="small" className="font-semibold mb-1">{t('openOffer.escrowProtection')}</Text>
+                   <p className="text-xs text-muted-foreground">
+                     {t('openOffer.escrowProtectionDescription')}
+                   </p>
                 </div>
               </div>
             </CardContent>

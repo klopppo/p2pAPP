@@ -179,11 +179,92 @@ body {
   0%, 100% { opacity: 0.75; }
   50% { opacity: 1; }
 }
+/* Orbiting dot around the smart contract core */
+@keyframes ncg-orbit-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+/* Particles that travel along the top flow path (wallet → contract) */
+@keyframes ncg-particle-flow {
+  0% { offset-distance: 0%; opacity: 0; }
+  3% { opacity: 1; }
+  92% { opacity: 1; }
+  100% { offset-distance: 100%; opacity: 1; }
+}
+/* Particles that travel along the bottom flow path (contract → wallet) */
+@keyframes ncg-particle-flow-rev {
+  0% { offset-distance: 100%; opacity: 0; }
+  4% { offset-distance: 96%; opacity: 1; }
+  92% { opacity: 1; }
+  100% { offset-distance: 0%; opacity: 1; }
+}
+/* Hexagonal blockchain node pulse */
+@keyframes ncg-hex-breathe {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.15); }
+}
+/* Key gentle rotation orbit */
+@keyframes ncg-key-orbit {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(8deg); }
+}
+/* Outer ring clockwise rotation */
+@keyframes ncg-ring-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+/* Inner ring counter-clockwise rotation */
+@keyframes ncg-ring-spin-rev {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+/* Individual node breathing pulse */
+@keyframes ncg-node-breathe {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
 .ncg-float { animation: ncg-float 4s ease-in-out infinite; }
 .ncg-flow-dash { animation: ncg-flow-dash 1.2s linear infinite; }
 .ncg-pulse-slow { animation: ncg-pulse-slow 3s ease-in-out infinite; }
+.ncg-orbit {
+  animation: ncg-orbit-rotate 6s linear infinite;
+  transform-origin: center;
+  offset-rotate: 0deg;
+}
+.ncg-particle {
+  animation: ncg-particle-flow 3s linear infinite;
+  offset-rotate: 0deg;
+}
+.ncg-particle-reverse {
+  animation: ncg-particle-flow-rev 3s linear infinite;
+  offset-rotate: 0deg;
+}
+.ncg-hex-pulse {
+  animation: ncg-hex-breathe 4s ease-in-out infinite;
+}
+.ncg-orbit-key {
+  animation: ncg-key-orbit 5s ease-in-out infinite;
+}
+.ncg-ring-rotate {
+  animation: ncg-ring-spin 60s linear infinite;
+}
+.ncg-ring-rotate-rev {
+  animation: ncg-ring-spin-rev 45s linear infinite;
+}
+.ncg-node-pulse {
+  animation: ncg-node-breathe 3s ease-in-out infinite;
+}
 @media (prefers-reduced-motion: reduce) {
   .ncg-float,
   .ncg-flow-dash,
-  .ncg-pulse-slow { animation: none; }
+  .ncg-pulse-slow,
+  .ncg-orbit,
+  .ncg-particle,
+  .ncg-particle-reverse,
+  .ncg-hex-pulse,
+  .ncg-orbit-key,
+  .ncg-ring-rotate,
+  .ncg-ring-rotate-rev,
+  .ncg-node-pulse { animation: none; }
 }

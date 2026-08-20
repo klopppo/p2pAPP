@@ -20,6 +20,7 @@ import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import { Text } from '@/components/ui/text'
 import { ArrowUpDown } from 'lucide-react'
 import { useUserProfile, useOffersBySeller } from '@/hooks/useOffers'
+import { useTranslation } from 'react-i18next'
 import { ReviewList } from '@/components/custom/ReviewList'
 
 // Local UI shape for the offers table. Mirrors what OffersTableWrapper expects;
@@ -95,6 +96,7 @@ function SortableHeader({
 }
 
 export function ProfilePage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { walletAddress: urlWalletAddress } = useParams()
   const { address: connectedAddress, isConnected } = useAccount()
@@ -182,12 +184,12 @@ export function ProfilePage() {
   if (!isConnected && isOwnProfile) {
     return (
       <section className="max-w-xl mx-auto space-y-6 text-center">
-        <AppPageHeader title="Profile" variant="centered" onBack={() => navigate(-1)} />
+        <AppPageHeader title={t('profile.title')} variant="centered" onBack={() => navigate(-1)} />
         <Card>
           <CardContent className="space-y-4">
-            <Text variant="h4">Connect your wallet</Text>
+            <Text variant="h4">{t('profile.connectWallet')}</Text>
             <Text variant="muted" className="text-muted-foreground">
-              Connect a wallet to view your profile, stats, and offers.
+              {t('profile.connectWalletDescription')}
             </Text>
           </CardContent>
         </Card>
@@ -199,7 +201,7 @@ export function ProfilePage() {
     return (
       <section className="flex items-center justify-center py-20 text-muted-foreground">
         <Loader2 className="w-5 h-5 animate-spin mr-2" />
-        Loading profile…
+        {t('profile.loadingProfile')}
       </section>
     )
   }
@@ -207,14 +209,14 @@ export function ProfilePage() {
   if (profileError || !profile) {
     return (
       <section className="max-w-xl mx-auto space-y-6">
-        <AppPageHeader title="Profile" variant="centered" onBack={() => navigate(-1)} />
+        <AppPageHeader title={t('profile.title')} variant="centered" onBack={() => navigate(-1)} />
         <Card>
           <CardContent className="space-y-4">
             <Text variant="body" className="text-destructive">
-              Couldn't load profile. Please try again.
+              {t('profile.errorLoading')}
             </Text>
             <Button className="rounded-full" onClick={() => window.location.reload()}>
-              Retry
+              {t('profile.retry')}
             </Button>
           </CardContent>
         </Card>
@@ -244,7 +246,7 @@ export function ProfilePage() {
             className="rounded-full shadow-none"
           >
             <Pencil className="w-3.5 h-3.5 mr-1" />
-            Edit Profile
+            {t('profile.editProfile')}
           </Button>
         </div>
       )}
@@ -258,7 +260,7 @@ export function ProfilePage() {
           <div className="flex items-center gap-3 flex-wrap">
             <Text variant="h2">{nickname}</Text>
             <Badge className="bg-success text-success-foreground hover:bg-success/90 text-sm">
-              {lastActive === '—' ? 'Offline' : 'Online'}
+              {lastActive === '—' ? t('profile.offline') : t('profile.online')}
             </Badge>
           </div>
           <div className="flex items-center gap-2 mt-1">
@@ -269,9 +271,9 @@ export function ProfilePage() {
                 variant="ghost"
                 onClick={() => {
                   navigator.clipboard.writeText(walletAddr)
-                  toast.success('Address copied')
+                  toast.success(t('profile.addressCopied'))
                 }}
-                title="Copy address"
+                title={t('profile.copyAddress')}
               >
                 <Copy className="w-4 h-4" />
               </Button>
@@ -279,7 +281,7 @@ export function ProfilePage() {
                 size="icon"
                 variant="ghost"
                 onClick={() => window.open(`https://blockscan.com/token/${walletAddr}`, '_blank', 'noopener')}
-                title="Open on Blockscan"
+                title={t('profile.openOnBlockscan')}
               >
                 <ExternalLink className="w-4 h-4" />
               </Button>
@@ -298,16 +300,16 @@ export function ProfilePage() {
           {/* Trader Details */}
           <Card>
             <CardContent className="space-y-3">
-              <Text variant="h4" className="font-bold">Trader Details</Text>
+              <Text variant="h4" className="font-bold">{t('profile.traderDetails')}</Text>
               <div className="space-y-3">
-                <div className="flex justify-between"><span className="text-muted-foreground">Member since</span><span>{memberSince}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Total Trades</span><span>{formatNumber(totalTrades)}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Completed</span><span>{formatNumber(completedTrades)}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Cancelled</span><span>{formatNumber(cancelledTrades)}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Disputes</span><span>{formatNumber(disputeCount)}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Completion rate</span><span>{completionRate}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Verification</span><span className="capitalize">{profile.verification_level ?? 'unverified'}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Reputation</span><span>{profile.reputation_score ?? 0}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">{t('profile.memberSince')}</span><span>{memberSince}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">{t('profile.totalTrades')}</span><span>{formatNumber(totalTrades)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">{t('profile.completed')}</span><span>{formatNumber(completedTrades)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">{t('profile.cancelled')}</span><span>{formatNumber(cancelledTrades)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">{t('profile.disputes')}</span><span>{formatNumber(disputeCount)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">{t('profile.completionRate')}</span><span>{completionRate}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">{t('profile.verification')}</span><span className="capitalize">{profile.verification_level ?? 'unverified'}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">{t('profile.reputation')}</span><span>{profile.reputation_score ?? 0}</span></div>
               </div>
             </CardContent>
           </Card>
@@ -321,7 +323,7 @@ export function ProfilePage() {
           {/* Total Trades */}
           <Card>
             <CardContent>
-              <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">Total Trades</Text>
+              <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">{t('profile.totalTrades')}</Text>
               <Text variant="h3" className="mt-1">{formatNumber(totalTrades)}</Text>
             </CardContent>
           </Card>
@@ -329,7 +331,7 @@ export function ProfilePage() {
           {/* Total Volume */}
           <Card>
             <CardContent>
-              <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">Total Volume</Text>
+              <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">{t('profile.totalVolume')}</Text>
               <Text variant="h3" className="mt-1">{formatVolume(profile.total_volume)}</Text>
             </CardContent>
           </Card>
@@ -337,10 +339,10 @@ export function ProfilePage() {
           {/* Last 30d Stats */}
           <Card>
             <CardContent className="space-y-3">
-              <Text variant="h4" className="font-bold">Last 30 Days</Text>
+              <Text variant="h4" className="font-bold">{t('profile.last30Days')}</Text>
               <div className="space-y-3">
-                <div className="flex justify-between"><span className="text-muted-foreground">Trades</span><span>{profile.last_30d_trades ?? 0}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Volume</span><span>{formatVolume(profile.last_30d_volume)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">{t('profile.trades')}</span><span>{profile.last_30d_trades ?? 0}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">{t('profile.volume')}</span><span>{formatVolume(profile.last_30d_volume)}</span></div>
               </div>
             </CardContent>
           </Card>
@@ -349,23 +351,23 @@ export function ProfilePage() {
 
       {/* User's Offers Table */}
       <div>
-        <Text variant="h4" className="mb-4">{isOwnProfile ? 'Your active offers' : 'Active offers'}</Text>
+        <Text variant="h4" className="mb-4">{isOwnProfile ? t('profile.yourActiveOffers') : t('profile.activeOffers')}</Text>
         <OffersTableWrapper>
           <Table>
             <TableHeader>
               <TableRow className="border-b border-border/50 bg-muted/50 -mx-3 md:-mx-4 px-3 md:px-4">
-                <TableHead>Type</TableHead>
-                <TableHead>Token</TableHead>
+                <TableHead>{t('profile.tableType')}</TableHead>
+                <TableHead>{t('profile.tableToken')}</TableHead>
                 <TableHead className="text-right">
-                  <SortableHeader label="Price" sortField="price" sortKey={sortKey} onToggle={toggleSort} />
+                  <SortableHeader label={t('profile.tablePrice')} sortField="price" sortKey={sortKey} onToggle={toggleSort} />
                 </TableHead>
                 <TableHead className="text-right">
-                  <SortableHeader label="Min Amount" sortField="minAmount" sortKey={sortKey} onToggle={toggleSort} />
+                  <SortableHeader label={t('profile.tableMinAmount')} sortField="minAmount" sortKey={sortKey} onToggle={toggleSort} />
                 </TableHead>
                 <TableHead className="text-right">
-                  <SortableHeader label="Max Amount" sortField="maxAmount" sortKey={sortKey} onToggle={toggleSort} />
+                  <SortableHeader label={t('profile.tableMaxAmount')} sortField="maxAmount" sortKey={sortKey} onToggle={toggleSort} />
                 </TableHead>
-                <TableHead>Action</TableHead>
+                <TableHead>{t('profile.tableAction')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -373,13 +375,13 @@ export function ProfilePage() {
                 <TableRow className="border-b border-border/50">
                   <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
                     <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />
-                    Loading offers…
+                    {t('profile.loadingOffers')}
                   </TableCell>
                 </TableRow>
               ) : filteredOffers.length === 0 ? (
                 <TableRow className="border-b border-border/50">
                   <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                    No active offers.{isOwnProfile && <Button className="rounded-full shadow-none ml-2" onClick={() => navigate('/app/create-offer')}>Create one</Button>}
+                    {t('profile.noActiveOffers')}{isOwnProfile && <Button className="rounded-full shadow-none ml-2" onClick={() => navigate('/app/create-offer')}>{t('profile.createOne')}</Button>}
                   </TableCell>
                 </TableRow>
               ) : (

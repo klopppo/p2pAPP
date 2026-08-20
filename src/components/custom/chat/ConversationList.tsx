@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { MessageCircle } from 'lucide-react'
 import { useConversations } from '@/hooks/useConversations'
 import { ConversationItem } from './ConversationItem'
@@ -16,13 +17,14 @@ interface Props {
  * selected (the right pane takes over).
  */
 export function ConversationList({ activeId, locallyReadIds, onSelect }: Props) {
+  const { t } = useTranslation()
   const { data, isLoading, isError } = useConversations()
 
   return (
     <div className="w-[380px] flex-shrink-0 bg-muted/60 backdrop-blur-sm flex flex-col min-h-0">
       <div className="p-4 shrink-0">
         <Text variant="h4" className="font-bold">
-          Messages
+          {t('chat.messages')}
         </Text>
         <p className="text-xs text-muted-foreground mt-1">
           Conversations from your active and past trades.

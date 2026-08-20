@@ -1,5 +1,6 @@
 import type { KeyboardEvent } from 'react'
 import { useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Send } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -26,8 +27,9 @@ export function MessageComposer({
   onTyping,
   onStopTyping,
   disabled,
-  placeholder = 'Type a message…',
+  placeholder,
 }: Props) {
+  const { t } = useTranslation()
   const lastTypingRef = useRef(0)
 
   const handleKey = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -52,7 +54,7 @@ export function MessageComposer({
     <div className="pt-4 border-t border-border/50 shrink-0">
       <div className="flex gap-2">
         <Input
-          placeholder={placeholder}
+          placeholder={placeholder ?? t('chat.typeMessage')}
           value={value}
           onChange={(e) => handleChange(e.target.value)}
           onKeyDown={handleKey}

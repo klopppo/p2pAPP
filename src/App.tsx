@@ -27,8 +27,10 @@ import DocsEscrowAndSecurity from './pages/docs/EscrowAndSecurity'
 import DocsCreatingOffers from './pages/docs/CreatingOffers'
 import DocsDisputes from './pages/docs/Disputes'
 import DocsFAQ from './pages/docs/FAQ'
+import DocsTermsOfService from './pages/docs/TermsOfService'
 import { UserSync } from './hooks/useSyncUser'
 import { TrustlessFlowOverlay } from './components/custom/TrustlessFlow'
+import { CookieConsent } from './components/custom/CookieConsent'
 
 const queryClient = new QueryClient()
 
@@ -41,6 +43,7 @@ function App() {
           borderRadius: 'large',
         })}>
           <TrustlessFlowOverlay />
+          <CookieConsent />
           <BrowserRouter>
             <UserSync />
             <Routes>
@@ -69,6 +72,7 @@ function App() {
                 <Route path="creating-offers" element={<DocsCreatingOffers />} />
                 <Route path="disputes" element={<DocsDisputes />} />
                 <Route path="faq" element={<DocsFAQ />} />
+                <Route path="terms-of-service" element={<DocsTermsOfService />} />
               </Route>
             </Routes>
           </BrowserRouter>

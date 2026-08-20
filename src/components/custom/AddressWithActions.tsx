@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
 import { Copy, ExternalLink } from 'lucide-react'
@@ -18,15 +19,18 @@ export function AddressWithActions({
   address,
   className = '',
   explorerBase = 'https://etherscan.io/address/',
-  copyToastMessage = 'Indirizzo copiato',
+  copyToastMessage,
   showText = true,
   textClassName = 'font-mono text-xs text-muted-foreground',
 }: Props) {
+  const { t } = useTranslation()
+  const resolvedCopyMessage = copyToastMessage ?? t('addressActions.copiedToast')
+
   if (!address) return null
 
   const handleCopy = () => {
     navigator.clipboard.writeText(address)
-    toast.success(copyToastMessage)
+    toast.success(resolvedCopyMessage)
   }
 
   const handleOpen = () => {
@@ -39,10 +43,10 @@ export function AddressWithActions({
         <Text variant="small" className={textClassName}>{formatAddress(address)}</Text>
       )}
       <div className="ml-1 flex items-center gap-1">
-        <Button size="icon" variant="ghost" onClick={handleCopy} title="Copia indirizzo">
+        <Button size="icon" variant="ghost" onClick={handleCopy} title={t('addressActions.copyAddress')}>
           <Copy className="w-4 h-4" />
         </Button>
-        <Button size="icon" variant="ghost" onClick={handleOpen} title="Apri su explorer">
+        <Button size="icon" variant="ghost" onClick={handleOpen} title={t('addressActions.openOnExplorer')}>
           <ExternalLink className="w-4 h-4" />
         </Button>
       </div>

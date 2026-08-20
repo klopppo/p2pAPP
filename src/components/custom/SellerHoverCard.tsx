@@ -5,6 +5,7 @@ import { Text } from '@/components/ui/text'
 import { Button } from '@/components/ui/button'
 import { Copy, ExternalLink, User } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 export interface SellerPreview {
   name: string
@@ -22,6 +23,7 @@ interface SellerHoverCardProps {
 }
 
 export function SellerHoverCard({ seller, children }: SellerHoverCardProps) {
+  const { t } = useTranslation()
   const formatAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`
 
   const onCopy = async (addr: string) => {
@@ -68,10 +70,10 @@ export function SellerHoverCard({ seller, children }: SellerHoverCardProps) {
                   {formatAddress(seller.address)}
                 </Text>
                 <div className="ml-auto flex items-center gap-1">
-                  <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); onCopy(seller.address) }} title="Copia indirizzo">
+                  <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); onCopy(seller.address) }} title={t('sellerHoverCard.copyAddress')}>
                     <Copy className="w-4 h-4" />
                   </Button>
-                  <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); onOpen(seller.address) }} title="Apri su Blockscan">
+                  <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); onOpen(seller.address) }} title={t('sellerHoverCard.openOnBlockscan')}>
                     <ExternalLink className="w-4 h-4" />
                   </Button>
                 </div>
@@ -86,9 +88,9 @@ export function SellerHoverCard({ seller, children }: SellerHoverCardProps) {
               <span className="font-medium">{seller.rating}</span>
             </div>
             <span className="text-muted-foreground">·</span>
-            <span><span className="font-medium">{seller.totalTrades.toLocaleString()}</span> <span className="text-muted-foreground">trades</span></span>
+            <span><span className="font-medium">{seller.totalTrades.toLocaleString()}</span> <span className="text-muted-foreground">{t('sellerHoverCard.trades')}</span></span>
             <span className="text-muted-foreground">·</span>
-            <span><span className="font-medium">{seller.completionRate}</span> <span className="text-muted-foreground">completion</span></span>
+            <span><span className="font-medium">{seller.completionRate}</span> <span className="text-muted-foreground">{t('sellerHoverCard.completion')}</span></span>
           </div>
 
           {/* Tags */}
@@ -109,7 +111,7 @@ export function SellerHoverCard({ seller, children }: SellerHoverCardProps) {
           >
             <Link to={`/app/profile/${seller.address}`}>
               <User className="w-3.5 h-3.5 mr-1.5" />
-              View Profile
+              {t('sellerHoverCard.viewProfile')}
             </Link>
           </Button>
         </div>

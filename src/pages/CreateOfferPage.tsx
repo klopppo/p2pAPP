@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAccount } from 'wagmi'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -33,6 +34,7 @@ interface OfferForm {
 }
 
 export function CreateOfferPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { address, isConnected } = useAccount()
   const [formData, setFormData] = useState<OfferForm>({
@@ -58,21 +60,21 @@ export function CreateOfferPage() {
     // so we resolve the seller from the connected wallet: upsert (idempotent
     // sync, also covers the connect-time sync) returns the user row with id.
     if (!isConnected || !address) {
-      toast.error('Connect your wallet to create an offer.')
+      toast.error(t('createOffer.errorConnectWallet'))
       return
     }
 
     // Form validation
     if (formData.price <= 0) {
-      toast.error('Price must be greater than 0.')
+      toast.error(t('createOffer.errorPriceZero'))
       return
     }
     if (formData.minAmount <= 0) {
-      toast.error('Minimum amount must be greater than 0.')
+      toast.error(t('createOffer.errorMinAmountZero'))
       return
     }
     if (formData.maxAmount < formData.minAmount) {
-      toast.error('Maximum amount must be greater than or equal to minimum amount.')
+      toast.error(t('createOffer.errorMaxLessThanMin'))
       return
     }
 
@@ -109,12 +111,12 @@ export function CreateOfferPage() {
       // Create offer in database
       await createOffer(offerData)
 
-      toast.success('Offer created successfully!')
+      toast.success(t('createOffer.successCreated'))
       navigate('/app/offers')
     } catch (error) {
       console.error('Error creating offer:', error)
       toast.error(
-        error instanceof Error ? error.message : 'Failed to create offer. Please try again.'
+        error instanceof Error ? error.message : t('createOffer.errorGeneric')
       )
     } finally {
       setIsSubmitting(false)
@@ -144,8 +146,8 @@ export function CreateOfferPage() {
       <div className="w-full max-w-xl mx-auto">
         {/* Centered Header Block */}
         <AppPageHeader
-          title="Create New Offer"
-          subtitle="Browse and create trade offers"
+          title={t('createOffer.title')}
+          subtitle={t('createOffer.subtitle')}
           variant="centered"
           onBack={() => navigate(-1)}
         />
@@ -155,7 +157,7 @@ export function CreateOfferPage() {
                 <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Type Selection */}
                   <div>
-                    <Label className="text-base font-semibold mb-2 block">Offer Type</Label>
+                    <Label className="text-base font-semibold mb-2 block">{t('createOffer.offerType')}</Label>
                     <div className="flex justify-center gap-4">
                       <Button
                         type="button"
@@ -166,7 +168,7 @@ export function CreateOfferPage() {
                             : 'bg-muted text-foreground hover:bg-muted/70'
                         }`}
                       >
-                        Buy
+                        {t('createOffer.buy')}
                       </Button>
                       <Button
                         type="button"
@@ -177,7 +179,7 @@ export function CreateOfferPage() {
                             : 'bg-muted text-foreground hover:bg-muted/70'
                         }`}
                       >
-                        Sell
+                        {t('createOffer.sell')}
                       </Button>
                     </div>
                   </div>
@@ -186,7 +188,7 @@ export function CreateOfferPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="token" className="text-base font-semibold mb-2 block">
-                        Token/Currency
+                        {t('createOffer.tokenCurrency')}
                       </Label>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -216,7 +218,7 @@ export function CreateOfferPage() {
                     </div>
                     <div>
                       <Label htmlFor="price" className="text-base font-semibold mb-2 block">
-                        Price Per Unit
+                        {t('createOffer.pricePerUnit')}
                       </Label>
                       <Input
                         id="price"
@@ -233,7 +235,7 @@ export function CreateOfferPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="minAmount" className="text-base font-semibold mb-2 block">
-                        Minimum Amount
+                        {t('createOffer.minimumAmount')}
                       </Label>
                       <Input
                         id="minAmount"
@@ -246,7 +248,7 @@ export function CreateOfferPage() {
                     </div>
                     <div>
                       <Label htmlFor="maxAmount" className="text-base font-semibold mb-2 block">
-                        Maximum Amount
+                        {t('createOffer.maximumAmount')}
                       </Label>
                       <Input
                         id="maxAmount"
@@ -263,7 +265,7 @@ export function CreateOfferPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="paymentMethod" className="text-base font-semibold mb-2 block">
-                        Payment Method
+                        {t('createOffer.paymentMethod')}
                       </Label>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -293,7 +295,7 @@ export function CreateOfferPage() {
                     </div>
                     <div>
                       <Label htmlFor="location" className="text-base font-semibold mb-2 block">
-                        Location
+                        {t('createOffer.location')}
                       </Label>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -326,7 +328,7 @@ export function CreateOfferPage() {
                   {/* Grace Period */}
                   <div>
                     <Label htmlFor="gracePeriod" className="text-base font-semibold mb-2 block">
-                      Grace Period (hours)
+                      {t('createOffer.gracePeriod')}
                     </Label>
                     <Input
                       id="gracePeriod"
@@ -337,25 +339,24 @@ export function CreateOfferPage() {
                       placeholder="24"
                     />
                     <p className="text-sm text-muted-foreground mt-2">
-                      Time for the counterparty to accept the offer
+                      {t('createOffer.gracePeriodHint')}
                     </p>
                   </div>
 
                   {/* Description */}
                   <div>
                     <Label htmlFor="description" className="text-base font-semibold mb-2 block">
-                      Description
+                      {t('createOffer.description')}
                     </Label>
                     <p className="text-sm text-muted-foreground mb-2">
-                      Optional. Share anything the counterparty should know: preferred
-                      meeting window, accepted banks, KYC requirements, etc.
+                      {t('createOffer.descriptionHint')}
                     </p>
                     <Textarea
                       id="description"
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       className="border border-border min-h-[120px] resize-none rounded-xl"
-                      placeholder="e.g. SEPA only — no instant transfers. Trades over €10k require ID verification."
+                      placeholder={t('createOffer.descriptionPlaceholder')}
                       maxLength={1000}
                     />
                     <p className="text-sm text-muted-foreground mt-1">{formData.description.length}/1000</p>
@@ -372,13 +373,13 @@ export function CreateOfferPage() {
                         className="rounded"
                       />
                       <Label htmlFor="isPrivate" className="text-base font-semibold">
-                        Make Private Offer
+                        {t('createOffer.makePrivateOffer')}
                       </Label>
                     </div>
                     {formData.isPrivate && (
                       <div className="mt-4">
                         <Label htmlFor="targetUser" className="text-base font-semibold mb-2 block">
-                          Target User Address
+                          {t('createOffer.targetUserAddress')}
                         </Label>
                         <Input
                           id="targetUser"
@@ -401,10 +402,10 @@ export function CreateOfferPage() {
                       {isSubmitting ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Creating...
+                          {t('createOffer.creating')}
                         </>
                       ) : (
-                        'Create Offer'
+                        t('createOffer.createOffer')
                       )}
                     </Button>
                   </div>

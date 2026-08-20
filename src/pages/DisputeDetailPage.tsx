@@ -1,4 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
   ExternalLink,
@@ -22,10 +23,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   KLEROS_ESC_ABI,
   KlerosEscState,
-  KlerosEscStateLabel,
-  RULING_LABEL,
   type KlerosEscStateValue,
-  type RulingValue,
 } from '@/lib/contracts'
 import { useDispute, useEscrowState } from '@/hooks/useDisputes'
 
@@ -48,17 +46,36 @@ const STATUS_STYLES: Record<DisputeStatusValue, string> = {
   closed: 'bg-muted text-muted-foreground',
 }
 
-const STATUS_LABEL: Record<DisputeStatusValue, string> = {
-  open: 'Open',
-  in_review: 'In Review',
-  escalated: 'Escalated',
-  resolved: 'Resolved',
-  closed: 'Closed',
-}
-
 const GATEWAY = (
   import.meta.env.VITE_IPFS_GATEWAY ?? 'https://ipfs.io/ipfs/'
 ).replace(/\/$/, '')
+
+const ON_CHAIN_STATE_I18N: Record<number, string> = {
+  [KlerosEscState.AWAITING_FUNDING]: 'disputeDetail.awaitingFunding',
+  [KlerosEscState.FUNDED]: 'disputeDetail.funded',
+  [KlerosEscState.CONFIRMED_PENDING]: 'disputeDetail.confirmedPending',
+  [KlerosEscState.AWAITING_RULING]: 'disputeDetail.awaitingRuling',
+  [KlerosEscState.RULING_RECEIVED]: 'disputeDetail.rulingReceived',
+  [KlerosEscState.RULING_EXECUTED]: 'disputeDetail.rulingExecutedState',
+  [KlerosEscState.COMPLETED]: 'disputeDetail.completed',
+  [KlerosEscState.CANCELLED]: 'disputeDetail.cancelledState',
+}
+
+const RULING_I18N: Record<number, string> = {
+  [0]: 'disputeDetail.refused',
+  [1]: 'disputeDetail.buyerWinsPenalty',
+  [2]: 'disputeDetail.sellerWinsPenalty',
+  [3]: 'disputeDetail.buyerWinsReturn',
+  [4]: 'disputeDetail.sellerWinsReturn',
+}
+
+const STATUS_LABEL_I18N: Record<DisputeStatusValue, string> = {
+  open: 'disputeDetail.open',
+  in_review: 'disputeDetail.inReview',
+  escalated: 'disputeDetail.escalated',
+  resolved: 'disputeDetail.resolved',
+  closed: 'disputeDetail.closed',
+}
 
 interface ParsedDescription {
   userText: string
@@ -152,6 +169,7 @@ function bytes(n: number) {
 export function DisputeDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const { data: dispute, isLoading, isError } = useDispute(id)
   const { address, isConnected } = useAccount()
   const publicClient = usePublicClient()
@@ -193,16 +211,16 @@ export function DisputeDetailPage() {
         <Card className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl">
           <div className="flex flex-col items-center justify-center py-10 text-center gap-3">
             <ShieldAlert className="w-8 h-8 text-destructive" />
-            <Text variant="h4">Couldn’t load this dispute</Text>
+            <Text variant="h4">{t('disputeDetail.couldNotLoad')}</Text>
             <Text variant="muted">
-              It may have been removed or you don’t have access.
+              {t('disputeDetail.accessDenied')}
             </Text>
             <Button
               variant="outline"
               className="rounded-full shadow-none mt-2"
               onClick={() => navigate('/app/disputes')}
             >
-              <ArrowLeft className="w-4 h-4 mr-1" /> Back to disputes
+              <ArrowLeft className="w-4 h-4 mr-1" /> {t('disputeDetail.backToDisputes')}
             </Button>
           </div>
         </Card>
@@ -266,10 +284,10 @@ export function DisputeDetailPage() {
         functionName: 'executeRuling',
       })
       await publicClient.waitForTransactionReceipt({ hash })
-      toast.success('Ruling executed — funds distributed per Kleros.')
+      toast.success(t('disputeDetail.rulingExecuted'))
       refetchEscrowState()
     } catch (err) {
-      toast.error('Execute ruling failed: ' + (err as Error).message)
+      toast.error(t('disputeDetail.rulingExecutedError', { message: (err as Error).message }))
     }
   }
 
@@ -282,10 +300,10 @@ export function DisputeDetailPage() {
         functionName: 'finalize',
       })
       await publicClient.waitForTransactionReceipt({ hash })
-      toast.success('Escrow finalized.')
+      toast.success(t('disputeDetail.escrowFinalized'))
       refetchEscrowState()
     } catch (err) {
-      toast.error('Finalize failed: ' + (err as Error).message)
+      toast.error(t('disputeDetail.escrowFinalizedError', { message: (err as Error).message }))
     }
   }
 
@@ -298,10 +316,10 @@ export function DisputeDetailPage() {
         functionName: 'timeoutDispute',
       })
       await publicClient.waitForTransactionReceipt({ hash })
-      toast.success('Dispute timed out — default rule applied.')
+      toast.success(t('disputeDetail.disputeTimedOut'))
       refetchEscrowState()
     } catch (err) {
-      toast.error('Timeout failed: ' + (err as Error).message)
+      toast.error(t('disputeDetail.disputeTimedOutError', { message: (err as Error).message }))
     }
   }
 
@@ -322,7 +340,7 @@ export function DisputeDetailPage() {
           variant="ghost"
           size="icon"
           onClick={() => navigate('/app/disputes')}
-          aria-label="Back to disputes"
+          aria-label={t('disputeDetail.backToDisputes')}
           className="rounded-full"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -336,20 +354,20 @@ export function DisputeDetailPage() {
         <span
           className={`inline-flex items-center px-2 h-5 rounded-full text-xs font-medium ${STATUS_STYLES[status]}`}
         >
-          {STATUS_LABEL[status]}
+          {t(STATUS_LABEL_I18N[status])}
         </span>
       </div>
 
       <Text as="h2" variant="h2" className="mb-1">
         {dispute.reason}
       </Text>
-      <Text variant="muted">Filed {formatDateTime(dispute.created_at)}</Text>
+      <Text variant="muted">{t('disputeDetail.filedOn', { date: formatDateTime(dispute.created_at) })}</Text>
 
       {/* Escrow contract + live chain state */}
       {escrowAddress && (
         <Card className="glass-panel rounded-2xl p-6 mt-3">
           <Text variant="h4" className="font-bold mb-2">
-            Escrow contract
+            {t('disputeDetail.escrowContract')}
           </Text>
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
@@ -370,19 +388,19 @@ export function DisputeDetailPage() {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <Text variant="small" className="text-muted-foreground">
-                    Buyer
+                    {t('disputeDetail.buyer')}
                   </Text>
                   <p className="font-mono">{formatAddress(escrowState.buyer)}</p>
                 </div>
                 <div>
                   <Text variant="small" className="text-muted-foreground">
-                    Seller
+                    {t('disputeDetail.seller')}
                   </Text>
                   <p className="font-mono">{formatAddress(escrowState.seller)}</p>
                 </div>
                 <div>
                   <Text variant="small" className="text-muted-foreground">
-                    Trade amount
+                    {t('disputeDetail.tradeAmount')}
                   </Text>
                   <p className="font-mono">
                     {escrowState.tradeAmount.toString()}
@@ -390,7 +408,7 @@ export function DisputeDetailPage() {
                 </div>
                 <div>
                   <Text variant="small" className="text-muted-foreground">
-                    Kleros court
+                    {t('disputeDetail.klerosCourt')}
                   </Text>
                   <a
                     href={`https://etherscan.io/address/${escrowState.klerosCourt}`}
@@ -408,9 +426,9 @@ export function DisputeDetailPage() {
             {liveEscrowStateValue !== null && (
               <div className="flex items-center gap-2 text-sm pt-1">
                 <Gavel className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="text-muted-foreground">On-chain state:</span>
+                <span className="text-muted-foreground">{t('disputeDetail.onChainState')}</span>
                 <span className="font-mono">
-                  {KlerosEscStateLabel[liveEscrowStateValue as keyof typeof KlerosEscStateLabel]}
+                  {t(ON_CHAIN_STATE_I18N[liveEscrowStateValue as keyof typeof ON_CHAIN_STATE_I18N])}
                 </span>
                 {escrowState?.klerosDisputeID != null &&
                   escrowState.klerosDisputeID > 0n && (
@@ -424,13 +442,14 @@ export function DisputeDetailPage() {
             {onChainRuling != null && onChainRuling >= 0 && (
               <div className="rounded-xl border border-border bg-background/60 px-3 py-2 text-sm">
                 <Text variant="small" className="text-muted-foreground mb-1">
-                  Kleros ruling
+                  {t('disputeDetail.klerosRuling')}
                 </Text>
                 <span className="font-mono">#{onChainRuling}</span>{' '}
                 <span className="text-muted-foreground">—</span>{' '}
                 <span>
-                  {RULING_LABEL[onChainRuling as RulingValue] ??
-                    'Unknown ruling'}
+                  {RULING_I18N[onChainRuling as keyof typeof RULING_I18N]
+                    ? t(RULING_I18N[onChainRuling as keyof typeof RULING_I18N])
+                    : t('disputeDetail.unknownRuling')}
                 </span>
               </div>
             )}
@@ -451,7 +470,7 @@ export function DisputeDetailPage() {
                     ) : (
                       <Gavel className="w-3.5 h-3.5 mr-1" />
                     )}
-                    Execute ruling
+                    {t('disputeDetail.executeRuling')}
                   </Button>
                 )}
                 {canFinalize && (
@@ -462,7 +481,7 @@ export function DisputeDetailPage() {
                     disabled={isWritePending}
                     onClick={handleFinalize}
                   >
-                    Finalize escrow
+                    {t('disputeDetail.finalizeEscrow')}
                   </Button>
                 )}
                 {canTimeout && (
@@ -474,7 +493,7 @@ export function DisputeDetailPage() {
                     onClick={handleTimeoutDispute}
                   >
                     <Timer className="w-3.5 h-3.5 mr-1" />
-                    Timeout dispute (30d)
+                    {t('disputeDetail.timeoutDispute')}
                   </Button>
                 )}
               </div>
@@ -487,7 +506,7 @@ export function DisputeDetailPage() {
       {trade && (
         <Card className="glass-panel rounded-2xl p-6 mt-3">
           <Text variant="h4" className="font-bold mb-2">
-            Linked trade
+            {t('disputeDetail.linkedTrade')}
           </Text>
 
           <div className="space-y-3">
@@ -509,7 +528,7 @@ export function DisputeDetailPage() {
 
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <Label className="text-base font-semibold mb-2 block">Buyer</Label>
+                <Label className="text-base font-semibold mb-2 block">{t('disputeDetail.buyer')}</Label>
                 <p className="font-mono text-sm">
                   {formatAddress(trade.buyer?.wallet_address ?? buyer?.wallet_address)}
                 </p>
@@ -521,7 +540,7 @@ export function DisputeDetailPage() {
                 )}
               </div>
               <div>
-                <Label className="text-base font-semibold mb-2 block">Seller</Label>
+                <Label className="text-base font-semibold mb-2 block">{t('disputeDetail.seller')}</Label>
                 <p className="font-mono text-sm">
                   {formatAddress(trade.seller?.wallet_address ?? seller?.wallet_address)}
                 </p>
@@ -536,7 +555,7 @@ export function DisputeDetailPage() {
 
             {trade.fiat_amount != null && trade.fiat_currency && (
               <div className="flex justify-between text-sm pt-1">
-                <span className="text-muted-foreground">Trade value</span>
+                <span className="text-muted-foreground">{t('disputeDetail.tradeValue')}</span>
                 <span className="font-mono">
                   {trade.fiat_amount} {trade.fiat_currency}
                 </span>
@@ -550,7 +569,7 @@ export function DisputeDetailPage() {
       {parsed.userText && (
         <Card className="glass-panel rounded-2xl p-6 mt-3">
           <Text variant="h4" className="font-bold mb-2">
-            Filer’s account
+            {t('disputeDetail.filersAccount')}
           </Text>
           <p className="text-sm whitespace-pre-wrap leading-7">
             {parsed.userText}
@@ -562,7 +581,7 @@ export function DisputeDetailPage() {
       {parsed.evidence.length > 0 && (
         <Card className="glass-panel rounded-2xl p-6 mt-3">
           <Text variant="h4" className="font-bold mb-2">
-            Proof
+            {t('disputeDetail.proof')}
           </Text>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {parsed.evidence.map((e, i) => (
@@ -596,13 +615,13 @@ export function DisputeDetailPage() {
       {(parsed.txHash || parsed.evidenceTxHash || parsed.onChainDisputeId || parsed.evidenceCid) && (
         <Card className="glass-panel rounded-2xl p-6 mt-3">
           <Text variant="h4" className="font-bold mb-2">
-            On-chain
+            {t('disputeDetail.onChain')}
           </Text>
 
           <div className="space-y-3">
             {parsed.txHash && (
               <div className="flex justify-between gap-3 text-sm">
-                <span className="text-muted-foreground">raiseDispute tx</span>
+                <span className="text-muted-foreground">{t('disputeDetail.raiseDisputeTx')}</span>
                 <a
                   href={`https://etherscan.io/tx/${parsed.txHash}`}
                   target="_blank"
@@ -616,7 +635,7 @@ export function DisputeDetailPage() {
             )}
             {parsed.evidenceTxHash && (
               <div className="flex justify-between gap-3 text-sm">
-                <span className="text-muted-foreground">submitEvidence tx</span>
+                <span className="text-muted-foreground">{t('disputeDetail.submitEvidenceTx')}</span>
                 <a
                   href={`https://etherscan.io/tx/${parsed.evidenceTxHash}`}
                   target="_blank"
@@ -630,13 +649,13 @@ export function DisputeDetailPage() {
             )}
             {parsed.onChainDisputeId && (
               <div className="flex justify-between gap-3 text-sm">
-                <span className="text-muted-foreground">Kleros dispute id</span>
+                <span className="text-muted-foreground">{t('disputeDetail.klerosDisputeId')}</span>
                 <span className="font-mono">#{parsed.onChainDisputeId}</span>
               </div>
             )}
             {parsed.evidenceCid && (
               <div className="flex justify-between gap-3 text-sm">
-                <span className="text-muted-foreground">Evidence CID</span>
+                <span className="text-muted-foreground">{t('disputeDetail.evidenceCid')}</span>
                 <a
                   href={`${GATEWAY}/${parsed.evidenceCid}`}
                   target="_blank"
@@ -650,7 +669,7 @@ export function DisputeDetailPage() {
             )}
             {parsed.arbitrationFeeWei && (
               <div className="flex justify-between gap-3 text-sm">
-                <span className="text-muted-foreground">Arbitration fee</span>
+                <span className="text-muted-foreground">{t('disputeDetail.arbitrationFee')}</span>
                 <span className="font-mono">
                   {formatEther(BigInt(parsed.arbitrationFeeWei))} ETH
                 </span>
@@ -658,9 +677,7 @@ export function DisputeDetailPage() {
             )}
             <Separator />
             <Text variant="muted" className="text-xs">
-              The KlerosEsc clone and Kleros court are the source of truth. The
-              Supabase row mirrors the on-chain state for fast listing and to
-              store IPFS CIDs that don't fit on-chain.
+              {t('disputeDetail.onChainDisclaimer')}
             </Text>
           </div>
         </Card>
@@ -670,7 +687,7 @@ export function DisputeDetailPage() {
       {evidenceRows && evidenceRows.length > 0 && (
         <Card className="glass-panel rounded-2xl p-6 mt-3">
           <Text variant="h4" className="font-bold mb-2">
-            Submitted evidence (legacy table)
+            {t('disputeDetail.legacyEvidence')}
           </Text>
           <ul className="space-y-2">
             {evidenceRows.map((row, i) => (
@@ -698,7 +715,7 @@ export function DisputeDetailPage() {
         <Alert className="mt-3 rounded-2xl">
           <Wallet className="w-4 h-4" />
           <AlertDescription>
-            Connect the buyer or seller wallet to interact with this dispute.
+            {t('disputeDetail.connectWalletDescription')}
           </AlertDescription>
         </Alert>
       )}
@@ -710,7 +727,7 @@ export function DisputeDetailPage() {
           className="rounded-full shadow-none"
           onClick={() => navigate('/app/disputes')}
         >
-          Back to disputes
+          {t('disputeDetail.backToDisputesButton')}
         </Button>
       </div>
     </div>

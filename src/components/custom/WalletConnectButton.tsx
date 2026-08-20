@@ -1,6 +1,7 @@
 import { useAccount, useDisconnect } from 'wagmi'
 import { useConnectModal } from '@rainbow-me/rainbowkit'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import MotionButton from '@/components/ui/motion-button'
 import {
   DropdownMenu,
@@ -16,6 +17,7 @@ export function WalletConnectButton() {
   const { address, isConnected } = useAccount()
   const { disconnect } = useDisconnect()
   const navigate = useNavigate()
+  const { t } = useTranslation()
 
   const formatAddress = (addr: string) =>
     `${addr.slice(0, 6)}...${addr.slice(-4)}`
@@ -48,11 +50,11 @@ export function WalletConnectButton() {
     return connectModalOpen ? (
       <div className="flex items-center gap-2 h-10 px-4 bg-background text-foreground border border-border rounded-full">
         <Loader2 className="h-4 w-4 animate-spin" />
-        <span className="text-sm">Connecting...</span>
+        <span className="text-sm">{t('wallet.connecting')}</span>
       </div>
     ) : (
       <MotionButton
-        label="Connect Wallet"
+        label={t('wallet.connectWallet')}
         classes="bg-background text-foreground border border-border"
         onClick={openConnectModal}
       />
@@ -72,11 +74,11 @@ export function WalletConnectButton() {
       <DropdownMenuContent className="bg-card border-border shadow-none rounded-2xl">
         <DropdownMenuItem onClick={copyAddress} className="rounded-xl">
           <Copy className="w-4 h-4" />
-          Copy Address
+          {t('wallet.copyAddress')}
         </DropdownMenuItem>
         <DropdownMenuItem className="rounded-xl">
           <ExternalLink className="w-4 h-4" />
-          View Explorer
+          {t('wallet.viewExplorer')}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
@@ -84,14 +86,14 @@ export function WalletConnectButton() {
           className="rounded-xl"
         >
           <User className="w-4 h-4" />
-          Edit Profile
+          {t('wallet.editProfile')}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => disconnect()}
           className="text-red-500 rounded-xl"
         >
-          Disconnect
+          {t('wallet.disconnect')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

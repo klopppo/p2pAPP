@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
 import { parseEventLogs, formatEther, type Abi } from 'viem'
@@ -50,17 +51,6 @@ interface UploadedFile {
   previewUrl: string
 }
 
-const DISPUTE_REASONS = [
-  'No payment received',
-  'Payment released without confirmation',
-  'Counterparty unresponsive',
-  'Wrong amount sent',
-  'Suspected fraud / scam',
-  'Other',
-]
-
-const SEVERITY: SeverityLabel[] = ['Low', 'Medium', 'High', 'Critical']
-
 const MAX_FILE_MB = 10
 const ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/heic'
 
@@ -72,16 +62,6 @@ type Stage =
   | 'mining'
   | 'submitting-evidence'
   | 'saving'
-
-const STAGE_LABEL: Record<Stage, string> = {
-  idle: 'File Dispute',
-  'fetching-fee': 'Reading arbitration fee…',
-  uploading: 'Uploading proof…',
-  raising: 'Confirm raiseDispute in wallet…',
-  mining: 'Waiting for Kleros dispute…',
-  'submitting-evidence': 'Submitting evidence…',
-  saving: 'Saving dispute…',
-}
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
@@ -99,6 +79,7 @@ async function cidToBytes32(cid: string): Promise<`0x${string}`> {
 }
 
 export function DisputePage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -106,6 +87,41 @@ export function DisputePage() {
   const { address, isConnected } = useAccount()
   const publicClient = usePublicClient()
   const { writeContractAsync } = useWriteContract()
+
+  const DISPUTE_REASONS = useMemo(
+    () => [
+      t('disputePage.reasonNoPayment'),
+      t('disputePage.reasonPaymentReleased'),
+      t('disputePage.reasonUnresponsive'),
+      t('disputePage.reasonWrongAmount'),
+      t('disputePage.reasonFraud'),
+      t('disputePage.reasonOther'),
+    ],
+    [t],
+  )
+
+  const SEVERITY = useMemo<SeverityLabel[]>(
+    () => [
+      t('disputePage.severityLow') as SeverityLabel,
+      t('disputePage.severityMedium') as SeverityLabel,
+      t('disputePage.severityHigh') as SeverityLabel,
+      t('disputePage.severityCritical') as SeverityLabel,
+    ],
+    [t],
+  )
+
+  const STAGE_LABEL = useMemo<Record<Stage, string>>(
+    () => ({
+      idle: t('disputePage.fileDispute'),
+      'fetching-fee': t('disputePage.stageFetchingFee'),
+      uploading: t('disputePage.stageUploading'),
+      raising: t('disputePage.stageRaising'),
+      mining: t('disputePage.stageMining'),
+      'submitting-evidence': t('disputePage.stageSubmittingEvidence'),
+      saving: t('disputePage.stageSaving'),
+    }),
+    [t],
+  )
 
   // When the user lands here from a trade detail page, the route carries
   // ?tradeId=<id> (which encodes the escrow contract address — see
@@ -200,27 +216,27 @@ const effectiveEscrow =
     if (!agreed || isSubmitting) return
 
     if (!isConnected || !address) {
-      toast.error('Connect your wallet to file a dispute.')
+      toast.error(t('disputePage.errorConnectWallet'))
       return
     }
     if (!factoryReady || !effectiveEscrow) {
       toast.error(
         !factoryReady
-          ? 'Factory address not configured (VITE_KLEROS_ESCROW_FACTORY).'
-          : 'Pick an escrow to dispute.',
+          ? t('disputePage.errorFactoryNotReady')
+          : t('disputePage.errorPickEscrow'),
       )
       return
     }
     if (files.length === 0) {
-      toast.error('Upload at least one proof picture.')
+      toast.error(t('disputePage.errorUploadProof'))
       return
     }
     if (!publicClient) {
-      toast.error('Public RPC client not ready. Try again.')
+      toast.error(t('disputePage.errorRpcClient'))
       return
     }
     if (arbitrationCostWei == null) {
-      toast.error('Could not read Kleros arbitration fee. Try again.')
+      toast.error(t('disputePage.errorArbitrationFee'))
       return
     }
 
@@ -245,7 +261,7 @@ const effectiveEscrow =
       const linkedTrade = await getTradeByEscrowAddress(effectiveEscrow)
       if (!linkedTrade) {
         toast.error(
-          'No trade found for this escrow. Open a trade from an offer first.',
+          t('disputePage.errorNoTrade'),
         )
         throw new Error(`No trade linked to escrow ${effectiveEscrow}`)
       }
@@ -301,7 +317,7 @@ const effectiveEscrow =
         // and can be retried from the detail page. Don't fail the whole flow.
         console.warn('[DisputePage] submitEvidence failed:', evidenceErr)
         toast.warning(
-          'Dispute raised, but evidence upload failed. Submit evidence from the detail page.',
+          t('disputePage.warningEvidenceFailed'),
         )
       }
 
@@ -354,11 +370,11 @@ const effectiveEscrow =
         /* non-fatal — the dispute row already landed */
       })
 
-      toast.success('Dispute filed on Kleros.')
+      toast.success(t('disputePage.successFiled'))
       navigate(`/app/disputes/${dispute.id}`)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error'
-      toast.error('Failed to file dispute: ' + msg)
+      toast.error(t('disputePage.errorGeneric', { message: msg }))
       console.error('[DisputePage] submit failed:', err)
     } finally {
       setStage('idle')
@@ -379,8 +395,8 @@ const effectiveEscrow =
   return (
     <div className="w-full max-w-xl mx-auto">
       <AppPageHeader
-        title="Open a Dispute"
-        subtitle="Raise a Kleros dispute on a deployed escrow — a decentralized arbitrator will rule"
+        title={t('disputePage.title')}
+        subtitle={t('disputePage.subtitle')}
         variant="centered"
         onBack={() => navigate(-1)}
       />
@@ -390,9 +406,7 @@ const effectiveEscrow =
         <Alert className="mb-3 rounded-2xl">
           <Wallet className="w-4 h-4" />
           <AlertDescription>
-            Connect your wallet to file a dispute. The on-chain transaction is
-            signed from your connected account; the Kleros arbitration fee is
-            paid in ETH.
+            {t('disputePage.connectWallet')}
           </AlertDescription>
         </Alert>
       )}
@@ -400,9 +414,7 @@ const effectiveEscrow =
         <Alert className="mb-3 rounded-2xl border-destructive/40 text-destructive">
           <AlertTriangle className="w-4 h-4" />
           <AlertDescription>
-            KlerosEscrowFactory address is not configured
-            (VITE_KLEROS_ESCROW_FACTORY). Filing is disabled until the env var
-            is set.
+            {t('disputePage.factoryNotConfigured')}
           </AlertDescription>
         </Alert>
       )}
@@ -410,8 +422,7 @@ const effectiveEscrow =
         <Alert className="mb-3 rounded-2xl">
           <AlertTriangle className="w-4 h-4" />
           <AlertDescription>
-            You have no escrows on this factory yet. Open a trade first — the
-            escrow contract for that trade is what you'll dispute.
+            {t('disputePage.noEscrows')}
           </AlertDescription>
         </Alert>
       )}
@@ -420,7 +431,7 @@ const effectiveEscrow =
         {/* Escrow, Reason & Severity */}
         <Card className="glass-panel rounded-2xl p-6 space-y-4">
           <Text variant="h4" className="font-bold mb-2">
-            Trade & Reason
+            {t('disputePage.tradeAndReason')}
           </Text>
 
           {escrowsLoading ? (
@@ -428,30 +439,27 @@ const effectiveEscrow =
           ) : (
             <div>
               <Label className="text-base font-semibold mb-2 block">
-                Escrow contract
+                {t('disputePage.escrowContract')}
               </Label>
               <FullDropdown
-                label="Escrow"
+                label={t('disputePage.escrowContract')}
                 value={escrowAddress}
                 onSelect={(v) => setEscrowAddress(v as `0x${string}`)}
                 options={escrowOptions}
               />
               <p className="text-sm text-muted-foreground mt-1">
-                Deployed by{' '}
-                <code className="font-mono text-xs">
-                  {KLEROS_ESCROW_FACTORY_ADDRESS.slice(0, 8)}…
-                  {KLEROS_ESCROW_FACTORY_ADDRESS.slice(-6)}
-                </code>{' '}
-                — your role must be buyer or seller on the chosen escrow.
+                {t('disputePage.escrowHint', {
+                  address: `${KLEROS_ESCROW_FACTORY_ADDRESS.slice(0, 8)}…${KLEROS_ESCROW_FACTORY_ADDRESS.slice(-6)}`,
+                })}
               </p>
             </div>
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label className="text-base font-semibold mb-2 block">Reason</Label>
+              <Label className="text-base font-semibold mb-2 block">{t('disputePage.reason')}</Label>
               <FullDropdown
-                label="Reason"
+                label={t('disputePage.reason')}
                 value={reason}
                 onSelect={setReason}
                 options={DISPUTE_REASONS.map((r) => ({ label: r, value: r }))}
@@ -459,10 +467,10 @@ const effectiveEscrow =
             </div>
             <div>
               <Label className="text-base font-semibold mb-2 block">
-                Severity
+                {t('disputePage.severity')}
               </Label>
               <FullDropdown
-                label="Severity"
+                label={t('disputePage.severity')}
                 value={severity}
                 onSelect={(v) => setSeverity(v as SeverityLabel)}
                 options={SEVERITY.map((s) => ({ label: s, value: s }))}
@@ -475,11 +483,11 @@ const effectiveEscrow =
             <div className="rounded-xl border border-border bg-background/60 px-4 py-3 flex items-center justify-between gap-3">
               <div>
                 <Text variant="small" className="text-muted-foreground">
-                  Kleros arbitration fee
+                  {t('disputePage.klerosArbitrationFee')}
                 </Text>
                 {arbitrationCostWei == null ? (
                   <Text variant="muted" className="text-xs">
-                    Reading…
+                    {t('disputePage.readingFee')}
                   </Text>
                 ) : (
                   <Text variant="body" className="font-mono">
@@ -494,7 +502,7 @@ const effectiveEscrow =
                   rel="noopener noreferrer"
                   className="text-xs text-primary hover:underline inline-flex items-center gap-1"
                 >
-                  Kleros <ExternalLink className="w-3 h-3" />
+                  {t('disputePage.klerosLink')} <ExternalLink className="w-3 h-3" />
                 </a>
               )}
             </div>
@@ -507,14 +515,14 @@ const effectiveEscrow =
               htmlFor="description"
               className="text-base font-semibold mb-2 block"
             >
-              What happened?
+              {t('disputePage.whatHappened')}
             </Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="border border-border min-h-[120px] resize-none"
-              placeholder="Describe the issue. Include dates, amounts, and any communication that supports your case. The Kleros jurors will see this on the case page."
+              placeholder={t('disputePage.descriptionPlaceholder')}
               maxLength={1000}
             />
             <p className="text-sm text-muted-foreground mt-1">
@@ -526,14 +534,10 @@ const effectiveEscrow =
         {/* Proof */}
         <Card className="glass-panel rounded-2xl p-6">
           <Text variant="h4" className="font-bold mb-2">
-            Proof
+            {t('disputePage.proof')}
           </Text>
           <p className="text-sm text-muted-foreground mb-2">
-            Upload screenshots, chat captures, or photos as proof. The first
-            picture's CID is hashed and pinned on-chain via{' '}
-            <code className="font-mono text-xs">submitEvidence(bytes32)</code>;
-            extras live in the Supabase row for off-chain display. Pictures
-            only (PNG/JPG/WebP/GIF/HEIC), up to {MAX_FILE_MB}MB each.
+            {t('disputePage.proofHint', { maxSize: MAX_FILE_MB })}
           </p>
 
           <div
@@ -552,10 +556,10 @@ const effectiveEscrow =
           >
             <UploadCloud className="w-8 h-8 text-muted-foreground" />
             <Text variant="small" className="font-semibold">
-              Click to upload or drag & drop
+              {t('disputePage.clickToUpload')}
             </Text>
             <Text variant="muted" className="text-xs">
-              PNG, JPG, WebP, GIF, HEIC — up to {MAX_FILE_MB}MB each
+              {t('disputePage.fileFormats', { maxSize: MAX_FILE_MB })}
             </Text>
           </div>
 
@@ -593,7 +597,7 @@ const effectiveEscrow =
                     type="button"
                     onClick={() => removeFile(idx)}
                     className="absolute top-1.5 right-1.5 p-1 rounded-full bg-background/80 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
-                    aria-label={`Remove ${f.name}`}
+                    aria-label={t('disputePage.removeFile', { filename: f.name })}
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -613,25 +617,14 @@ const effectiveEscrow =
               className="mt-1 w-4 h-4 rounded accent-primary cursor-pointer"
             />
             <span className="text-sm text-muted-foreground">
-              I have read and agree to the{' '}
-              <a href="#" className="text-primary hover:underline">
-                Terms of Service
-              </a>
-              ,{' '}
-              <a href="#" className="text-primary hover:underline">
-                Kleros Terms
-              </a>
-              , and confirm the information provided is accurate. Filing a
-              false dispute may result in the loss of my security deposit
-              (slashed to the counterparty) and a Kleros arbitration fee paid
-              in ETH.
+              {t('disputePage.acknowledgement')}
             </span>
           </label>
 
           {!agreed && (
             <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5" />
-              You must accept the terms to continue.
+              {t('disputePage.mustAcceptTerms')}
             </p>
           )}
         </Card>
@@ -645,7 +638,7 @@ const effectiveEscrow =
             disabled={isSubmitting}
             className="rounded-full px-8 py-3 shadow-none"
           >
-            Reset
+            {t('disputePage.reset')}
           </Button>
           <Button
             type="submit"
@@ -660,7 +653,7 @@ const effectiveEscrow =
             ) : (
               <span className="flex items-center gap-2">
                 <ShieldAlert className="w-4 h-4" />
-                File Dispute
+                {t('disputePage.fileDispute')}
               </span>
             )}
           </Button>

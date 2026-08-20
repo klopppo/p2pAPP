@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Tag,
@@ -87,24 +88,27 @@ const SocialLinks = ({ className = '' }: { className?: string }) => (
 )
 
 const NAV_LINKS = [
-  { label: 'Messages', to: '/app/messages' as const, icon: MessageCircle },
-  { label: 'Trades', to: '/app/trades' as const, icon: ArrowLeftRight },
-  { label: 'Offers', to: '/app/offers' as const, icon: Tag },
-  { label: 'Profile', to: '/app/profile' as const, icon: User },
+  { labelKey: 'nav.messages', to: '/app/messages' as const, icon: MessageCircle },
+  { labelKey: 'nav.trades', to: '/app/trades' as const, icon: ArrowLeftRight },
+  { labelKey: 'nav.offers', to: '/app/offers' as const, icon: Tag },
+  { labelKey: 'nav.profile', to: '/app/profile' as const, icon: User },
 ]
 
 const RESOURCE_LINKS: ReadonlyArray<
-  | { label: string; to: string; icon: typeof ShieldAlert }
-  | { label: string; href: string; icon: typeof ShieldAlert }
+  | { labelKey: string; to: string; icon: typeof ShieldAlert }
+  | { labelKey: string; href: string; icon: typeof ShieldAlert }
 > = [
-  // Internal route — uses `to`, rendered with <Link> for client-side nav.
-  { label: 'Disputes', to: '/app/disputes', icon: ShieldAlert },
-  { label: 'Docs', to: '/docs', icon: BookOpen },
-  // External links — use `href` + target="_blank".
-  { label: 'Discord', href: 'https://discord.gg/example', icon: MessageCircle },
+  { labelKey: 'nav.disputes', to: '/app/disputes', icon: ShieldAlert },
+  { labelKey: 'nav.docs', to: '/docs', icon: BookOpen },
+  { labelKey: 'nav.discord', href: 'https://discord.gg/example', icon: MessageCircle },
 ] as const
 
-const LANGUAGES = ['English', 'Español', 'Français', 'Deutsch', '中文']
+const LANGUAGES: { label: string; code: string }[] = [
+  { label: 'English', code: 'en' },
+  { label: 'Español', code: 'es' },
+  { label: 'Français', code: 'fr' },
+  { label: '中文', code: 'zh' },
+]
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'ETH']
 
 interface NavbarProps {
@@ -112,11 +116,14 @@ interface NavbarProps {
 }
 
 export function Navbar({ showTabs = false }: NavbarProps) {
+  const { t, i18n } = useTranslation()
   const [resourcesOpen, setResourcesOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [showLang, setShowLang] = useState(false)
   const [showCurr, setShowCurr] = useState(false)
-  const [language, setLanguage] = useState('English')
+  const [language, setLanguage] = useState(
+    () => LANGUAGES.find((l) => l.code === i18n.language)?.label ?? 'English'
+  )
   const [currency, setCurrency] = useState('USD')
   const location = useLocation()
   const navigate = useNavigate()
@@ -153,7 +160,7 @@ export function Navbar({ showTabs = false }: NavbarProps) {
                     }`}
                   >
                     <link.icon className="w-4 h-4" />
-                    {link.label}
+                    {t(link.labelKey)}
                   </Link>
                 )
               })}
@@ -165,7 +172,7 @@ export function Navbar({ showTabs = false }: NavbarProps) {
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors cursor-pointer"
                   >
                     <BookOpen className="w-4 h-4" />
-                    Resources
+                    {t('nav.resources')}
                     <ChevronDown className={`w-3.5 h-3.5 transition-transform ${resourcesOpen ? 'rotate-180' : ''}`} />
                   </button>
                 </DropdownMenuTrigger>
@@ -177,13 +184,9 @@ export function Navbar({ showTabs = false }: NavbarProps) {
                     {RESOURCE_LINKS.map((r) => {
                       const Icon = r.icon
                       return 'to' in r ? (
-                        // Internal route — client-side navigation via <Link>.
                         <DropdownMenuItem
-                          key={r.label}
+                          key={r.labelKey}
                           asChild
-                          // Tell Radix to close the menu after the click; the
-                          // dropdown would otherwise stay open through the
-                          // route transition.
                           onSelect={(e) => {
                             e.preventDefault()
                             navigate(r.to)
@@ -191,18 +194,18 @@ export function Navbar({ showTabs = false }: NavbarProps) {
                         >
                           <Link to={r.to}>
                             <Icon className="w-4 h-4" />
-                            {r.label}
+                            {t(r.labelKey)}
                           </Link>
                         </DropdownMenuItem>
                       ) : (
-                        <DropdownMenuItem key={r.label} asChild>
+                        <DropdownMenuItem key={r.labelKey} asChild>
                           <a
                             href={r.href}
                             target="_blank"
                             rel="noopener noreferrer"
                           >
                             <Icon className="w-4 h-4" />
-                            {r.label}
+                            {t(r.labelKey)}
                           </a>
                         </DropdownMenuItem>
                       )
@@ -227,7 +230,7 @@ export function Navbar({ showTabs = false }: NavbarProps) {
               <DropdownMenuTrigger asChild>
                 <button
                   className="w-9 h-9 flex items-center justify-center rounded-full border border-border bg-card/70 text-muted-foreground hover:text-foreground hover:bg-card transition-all cursor-pointer"
-                  aria-label="Global preferences"
+                  aria-label={t('nav.globalPreferences')}
                 >
                   <MoreHorizontal className="w-4 h-4" />
                 </button>
@@ -238,7 +241,7 @@ export function Navbar({ showTabs = false }: NavbarProps) {
                 className="w-64 rounded-2xl border border-border bg-card/95 backdrop-blur-xl shadow-2xl p-0 overflow-hidden"
               >
                 <DropdownMenuLabel className="px-4 pt-4 pb-2 text-base font-semibold text-foreground">
-                  Global preferences
+                  {t('nav.globalPreferences')}
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="mx-4" />
 
@@ -251,7 +254,7 @@ export function Navbar({ showTabs = false }: NavbarProps) {
                     >
                       <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
                         <Globe className="w-4 h-4" />
-                        Language
+                        {t('nav.language')}
                       </div>
                       <div className="flex items-center gap-1 text-sm font-semibold text-foreground">
                         {language}
@@ -264,22 +267,23 @@ export function Navbar({ showTabs = false }: NavbarProps) {
                         onClick={() => setShowLang(false)}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                       >
-                        <ChevronRight className="w-3 h-3 rotate-180" /> Back
+                        <ChevronRight className="w-3 h-3 rotate-180" /> {t('nav.back')}
                       </button>
                       {LANGUAGES.map((l) => (
                         <button
-                          key={l}
+                          key={l.code}
                           onClick={() => {
-                            setLanguage(l)
+                            setLanguage(l.label)
+                            i18n.changeLanguage(l.code)
                             setShowLang(false)
                           }}
                           className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-colors cursor-pointer ${
-                            l === language
+                            l.label === language
                               ? 'bg-foreground/10 text-foreground font-semibold'
                               : 'hover:bg-accent text-foreground'
                           }`}
                         >
-                          {l}
+                          {l.label}
                         </button>
                       ))}
                     </div>
@@ -295,7 +299,7 @@ export function Navbar({ showTabs = false }: NavbarProps) {
                     >
                       <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
                         <DollarSign className="w-4 h-4" />
-                        Currency
+                        {t('nav.currency')}
                       </div>
                       <div className="flex items-center gap-1 text-sm font-semibold text-foreground">
                         {currency}
@@ -308,7 +312,7 @@ export function Navbar({ showTabs = false }: NavbarProps) {
                         onClick={() => setShowCurr(false)}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                       >
-                        <ChevronRight className="w-3 h-3 rotate-180" /> Back
+                        <ChevronRight className="w-3 h-3 rotate-180" /> {t('nav.back')}
                       </button>
                       {CURRENCIES.map((c) => (
                         <button
@@ -340,7 +344,7 @@ export function Navbar({ showTabs = false }: NavbarProps) {
         <button
           onClick={() => setMobileOpen((v) => !v)}
           className="p-2 text-foreground md:hidden cursor-pointer"
-          aria-label="Toggle menu"
+          aria-label={t('nav.toggleMenu')}
         >
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
@@ -372,31 +376,30 @@ export function Navbar({ showTabs = false }: NavbarProps) {
                       }`}
                     >
                       <link.icon className="w-4 h-4" />
-                      {link.label}
+                      {t(link.labelKey)}
                     </Link>
                   )
                 })}
               {showTabs && (
                 <div className="border-t border-border pt-2 mt-1">
                   <p className="px-3 py-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                    Resources
+                    {t('nav.resources')}
                   </p>
                   {RESOURCE_LINKS.map((r) => {
                     const Icon = r.icon
                     return 'to' in r ? (
-                      // Internal route — client-side navigation; close menu on click.
                       <Link
-                        key={r.label}
+                        key={r.labelKey}
                         to={r.to}
                         onClick={() => setMobileOpen(false)}
                         className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                       >
                         <Icon className="w-4 h-4" />
-                        {r.label}
+                        {t(r.labelKey)}
                       </Link>
                     ) : (
                       <a
-                        key={r.label}
+                        key={r.labelKey}
                         href={r.href}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -404,7 +407,7 @@ export function Navbar({ showTabs = false }: NavbarProps) {
                         className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                       >
                         <Icon className="w-4 h-4" />
-                        {r.label}
+                        {t(r.labelKey)}
                       </a>
                     )
                   })}

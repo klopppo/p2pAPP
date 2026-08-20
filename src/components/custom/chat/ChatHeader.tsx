@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { ConversationView, ConversationWithParticipant } from '@/types/database'
@@ -17,6 +18,7 @@ interface Props {
  * dot, and a small trade summary pill linking back to the trade.
  */
 export function ChatHeader({ conversation, currentUserId, online, onBack }: Props) {
+  const { t } = useTranslation()
   const other: ConversationWithParticipant | undefined = conversation.participants.find(
     (p) => p.user_id !== currentUserId
   )
@@ -54,7 +56,7 @@ export function ChatHeader({ conversation, currentUserId, online, onBack }: Prop
           {name}
         </Text>
         <Text variant="muted" className="text-sm">
-          {online ? 'Online' : 'Offline'}
+          {online ? t('chat.online') : t('chat.offline')}
         </Text>
       </div>
 

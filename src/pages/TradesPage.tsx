@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Loader2, Inbox, ArrowLeftRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -20,34 +21,6 @@ type StatusFilter =
   | 'disputed'
   | 'refunded'
   | 'pending'
-
-const ROLE_FILTERS: { value: RoleFilter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'buyer', label: 'As buyer' },
-  { value: 'seller', label: 'As seller' },
-]
-
-const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'active', label: 'Active' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' },
-  { value: 'disputed', label: 'Disputed' },
-  { value: 'refunded', label: 'Refunded' },
-]
-
-const ESCROW_LABELS: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
-  awaiting_deposit: { label: 'Awaiting deposit', variant: 'outline' },
-  buyer_deposited: { label: 'Buyer deposited', variant: 'secondary' },
-  seller_deposited: { label: 'Seller locked', variant: 'secondary' },
-  confirmed: { label: 'Confirmed', variant: 'default' },
-  deposited: { label: 'Deposited', variant: 'secondary' },
-  pending_release: { label: 'Pending release', variant: 'default' },
-  disputed: { label: 'Disputed', variant: 'destructive' },
-  released: { label: 'Released', variant: 'secondary' },
-  refunded: { label: 'Refunded', variant: 'outline' },
-}
 
 function formatAddress(addr: string | null | undefined) {
   if (!addr) return '—'
@@ -88,10 +61,39 @@ interface TradeRow {
 }
 
 export function TradesPage() {
+  const { t } = useTranslation()
   const { data: user } = useCurrentUser()
   const { data: trades = [], isLoading, isError } = useTrades()
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+
+  const ROLE_FILTERS: { value: RoleFilter; label: string }[] = [
+    { value: 'all', label: t('trades.roleAll') },
+    { value: 'buyer', label: t('trades.roleAsBuyer') },
+    { value: 'seller', label: t('trades.roleAsSeller') },
+  ]
+
+  const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
+    { value: 'all', label: t('trades.statusAll') },
+    { value: 'pending', label: t('trades.statusPending') },
+    { value: 'active', label: t('trades.statusActive') },
+    { value: 'completed', label: t('trades.statusCompleted') },
+    { value: 'cancelled', label: t('trades.statusCancelled') },
+    { value: 'disputed', label: t('trades.statusDisputed') },
+    { value: 'refunded', label: t('trades.statusRefunded') },
+  ]
+
+  const ESCROW_LABELS: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
+    awaiting_deposit: { label: t('trades.escrowAwaitingDeposit'), variant: 'outline' },
+    buyer_deposited: { label: t('trades.escrowBuyerDeposited'), variant: 'secondary' },
+    seller_deposited: { label: t('trades.escrowSellerDeposited'), variant: 'secondary' },
+    confirmed: { label: t('trades.escrowConfirmed'), variant: 'default' },
+    deposited: { label: t('trades.escrowDeposited'), variant: 'secondary' },
+    pending_release: { label: t('trades.escrowPendingRelease'), variant: 'default' },
+    disputed: { label: t('trades.escrowDisputed'), variant: 'destructive' },
+    released: { label: t('trades.escrowReleased'), variant: 'secondary' },
+    refunded: { label: t('trades.escrowRefunded'), variant: 'outline' },
+  }
 
   const myId = user?.id
 
@@ -111,14 +113,14 @@ export function TradesPage() {
   return (
     <section className="space-y-8">
       <AppPageHeader
-        title="Trades"
-        subtitle="Manage your active and past trades"
+        title={t('trades.title')}
+        subtitle={t('trades.subtitle')}
         variant="split"
         action={
           <Button asChild className="rounded-full shadow-none">
             <Link to="/app/offers">
               <ArrowLeftRight className="w-4 h-4 mr-1" />
-              Browse offers
+              {t('trades.browseOffers')}
             </Link>
           </Button>
         }
@@ -127,17 +129,17 @@ export function TradesPage() {
       {/* Filter strip */}
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <Text variant="muted">
-          {filtered.length} {filtered.length === 1 ? 'trade' : 'trades'}
+          {t('trades.tradeCount', { count: filtered.length })}
         </Text>
         <div className="flex items-center gap-3">
           <FullDropdown
-            label="Role"
+            label={t('trades.roleLabel')}
             value={roleFilter}
             onSelect={(v) => setRoleFilter(v as RoleFilter)}
             options={ROLE_FILTERS}
           />
           <FullDropdown
-            label="Status"
+            label={t('trades.statusLabel')}
             value={statusFilter}
             onSelect={(v) => setStatusFilter(v as StatusFilter)}
             options={STATUS_FILTERS}
@@ -149,15 +151,15 @@ export function TradesPage() {
       {isLoading ? (
         <Card className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl">
           <div className="flex items-center justify-center py-12 text-muted-foreground">
-            <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading trades…
+            <Loader2 className="w-5 h-5 animate-spin mr-2" /> {t('trades.loadingTrades')}
           </div>
         </Card>
       ) : isError ? (
         <Card className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl">
           <div className="flex flex-col items-center justify-center py-10 text-center gap-3">
-            <Text variant="h4">Couldn’t load trades</Text>
+            <Text variant="h4">{t('trades.errorTitle')}</Text>
             <Text variant="muted">
-              Something went wrong while fetching your trades. Try again later.
+              {t('trades.errorDescription')}
             </Text>
           </div>
         </Card>
@@ -166,37 +168,37 @@ export function TradesPage() {
           <div className="flex flex-col items-center justify-center py-12 text-center gap-4">
             <Inbox className="w-10 h-10 text-muted-foreground" />
             <div className="space-y-1">
-              <Text variant="h4">No trades yet</Text>
+              <Text variant="h4">{t('trades.emptyTitle')}</Text>
               <Text variant="muted" className="max-w-sm">
-                When you open a trade from an offer, it will appear here.
+                {t('trades.emptyDescription')}
               </Text>
             </div>
             <Button asChild className="rounded-full shadow-none mt-2">
               <Link to="/app/offers">
                 <ArrowLeftRight className="w-4 h-4 mr-1" />
-                Find an offer
+                {t('trades.findAnOffer')}
               </Link>
             </Button>
           </div>
         </Card>
       ) : (
         <ul className="space-y-3">
-          {filtered.map((t) => {
-            const escrowMeta = ESCROW_LABELS[t.escrow_status] ?? {
-              label: t.escrow_status,
+          {filtered.map((trade) => {
+            const escrowMeta = ESCROW_LABELS[trade.escrow_status] ?? {
+              label: trade.escrow_status,
               variant: 'outline' as const,
             }
             const counterparty =
-              myId === t.buyer_id ? t.seller : t.buyer
-            const role = myId === t.buyer_id ? 'buyer' : 'seller'
+              myId === trade.buyer_id ? trade.seller : trade.buyer
+            const role = myId === trade.buyer_id ? 'buyer' : 'seller'
             const cpName =
               counterparty?.nickname ??
               formatAddress(counterparty?.wallet_address)
             const cpAvatar = counterparty?.avatar_url ?? undefined
             return (
-              <li key={t.id}>
+              <li key={trade.id}>
                 <Link
-                  to={`/app/trades/${t.id}`}
+                  to={`/app/trades/${trade.id}`}
                   className="block group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl"
                 >
                   <Card className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl transition-colors group-hover:border-primary/50 group-hover:bg-background/70">
@@ -207,7 +209,7 @@ export function TradesPage() {
                             variant="small"
                             className="uppercase tracking-wider text-muted-foreground"
                           >
-                            {t.trade_id}
+                            {trade.trade_id}
                           </Text>
                           <Badge
                             variant={escrowMeta.variant}
@@ -218,24 +220,24 @@ export function TradesPage() {
                         </div>
 
                         <Text variant="h4" className="truncate">
-                          {Number(t.crypto_amount).toLocaleString('en-US', {
+                          {Number(trade.crypto_amount).toLocaleString('en-US', {
                             maximumFractionDigits: 6,
                           })}{' '}
-                          {t.crypto_token}
+                          {trade.crypto_token}
                           <span className="text-muted-foreground font-normal">
                             {' '}
                             ·{' '}
-                            {Number(t.fiat_amount).toLocaleString('en-US', {
+                            {Number(trade.fiat_amount).toLocaleString('en-US', {
                               maximumFractionDigits: 2,
                             })}{' '}
-                            {t.fiat_currency}
+                            {trade.fiat_currency}
                           </span>
                         </Text>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-1 text-sm">
                           <div className="flex flex-col">
                             <span className="text-muted-foreground text-xs">
-                              {role === 'buyer' ? 'Seller' : 'Buyer'}
+                              {role === 'buyer' ? t('trades.sellerLabel') : t('trades.buyerLabel')}
                             </span>
                             <span className="inline-flex items-center gap-1.5 truncate">
                               <Avatar className="h-5 w-5">
@@ -251,15 +253,15 @@ export function TradesPage() {
                           </div>
                           <div className="flex flex-col">
                             <span className="text-muted-foreground text-xs">
-                              Trade status
+                              {t('trades.tradeStatus')}
                             </span>
-                            <span className="capitalize">{t.status}</span>
+                            <span className="capitalize">{trade.status}</span>
                           </div>
                           <div className="flex flex-col">
                             <span className="text-muted-foreground text-xs">
-                              Opened
+                              {t('trades.opened')}
                             </span>
-                            <span>{formatDate(t.created_at)}</span>
+                            <span>{formatDate(trade.created_at)}</span>
                           </div>
                         </div>
                       </div>

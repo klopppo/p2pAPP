@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useOffers } from '@/hooks/useOffers'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -123,6 +124,7 @@ function SortableHeader({
 }
 
 export function OffersPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { data, isLoading, isError } = useOffers()
   const [searchQuery, setSearchQuery] = useState('')
@@ -178,12 +180,12 @@ export function OffersPage() {
     <section>
             {/* Header */}
             <AppPageHeader
-              title="Offers"
-              subtitle="Browse and create trade offers"
+              title={t('offers.title')}
+              subtitle={t('offers.subtitle')}
               variant="split"
               action={
                 <Link to="/app/create-offer">
-                  <Button className="rounded-full shadow-none">Create Offer</Button>
+                  <Button className="rounded-full shadow-none">{t('offers.createOffer')}</Button>
                 </Link>
               }
             />
@@ -191,42 +193,42 @@ export function OffersPage() {
             {/* Filters */}
             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
               <Input
-                placeholder="Search offers..."
+                placeholder={t('offers.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="max-w-xs rounded-full border-border"
               />
               <div className="flex items-center gap-3">
                 <FullDropdown
-                  label="Type"
+                  label={t('offers.typeLabel')}
                   value={typeFilter}
                   onSelect={setTypeFilter}
                   options={[
-                    { label: 'All', value: 'all' },
-                    { label: 'Buy', value: 'buy' },
-                    { label: 'Sell', value: 'sell' },
+                    { label: t('offers.filterAll'), value: 'all' },
+                    { label: t('offers.filterBuy'), value: 'buy' },
+                    { label: t('offers.filterSell'), value: 'sell' },
                   ]}
                 />
                 <FullDropdown
-                  label="Token"
+                  label={t('offers.tokenLabel')}
                   value={tokenFilter}
                   onSelect={setTokenFilter}
                   options={[
-                    { label: 'All', value: 'all' },
+                    { label: t('offers.filterAll'), value: 'all' },
                     { label: 'ETH', value: 'ETH' },
                     { label: 'BTC', value: 'BTC' },
                     { label: 'USDC', value: 'USDC' },
                   ]}
                 />
                 <FullDropdown
-                  label="Payment"
+                  label={t('offers.paymentLabel')}
                   value={paymentFilter}
                   onSelect={setPaymentFilter}
                   options={[
-                    { label: 'All', value: 'all' },
-                    { label: 'Bank Transfer', value: 'bank' },
-                    { label: 'PayPal', value: 'paypal' },
-                    { label: 'Wise', value: 'wise' },
+                    { label: t('offers.filterAll'), value: 'all' },
+                    { label: t('offers.filterPaymentBank'), value: 'bank' },
+                    { label: t('offers.filterPaymentPaypal'), value: 'paypal' },
+                    { label: t('offers.filterPaymentWise'), value: 'wise' },
                   ]}
                 />
               </div>
@@ -237,17 +239,17 @@ export function OffersPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="border-b border-border/50 bg-muted/50 -mx-3 md:-mx-4 px-3 md:px-4">
-                    <TableHead>Trader</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Token</TableHead>
+                    <TableHead>{t('offers.tableTrader')}</TableHead>
+                    <TableHead>{t('offers.tableType')}</TableHead>
+                    <TableHead>{t('offers.tableToken')}</TableHead>
                     <TableHead className="text-right">
-                      <SortableHeader label="Price" sortField="price" sortKey={sortKey} onToggle={toggleSort} />
+                      <SortableHeader label={t('offers.tablePrice')} sortField="price" sortKey={sortKey} onToggle={toggleSort} />
                     </TableHead>
                     <TableHead className="text-right">
-                      <SortableHeader label="Min Amount" sortField="minAmount" sortKey={sortKey} onToggle={toggleSort} />
+                      <SortableHeader label={t('offers.tableMinAmount')} sortField="minAmount" sortKey={sortKey} onToggle={toggleSort} />
                     </TableHead>
                     <TableHead className="text-right">
-                      <SortableHeader label="Max Amount" sortField="maxAmount" sortKey={sortKey} onToggle={toggleSort} />
+                      <SortableHeader label={t('offers.tableMaxAmount')} sortField="maxAmount" sortKey={sortKey} onToggle={toggleSort} />
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -256,13 +258,13 @@ export function OffersPage() {
                     <TableRow className="border-b border-border/50">
                       <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
                         <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />
-                        Loading offers…
+                        {t('offers.loadingOffers')}
                       </TableCell>
                     </TableRow>
                   ) : isError ? (
                     <TableRow className="border-b border-border/50">
                       <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                        Couldn’t load offers. Please try again.
+                        {t('offers.errorLoading')}
                       </TableCell>
                     </TableRow>
                   ) : filteredOffers.length === 0 ? (

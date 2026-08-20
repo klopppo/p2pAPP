@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAccount } from 'wagmi'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
@@ -38,6 +39,7 @@ const EMPTY_FORM: ProfileForm = {
 }
 
 export function EditProfilePage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { address, isConnected } = useAccount()
   const { data: profile, isLoading } = useUserProfile(address)
@@ -70,7 +72,7 @@ export function EditProfilePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!address || !isConnected) {
-      toast.error('Connect your wallet first')
+      toast.error(t('editProfile.errorConnectWallet'))
       return
     }
     setSaving(true)
@@ -85,7 +87,7 @@ export function EditProfilePage() {
         telegramHandle: form.telegramHandle || null,
         githubHandle: form.githubHandle || null,
       })
-      toast.success('Profile saved')
+      toast.success(t('editProfile.successSaved'))
       qc.invalidateQueries({ queryKey: ['current-user', address] })
       qc.invalidateQueries({ queryKey: ['user-profile', address] })
       if (wasOnboarding.current) {
@@ -95,7 +97,7 @@ export function EditProfilePage() {
       }
     } catch (err) {
       console.error('Error saving profile:', err)
-      toast.error('Failed to save profile')
+      toast.error(t('editProfile.errorSaveFailed'))
     } finally {
       setSaving(false)
     }
@@ -104,12 +106,12 @@ export function EditProfilePage() {
   if (!isConnected || !address) {
     return (
       <section className="max-w-xl mx-auto space-y-6 text-center">
-        <AppPageHeader title="Edit Profile" variant="centered" onBack={() => navigate(-1)} />
+        <AppPageHeader title={t('editProfile.title')} variant="centered" onBack={() => navigate(-1)} />
         <Card>
           <CardContent className="space-y-4">
-            <Text variant="h4">Connect your wallet</Text>
+            <Text variant="h4">{t('editProfile.connectWallet')}</Text>
             <Text variant="muted" className="text-muted-foreground">
-              Connect a wallet to edit your profile.
+              {t('editProfile.connectWalletDescription')}
             </Text>
           </CardContent>
         </Card>
@@ -121,7 +123,7 @@ export function EditProfilePage() {
     return (
       <section className="flex items-center justify-center py-20 text-muted-foreground">
         <Loader2 className="w-5 h-5 animate-spin mr-2" />
-        Loading profile…
+        {t('editProfile.loadingProfile')}
       </section>
     )
   }
@@ -130,8 +132,8 @@ export function EditProfilePage() {
     <section className="space-y-8">
       <div className="max-w-xl mx-auto space-y-4">
         <AppPageHeader
-          title="Edit Profile"
-          subtitle="Update your public information"
+          title={t('editProfile.title')}
+          subtitle={t('editProfile.subtitle')}
           variant="centered"
           onBack={() => navigate(-1)}
         />
@@ -150,81 +152,81 @@ export function EditProfilePage() {
               </div>
               <div className="flex-1 flex flex-col gap-3">
                 <div>
-                  <Label htmlFor="nickname" className="text-base font-semibold mb-2 block">Nickname</Label>
+                  <Label htmlFor="nickname" className="text-base font-semibold mb-2 block">{t('editProfile.nickname')}</Label>
                   <Input
                     id="nickname"
                     value={form.nickname}
                     onChange={(e) => update('nickname', e.target.value)}
                     className="rounded-full border border-border"
-                    placeholder="Your display name"
+                    placeholder={t('editProfile.nicknamePlaceholder')}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="location" className="text-base font-semibold mb-2 block">Location</Label>
+                  <Label htmlFor="location" className="text-base font-semibold mb-2 block">{t('editProfile.location')}</Label>
                   <Input
                     id="location"
                     value={form.location}
                     onChange={(e) => update('location', e.target.value)}
                     className="rounded-full border border-border"
-                    placeholder="e.g. Europe/Madrid"
+                    placeholder={t('editProfile.locationPlaceholder')}
                   />
                 </div>
               </div>
             </div>
 
             <div className="mb-4">
-              <Label htmlFor="bio" className="text-base font-semibold mb-2 block">Bio</Label>
+              <Label htmlFor="bio" className="text-base font-semibold mb-2 block">{t('editProfile.bio')}</Label>
               <Textarea
                 id="bio"
                 value={form.bio}
                 onChange={(e) => update('bio', e.target.value)}
                 className="border border-border min-h-[80px] resize-none"
-                placeholder="Tell others about yourself..."
+                placeholder={t('editProfile.bioPlaceholder')}
                 maxLength={500}
               />
               <p className="text-sm text-muted-foreground mt-1">{form.bio.length}/500</p>
             </div>
 
             <div className="mb-4">
-              <Label htmlFor="website" className="text-base font-semibold mb-2 block">Website</Label>
+              <Label htmlFor="website" className="text-base font-semibold mb-2 block">{t('editProfile.website')}</Label>
               <Input
                 id="website"
                 value={form.website}
                 onChange={(e) => update('website', e.target.value)}
                 className="rounded-full border border-border"
-                placeholder="https://yoursite.com"
+                placeholder={t('editProfile.websitePlaceholder')}
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="twitterHandle" className="text-base font-semibold mb-2 block">Twitter</Label>
+                <Label htmlFor="twitterHandle" className="text-base font-semibold mb-2 block">{t('editProfile.twitter')}</Label>
                 <Input
                   id="twitterHandle"
                   value={form.twitterHandle}
                   onChange={(e) => update('twitterHandle', e.target.value)}
                   className="rounded-full border border-border"
-                  placeholder="@handle"
+                  placeholder={t('editProfile.handlePlaceholder')}
                 />
               </div>
               <div>
-                <Label htmlFor="telegramHandle" className="text-base font-semibold mb-2 block">Telegram</Label>
+                <Label htmlFor="telegramHandle" className="text-base font-semibold mb-2 block">{t('editProfile.telegram')}</Label>
                 <Input
                   id="telegramHandle"
                   value={form.telegramHandle}
                   onChange={(e) => update('telegramHandle', e.target.value)}
                   className="rounded-full border border-border"
-                  placeholder="@handle"
+                  placeholder={t('editProfile.handlePlaceholder')}
                 />
               </div>
               <div>
-                <Label htmlFor="githubHandle" className="text-base font-semibold mb-2 block">GitHub</Label>
+                <Label htmlFor="githubHandle" className="text-base font-semibold mb-2 block">{t('editProfile.github')}</Label>
                 <Input
                   id="githubHandle"
                   value={form.githubHandle}
                   onChange={(e) => update('githubHandle', e.target.value)}
                   className="rounded-full border border-border"
-                  placeholder="username"
+                  placeholder={t('editProfile.githubPlaceholder')}
                 />
               </div>
             </div>
@@ -232,16 +234,16 @@ export function EditProfilePage() {
 
           <div className="flex justify-between pt-2">
             <Button type="button" variant="outline" onClick={() => navigate(-1)} className="rounded-full px-8 py-3">
-              Cancel
+              {t('editProfile.cancel')}
             </Button>
             <Button type="submit" disabled={saving} className="rounded-full px-8 py-3">
               {saving ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving…
+                  {t('editProfile.saving')}
                 </>
               ) : (
-                'Save Changes'
+                t('editProfile.saveChanges')
               )}
             </Button>
           </div>
