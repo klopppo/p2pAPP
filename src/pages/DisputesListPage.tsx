@@ -75,7 +75,7 @@ export function DisputesListPage() {
       { value: 'escalated', label: t('disputes.filterEscalated') },
       { value: 'resolved', label: t('disputes.filterResolved') },
       { value: 'closed', label: t('disputes.filterClosed') },
-    ],
+    ],  
     [t],
   )
 

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Text } from '@/components/ui/text'
 import { StarRating } from '@/components/custom/StarRating'
 import type { TradeRating } from '@/types/database'
@@ -7,6 +8,7 @@ interface RatingBreakdownProps {
 }
 
 export function RatingBreakdown({ reviews }: RatingBreakdownProps) {
+  const { t } = useTranslation()
   const total = reviews.length
 
   if (total === 0) return null
@@ -30,7 +32,7 @@ export function RatingBreakdown({ reviews }: RatingBreakdownProps) {
         <div className="space-y-0.5">
           <StarRating value={Math.round(avg)} readonly size="sm" />
           <Text variant="muted" className="text-xs">
-            {total} review{total !== 1 ? 's' : ''}
+            {t(total === 1 ? 'review.reviewCount' : 'review.reviewCountPlural', { count: total })}
           </Text>
         </div>
       </div>
