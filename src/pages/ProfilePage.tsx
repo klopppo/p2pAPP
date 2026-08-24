@@ -22,6 +22,8 @@ import { ArrowUpDown } from 'lucide-react'
 import { useUserProfile, useOffersBySeller } from '@/hooks/useOffers'
 import { useTranslation } from 'react-i18next'
 import { ReviewList } from '@/components/custom/ReviewList'
+import { RatingBreakdown } from '@/components/custom/RatingBreakdown'
+import { useUserReviews, useUserReputation } from '@/hooks/useReviews'
 
 // Local UI shape for the offers table. Mirrors what OffersTableWrapper expects;
 // kept here because the data comes from useOffersBySeller (which returns the DB
@@ -181,20 +183,14 @@ export function ProfilePage() {
     return sorted
   }, [mappedOffers, sortKey, sortDir])
 
-  if (!isConnected && isOwnProfile) {
-    return (
-      <section className="max-w-xl mx-auto space-y-6 text-center">
-        <AppPageHeader title={t('profile.title')} variant="centered" onBack={() => navigate(-1)} />
-        <Card>
-          <CardContent className="space-y-4">
-            <Text variant="h4">{t('profile.connectWallet')}</Text>
-            <Text variant="muted" className="text-muted-foreground">
-              {t('profile.connectWalletDescription')}
-            </Text>
-          </CardContent>
-        </Card>
-      </section>
-    )
+  // No wallet + no URL target → there is nothing meaningful to render on
+  // the main /app/profile route. The Navbar still shows "Profile"
+  // (so the user can connect from there), but the page body is empty
+  // until they connect. Showing the centered "Connect your wallet" card
+  // here was duplicative — the WalletConnectButton in the Navbar already
+  // covers it.
+  if (!isConnected && isOwnProfile && !urlWalletAddress) {
+    return null
   }
 
   if (profileLoading) {
@@ -314,12 +310,18 @@ export function ProfilePage() {
             </CardContent>
           </Card>
 
+          {/* Rating breakdown (uses cached trade_ratings) */}
+          <ProfileRatingsCard userId={profile.id} />
+
           {/* Ratings & Feedback */}
           <ReviewList userId={profile.id} />
         </div>
 
         {/* Right column */}
         <div className="flex flex-col gap-4">
+          {/* Reputation breakdown (cached reputation_scores row) */}
+          <ProfileReputationCard userId={profile.id} />
+
           {/* Total Trades */}
           <Card>
             <CardContent>
@@ -413,5 +415,87 @@ export function ProfilePage() {
         </OffersTableWrapper>
       </div>
     </section>
+  )
+}
+
+// ── Inline cards wired to reputation hooks ──────────────────────────────────
+
+function ProfileRatingsCard({ userId }: { userId: string }) {
+  const { t } = useTranslation()
+  const { data: reviews = [], isLoading } = useUserReviews(userId)
+  return (
+    <Card>
+      <CardContent className="space-y-3">
+        <Text variant="h4" className="font-bold">{t('profile.ratingsBreakdown')}</Text>
+        {isLoading ? (
+          <Text variant="muted" className="text-xs">{t('profile.loading')}</Text>
+        ) : reviews.length === 0 ? (
+          <Text variant="muted" className="text-xs">{t('profile.noRatingsYet')}</Text>
+        ) : (
+          <RatingBreakdown reviews={reviews as Array<Pick<import('@/types/database').TradeRating, 'score'>>} />
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function ProfileReputationCard({ userId }: { userId: string }) {
+  const { t } = useTranslation()
+  const { data: rep, isLoading } = useUserReputation(userId)
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent>
+          <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">{t('profile.reputation')}</Text>
+          <Text variant="muted" className="text-xs mt-1">{t('profile.loading')}</Text>
+        </CardContent>
+      </Card>
+    )
+  }
+  if (!rep) {
+    return (
+      <Card>
+        <CardContent>
+          <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">{t('profile.reputation')}</Text>
+          <Text variant="muted" className="text-xs mt-1">{t('profile.noReputationYet')}</Text>
+        </CardContent>
+      </Card>
+    )
+  }
+  return (
+    <Card>
+      <CardContent className="space-y-3">
+        <div>
+          <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">{t('profile.reputation')}</Text>
+          <Text variant="h3" className="mt-1">{rep.overall}<span className="text-sm text-muted-foreground ml-1">/ 100</span></Text>
+        </div>
+        <div className="space-y-2">
+          <RepRow label={t('profile.repTrustworthiness')} value={rep.trustworthiness} />
+          <RepRow label={t('profile.repReliability')} value={rep.reliability} />
+          <RepRow label={t('profile.repCommunication')} value={rep.communication} />
+          <RepRow label={t('profile.repSpeed')} value={rep.speed} />
+          <RepRow label={t('profile.repProfessionalism')} value={rep.professionalism} />
+        </div>
+        <div className="flex justify-between text-xs text-muted-foreground pt-2 border-t border-border/50">
+          <span>{t('profile.repPointsEarned')}: <span className="font-mono text-foreground">+{rep.points_earned}</span></span>
+          <span>{t('profile.repPointsLost')}: <span className="font-mono text-foreground">−{rep.points_lost}</span></span>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function RepRow({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-sm text-muted-foreground w-32 shrink-0">{label}</span>
+      <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+        <div
+          className="h-full bg-primary rounded-full transition-all"
+          style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
+        />
+      </div>
+      <span className="font-mono text-xs w-8 text-right">{value}</span>
+    </div>
   )
 }

@@ -87,12 +87,14 @@ export function TradesPage() {
     awaiting_deposit: { label: t('trades.escrowAwaitingDeposit'), variant: 'outline' },
     buyer_deposited: { label: t('trades.escrowBuyerDeposited'), variant: 'secondary' },
     seller_deposited: { label: t('trades.escrowSellerDeposited'), variant: 'secondary' },
+    funded: { label: t('trades.escrowFunded') ?? 'Funded', variant: 'secondary' },
     confirmed: { label: t('trades.escrowConfirmed'), variant: 'default' },
     deposited: { label: t('trades.escrowDeposited'), variant: 'secondary' },
     pending_release: { label: t('trades.escrowPendingRelease'), variant: 'default' },
     disputed: { label: t('trades.escrowDisputed'), variant: 'destructive' },
     released: { label: t('trades.escrowReleased'), variant: 'secondary' },
     refunded: { label: t('trades.escrowRefunded'), variant: 'outline' },
+    cancelled: { label: t('trades.escrowCancelled') ?? 'Cancelled', variant: 'outline' },
   }
 
   const myId = user?.id

@@ -12,14 +12,63 @@ export const EscrowStatus = {
   AWAITING_DEPOSIT: 'awaiting_deposit',
   BUYER_DEPOSITED: 'buyer_deposited',
   SELLER_DEPOSITED: 'seller_deposited',
+  /** KlerosEsc.State.FUNDED — buyer + seller deposits in and seller has
+   *  locked tradeAmount. Distinct from SELLER_DEPOSITED which only captures
+   *  one of those transitions. */
+  FUNDED: 'funded',
   CONFIRMED: 'confirmed',
   DEPOSITED: 'deposited',
   PENDING_RELEASE: 'pending_release',
   DISPUTED: 'disputed',
   RELEASED: 'released',
   REFUNDED: 'refunded',
+  /** KlerosEsc.State.CANCELLED — funding-phase mutual cancel via
+   *  `cancelTrade()`. Distinct from REFUNDED (which is the buyer-favorable
+   *  dispute payout). See contract-execution-status.md §B-3. */
+  CANCELLED: 'cancelled',
 } as const
 export type EscrowStatus = typeof EscrowStatus[keyof typeof EscrowStatus]
+
+/**
+ * Kleros-specific event types that power the trade_events audit log. These
+ * extend the existing event_type enum (`dispute_raised`, `appeal_funded`,
+ * etc.) so granular per-event trails are recorded by the server-side indexer
+ * (planned in docs/todo.md).
+ */
+export const TradeEventType = {
+  OFFER_CREATED: 'offer_created',
+  OFFER_ACCEPTED: 'offer_accepted',
+  OFFER_COMPLETED: 'offer_completed',
+  OFFER_CANCELLED: 'offer_cancelled',
+  OFFER_EXPIRED: 'offer_expired',
+  PAYMENT_SENT: 'payment_sent',
+  CRYPTO_SENT: 'crypto_sent',
+  ESCROW_DEPOSITED: 'escrow_deposited',
+  ESCROW_CONFIRMED: 'escrow_confirmed',
+  ESCROW_RELEASED: 'escrow_released',
+  ESCROW_REFUNDED: 'escrow_refunded',
+  ESCROW_DISPUTED: 'escrow_disputed',
+  ESCROW_RESOLVED: 'escrow_resolved',
+  ESCROW_CANCELLED: 'escrow_cancelled',
+  ESCROW_FUNDED: 'escrow_funded',
+  RATING_SUBMITTED: 'rating_submitted',
+  DISPUTE_OPENED: 'dispute_opened',
+  DISPUTE_RAISED: 'dispute_raised',
+  DISPUTE_RESOLVED: 'dispute_resolved',
+  DISPUTE_TIMED_OUT: 'dispute_timed_out',
+  DISPUTE_FINALIZED: 'dispute_finalized',
+  EVIDENCE_SUBMITTED: 'evidence_submitted',
+  APPEAL_FUNDED: 'appeal_funded',
+  RULING_RECEIVED: 'ruling_received',
+  RULING_EXECUTED: 'ruling_executed',
+  FUNDS_RETURNED: 'funds_returned',
+  CANCELLATION: 'cancellation',
+  REFUND_ISSUED: 'refund_issued',
+  /** Generic fallback for transitions that don't have a dedicated value above. */
+  ESCROW_STATUS_UPDATED: 'escrow_status_updated',
+  TRADE_STATUS_UPDATED: 'trade_status_updated',
+} as const
+export type TradeEventType = typeof TradeEventType[keyof typeof TradeEventType]
 
 export const OfferStatus = {
   ACTIVE: 'active',
@@ -174,7 +223,7 @@ export interface KYCProvider {
   provider_name: string
   status: KYCStatus
   provider_ref: string | null
-  metadata: Record<string, any>
+  metadata: Record<string, unknown>
   verified_at: string | null
 }
 
@@ -241,7 +290,7 @@ export interface Trade {
   fiat_received: number
 
   payment_method: string
-  payment_details: Record<string, any>
+  payment_details: Record<string, unknown>
 
   // Escrow contract details
   escrow_contract_addr: string | null
@@ -255,6 +304,26 @@ export interface Trade {
   // Platform fee tracking
   platform_fee_bps: number
   treasury_address: string | null
+
+  // Kleros / on-chain mirrors (cache of immutable escrow configuration
+  // + per-trade timestamps so the server-side indexer can write these without
+  // re-reading the chain per row). Optional because the columns may not exist
+  // in older deployments.
+  /** msg.sender of KlerosEscrowFactory.createEscrow(). Distinct from
+   *  buyer/seller — equals the taker in the typical flow. */
+  creator: string | null
+  /** The pinned Kleros Court address (factory-owned). */
+  kleros_court_addr: string | null
+  /** subcourtId (uint96 right-aligned bytes32) — Kleros extraData part 1. */
+  kleros_extra_data_part1: string | null
+  /** minJurors (bytes32) — Kleros extraData part 2. */
+  kleros_extra_data_part2: string | null
+  /** Block-timestamp of buyer/deposit (unix seconds, 0 if no deposit). */
+  buyer_deposit_time: string | null
+  /** Block-timestamp of seller/deposit (unix seconds, 0 if no deposit). */
+  seller_deposit_time: string | null
+  /** Block-timestamp of confirm() (unix seconds, null if not confirmed). */
+  confirmation_time: string | null
 
   // Dispute tracking
   has_dispute: boolean
@@ -296,6 +365,15 @@ export interface CreateTradeInput {
   escrow_contract_addr?: string | null
   /** Role of the user opening the trade — used for the offer_accepted event. */
   taker_role: 'buyer' | 'seller'
+  /** msg.sender of KlerosEscrowFactory.createEscrow() (the taker in the
+   *  typical flow). Optional but useful for audits / indexer joins. */
+  creator?: string | null
+  /** Pinned Kleros Court address (factory-owned). Optional — read from the
+   *  factory contract and persisted here so the server-side indexer doesn't
+   *  have to re-read the chain per row. */
+  kleros_court_addr?: string | null
+  kleros_extra_data_part1?: string | null
+  kleros_extra_data_part2?: string | null
 }
 
 export interface TradeRating {
@@ -316,8 +394,23 @@ export interface TradeEvent {
   type: string
   actor: string
   description: string | null
-  metadata: Record<string, any>
+  metadata: Record<string, unknown>
   created_at: string
+}
+
+/**
+ * Subset of the trades row the UI persists when a dispute completes via
+ * executeRuling / timeoutDispute / finalize. The actual `updateTradeStatus`
+ * helper accepts a partial of this (Partial<TradeTerminalMirror>) so callers
+ * can pass only the fields they want to flip.
+ */
+export interface TradeTerminalMirror {
+  /** High-level trade status. */
+  status: TradeStatus
+  /** Matching escrow_status (e.g. 'released' / 'refunded' / 'disputed'). */
+  escrow_status: EscrowStatus
+  /** Tx hash of the on-chain settlement call. */
+  escrow_tx_hash?: string
 }
 
 // =================================================================
@@ -355,8 +448,25 @@ export interface Dispute {
   kleros_dispute_status?: number | null
   /** Cached KlerosEsc.State (uint8) at the time of the last update. */
   escrow_state?: number | null
+  /** Cached ruling (Ruling enum, 0..4) at the time of the last update. */
+  on_chain_ruling?: number | null
   /** IPFS CID of the primary evidence image (for off-chain display). */
   evidence_cid?: string | null
+  // New indexer-shaped columns. Optional for back-compat with old DBs.
+  /** ERC-1497 evidence-group counter (0 = first round, increments per appeal). */
+  evidence_group_id?: number | null
+  /** Number of appeal rounds completed against this Kleros dispute. */
+  appeal_count?: number | null
+  /** Which party raised the dispute ('buyer' | 'seller'). */
+  raiser?: 'buyer' | 'seller' | null
+  /** ETH wei forwarded to KlerosCourt.createDispute() (stored as text). */
+  fee_paid_wei?: string | null
+  /** 'buyer' | 'seller' — populated by DisputeTimedOut event. */
+  winner?: 'buyer' | 'seller' | null
+  /** KlerosEsc.disputeTimestamp (unix seconds). */
+  dispute_timestamp?: string | null
+  /** KlerosEsc.rulingReceivedTime (unix seconds). */
+  ruling_received_time?: string | null
 }
 
 export interface DisputeEvidence {
@@ -364,9 +474,18 @@ export interface DisputeEvidence {
   dispute_id: string
   submitted_by: 'buyer' | 'seller' | 'neutral'
   evidence_kind: string
-  file_hash: string
-  file_encrypted: string
-  submitted_at: string
+  /** IPFS CID of the off-chain evidence bundle. (Originally named
+   *  `file_hash`; renamed for clarity in migration 20260824*.) */
+  ipfs_cid: string
+  /** Gateway URL resolvable in browsers (`https://ipfs.io/ipfs/<cid>`). */
+  ipfs_url: string
+  /** bytes32 actually submitted on-chain via submitEvidence() — keccak256(cid). */
+  keccak_bytes32: string | null
+  /** Tx hash of the corresponding submitEvidence() call, if executed. */
+  tx_hash: string | null
+  /** On-chain `evidenceGroupID` at the time of submission (0 = first round). */
+  evidence_group_id: number | null
+  submitted_at: string | null
 }
 
 // =================================================================
@@ -545,7 +664,7 @@ export interface Notification {
   trade_id: string | null
   title: string
   body: string
-  payload: Record<string, any>
+  payload: Record<string, unknown>
   read_at: string | null
   created_at: string
 }
