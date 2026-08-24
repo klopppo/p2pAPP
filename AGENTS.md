@@ -8,6 +8,26 @@
 
 ---
 
+# Working agreements
+
+## Docs must be updated after each meaningful change
+
+**Every commit that lands a non-trivial change updates `docs/` in the same
+commit.** A change is "non-trivial" if it adds/removes a feature, completes a
+todo item, ships a migration, changes a contract surface, or shifts the
+public behaviour of an existing feature.
+
+- `docs/todo.md` — active backlog. Move items out of here when they ship.
+- `docs/done.md` — reverse-chronological log of shipped work. Add a new
+  entry at the top the same day the work lands.
+- `docs/<feature>-status.md` — one per large feature area (see
+  `docs/dispute-status.md` for the template: **Done / Missing / Plan**).
+
+Smaller changes (typo fixes, single-file refactors with no behaviour delta,
+test additions) don't need a doc update.
+
+---
+
 # Design System — `vite-app`
 
 Living reference for building new pages/components. Mirror the conventions in [`OffersPage`](src/pages/OffersPage.tsx) and [`ProfilePage`](src/pages/ProfilePage.tsx).

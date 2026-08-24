@@ -46,9 +46,10 @@ export function NotificationDispatcherHost() {
                 prefs.data.map((p) => [p.channel, p.email_address])
               )
             : {}
-          if (!contacts.email && user.email) {
-            contacts.email = user.email
-          }
+          // `User.email` lives on the private profile (UserPrivate) which the
+          // public `useCurrentUser` does not load. NotificationPreferences
+          // already carries the email contact when the user opted in; if it
+          // isn't present the dispatch layer skips the email channel.
 
           await dispatchNotification({
             notification: n,

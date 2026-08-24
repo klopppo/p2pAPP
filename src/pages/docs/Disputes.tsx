@@ -1,9 +1,8 @@
 import { Card } from '@/components/ui/card'
 import { Text } from '@/components/ui/text'
-import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { Gavel, AlertTriangle, FileText, Scale, Clock, CheckCircle } from 'lucide-react'
+import { AlertTriangle, Scale } from 'lucide-react'
 
 export default function Disputes() {
   return (

@@ -30,7 +30,10 @@ const Text = React.forwardRef<
   return (
     <Component
       className={cn(variantClasses[variant], className)}
-      ref={ref as any}
+      // The forwardRef generic is fixed to <HTMLParagraphElement>, but the
+      // resolved Component can be a heading element; widen via unknown so we
+      // don't fall back to `any`.
+      ref={ref as unknown as React.Ref<HTMLHeadingElement>}
       {...props}
     />
   )

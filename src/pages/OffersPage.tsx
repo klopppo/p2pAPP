@@ -170,7 +170,7 @@ export function OffersPage() {
     }
 
     return filtered
-  }, [offers, searchQuery, typeFilter, tokenFilter, sortKey, sortDir])
+  }, [offers, searchQuery, typeFilter, tokenFilter, paymentFilter, sortKey, sortDir])
 
   const loadMore = () => {
     list.nextPage()

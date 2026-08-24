@@ -98,7 +98,36 @@ export function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
 
-  // Select partner from route param, or fall back to first chat
+  const scrollToBottom = () => {
+    const el = messagesContainerRef.current
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  }
+
+  // Hoisted (function declaration) so the selection effect below can call it
+  // without a TDZ violation. The cascading setStates inside are intentional:
+  // picking an initial partner requires (a) optionally adding them to the
+  // list and (b) marking them as the active conversation.
+  function selectPartner(partner: ChatPartner) {
+    setSelectedPartner(partner)
+    // The `ourTeam` thread is a system welcome channel — seed it with the
+    // greeting message. Real peer-to-peer chats use the chat hooks
+    // (useMessages / useConversations) which skip this branch.
+    if (partner.id === OUR_TEAM_ID) {
+      setMessages([OUR_TEAM_WELCOME])
+    } else {
+      setMessages([])
+    }
+    setPartners((prev) =>
+      prev.map((p) => (p.id === partner.id ? { ...p, unread: 0 } : p)),
+    )
+    // Scroll to top when switching chats
+    messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // Select partner from route param, or fall back to first chat.
+  /* eslint-disable react-hooks/set-state-in-effect --
+     intentional: seeding the initial conversation from the route param
+     requires state writes (selectedPartner + messages + partners). */
   useEffect(() => {
     if (selectedPartner) return
     if (userId) {
@@ -120,29 +149,8 @@ export function ChatPage() {
     } else if (partners.length > 0) {
       selectPartner(partners[0])
     }
-  }, [])
-
-  const scrollToBottom = () => {
-    const el = messagesContainerRef.current
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
-  }
-
-  const selectPartner = (partner: ChatPartner) => {
-    setSelectedPartner(partner)
-    // The `ourTeam` thread is a system welcome channel — seed it with the
-    // greeting message. Real peer-to-peer chats use the chat hooks
-    // (useMessages / useConversations) which skip this branch.
-    if (partner.id === OUR_TEAM_ID) {
-      setMessages([OUR_TEAM_WELCOME])
-    } else {
-      setMessages([])
-    }
-    setPartners(prev => prev.map(p =>
-      p.id === partner.id ? { ...p, unread: 0 } : p
-    ))
-    // Scroll to top when switching chats
-    messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+  }, [userId, partners, selectedPartner])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const sendMessage = () => {
     if (!inputValue.trim() || !selectedPartner) return

@@ -3,8 +3,10 @@ import { Text } from '@/components/ui/text'
 import { StarRating } from '@/components/custom/StarRating'
 import type { TradeRating } from '@/types/database'
 
+/** Subset of TradeRating the breakdown needs; allows callers to pass rows
+ *  with extra Supabase joins without an unsafe cast. */
 interface RatingBreakdownProps {
-  reviews: TradeRating[]
+  reviews: Array<Pick<TradeRating, 'score'>>
 }
 
 export function RatingBreakdown({ reviews }: RatingBreakdownProps) {

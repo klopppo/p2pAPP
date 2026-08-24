@@ -42,7 +42,7 @@ export const TypingEffect = ({
       }, rotationInterval)
       return () => clearTimeout(changeLabelTimeout)
     }
-  }, [charIndex, currentText, isInView])
+  }, [charIndex, currentText, isInView, typingSpeed, rotationInterval, texts.length])
 
   return (
     <div

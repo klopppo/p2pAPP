@@ -1,5 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import { getActiveOffers, getOfferById, getOffersBySeller } from '@/lib/supabase'
+import {
+  ensureUser,
+  getActiveOffers,
+  getOfferById,
+  getOffersBySeller,
+} from '@/lib/supabase'
 
 /**
  * Active offers list (first page). react-query is already mounted in App.tsx
@@ -45,7 +50,6 @@ export function useUserProfile(walletAddress: string | undefined) {
     queryKey: ['user-profile', walletAddress],
     queryFn: async () => {
       if (!walletAddress) throw new Error('No wallet address')
-      const { ensureUser } = await import('@/lib/supabase')
       return ensureUser(walletAddress)
     },
     enabled: !!walletAddress,
