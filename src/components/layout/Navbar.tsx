@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useAccount } from 'wagmi'
 import {
   Tag,
   BookOpen,
@@ -87,18 +88,29 @@ const SocialLinks = ({ className = '' }: { className?: string }) => (
   </div>
 )
 
-const NAV_LINKS = [
-  { labelKey: 'nav.messages', to: '/app/messages' as const, icon: MessageCircle },
-  { labelKey: 'nav.trades', to: '/app/trades' as const, icon: ArrowLeftRight },
-  { labelKey: 'nav.offers', to: '/app/offers' as const, icon: Tag },
-  { labelKey: 'nav.profile', to: '/app/profile' as const, icon: User },
+/**
+ * Top-level navigation. `requiresAuth: true` items are hidden when no wallet
+ * is connected — they need a wallet identity to be meaningful (and
+ * `messages` needs it to query conversations at all). Items without the
+ * flag stay visible so visitors can still discover `offers` / `profile`.
+ */
+const NAV_LINKS: ReadonlyArray<{
+  labelKey: string
+  to: string
+  icon: typeof MessageCircle
+  requiresAuth?: boolean
+}> = [
+  { labelKey: 'nav.messages', to: '/app/messages', icon: MessageCircle, requiresAuth: true },
+  { labelKey: 'nav.trades', to: '/app/trades', icon: ArrowLeftRight, requiresAuth: true },
+  { labelKey: 'nav.offers', to: '/app/offers', icon: Tag },
+  { labelKey: 'nav.profile', to: '/app/profile', icon: User },
 ]
 
 const RESOURCE_LINKS: ReadonlyArray<
-  | { labelKey: string; to: string; icon: typeof ShieldAlert }
-  | { labelKey: string; href: string; icon: typeof ShieldAlert }
+  | { labelKey: string; to: string; icon: typeof ShieldAlert; requiresAuth?: boolean }
+  | { labelKey: string; href: string; icon: typeof ShieldAlert; requiresAuth?: boolean }
 > = [
-  { labelKey: 'nav.disputes', to: '/app/disputes', icon: ShieldAlert },
+  { labelKey: 'nav.disputes', to: '/app/disputes', icon: ShieldAlert, requiresAuth: true },
   { labelKey: 'nav.docs', to: '/docs', icon: BookOpen },
   { labelKey: 'nav.discord', href: 'https://discord.gg/example', icon: MessageCircle },
 ] as const
@@ -118,6 +130,7 @@ interface NavbarProps {
 
 export function Navbar({ showTabs = false }: NavbarProps) {
   const { t, i18n } = useTranslation()
+  const { isConnected } = useAccount()
   const [resourcesOpen, setResourcesOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [showLang, setShowLang] = useState(false)
@@ -129,6 +142,16 @@ export function Navbar({ showTabs = false }: NavbarProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const currentPath = location.pathname
+
+  // Items with `requiresAuth` are filtered out when no wallet is connected.
+  // Public items (offers, profile, docs, discord) stay visible so visitors
+  // can still discover the marketplace from the navbar.
+  const visibleNavLinks = isConnected
+    ? NAV_LINKS
+    : NAV_LINKS.filter((l) => !l.requiresAuth)
+  const visibleResourceLinks = isConnected
+    ? RESOURCE_LINKS
+    : RESOURCE_LINKS.filter((r) => !r.requiresAuth)
 
   return (
     <motion.header
@@ -144,10 +167,10 @@ export function Navbar({ showTabs = false }: NavbarProps) {
             <CofferNodeLogo variant="full" theme="gray" className="h-8" />
           </Link>
 
-          {/* Desktop nav */}
+{/* Desktop nav */}
           {showTabs && (
             <nav className="hidden md:flex items-center gap-1">
-              {NAV_LINKS.map((link) => {
+              {visibleNavLinks.map((link) => {
                 const isActive = currentPath.startsWith(link.to)
 
                 return (
@@ -166,54 +189,55 @@ export function Navbar({ showTabs = false }: NavbarProps) {
                 )
               })}
 
-              {/* Resources dropdown */}
-              <DropdownMenu onOpenChange={setResourcesOpen}>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors cursor-pointer"
+              {visibleResourceLinks.length > 0 && (
+                <DropdownMenu onOpenChange={setResourcesOpen}>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors cursor-pointer"
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      {t('nav.resources')}
+                      <ChevronDown className={`w-3.5 h-3.5 transition-transform ${resourcesOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    sideOffset={8}
                   >
-                    <BookOpen className="w-4 h-4" />
-                    {t('nav.resources')}
-                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${resourcesOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="start"
-                  sideOffset={8}
-                >
-                  <DropdownMenuGroup>
-                    {RESOURCE_LINKS.map((r) => {
-                      const Icon = r.icon
-                      return 'to' in r ? (
-                        <DropdownMenuItem
-                          key={r.labelKey}
-                          asChild
-                          onSelect={(e) => {
-                            e.preventDefault()
-                            navigate(r.to)
-                          }}
-                        >
-                          <Link to={r.to}>
-                            <Icon className="w-4 h-4" />
-                            {t(r.labelKey)}
-                          </Link>
-                        </DropdownMenuItem>
-                      ) : (
-                        <DropdownMenuItem key={r.labelKey} asChild>
-                          <a
-                            href={r.href}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                    <DropdownMenuGroup>
+                      {visibleResourceLinks.map((r) => {
+                        const Icon = r.icon
+                        return 'to' in r ? (
+                          <DropdownMenuItem
+                            key={r.labelKey}
+                            asChild
+                            onSelect={(e) => {
+                              e.preventDefault()
+                              navigate(r.to)
+                            }}
                           >
-                            <Icon className="w-4 h-4" />
-                            {t(r.labelKey)}
-                          </a>
-                        </DropdownMenuItem>
-                      )
-                    })}
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                            <Link to={r.to}>
+                              <Icon className="w-4 h-4" />
+                              {t(r.labelKey)}
+                            </Link>
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem key={r.labelKey} asChild>
+                            <a
+                              href={r.href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <Icon className="w-4 h-4" />
+                              {t(r.labelKey)}
+                            </a>
+                          </DropdownMenuItem>
+                        )
+                      })}
+                    </DropdownMenuGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </nav>
           )}
         </div>
@@ -362,7 +386,7 @@ export function Navbar({ showTabs = false }: NavbarProps) {
           >
             <nav className="flex flex-col gap-1 px-5 py-4">
               {showTabs &&
-                NAV_LINKS.map((link) => {
+                visibleNavLinks.map((link) => {
                   const isActive = currentPath.startsWith(link.to)
 
                   return (
@@ -381,12 +405,12 @@ export function Navbar({ showTabs = false }: NavbarProps) {
                     </Link>
                   )
                 })}
-              {showTabs && (
+              {showTabs && visibleResourceLinks.length > 0 && (
                 <div className="border-t border-border pt-2 mt-1">
                   <p className="px-3 py-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                     {t('nav.resources')}
                   </p>
-                  {RESOURCE_LINKS.map((r) => {
+                  {visibleResourceLinks.map((r) => {
                     const Icon = r.icon
                     return 'to' in r ? (
                       <Link
