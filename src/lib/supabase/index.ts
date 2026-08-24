@@ -60,14 +60,50 @@ export const EscrowStatus = {
   AWAITING_DEPOSIT: 'awaiting_deposit',
   BUYER_DEPOSITED: 'buyer_deposited',
   SELLER_DEPOSITED: 'seller_deposited',
+  /** KlerosEsc.State.FUNDED — buyer + seller deposits in and seller has
+   *  locked tradeAmount. Distinct from SELLER_DEPOSITED which only captures
+   *  one of those transitions. */
+  FUNDED: 'funded',
   CONFIRMED: 'confirmed',
   DEPOSITED: 'deposited',
   PENDING_RELEASE: 'pending_release',
   DISPUTED: 'disputed',
   RELEASED: 'released',
   REFUNDED: 'refunded',
+  /** KlerosEsc.State.CANCELLED — funding-phase mutual cancel via
+   *  `cancelTrade()`. Distinct from REFUNDED (which is the buyer-favorable
+   *  dispute payout). See contract-execution-status.md §B-3. */
+  CANCELLED: 'cancelled',
 } as const
 export type EscrowStatus = typeof EscrowStatus[keyof typeof EscrowStatus]
+
+/**
+ * Subset of the KlerosEsc event names that the trade_events audit log uses.
+ * Granular per-event trails are written by the future server-side indexer so
+ * the UI can distinguish, for example, `RulingReceived` from `RulingExecuted`.
+ */
+export const TradeEventType = {
+  OFFER_ACCEPTED: 'offer_accepted',
+  ESCROW_FUNDED: 'escrow_funded',
+  ESCROW_CONFIRMED: 'escrow_confirmed',
+  ESCROW_RELEASED: 'escrow_released',
+  ESCROW_REFUNDED: 'escrow_refunded',
+  ESCROW_DISPUTED: 'escrow_disputed',
+  ESCROW_RESOLVED: 'escrow_resolved',
+  ESCROW_CANCELLED: 'escrow_cancelled',
+  DISPUTE_RAISED: 'dispute_raised',
+  EVIDENCE_SUBMITTED: 'evidence_submitted',
+  APPEAL_FUNDED: 'appeal_funded',
+  RULING_RECEIVED: 'ruling_received',
+  RULING_EXECUTED: 'ruling_executed',
+  DISPUTE_FINALIZED: 'dispute_finalized',
+  DISPUTE_TIMED_OUT: 'dispute_timed_out',
+  FUNDS_RETURNED: 'funds_returned',
+  /** Generic fallback. */
+  ESCROW_STATUS_UPDATED: 'escrow_status_updated',
+  TRADE_STATUS_UPDATED: 'trade_status_updated',
+} as const
+export type TradeEventType = typeof TradeEventType[keyof typeof TradeEventType]
 
 export const OfferStatus = {
   ACTIVE: 'active',
@@ -581,11 +617,19 @@ export async function upsertTradeEscrowStatus(
  * cancelled/disputed/refunded) plus the matching timestamp column. Mirrors the
  * terminal on-chain outcome into Supabase so listing pages can filter without
  * an RPC round-trip. Logs a `trade_status_updated` event.
+ *
+ * Pass `escrowEventType` to override the generic trade_status_updated entry
+ * with a granular Kleros-specific value (e.g. ESCROW_RELEASED when calling
+ * this from `handleRelease`).
  */
 export async function updateTradeStatus(
   tradeId: string,
   status: string,
-  options?: { escrowStatus?: string; txHash?: string },
+  options?: {
+    escrowStatus?: string
+    txHash?: string
+    escrowEventType?: TradeEventType
+  },
 ) {
   const now = new Date().toISOString()
   const updates: Record<string, unknown> = {
@@ -615,10 +659,56 @@ export async function updateTradeStatus(
 
   await logTradeEvent(
     data.id,
-    'trade_status_updated',
+    options?.escrowEventType ?? TradeEventType.TRADE_STATUS_UPDATED,
     'system',
     `Trade status → ${status}`,
-    { status, escrow_status: options?.escrowStatus ?? null, tx_hash: options?.txHash ?? null },
+    {
+      status,
+      escrow_status: options?.escrowStatus ?? null,
+      tx_hash: options?.txHash ?? null,
+    },
+  ).catch(() => {
+    /* non-fatal — the status mirror already landed */
+  })
+
+  return data
+}
+
+/**
+ * Update a trade's `escrow_status` only (no high-level status flip).
+ * Used when an on-chain transition doesn't move the trade to a terminal
+ * state — e.g. SellerFundsLocked → FUNDED, BuyerSecurityDeposited, etc.
+ * Logs a granular Kleros event so the audit trail shows the exact transition.
+ */
+export async function setTradeEscrowStatus(
+  tradeId: string,
+  escrowStatus: EscrowStatus,
+  options?: { txHash?: string; escrowEventType?: TradeEventType },
+) {
+  const updates: Record<string, unknown> = {
+    escrow_status: escrowStatus,
+    updated_at: new Date().toISOString(),
+  }
+  if (options?.txHash) updates.escrow_tx_hash = options.txHash
+
+  const { data, error } = await supabase
+    .from('trades')
+    .update(updates)
+    .eq('id', tradeId)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error setting trade escrow status:', error)
+    throw error
+  }
+
+  await logTradeEvent(
+    data.id,
+    options?.escrowEventType ?? TradeEventType.ESCROW_STATUS_UPDATED,
+    'system',
+    `Escrow status → ${escrowStatus}`,
+    { escrow_status: escrowStatus, tx_hash: options?.txHash ?? null },
   ).catch(() => {
     /* non-fatal — the status mirror already landed */
   })
@@ -629,33 +719,45 @@ export async function updateTradeStatus(
 /**
  * Create a new trade from an offer.
  *
- * Escrow is DB-managed for now (no smart contract): escrow_contract_addr stays
- * null and escrow_status starts at awaiting_deposit. The buyer/seller roles are
- * resolved by the caller based on offer.type (the taker is the opposite party).
- * Logs an `offer_accepted` event using the inserted row's UUID `id` (note:
- * trade_events.trade_id is the UUID primary key, NOT the varchar trade_id).
+ * Persists both the offer-side metadata and (if `escrowAddress` is supplied)
+ * the Kleros/Escrow configuration snapshot so the server-side indexer doesn't
+ * have to re-read the chain per row. The buyer/seller roles are resolved by
+ * the caller based on offer.type (the taker is the opposite party).
+ *
+ * Logs an `offer_accepted` event using the inserted row's UUID `id`
+ * (trade_events.trade_id is the UUID primary key, NOT the varchar trade_id).
  */
 export async function createTrade(input: CreateTradeInput) {
+  const insertRow: Record<string, unknown> = {
+    trade_id: generateTradeId(),
+    offer_id: input.offer_id,
+    status: TradeStatus.ACTIVE,
+    buyer_id: input.buyer_id,
+    seller_id: input.seller_id,
+    crypto_token: input.crypto_token,
+    crypto_amount: input.crypto_amount,
+    crypto_price_per_unit: input.crypto_price_per_unit,
+    fiat_currency: input.fiat_currency,
+    fiat_amount: input.fiat_amount,
+    payment_method: input.payment_method,
+    payment_details: input.payment_details ?? {},
+    platform_fee_bps: input.platform_fee_bps,
+    treasury_address: input.treasury_address ?? null,
+    creator: input.creator ?? null,
+    kleros_court_addr: input.kleros_court_addr ?? null,
+    kleros_extra_data_part1: input.kleros_extra_data_part1 ?? null,
+    kleros_extra_data_part2: input.kleros_extra_data_part2 ?? null,
+  }
+  if (input.escrow_contract_addr) {
+    insertRow.escrow_contract_addr = input.escrow_contract_addr
+    insertRow.escrow_status = EscrowStatus.AWAITING_DEPOSIT
+  } else {
+    insertRow.escrow_contract_addr = null
+    insertRow.escrow_status = EscrowStatus.AWAITING_DEPOSIT
+  }
   const { data, error } = await supabase
     .from('trades')
-    .insert({
-      trade_id: generateTradeId(),
-      offer_id: input.offer_id,
-      status: TradeStatus.ACTIVE,
-      buyer_id: input.buyer_id,
-      seller_id: input.seller_id,
-      crypto_token: input.crypto_token,
-      crypto_amount: input.crypto_amount,
-      crypto_price_per_unit: input.crypto_price_per_unit,
-      fiat_currency: input.fiat_currency,
-      fiat_amount: input.fiat_amount,
-      payment_method: input.payment_method,
-      payment_details: input.payment_details ?? {},
-      escrow_contract_addr: null,
-      escrow_status: EscrowStatus.AWAITING_DEPOSIT,
-      platform_fee_bps: input.platform_fee_bps,
-      treasury_address: input.treasury_address ?? null,
-    })
+    .insert(insertRow)
     .select()
     .single()
 
@@ -668,7 +770,12 @@ export async function createTrade(input: CreateTradeInput) {
     data.id,
     'offer_accepted',
     input.taker_role,
-    `Trade opened by ${input.taker_role}`
+    `Trade opened by ${input.taker_role}`,
+    {
+      escrow_address: input.escrow_contract_addr ?? null,
+      creator: input.creator ?? null,
+      kleros_court: input.kleros_court_addr ?? null,
+    },
   )
 
   return data
@@ -795,14 +902,85 @@ export async function getKYCApplicationByUser(userId: string) {
 // =================================================================
 
 /**
- * Create dispute
+ * Mirror the on-chain state of a dispute's escrow back into the Supabase row.
+ * Called by `DisputeDetailPage` after each on-chain action
+ * (executeRuling / finalize / timeoutDispute / appeal) AND by the
+ * `useEscrowEventWatcher` callback when the underlying events fire so the
+ * cache stays current when nobody has the page open.
+ *
+ * Pass only the fields that changed; undefined keys are left untouched.
+ * `resolvedAt` should be set when the dispute reaches a terminal state.
+ */
+export async function updateDisputeOnChain(
+  id: string,
+  update: {
+    escrowState?: number | null
+    klerosDisputeStatus?: number | null
+    onChainRuling?: number | null
+    status?: DisputeStatus
+    resolvedAt?: string | null
+    evidenceGroupId?: number | null
+    appealCount?: number | null
+    raiser?: 'buyer' | 'seller' | null
+    feePaidWei?: string | null
+    winner?: 'buyer' | 'seller' | null
+    disputeTimestamp?: string | null
+    rulingReceivedTime?: string | null
+  },
+) {
+  const dbUpdate: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (update.escrowState !== undefined) dbUpdate.escrow_state = update.escrowState
+  if (update.klerosDisputeStatus !== undefined) {
+    dbUpdate.kleros_dispute_status = update.klerosDisputeStatus
+  }
+  if (update.onChainRuling !== undefined) {
+    dbUpdate.on_chain_ruling = update.onChainRuling
+  }
+  if (update.status) dbUpdate.status = update.status
+  if (update.resolvedAt) dbUpdate.resolved_at = update.resolvedAt
+  if (update.evidenceGroupId !== undefined) {
+    dbUpdate.evidence_group_id = update.evidenceGroupId
+  }
+  if (update.appealCount !== undefined) {
+    dbUpdate.appeal_count = update.appealCount
+  }
+  if (update.raiser !== undefined) dbUpdate.raiser = update.raiser
+  if (update.feePaidWei !== undefined) dbUpdate.fee_paid_wei = update.feePaidWei
+  if (update.winner !== undefined) dbUpdate.winner = update.winner
+  if (update.disputeTimestamp !== undefined) {
+    dbUpdate.dispute_timestamp = update.disputeTimestamp
+  }
+  if (update.rulingReceivedTime !== undefined) {
+    dbUpdate.ruling_received_time = update.rulingReceivedTime
+  }
+
+  const { data, error } = await supabase
+    .from('disputes')
+    .update(dbUpdate)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error updating dispute on-chain state:', error)
+    throw error
+  }
+  return data
+}
+
+/**
+ * Create dispute. `status` defaults to `DisputeStatus.OPEN` (the Supabase row
+ * lifecycle starts there); the page should bump to `'in_review'` right after
+ * `raiseDispute` lands via `updateDisputeOnChain` (B-9).
  */
 export async function createDispute(disputeData: Partial<Dispute>) {
   const { data, error } = await supabase
     .from('disputes')
     .insert({
       ...disputeData,
-      status: DisputeStatus.OPEN,
+      status: disputeData.status ?? DisputeStatus.OPEN,
       created_at: new Date().toISOString(),
     })
     .select()
@@ -814,6 +992,98 @@ export async function createDispute(disputeData: Partial<Dispute>) {
   }
 
   return data
+}
+
+/**
+ * Mirror the terminal outcome of a dispute into the linked `trades` row.
+ * Called from `DisputeDetailPage` on `executeRuling` / `finalize` /
+ * `timeoutDispute` so the trades list reflects the settlement even when
+ * nobody has the dispute page open. Best-effort — caller should `.catch(noop)`
+ * if it doesn't want to block the tx flow.
+ */
+export async function mirrorDisputeToTrade(
+  tradeId: string,
+  outcome: {
+    /** Resulting trade status. */
+    tradeStatus: 'completed' | 'refunded' | 'disputed'
+    /** Matching escrow_status (released / refunded / disputed). */
+    escrowStatus: EscrowStatus
+    /** Tx hash of the settlement call. */
+    txHash: string
+    /** Per-event type for the trade_events row. */
+    escrowEventType: TradeEventType
+  },
+) {
+  return updateTradeStatus(tradeId, outcome.tradeStatus, {
+    escrowStatus: outcome.escrowStatus,
+    txHash: outcome.txHash,
+    escrowEventType: outcome.escrowEventType,
+  })
+}
+
+/**
+ * Insert one row per uploaded evidence file. Called from `DisputePage`
+ * (one tx per file via `submitEvidence(bytes32)`) and from
+ * `DisputeDetailPage` ("Submit additional evidence" loop).
+ *
+ * Each row carries:
+ *   - the IPFS CID + gateway URL (off-chain display)
+ *   - the keccak256 bytes32 actually posted on-chain
+ *   - the tx hash of the corresponding `submitEvidence` call (best-effort
+ *     populated by the page; NULL when only the off-chain row landed)
+ *   - the on-chain `evidenceGroupID` at submission time
+ *   - the filer's role (buyer/seller). Caller MUST pass this explicitly;
+ *     we don't default anymore because a seller-raised dispute was being
+ *     tagged `'buyer'` (B-4).
+ */
+export interface DisputeEvidenceFile {
+  cid: string
+  url: string
+  name: string
+  size: number
+  kind?: string
+  /** keccak256(cid) as 0x-prefixed bytes32 — the value sent to
+   *  `KlerosEsc.submitEvidence(bytes32)`. */
+  keccakBytes32?: `0x${string}` | null
+  /** Tx hash of the on-chain submitEvidence call, if it succeeded. */
+  txHash?: `0x${string}` | null
+  /** KlerosEsc.evidenceGroupID at submission time (0 = first round). */
+  evidenceGroupId?: number | null
+}
+
+export async function insertDisputeEvidence(
+  disputeId: string,
+  files: DisputeEvidenceFile[],
+  submittedBy: 'buyer' | 'seller' | 'neutral',
+  evidenceGroupId: number | null = null,
+) {
+  if (files.length === 0) return []
+  if (!submittedBy) {
+    throw new Error(
+      '[insertDisputeEvidence] submittedBy is required — pass the filer role explicitly (B-4).',
+    )
+  }
+  const now = new Date().toISOString()
+  const rows = files.map((f) => ({
+    dispute_id: disputeId,
+    submitted_by: submittedBy,
+    evidence_kind: f.kind ?? 'image',
+    ipfs_cid: f.cid,
+    ipfs_url: f.url,
+    keccak_bytes32: f.keccakBytes32 ?? null,
+    tx_hash: f.txHash ?? null,
+    evidence_group_id: f.evidenceGroupId ?? evidenceGroupId ?? null,
+    submitted_at: now,
+  }))
+  const { data, error } = await supabase
+    .from('dispute_evidence')
+    .insert(rows)
+    .select()
+  if (error) {
+    console.error('Error inserting dispute evidence:', error)
+    throw error
+  }
+  return data ?? []
 }
 
 /**
@@ -956,6 +1226,24 @@ export async function getRatingsByUser(userId: string) {
     throw error
   }
 
+  return data
+}
+
+/**
+ * Read the cached `reputation_scores` row for a user. Returns null if the row
+ * doesn't exist (older accounts that haven't earned / lost reputation yet).
+ */
+export async function getReputationScores(userId: string) {
+  const { data, error } = await supabase
+    .from('reputation_scores')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (error) {
+    console.error('Error fetching reputation scores:', error)
+    throw error
+  }
   return data
 }
 
@@ -1387,22 +1675,123 @@ export async function isAuthenticated(): Promise<boolean> {
 }
 
 /**
- * Sign in with wallet (Magic Link)
+ * Sign in with wallet (SIWE — Sign-In With Ethereum).
+ *
+ * Replaces the legacy magic-link OTP flow (which sent a one-time email to
+ * the virtual `0x…@wallet.p2p` address). The new flow uses a
+ * personal_sign signature challenge → viem verifies it locally → on success
+ * the `users` row is upserted. No email server, no round-trip; works in
+ * any environment with a connected wallet.
+ *
+ * The signature covers a one-shot nonce + an `Issued At` timestamp so a
+ * replayed challenge can't be re-used.
  */
-export async function signInWithWallet(walletAddress: string) {
-  const { data, error } = await supabase.auth.signInWithOtp({
-    email: `${walletAddress.toLowerCase()}@wallet.p2p`,
-    options: {
-      emailRedirectTo: window.location.origin + '/app/verify',
-    },
+export async function signInWithWallet(
+  walletAddress: string,
+  options: {
+    signMessage: (args: { message: string }) => Promise<`0x${string}`>
+    verifyMessage?: (args: {
+      message: string
+      signature: `0x${string}`
+      address: `0x${string}`
+    }) => Promise<boolean>
+    chainId?: number
+    appName?: string
+  },
+): Promise<void> {
+  const { signMessage, chainId, appName } = options
+  const verifyMessageFn =
+    options.verifyMessage ??
+    (async (a) => (await import('viem')).verifyMessage(a))
+
+  const addr = walletAddress.toLowerCase() as `0x${string}`
+  const { message, nonce, issuedAt } = buildSiweChallengeLocal(addr, {
+    chainId,
+    appName,
   })
 
-  if (error) {
-    console.error('Error signing in with wallet:', error)
-    throw error
+  // 1. Ask the wallet to personal_sign the challenge.
+  const signature = await signMessage({ message })
+
+  // 2. Verify locally (no server). The verifyMessage helper is the same
+  //    algorithm an edge function would run, just in-browser.
+  const valid = await verifyMessageFn({
+    message,
+    signature,
+    address: addr,
+  })
+  if (!valid) {
+    const err = new Error('SIWE signature did not verify — refusing to sign in.')
+    err.name = 'SiweRejectedError'
+    throw err
   }
 
-  return data
+  // 3. Touch the users row (idempotent).
+  await ensureUser(walletAddress)
+
+  // Stash the SIWE session markers so the dev tools / session panel can
+  // display the latest login. Real JWT minting will replace this once we
+  // land an edge function in a follow-up.
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(
+      'coffernode:siwe:last',
+      JSON.stringify({ address: addr, nonce, issuedAt, signature }),
+    )
+  }
+}
+
+/**
+ * Inlined copy of `buildSiweChallenge` so this module stays importable
+ * without leaking the `lib/siwe` import (which would cause a circular dep
+ * with `@/lib/notifications`). Defined local-first.
+ */
+function buildSiweChallengeLocal(
+  address: `0x${string}`,
+  options: { chainId?: number; appName?: string } = {},
+): { nonce: string; message: string; issuedAt: string } {
+  const issuedAt = new Date().toISOString()
+  // Lazy nonce — keep the function side-effect-free for SSR/test.
+  const nonce = localNonce()
+  const appName = options.appName ?? 'CofferNode'
+  const chainLine = options.chainId != null ? `\nChain ID: ${options.chainId}` : ''
+  const message =
+    `${appName} wants you to sign in with your Ethereum account:\n` +
+    `${address}\n\n` +
+    `Sign in to access your wallet profile and trade history.\n\n` +
+    `URI: https://coffernode.app\n` +
+    `Version: 1\n` +
+    `Nonce: ${nonce}\n` +
+    `Issued At: ${issuedAt}` +
+    chainLine
+  return { nonce, message, issuedAt }
+}
+
+/**
+ * Tiny in-file nonce generator. Pulled out of `lib/siwe` to keep that
+ * module import-cycle-free. Same algorithm — `crypto.getRandomValues` if
+ * available, deterministic base64url string.
+ */
+function localNonce(bytes = 16): string {
+  const arr = new Uint8Array(bytes)
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(arr)
+  } else {
+    for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 256)
+  }
+  let bin = ''
+  for (let i = 0; i < arr.length; i++) bin += String.fromCharCode(arr[i])
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/**
+ * Drop the SIWE session marker (if any). Currently a no-op for Supabase
+ * Auth (no session was minted) but exposed so the navbar profile menu can
+ * call it.
+ */
+export async function signOutSiweMarker(): Promise<void> {
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem('coffernode:siwe:last')
+  }
 }
 
 /**

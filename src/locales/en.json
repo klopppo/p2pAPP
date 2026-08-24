@@ -139,6 +139,16 @@
     "completionRate": "Completion rate",
     "verification": "Verification",
     "reputation": "Reputation",
+    "ratingsBreakdown": "Ratings breakdown",
+    "noRatingsYet": "No ratings yet.",
+    "noReputationYet": "No reputation activity yet.",
+    "repTrustworthiness": "Trustworthiness",
+    "repReliability": "Reliability",
+    "repCommunication": "Communication",
+    "repSpeed": "Speed",
+    "repProfessionalism": "Professionalism",
+    "repPointsEarned": "Points earned",
+    "repPointsLost": "Points lost",
     "yourActiveOffers": "Your active offers",
     "activeOffers": "Active offers",
     "noActiveOffers": "No active offers.",
@@ -286,6 +296,7 @@
     "executeRuling": "Execute ruling",
     "finalizeEscrow": "Finalize escrow",
     "timeoutDispute": "Timeout dispute (30d)",
+    "appeal": "Appeal ruling",
     "backToDisputesButton": "Back to disputes",
     "connectWalletDescription": "Connect the buyer or seller wallet to interact with this dispute.",
     "rulingExecuted": "Ruling executed — funds distributed per Kleros.",
@@ -294,6 +305,8 @@
     "escrowFinalizedError": "Finalize failed: {{message}}",
     "disputeTimedOut": "Dispute timed out — default rule applied.",
     "disputeTimedOutError": "Timeout failed: {{message}}",
+    "appealFunded": "Appeal funded — new Kleros round in progress.",
+    "appealFundedError": "Appeal failed: {{message}}",
     "onChainDisclaimer": "The KlerosEsc clone and Kleros court are the source of truth. The Supabase row mirrors the on-chain state for fast listing and to store IPFS CIDs that don't fit on-chain.",
     "refused": "Refused (auto-cancel)",
     "buyerWinsPenalty": "Buyer wins, seller deposit slashed",
@@ -442,7 +455,10 @@
     "releaseSuccess": "Trade released — funds distributed.",
     "releaseFailed": "Release failed: {{message}}",
     "rulingExecutedSuccess": "Ruling executed — trade resolved.",
-    "rulingExecutedFailed": "Execute ruling failed: {{message}}"
+    "rulingExecutedFailed": "Execute ruling failed: {{message}}",
+    "cancelTrade": "Cancel (counterparty stalled)",
+    "cancelSuccess": "Trade cancelled — deposits returned.",
+    "cancelFailed": "Cancel failed: {{message}}"
   },
   "editProfile": {
     "title": "Edit Profile",
@@ -514,7 +530,6 @@
     "stageSubmittingEvidence": "Submitting evidence…",
     "stageSaving": "Saving dispute…",
     "errorConnectWallet": "Connect your wallet to file a dispute.",
-    "errorFactoryNotReady": "Factory address not configured (VITE_KLEROS_ESCROW_FACTORY).",
     "errorPickEscrow": "Pick an escrow to dispute.",
     "errorUploadProof": "Upload at least one proof picture.",
     "errorRpcClient": "Public RPC client not ready. Try again.",
@@ -602,5 +617,17 @@
     "blockscan": "Blockscan",
     "eth": "ETH",
     "backTo": "Back to {{target}}"
+  },
+  "errors": {
+    "cancelledByUser": "Cancelled — no transaction was sent.",
+    "networkError": "Network error — please retry.",
+    "reverted": "Transaction reverted: {{reason}}",
+    "fallback": "Something went wrong — please try again."
+  },
+  "chainGuard": {
+    "title": "Wrong network",
+    "description": "Your wallet is on the wrong EVM chain. Switch to {{chain}} to continue.",
+    "switchCta": "Switch to {{chain}}",
+    "switchError": "Couldn't switch automatically: {{message}}"
   }
 }

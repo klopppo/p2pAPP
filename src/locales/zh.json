@@ -139,6 +139,16 @@
     "completionRate": "完成率",
     "verification": "验证",
     "reputation": "信誉",
+    "ratingsBreakdown": "评分明细",
+    "noRatingsYet": "暂无评分。",
+    "noReputationYet": "暂无信誉活动。",
+    "repTrustworthiness": "可信度",
+    "repReliability": "可靠性",
+    "repCommunication": "沟通",
+    "repSpeed": "速度",
+    "repProfessionalism": "专业度",
+    "repPointsEarned": "获得积分",
+    "repPointsLost": "失去积分",
     "yourActiveOffers": "您的活跃报价",
     "activeOffers": "活跃报价",
     "noActiveOffers": "暂无活跃报价。",
@@ -286,6 +296,7 @@
     "executeRuling": "执行裁决",
     "finalizeEscrow": "完成托管结算",
     "timeoutDispute": "争议超时（30 天）",
+    "appeal": "上诉裁决",
     "backToDisputesButton": "返回争议列表",
     "connectWalletDescription": "请连接买家或卖家的钱包以与此争议交互。",
     "rulingExecuted": "裁决已执行——资金按 Kleros 裁决分配。",
@@ -294,6 +305,8 @@
     "escrowFinalizedError": "结算失败：{{message}}",
     "disputeTimedOut": "争议已超时——已应用默认规则。",
     "disputeTimedOutError": "超时处理失败：{{message}}",
+    "appealFunded": "上诉已资助——新一轮 Kleros 正在进行。",
+    "appealFundedError": "上诉失败：{{message}}",
     "onChainDisclaimer": "KlerosEsc 克隆合约和 Kleros 法庭为数据权威来源。Supabase 记录镜像链上状态，用于快速列表查询及存储无法放在链上的 IPFS CID。",
     "refused": "已拒绝（自动取消）",
     "buyerWinsPenalty": "买家胜诉，卖家保证金被扣除",
@@ -442,7 +455,10 @@
     "releaseSuccess": "交易已释放——资金已分配。",
     "releaseFailed": "释放失败：{{message}}",
     "rulingExecutedSuccess": "裁决已执行——交易已解决。",
-    "rulingExecutedFailed": "执行裁决失败：{{message}}"
+    "rulingExecutedFailed": "执行裁决失败：{{message}}",
+    "cancelTrade": "取消（对方未响应）",
+    "cancelSuccess": "交易已取消——保证金已退还。",
+    "cancelFailed": "取消失败：{{message}}"
   },
   "editProfile": {
     "title": "编辑资料",
@@ -514,7 +530,6 @@
     "stageSubmittingEvidence": "提交证据…",
     "stageSaving": "保存争议…",
     "errorConnectWallet": "请连接钱包以发起争议。",
-    "errorFactoryNotReady": "工厂地址未配置（VITE_KLEROS_ESCROW_FACTORY）。",
     "errorPickEscrow": "请选择要争议的托管合约。",
     "errorUploadProof": "请至少上传一张证据图片。",
     "errorRpcClient": "公共 RPC 客户端未就绪，请重试。",
@@ -602,5 +617,17 @@
     "blockscan": "Blockscan",
     "eth": "ETH",
     "backTo": "返回{{target}}"
+  },
+  "errors": {
+    "cancelledByUser": "已取消 — 未发送任何交易。",
+    "networkError": "网络错误 — 请重试。",
+    "reverted": "交易已回滚：{{reason}}",
+    "fallback": "出错了 — 请重试。"
+  },
+  "chainGuard": {
+    "title": "错误的网络",
+    "description": "您的钱包当前在错误的 EVM 链上。请切换到 {{chain}} 以继续。",
+    "switchCta": "切换到 {{chain}}",
+    "switchError": "无法自动切换：{{message}}"
   }
 }

@@ -39,9 +39,14 @@ import {
   getUserByWallet,
   ensureUser,
   getTradeByEscrowAddress,
+  insertDisputeEvidence,
+  updateDisputeOnChain,
   updateTradeStatus,
+  type DisputeEvidenceFile,
 } from '@/lib/supabase'
-import { useUserEscrows, useArbitrationCost } from '@/hooks/useDisputes'
+import { useUserEscrows, useArbitrationCost, useEscrowState } from '@/hooks/useDisputes'
+import { DisputeStatus, TradeEventType } from '@/types/database'
+import { errorMessage } from '@/lib/errorMessage'
 
 interface UploadedFile {
   file: File
@@ -88,14 +93,17 @@ export function DisputePage() {
   const publicClient = usePublicClient()
   const { writeContractAsync } = useWriteContract()
 
+  // Stable short codes for `disputes.reason` (varchar(200) — keep under the
+  // limit). `reason_category` carries the full localized label. Codes mirror
+  // what the relational-schema doc calls `dispute_category` enum values.
   const DISPUTE_REASONS = useMemo(
     () => [
-      t('disputePage.reasonNoPayment'),
-      t('disputePage.reasonPaymentReleased'),
-      t('disputePage.reasonUnresponsive'),
-      t('disputePage.reasonWrongAmount'),
-      t('disputePage.reasonFraud'),
-      t('disputePage.reasonOther'),
+      { value: 'no_payment', label: t('disputePage.reasonNoPayment') },
+      { value: 'payment_released', label: t('disputePage.reasonPaymentReleased') },
+      { value: 'unresponsive', label: t('disputePage.reasonUnresponsive') },
+      { value: 'wrong_amount', label: t('disputePage.reasonWrongAmount') },
+      { value: 'fraud', label: t('disputePage.reasonFraud') },
+      { value: 'other', label: t('disputePage.reasonOther') },
     ],
     [t],
   )
@@ -130,7 +138,7 @@ export function DisputePage() {
   const queryEscrow = searchParams.get('escrowAddress') as `0x${string}` | null
 
   const [escrowAddress, setEscrowAddress] = useState<`0x${string}` | ''>('')
-  const [reason, setReason] = useState(DISPUTE_REASONS[0])
+  const [reason, setReason] = useState(DISPUTE_REASONS[0].value)
   const [severity, setSeverity] = useState<SeverityLabel>(SEVERITY[1])
   const [description, setDescription] = useState('')
   const [files, setFiles] = useState<UploadedFile[]>([])
@@ -162,6 +170,21 @@ const effectiveEscrow =
       })),
     [userEscrows],
   )
+
+  // B-4: read the escrow state to determine the filer's role
+  // (buyer vs seller). Previously this defaulted to 'buyer' in
+  // `insertDisputeEvidence`, mis-tagging seller-raised disputes.
+  const { data: escrowState } = useEscrowState(
+    effectiveEscrow || undefined,
+  )
+  const filerRole: 'buyer' | 'seller' | null =
+    !!address && !!escrowState
+      ? address.toLowerCase() === escrowState.buyer.toLowerCase()
+        ? 'buyer'
+        : address.toLowerCase() === escrowState.seller.toLowerCase()
+          ? 'seller'
+          : null
+      : null
 
   const addFiles = useCallback((incoming: FileList | File[]) => {
     const accepted: UploadedFile[] = []
@@ -203,7 +226,7 @@ const effectiveEscrow =
   const handleReset = () => {
     files.forEach((f) => URL.revokeObjectURL(f.previewUrl))
     setEscrowAddress('')
-    setReason(DISPUTE_REASONS[0])
+    setReason(DISPUTE_REASONS[0].value)
     setSeverity(SEVERITY[1])
     setDescription('')
     setFiles([])
@@ -222,7 +245,7 @@ const effectiveEscrow =
     if (!factoryReady || !effectiveEscrow) {
       toast.error(
         !factoryReady
-          ? t('disputePage.errorFactoryNotReady')
+          ? t('disputePage.factoryNotConfigured')
           : t('disputePage.errorPickEscrow'),
       )
       return
@@ -323,21 +346,13 @@ const effectiveEscrow =
 
       // 6) Persist the dispute to Supabase with on-chain metadata.
       setStage('saving')
-      const evidenceJson = JSON.stringify(
-        uploads.map((u) => ({
-          cid: u.cid,
-          url: u.url,
-          name: u.name,
-          size: u.size,
-        })),
-      )
       const dispute = await createDispute({
         dispute_id: generateDisputeId(),
         trade_id: linkedTrade.id,
         buyer_id: linkedTrade.buyer_id,
         seller_id: linkedTrade.seller_id,
         reason,
-        reason_category: reason,
+        reason_category: DISPUTE_REASONS.find((r) => r.value === reason)?.label ?? reason,
         description: [
           description,
           `--- on-chain ---`,
@@ -348,7 +363,6 @@ const effectiveEscrow =
           `arbitration_fee_wei: ${arbitrationCostWei.toString()}`,
           `severity: ${SEVERITY_TO_APPLEVEL[severity]} (${severity})`,
           `evidence_cid: ${primaryCid}`,
-          `evidence: ${evidenceJson}`,
         ].join('\n\n'),
         can_appeal: true,
         appeal_deadline: null,
@@ -358,7 +372,52 @@ const effectiveEscrow =
         tx_hash_evidence: evidenceTxHash,
         evidence_cid: primaryCid,
         escrow_state: KlerosEscState.AWAITING_RULING,
+        // B-9: start at IN_REVIEW so the `DisputesListPage` "In review"
+        // filter surfaces this dispute immediately (instead of leaving it
+        // stuck at 'open' until someone visits the detail page).
+        status: DisputeStatus.IN_REVIEW,
+        evidence_group_id: 0,
+        appeal_count: 0,
+        raiser: filerRole ?? undefined,
+        fee_paid_wei: arbitrationCostWei.toString(),
+        dispute_timestamp: new Date().toISOString(),
       })
+
+      // 6a) Persist each uploaded file as a dispute_evidence row. Best-effort —
+      //     the dispute row + on-chain submitEvidence() are the source of truth;
+      //     these rows back the gallery on the detail page. B-4: pass the
+      //     filer role explicitly (sellers raising a dispute are not 'buyer').
+      //     Each row carries the per-file keccak + on-chain tx hash so the
+      //     detail-page "legacy evidence" list can deep-link to Etherscan.
+      const primaryKeccak = await cidToBytes32(uploads[0].cid)
+      const evidenceFiles: DisputeEvidenceFile[] = uploads.map((u, idx) => ({
+        cid: u.cid,
+        url: u.url,
+        name: u.name,
+        size: u.size,
+        // Only the first file was sent on-chain; remaining rows are
+        // Supabase-only and carry keccakBytes32=null so future indexer
+        // doesn't claim they're on-chain.
+        keccakBytes32: idx === 0 ? primaryKeccak : null,
+        txHash: idx === 0 ? evidenceTxHash : null,
+        evidenceGroupId: 0,
+      }))
+      await insertDisputeEvidence(
+        dispute.id,
+        evidenceFiles,
+        filerRole ?? 'neutral',
+        0,
+      ).catch((err) => {
+        console.warn('[DisputePage] insertDisputeEvidence failed:', err)
+      })
+
+      // B-9 (belt-and-braces) — also bump via updateDisputeOnChain in case
+      // an older DB doesn't support the status-on-create path.
+      await updateDisputeOnChain(dispute.id, {
+        status: DisputeStatus.IN_REVIEW,
+        evidenceGroupId: 0,
+        appealCount: 0,
+      }).catch(() => undefined)
 
       // 6b) Mirror the trade into `disputed` so the trades list stops showing
       //     it as a funding/active trade. Non-fatal — the dispute row is the
@@ -366,6 +425,7 @@ const effectiveEscrow =
       await updateTradeStatus(linkedTrade.id, 'disputed', {
         escrowStatus: 'disputed',
         txHash,
+        escrowEventType: TradeEventType.ESCROW_DISPUTED,
       }).catch(() => {
         /* non-fatal — the dispute row already landed */
       })
@@ -373,9 +433,8 @@ const effectiveEscrow =
       toast.success(t('disputePage.successFiled'))
       navigate(`/app/disputes/${dispute.id}`)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error'
-      toast.error(t('disputePage.errorGeneric', { message: msg }))
       console.error('[DisputePage] submit failed:', err)
+      toast.error(errorMessage(err, 'disputePage', t))
     } finally {
       setStage('idle')
     }
@@ -462,7 +521,7 @@ const effectiveEscrow =
                 label={t('disputePage.reason')}
                 value={reason}
                 onSelect={setReason}
-                options={DISPUTE_REASONS.map((r) => ({ label: r, value: r }))}
+                options={DISPUTE_REASONS.map((r) => ({ label: r.label, value: r.value }))}
               />
             </div>
             <div>

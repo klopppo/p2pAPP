@@ -1,3 +1,4 @@
+import { useCallback, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -10,10 +11,12 @@ import {
   Loader2,
   Gavel,
   Timer,
+  Scale,
+  UploadCloud,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
-import { formatEther, type Abi } from 'viem'
+import { formatEther, keccak256, toBytes, type Abi } from 'viem'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -25,7 +28,18 @@ import {
   KlerosEscState,
   type KlerosEscStateValue,
 } from '@/lib/contracts'
-import { useDispute, useEscrowState } from '@/hooks/useDisputes'
+import { useDispute, useEscrowState, useAppealInfo, useEscrowEventWatcher } from '@/hooks/useDisputes'
+import {
+  type DisputeEvidenceFile,
+  EscrowStatus,
+  mirrorDisputeToTrade,
+  TradeEventType,
+  updateDisputeOnChain,
+  insertDisputeEvidence,
+} from '@/lib/supabase'
+import { uploadToIpfs } from '@/lib/ipfs'
+import { errorMessage } from '@/lib/errorMessage'
+import { DisputeStatus, TradeStatus } from '@/types/database'
 
 type DisputeStatusValue =
   | 'open'
@@ -187,10 +201,119 @@ export function DisputeDetailPage() {
     escrowAddress || undefined,
   )
 
-  const isFiler = isConnected && address && escrowState
-    ? address.toLowerCase() === escrowState.buyer.toLowerCase() ||
-      address.toLowerCase() === escrowState.seller.toLowerCase()
-    : false
+  // Subscribe to on-chain events for this escrow. The handler refreshes the
+  // multicall AND writes the cached columns on `disputes.*` so the page
+  // reflects state transitions without a manual reload (and the
+  // `useEscrowEventWatcher` filter list matches what the server-side indexer
+  // will eventually need).
+  const handleEscrowEvent = useCallback(
+    async (eventName: string, args: Record<string, unknown>) => {
+      const disputed = dispute?.id
+      if (!disputed) return
+      // Read trade id lazily so we don't need the destructured `trade`
+      // variable in scope here (declared below after the early returns).
+      const tradeId =
+        (dispute?.trade as null | { id?: string | null })?.id ?? null
+      try {
+        if (eventName === 'RulingReceived') {
+          const ruling = Number((args.ruling as bigint | number | undefined) ?? 0)
+          await updateDisputeOnChain(disputed, {
+            escrowState: KlerosEscState.RULING_RECEIVED,
+            onChainRuling: ruling,
+            rulingReceivedTime: new Date().toISOString(),
+          })
+        } else if (eventName === 'RulingExecuted') {
+          const ruling = Number((args.ruling as bigint | number | undefined) ?? 0)
+          await updateDisputeOnChain(disputed, {
+            escrowState: KlerosEscState.RULING_EXECUTED,
+            klerosDisputeStatus: 2,
+            onChainRuling: ruling,
+          })
+          if (tradeId) {
+            const buyerWins =
+              ruling === 1 || ruling === 3
+            await mirrorDisputeToTrade(tradeId, {
+              tradeStatus: buyerWins ? TradeStatus.REFUNDED : TradeStatus.COMPLETED,
+              escrowStatus: buyerWins ? EscrowStatus.REFUNDED : EscrowStatus.RELEASED,
+              txHash: '',
+              escrowEventType: TradeEventType.RULING_EXECUTED,
+            }).catch(() => undefined)
+          }
+        } else if (eventName === 'Finalized') {
+          await updateDisputeOnChain(disputed, {
+            escrowState: KlerosEscState.COMPLETED,
+            status: DisputeStatus.RESOLVED,
+            resolvedAt: new Date().toISOString(),
+          })
+        } else if (eventName === 'DisputeTimedOut') {
+          const buyerWasDisputer = args.buyerWasDisputer as boolean | undefined
+          const winner: 'buyer' | 'seller' = buyerWasDisputer ? 'seller' : 'buyer'
+          await updateDisputeOnChain(disputed, {
+            escrowState: KlerosEscState.COMPLETED,
+            status: DisputeStatus.CLOSED,
+            winner,
+            resolvedAt: new Date().toISOString(),
+          })
+          // Mirror the timeout outcome to the linked trade (mirror was
+          // missing — surfaces as `trades.status='disputed'` forever).
+          if (tradeId) {
+            await mirrorDisputeToTrade(tradeId, {
+              tradeStatus:
+                winner === 'seller'
+                  ? TradeStatus.COMPLETED
+                  : TradeStatus.REFUNDED,
+              escrowStatus:
+                winner === 'seller'
+                  ? EscrowStatus.RELEASED
+                  : EscrowStatus.REFUNDED,
+              txHash: '',
+              escrowEventType: TradeEventType.DISPUTE_TIMED_OUT,
+            }).catch(() => undefined)
+          }
+        } else if (eventName === 'AppealFunded') {
+          await updateDisputeOnChain(disputed, {
+            escrowState: KlerosEscState.AWAITING_RULING,
+            klerosDisputeStatus: 1,
+            onChainRuling: null,
+            status: DisputeStatus.ESCALATED,
+            appealCount: (dispute?.appeal_count ?? 0) + 1,
+            evidenceGroupId: (dispute?.evidence_group_id ?? 0) + 1,
+          })
+        } else if (eventName === 'Evidence') {
+          // Best-effort: nothing to write beyond what `submitEvidence` tx did
+          // on the chain; the dispute_evidence row was added by the page
+          // that called submitEvidence (this page or DisputePage). Future
+          // indexer will reconcile via the Evidence event topic.
+        }
+      } catch (err) {
+        console.warn(`[DisputeDetailPage] handleEscrowEvent(${eventName}) failed:`, err)
+      } finally {
+        if (
+          eventName === 'RulingReceived' ||
+          eventName === 'RulingExecuted' ||
+          eventName === 'Finalized' ||
+          eventName === 'AppealFunded' ||
+          eventName === 'DisputeTimedOut'
+        ) {
+          refetchEscrowState()
+        }
+      }
+    },
+    // The dispute object refetches on every state transition, so reading
+    // trade id lazily inside the callback (via dispute?.trade) keeps the
+    // handler fresh without needing a destructured `trade` variable in
+    // deps (which would TDZ because trade is declared below the early
+    // returns).
+     
+    [dispute, refetchEscrowState],
+  )
+  useEscrowEventWatcher(escrowAddress || undefined, handleEscrowEvent)
+
+  // Appeal data — only meaningful once a dispute is raised on Kleros.
+  const { data: appealInfo } = useAppealInfo(
+    escrowAddress || undefined,
+    escrowState?.klerosDisputeID ?? null,
+  )
 
   if (isLoading) {
     return (
@@ -230,6 +353,7 @@ export function DisputeDetailPage() {
 
   const status = dispute.status as DisputeStatusValue
   const trade = dispute.trade as null | {
+    id: string
     trade_id: string
     crypto_token?: string
     crypto_amount?: number
@@ -259,7 +383,16 @@ export function DisputeDetailPage() {
       }
     | null
   const seller = dispute.seller as typeof buyer
-  const evidenceRows = dispute.evidence as Array<Record<string, unknown>> | null
+  const evidenceRows = (dispute.evidence ?? []) as Array<{
+  id: string
+  submitted_by: 'buyer' | 'seller' | 'neutral'
+  ipfs_cid: string
+  ipfs_url: string
+  keccak_bytes32: string | null
+  tx_hash: string | null
+  evidence_group_id: number | null
+  submitted_at: string | null
+}>
 
   // Resolve the on-chain ruling: prefer the cached column from DB, fall back
   // to the live escrow-state read.
@@ -275,6 +408,24 @@ export function DisputeDetailPage() {
       ? (escrowState.state as KlerosEscStateValue)
       : null
 
+  // Whether the connected wallet can submit evidence: must be buyer or seller
+  // (contract: `KlerosEsc.submitEvidence` reverts for anyone else). The
+  // additional-evidence flow lives on the detail page so jurors see
+  // post-appeal rounds on kleros.io.
+  const canSubmitMoreEvidence =
+    !!escrowAddress &&
+    !!escrowState &&
+    (liveEscrowStateValue === KlerosEscState.AWAITING_RULING ||
+      liveEscrowStateValue === KlerosEscState.RULING_RECEIVED)
+
+  const filerRole: 'buyer' | 'seller' | null = address && escrowState
+    ? address.toLowerCase() === escrowState.buyer.toLowerCase()
+      ? 'buyer'
+      : address.toLowerCase() === escrowState.seller.toLowerCase()
+        ? 'seller'
+        : null
+    : null
+
   const handleExecuteRuling = async () => {
     if (!escrowAddress || !publicClient) return
     try {
@@ -284,10 +435,35 @@ export function DisputeDetailPage() {
         functionName: 'executeRuling',
       })
       await publicClient.waitForTransactionReceipt({ hash })
+      // Mirror: state → RULING_EXECUTED, Kleros status → Solved (2), cache the
+      // ruling. Dispute stays in_review until finalize() locks it.
+      const ruling = escrowState?.currentRuling != null
+        ? Number(escrowState.currentRuling)
+        : null
+      await updateDisputeOnChain(dispute.id, {
+        escrowState: KlerosEscState.RULING_EXECUTED,
+        klerosDisputeStatus: 2,
+        onChainRuling: ruling,
+      }).catch((err) =>
+        console.warn('[DisputeDetailPage] updateDisputeOnChain(executeRuling):', err),
+      )
+      // Mirror the trade payout (B-3, B-7): rulings 1/3 → buyer wins
+      // (refund), 0/2/4 → seller wins (release).
+      if (trade?.id && ruling != null) {
+        const buyerWins = ruling === 1 || ruling === 3
+        await mirrorDisputeToTrade(trade.id, {
+          tradeStatus: buyerWins ? TradeStatus.REFUNDED : TradeStatus.COMPLETED,
+          escrowStatus: buyerWins ? EscrowStatus.REFUNDED : EscrowStatus.RELEASED,
+          txHash: hash,
+          escrowEventType: TradeEventType.RULING_EXECUTED,
+        }).catch((err) =>
+          console.warn('[DisputeDetailPage] mirrorDisputeToTrade(executeRuling):', err),
+        )
+      }
       toast.success(t('disputeDetail.rulingExecuted'))
       refetchEscrowState()
     } catch (err) {
-      toast.error(t('disputeDetail.rulingExecutedError', { message: (err as Error).message }))
+      toast.error(errorMessage(err, 'disputeDetail', t, 'rulingExecutedError'))
     }
   }
 
@@ -300,10 +476,33 @@ export function DisputeDetailPage() {
         functionName: 'finalize',
       })
       await publicClient.waitForTransactionReceipt({ hash })
+      // Mirror: state → COMPLETED, dispute → resolved with resolved_at.
+      await updateDisputeOnChain(dispute.id, {
+        escrowState: KlerosEscState.COMPLETED,
+        status: DisputeStatus.RESOLVED,
+        resolvedAt: new Date().toISOString(),
+      }).catch((err) =>
+        console.warn('[DisputeDetailPage] updateDisputeOnChain(finalize):', err),
+      )
+      // Mirror the trade-side outcome at finalize time (B-7).
+      if (trade?.id) {
+        const ruling = escrowState?.currentRuling != null
+          ? Number(escrowState.currentRuling)
+          : null
+        const buyerWins = ruling === 1 || ruling === 3
+        await mirrorDisputeToTrade(trade.id, {
+          tradeStatus: buyerWins ? TradeStatus.REFUNDED : TradeStatus.COMPLETED,
+          escrowStatus: buyerWins ? EscrowStatus.REFUNDED : EscrowStatus.RELEASED,
+          txHash: hash,
+          escrowEventType: TradeEventType.DISPUTE_FINALIZED,
+        }).catch((err) =>
+          console.warn('[DisputeDetailPage] mirrorDisputeToTrade(finalize):', err),
+        )
+      }
       toast.success(t('disputeDetail.escrowFinalized'))
       refetchEscrowState()
     } catch (err) {
-      toast.error(t('disputeDetail.escrowFinalizedError', { message: (err as Error).message }))
+      toast.error(errorMessage(err, 'disputeDetail', t, 'escrowFinalizedError'))
     }
   }
 
@@ -316,10 +515,38 @@ export function DisputeDetailPage() {
         functionName: 'timeoutDispute',
       })
       await publicClient.waitForTransactionReceipt({ hash })
+      // Mirror: state → COMPLETED, dispute → closed (timeout is unilateral loss
+      // for the disputer, not a Kleros-mediated resolution).
+      await updateDisputeOnChain(dispute.id, {
+        escrowState: KlerosEscState.COMPLETED,
+        status: DisputeStatus.CLOSED,
+        resolvedAt: new Date().toISOString(),
+      }).catch((err) =>
+        console.warn('[DisputeDetailPage] updateDisputeOnChain(timeoutDispute):', err),
+      )
+      // Mirror the trade-side outcome (B-7): the disputer loses. Use
+      // `escrowState.disputer` to determine the winner without re-reading.
+      if (trade?.id && escrowState?.disputer) {
+        const buyerWasDisputer =
+          escrowState.disputer.toLowerCase() === escrowState.buyer.toLowerCase()
+        const winner: 'buyer' | 'seller' = buyerWasDisputer ? 'seller' : 'buyer'
+        await mirrorDisputeToTrade(trade.id, {
+          tradeStatus:
+            winner === 'seller'
+              ? TradeStatus.COMPLETED
+              : TradeStatus.REFUNDED,
+          escrowStatus:
+            winner === 'seller' ? EscrowStatus.RELEASED : EscrowStatus.REFUNDED,
+          txHash: hash,
+          escrowEventType: TradeEventType.DISPUTE_TIMED_OUT,
+        }).catch((err) =>
+          console.warn('[DisputeDetailPage] mirrorDisputeToTrade(timeoutDispute):', err),
+        )
+      }
       toast.success(t('disputeDetail.disputeTimedOut'))
       refetchEscrowState()
     } catch (err) {
-      toast.error(t('disputeDetail.disputeTimedOutError', { message: (err as Error).message }))
+      toast.error(errorMessage(err, 'disputeDetail', t, 'disputeTimedOutError'))
     }
   }
 
@@ -332,6 +559,34 @@ export function DisputeDetailPage() {
   const canTimeout =
     liveEscrowStateValue === KlerosEscState.AWAITING_RULING ||
     liveEscrowStateValue === KlerosEscState.RULING_RECEIVED
+
+  const handleAppeal = async () => {
+    if (!escrowAddress || !publicClient || !appealInfo?.appealCostWei) return
+    try {
+      const hash = await writeContractAsync({
+        address: escrowAddress,
+        abi: KLEROS_ESC_ABI as Abi,
+        functionName: 'appeal',
+        value: appealInfo.appealCostWei,
+      })
+      await publicClient.waitForTransactionReceipt({ hash })
+      // Mirror: state moves back to AWAITING_RULING for the new round; mark
+      // the dispute as escalated.
+      await updateDisputeOnChain(dispute.id, {
+        escrowState: KlerosEscState.AWAITING_RULING,
+        klerosDisputeStatus: 1,
+        onChainRuling: null,
+        status: DisputeStatus.ESCALATED,
+      }).catch((err) =>
+        console.warn('[DisputeDetailPage] updateDisputeOnChain(appeal):', err),
+      )
+      toast.success(t('disputeDetail.appealFunded'))
+      refetchEscrowState()
+    } catch (err) {
+      toast.error(errorMessage(err, 'disputeDetail', t, 'appealFundedError'))
+    }
+  }
+  const canAppeal = !!appealInfo?.appealable
 
   return (
     <div className="w-full max-w-xl mx-auto">
@@ -454,8 +709,12 @@ export function DisputeDetailPage() {
               </div>
             )}
 
-            {/* On-chain actions the connected wallet can take. */}
-            {isConnected && isFiler && (canExecuteRuling || canFinalize || canTimeout) && (
+            {/* On-chain actions the connected wallet can take. B-7: drop `isFiler` so
+                any connected wallet can call executeRuling / finalize /
+                timeoutDispute — they're permissionless on the contract
+                (deliberate keeper-bot design). Only the appeal path remains
+                buyer/seller-only because `appeal()` checks msg.sender. */}
+            {isConnected && (canExecuteRuling || canFinalize || canTimeout || canAppeal) && (
               <div className="flex flex-wrap gap-2 pt-2 border-t border-border/50">
                 {canExecuteRuling && (
                   <Button
@@ -471,6 +730,27 @@ export function DisputeDetailPage() {
                       <Gavel className="w-3.5 h-3.5 mr-1" />
                     )}
                     {t('disputeDetail.executeRuling')}
+                  </Button>
+                )}
+                {canAppeal && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-full"
+                    disabled={isWritePending}
+                    onClick={handleAppeal}
+                  >
+                    {isWritePending ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                    ) : (
+                      <Scale className="w-3.5 h-3.5 mr-1" />
+                    )}
+                    {t('disputeDetail.appeal')}
+                    {appealInfo?.appealCostWei != null && (
+                      <span className="font-mono text-xs ml-1 text-muted-foreground">
+                        ({formatEther(appealInfo.appealCostWei)} ETH)
+                      </span>
+                    )}
                   </Button>
                 )}
                 {canFinalize && (
@@ -497,6 +777,19 @@ export function DisputeDetailPage() {
                   </Button>
                 )}
               </div>
+            )}
+            {/* "Submit additional evidence" — buyer/seller only (enforced by
+                 the contract). On click: uploads file to IPFS, calls
+                 KlerosEsc.submitEvidence(bytes32(keccak256(cid))) on-chain,
+                 and writes a dispute_evidence row linked to the current
+                 evidence_group_id so jurors see post-appeal rounds. */}
+            {isConnected && filerRole && canSubmitMoreEvidence && (
+              <SubmitMoreEvidence
+                escrowAddress={escrowAddress}
+                evidenceGroupId={escrowState?.evidenceGroupID ?? 0}
+                disputeId={dispute.id}
+                filerRole={filerRole}
+              />
             )}
           </div>
         </Card>
@@ -683,26 +976,42 @@ export function DisputeDetailPage() {
         </Card>
       )}
 
-      {/* Evidence from dispute_evidence table (legacy / when present) */}
-      {evidenceRows && evidenceRows.length > 0 && (
+      {/* Evidence from dispute_evidence table. Renamed columns in
+          migration 20260824*: `ipfs_cid` (was `file_hash`), `ipfs_url` (was
+          `file_encrypted`), with new `keccak_bytes32` + `tx_hash` +
+          `evidence_group_id` for round-aware display. */}
+      {evidenceRows.length > 0 && (
         <Card className="glass-panel rounded-2xl p-6 mt-3">
           <Text variant="h4" className="font-bold mb-2">
             {t('disputeDetail.legacyEvidence')}
           </Text>
           <ul className="space-y-2">
-            {evidenceRows.map((row, i) => (
+            {evidenceRows.map((row) => (
               <li
-                key={i}
+                key={row.id}
                 className="flex items-center gap-2 text-sm rounded-lg border border-border bg-background/60 px-3 py-2"
               >
                 <span className="text-muted-foreground text-xs">
-                  {String(row.submitted_by ?? 'unknown')}
+                  {row.submitted_by ?? 'unknown'}
+                </span>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  round {row.evidence_group_id ?? 0}
                 </span>
                 <span className="font-mono truncate flex-1">
-                  {String(row.file_hash ?? '').slice(0, 18)}…
+                  {(row.ipfs_cid ?? '').slice(0, 18)}…
                 </span>
+                {row.tx_hash && (
+                  <a
+                    href={`https://etherscan.io/tx/${row.tx_hash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline shrink-0"
+                  >
+                    tx
+                  </a>
+                )}
                 <span className="text-xs text-muted-foreground">
-                  {formatDateTime(row.submitted_at as string)}
+                  {formatDateTime(row.submitted_at)}
                 </span>
               </li>
             ))}
@@ -729,6 +1038,103 @@ export function DisputeDetailPage() {
         >
           {t('disputeDetail.backToDisputesButton')}
         </Button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * "Submit additional evidence" affordance shown on `DisputeDetailPage` so
+ * buyers/sellers can pin post-appeal rounds to the chain (`KlerosEsc.sol:611`).
+ * Each file → one IPFS upload → one `submitEvidence(bytes32)` tx → one
+ * `dispute_evidence` row tagged with the current `evidence_group_id`.
+ *
+ * B-5: used to be hidden (DisputePage raised only the first CID on-chain).
+ */
+function SubmitMoreEvidence({
+  escrowAddress,
+  evidenceGroupId,
+  disputeId,
+  filerRole,
+}: {
+  escrowAddress: `0x${string}` | null
+  evidenceGroupId: bigint
+  disputeId: string
+  filerRole: 'buyer' | 'seller'
+}) {
+  const { t } = useTranslation()
+  const publicClient = usePublicClient()
+  const { writeContractAsync, isPending } = useWriteContract()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [busy, setBusy] = useState(false)
+
+  const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !escrowAddress || !publicClient) return
+    setBusy(true)
+    try {
+      const upload = await uploadToIpfs(file)
+      const evidenceBytes32 = keccak256(toBytes(upload.cid)) as `0x${string}`
+      const txHash = await writeContractAsync({
+        address: escrowAddress,
+        abi: KLEROS_ESC_ABI as Abi,
+        functionName: 'submitEvidence',
+        args: [evidenceBytes32],
+      })
+      await publicClient.waitForTransactionReceipt({ hash: txHash })
+      const rows: DisputeEvidenceFile[] = [
+        {
+          cid: upload.cid,
+          url: upload.url,
+          name: upload.name ?? file.name,
+          size: upload.size ?? file.size,
+          kind: file.type.split('/')[1] ?? 'image',
+          keccakBytes32: evidenceBytes32,
+          txHash,
+          evidenceGroupId: Number(evidenceGroupId),
+        },
+      ]
+      await insertDisputeEvidence(disputeId, rows, filerRole, Number(evidenceGroupId))
+      toast.success(t('disputeDetail.evidenceSubmittedSuccess'))
+    } catch (err) {
+      console.warn('[DisputeDetailPage] submitEvidence failed:', err)
+      toast.error(errorMessage(err, 'disputeDetail', t, 'evidenceSubmittedError'))
+    } finally {
+      setBusy(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 pt-2 border-t border-border/50">
+      <Label className="text-sm font-medium">
+        {t('disputeDetail.submitMoreEvidence')}
+      </Label>
+      <div className="flex items-center gap-2">
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*,application/pdf"
+          className="hidden"
+          onChange={onPick}
+        />
+        <Button
+          size="sm"
+          variant="outline"
+          className="rounded-full"
+          disabled={busy || isPending}
+          onClick={() => fileRef.current?.click()}
+        >
+          {busy || isPending ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+          ) : (
+            <UploadCloud className="w-3.5 h-3.5 mr-1" />
+          )}
+          {busy || isPending ? t('disputeDetail.submittingEvidence') : t('disputeDetail.submitEvidence')}
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          {t('disputeDetail.evidenceRound', { n: Number(evidenceGroupId) })}
+        </span>
       </div>
     </div>
   )

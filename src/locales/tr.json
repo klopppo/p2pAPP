@@ -139,6 +139,16 @@
     "completionRate": "Tamamlanma oranı",
     "verification": "Doğrulama",
     "reputation": "İtibar",
+    "ratingsBreakdown": "Puan dökümü",
+    "noRatingsYet": "Henüz puan yok.",
+    "noReputationYet": "Henüz itibar etkinliği yok.",
+    "repTrustworthiness": "Güvenilirlik",
+    "repReliability": "Tutarlılık",
+    "repCommunication": "İletişim",
+    "repSpeed": "Hız",
+    "repProfessionalism": "Profesyonellik",
+    "repPointsEarned": "Kazanılan puan",
+    "repPointsLost": "Kaybedilen puan",
     "yourActiveOffers": "Aktif teklifleriniz",
     "activeOffers": "Aktif teklifler",
     "noActiveOffers": "Aktif teklif yok.",
@@ -286,6 +296,7 @@
     "executeRuling": "Kararı uygula",
     "finalizeEscrow": "Emaneti sonlandır",
     "timeoutDispute": "Uyuşmazlığı zaman aşımına uğrat (30g)",
+    "appeal": "Karara itiraz et",
     "backToDisputesButton": "Uyuşmazlıklara dön",
     "connectWalletDescription": "Bu uyuşmazlıkla etkileşim kurmak için alıcı veya satıcı cüzdanını bağlayın.",
     "rulingExecuted": "Karar uygulandı — fonlar Kleros'a göre dağıtıldı.",
@@ -294,6 +305,8 @@
     "escrowFinalizedError": "Sonlandırma başarısız: {{message}}",
     "disputeTimedOut": "Uyuşmazlık zaman aşımına uğradı — varsayılan kural uygulandı.",
     "disputeTimedOutError": "Zaman aşımı başarısız: {{message}}",
+    "appealFunded": "İtiraz finanse edildi — yeni Kleros turu başladı.",
+    "appealFundedError": "İtiraz başarısız: {{message}}",
     "onChainDisclaimer": "KlerosEsc klonu ve Kleros mahkemesi gerçek kaynağıdır. Supabase satırı, zincir içi durumu hızlı listeleme için yansıtır ve zincir içine sığmayan IPFS CID'lerini depolar.",
     "refused": "Reddedildi (otomatik iptal)",
     "buyerWinsPenalty": "Alıcı kazandı, satıcı depozitosu haciz edildi",
@@ -442,7 +455,10 @@
     "releaseSuccess": "İşlem serbest bırakıldı — fonlar dağıtıldı.",
     "releaseFailed": "Serbest bırakma başarısız: {{message}}",
     "rulingExecutedSuccess": "Karar uygulandı — işlem çözümlendi.",
-    "rulingExecutedFailed": "Karar uygulanamadı: {{message}}"
+    "rulingExecutedFailed": "Karar uygulanamadı: {{message}}",
+    "cancelTrade": "İptal (karşı taraf yanıt vermiyor)",
+    "cancelSuccess": "İşlem iptal edildi — depozitolar iade edildi.",
+    "cancelFailed": "İptal başarısız: {{message}}"
   },
   "editProfile": {
     "title": "Profili Düzenle",
@@ -514,7 +530,6 @@
     "stageSubmittingEvidence": "Kanıt gönderiliyor…",
     "stageSaving": "Uyuşmazlık kaydediliyor…",
     "errorConnectWallet": "Uyuşmazlık açmak için cüzdanınızı bağlayın.",
-    "errorFactoryNotReady": "Fabrika adresi yapılandırılmamış (VITE_KLEROS_ESCROW_FACTORY).",
     "errorPickEscrow": "Uyuşmazlığa açmak için bir emanet seçin.",
     "errorUploadProof": "En az bir kanıt resmi yükleyin.",
     "errorRpcClient": "Genel RPC istemcisi hazır değil. Tekrar deneyin.",
@@ -602,5 +617,17 @@
     "blockscan": "Blockscan",
     "eth": "ETH",
     "backTo": "{{target}}'e dön"
+  },
+  "errors": {
+    "cancelledByUser": "İptal edildi — hiçbir işlem gönderilmedi.",
+    "networkError": "Ağ hatası — lütfen tekrar deneyin.",
+    "reverted": "İşlem geri alındı: {{reason}}",
+    "fallback": "Bir şeyler ters gitti — lütfen tekrar deneyin."
+  },
+  "chainGuard": {
+    "title": "Yanlış ağ",
+    "description": "Cüzdanınız yanlış EVM ağında. Devam etmek için {{chain}} ağına geçin.",
+    "switchCta": "{{chain}} ağına geç",
+    "switchError": "Otomatik geçiş yapılamadı: {{message}}"
   }
 }

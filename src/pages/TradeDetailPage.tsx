@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -21,6 +21,7 @@ import {
   Send,
   Timer,
   ExternalLink,
+  XCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -28,6 +29,7 @@ import { Text } from '@/components/ui/text'
 import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
+  CANCEL_TIMELOCK_SECONDS,
   ERC20_ABI,
   KLEROS_ESC_ABI,
   KlerosEscState,
@@ -35,19 +37,39 @@ import {
   Ruling,
   type KlerosEscStateValue,
 } from '@/lib/contracts'
-import { useEscrowState } from '@/hooks/useDisputes'
+import { useEscrowEventWatcher, useEscrowState } from '@/hooks/useDisputes'
 import {
+  EscrowStatus,
   getTradeById,
-  upsertTradeEscrowStatus,
+  setTradeEscrowStatus,
+  TradeEventType,
   updateTradeStatus,
+  updateUserReputation,
+  upsertTradeEscrowStatus,
 } from '@/lib/supabase'
+import { errorMessage } from '@/lib/errorMessage'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useTradeRatings, useHasRated } from '@/hooks/useReviews'
 import { ReviewForm } from '@/components/custom/ReviewForm'
 import { StarRating } from '@/components/custom/StarRating'
-import { EscrowStatus } from '@/types/database'
 
 type TxStage = 'idle' | 'approving' | 'depositing' | 'confirming' | 'mining'
+
+/**
+ * A `now`-clock that ticks every second while a state using timelocks is on
+ * screen. Returns 0n (falsy) until the interval starts so the calling code can
+ * gate on `nowSecs > 0n` for conditional rendering.
+ */
+function useNowSecsBig(): bigint {
+  const [now, setNow] = useState(0n)
+  useEffect(() => {
+    const tick = () => setNow(BigInt(Math.floor(Date.now() / 1000)))
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [])
+  return now
+}
 
 function getTxLabel(t: (key: string) => string, stage: TxStage): string {
   const labels: Record<TxStage, string> = {
@@ -145,7 +167,7 @@ export function TradeDetailPage() {
   const fundEscrow = async (
     which: 'buyer' | 'seller',
     amountWei: bigint,
-    afterApprove: () => Promise<`0x${string}`>,
+    afterApprove: () => Promise<`0x${string}` | { depositHash: `0x${string}`; lockHash: `0x${string}` | null }>,
   ) => {
     if (!tokenAddress || !escrowAddress || !publicClient) return
 
@@ -172,12 +194,22 @@ export function TradeDetailPage() {
         // if the approve is still pending.
       }
 
-      // 2) Call the appropriate deposit function on the escrow.
+      // 2) Call the appropriate deposit function on the escrow. The seller's
+      //    path needs both depositSellerSecurityDeposit + lockFunds, so the
+      //    callback may return two tx hashes (we mirror both).
       setTxStage('depositing')
-      const txHash = await afterApprove()
+      const result = await afterApprove()
+
+      const depositTxHash: `0x${string}` =
+        typeof result === 'string' ? result : result.depositHash
+      const lockTxHash: `0x${string}` | null =
+        typeof result === 'string' ? null : result.lockHash
 
       setTxStage('mining')
-      await publicClient.waitForTransactionReceipt({ hash: txHash })
+      await publicClient.waitForTransactionReceipt({ hash: depositTxHash })
+      if (lockTxHash) {
+        await publicClient.waitForTransactionReceipt({ hash: lockTxHash })
+      }
 
       // 3) Mirror on-chain progress into Supabase so the listing pages can
       // filter by `escrow_status` without a re-read.
@@ -188,10 +220,22 @@ export function TradeDetailPage() {
       await upsertTradeEscrowStatus(
         trade!.id,
         newStatus,
-        txHash,
+        depositTxHash,
       ).catch(() => {
         /* non-fatal — the chain tx already happened */
       })
+
+      // 3a) Seller path: after lockFunds the on-chain state moves from
+      //      SELLER_DEPOSITED (or AWAITING_FUNDING) to FUNDED. Write the new
+      //      status + log a granular event. Only fires when lockFunds()
+      //      succeeded (i.e. when the buyer deposit was already in).
+      if (lockTxHash) {
+        await setTradeEscrowStatus(
+          trade!.id,
+          EscrowStatus.FUNDED,
+          { txHash: lockTxHash, escrowEventType: TradeEventType.ESCROW_FUNDED },
+        ).catch(() => undefined)
+      }
 
       toast.success(
         which === 'buyer'
@@ -203,8 +247,8 @@ export function TradeDetailPage() {
       console.error('[TradeDetailPage] fund failed:', err)
       toast.error(
         which === 'buyer'
-          ? t('tradeDetail.depositFailed', { message: (err as Error).message })
-          : t('tradeDetail.lockFailed', { message: (err as Error).message }),
+          ? errorMessage(err, 'tradeDetail', t, 'depositFailed')
+          : errorMessage(err, 'tradeDetail', t, 'lockFailed'),
       )
     } finally {
       setTxStage('idle')
@@ -242,11 +286,12 @@ export function TradeDetailPage() {
           functionName: 'depositSellerSecurityDeposit',
         })
         await publicClient!.waitForTransactionReceipt({ hash: depHash })
-        return writeContractAsync({
+        const lockHash = await writeContractAsync({
           address: escrowAddress!,
           abi: KLEROS_ESC_ABI as Abi,
           functionName: 'lockFunds',
         })
+        return { depositHash: depHash, lockHash }
       },
     )
   }
@@ -262,13 +307,14 @@ export function TradeDetailPage() {
       })
       setTxStage('mining')
       await publicClient!.waitForTransactionReceipt({ hash: txHash })
-      await upsertTradeEscrowStatus(trade!.id, EscrowStatus.CONFIRMED, txHash).catch(
-        () => undefined,
-      )
+      await setTradeEscrowStatus(trade!.id, EscrowStatus.CONFIRMED, {
+        txHash,
+        escrowEventType: TradeEventType.ESCROW_CONFIRMED,
+      }).catch(() => undefined)
       toast.success(t('tradeDetail.confirmSuccess'))
       refetchEscrow()
     } catch (err) {
-      toast.error(t('tradeDetail.confirmFailed', { message: (err as Error).message }))
+      toast.error(errorMessage(err, 'tradeDetail', t, 'confirmFailed'))
     } finally {
       setTxStage('idle')
     }
@@ -287,15 +333,24 @@ export function TradeDetailPage() {
       await publicClient!.waitForTransactionReceipt({ hash: txHash })
       // Mirror the terminal outcome: funds delivered to buyer.
       await updateTradeStatus(trade!.id, 'completed', {
-        escrowStatus: 'released',
+        escrowStatus: EscrowStatus.RELEASED,
         txHash,
+        escrowEventType: TradeEventType.ESCROW_RELEASED,
       }).catch(() => {
         /* non-fatal — the chain tx already happened */
       })
+      // Successful release bumps both parties' reputation slightly. The
+      // RPC clamps the overall score to [0,100].
+      if (trade) {
+        await Promise.allSettled([
+          updateUserReputation(trade.buyer_id, 3),
+          updateUserReputation(trade.seller_id, 3),
+        ])
+      }
       toast.success(t('tradeDetail.releaseSuccess'))
       refetchEscrow()
     } catch (err) {
-      toast.error(t('tradeDetail.releaseFailed', { message: (err as Error).message }))
+      toast.error(errorMessage(err, 'tradeDetail', t, 'releaseFailed'))
     } finally {
       setTxStage('idle')
     }
@@ -320,15 +375,25 @@ export function TradeDetailPage() {
         ruling === Ruling.AWARD_BUYER_PENALTY_SELLER ||
         ruling === Ruling.AWARD_BUYER_RETURN_DEPOSITS
       await updateTradeStatus(trade!.id, buyerWins ? 'refunded' : 'completed', {
-        escrowStatus: buyerWins ? 'refunded' : 'released',
+        escrowStatus: buyerWins ? EscrowStatus.REFUNDED : EscrowStatus.RELEASED,
         txHash,
+        escrowEventType: TradeEventType.ESCROW_RESOLVED,
       }).catch(() => {
         /* non-fatal — the chain tx already happened */
       })
+      // Reputation: small bump to the winner, small penalty to the loser.
+      if (trade) {
+        const winnerId = buyerWins ? trade.buyer_id : trade.seller_id
+        const loserId = buyerWins ? trade.seller_id : trade.buyer_id
+        await Promise.allSettled([
+          updateUserReputation(winnerId, 2),
+          updateUserReputation(loserId, -3),
+        ])
+      }
       toast.success(t('tradeDetail.rulingExecutedSuccess'))
       refetchEscrow()
     } catch (err) {
-      toast.error(t('tradeDetail.rulingExecutedFailed', { message: (err as Error).message }))
+      toast.error(errorMessage(err, 'tradeDetail', t, 'rulingExecutedFailed'))
     } finally {
       setTxStage('idle')
     }
@@ -348,22 +413,144 @@ export function TradeDetailPage() {
     !(escrowState?.sellerSecurityDeposited ?? false)
   const showBuyerConfirm =
     !!isBuyer && liveState === KlerosEscState.FUNDED
-  const graceEnd = useMemo(() => {
+
+  // CONFIRMED_PENDING: gate `release()` on the on-chain grace period having
+  // elapsed (`now >= confirmationTime + gracePeriod`). `confirmationTime` is
+  // zero until the buyer has actually called `confirm()`.
+  const nowSecsBig = useNowSecsBig()
+  const graceEndSeconds = useMemo(() => {
     if (!escrowState || liveState !== KlerosEscState.CONFIRMED_PENDING) return null
-    // CONFIRMED_PENDING only stores confirmationTime? — no, that's not in
-    // our escrowState slice. The full ABI would expose it; for the demo we
-    // re-read via a follow-up RPC if needed. For now, indicate "release
-    // available" without a precise countdown.
-    return null
+    if (escrowState.confirmationTime === 0n) return null
+    return escrowState.confirmationTime + escrowState.gracePeriod
   }, [escrowState, liveState])
+  const gracePeriodElapsed =
+    graceEndSeconds != null && nowSecsBig >= graceEndSeconds
   const showRelease =
-    liveState === KlerosEscState.CONFIRMED_PENDING
+    liveState === KlerosEscState.CONFIRMED_PENDING && gracePeriodElapsed === true
   const showExecuteRuling =
     liveState === KlerosEscState.RULING_RECEIVED
   const showRaiseDispute =
     (liveState === KlerosEscState.FUNDED ||
       liveState === KlerosEscState.CONFIRMED_PENDING) &&
     (isBuyer || isSeller)
+
+  // Funding-phase timelock cancel. Per KlerosEsc.cancelTrade():
+  //   buyer  → buyerSecurityDeposited && !fundsLocked && now >= buyerDepositTime + 1 day
+  //   seller → sellerSecurityDeposited && !buyerSecurityDeposited && now >= sellerDepositTime + 1 day
+  // We surface the button when the connected wallet could plausibly call it
+  // and let the contract revert if the timelock hasn't elapsed.
+  const nowSecsBig2 = useNowSecsBig()
+
+  const { showCancel } = useMemo(() => {
+    const buyerOk =
+      !!isBuyer &&
+      liveState === KlerosEscState.AWAITING_FUNDING &&
+      (escrowState?.buyerSecurityDeposited ?? false) &&
+      !(escrowState?.fundsLocked ?? false) &&
+      (escrowState?.buyerDepositTime ?? 0n) > 0n &&
+      nowSecsBig2 >= (escrowState?.buyerDepositTime ?? 0n) + CANCEL_TIMELOCK_SECONDS
+    const sellerOk =
+      !!isSeller &&
+      liveState === KlerosEscState.AWAITING_FUNDING &&
+      (escrowState?.sellerSecurityDeposited ?? false) &&
+      !(escrowState?.buyerSecurityDeposited ?? false) &&
+      (escrowState?.sellerDepositTime ?? 0n) > 0n &&
+      nowSecsBig2 >= (escrowState?.sellerDepositTime ?? 0n) + CANCEL_TIMELOCK_SECONDS
+    return { showCancel: buyerOk || sellerOk }
+  }, [
+    isBuyer,
+    isSeller,
+    liveState,
+    nowSecsBig2,
+    escrowState?.buyerSecurityDeposited,
+    escrowState?.fundsLocked,
+    escrowState?.buyerDepositTime,
+    escrowState?.sellerSecurityDeposited,
+    escrowState?.sellerDepositTime,
+  ])
+
+  const handleCancelTrade = async () => {
+    if (!escrowAddress) return
+    try {
+      setTxStage('confirming')
+      const txHash = await writeContractAsync({
+        address: escrowAddress,
+        abi: KLEROS_ESC_ABI as Abi,
+        functionName: 'cancelTrade',
+      })
+      setTxStage('mining')
+      await publicClient!.waitForTransactionReceipt({ hash: txHash })
+      // Funding-phase mutual cancel — both parties get their own deposits
+      // back (and seller gets tradeAmount back if it was locked). NOT a
+      // ruling; do not label this as 'refunded' (which means buyer-favorable
+      // dispute payout). Use EscrowStatus.CANCELLED.
+      await updateTradeStatus(trade!.id, 'cancelled', {
+        escrowStatus: EscrowStatus.CANCELLED,
+        txHash,
+        escrowEventType: TradeEventType.ESCROW_CANCELLED,
+      }).catch(() => undefined)
+      toast.success(t('tradeDetail.cancelSuccess'))
+      refetchEscrow()
+    } catch (err) {
+      toast.error(errorMessage(err, 'tradeDetail', t, 'cancelFailed'))
+    } finally {
+      setTxStage('idle')
+    }
+  }
+
+  // ── B-2: live refresh on counterparty actions ───────────────────────────
+  // The KlerosEsc emits events for every state transition. We mount the
+  // shared watcher here so counterparty `cancelTrade` / `release` / `lockFunds`
+  // / deposit events show up without a manual page refresh. Only relevant
+  // financing-phase + dispute-lifecycle events are dispatched by name.
+  useEscrowEventWatcher(escrowAddress, (name) => {
+    if (
+      name === 'Released' ||
+      name === 'TradeCancelled' ||
+      name === 'FundsReturned' ||
+      name === 'TradeFullyFunded' ||
+      name === 'BuyerSecurityDeposited' ||
+      name === 'SellerSecurityDeposited' ||
+      name === 'SellerFundsLocked' ||
+      name === 'Confirmed'
+    ) {
+      refetchEscrow()
+      // Mirror the financing-phase transition into Supabase so the trades
+      // list + dispute page see the new state immediately.
+      if (name === 'TradeFullyFunded') {
+        setTradeEscrowStatus(trade!.id, EscrowStatus.FUNDED, {
+          escrowEventType: TradeEventType.ESCROW_FUNDED,
+        }).catch(() => undefined)
+      } else if (name === 'Confirmed') {
+        setTradeEscrowStatus(trade!.id, EscrowStatus.CONFIRMED, {
+          escrowEventType: TradeEventType.ESCROW_CONFIRMED,
+        }).catch(() => undefined)
+      } else if (name === 'BuyerSecurityDeposited') {
+        upsertTradeEscrowStatus(
+          trade!.id,
+          EscrowStatus.BUYER_DEPOSITED,
+        ).catch(() => undefined)
+      } else if (
+        name === 'SellerSecurityDeposited' ||
+        name === 'SellerFundsLocked'
+      ) {
+        upsertTradeEscrowStatus(
+          trade!.id,
+          EscrowStatus.SELLER_DEPOSITED,
+        ).catch(() => undefined)
+      } else if (name === 'TradeCancelled') {
+        updateTradeStatus(trade!.id, 'cancelled', {
+          escrowStatus: EscrowStatus.CANCELLED,
+          escrowEventType: TradeEventType.ESCROW_CANCELLED,
+        }).catch(() => undefined)
+      } else if (name === 'Released') {
+        updateTradeStatus(trade!.id, 'completed', {
+          escrowStatus: EscrowStatus.RELEASED,
+          escrowEventType: TradeEventType.ESCROW_RELEASED,
+        }).catch(() => undefined)
+      }
+    }
+  })
 
   // ── Rating section ─────────────────────────────────────────────────────
   const { data: currentUser } = useCurrentUser()
@@ -653,11 +840,21 @@ export function TradeDetailPage() {
                   <Send className="w-4 h-4 mr-2" />
                 )}
                 {isTxBusy ? getTxLabel(t, txStage) : t('tradeDetail.releaseCrypto')}
-                {graceEnd && (
-                  <Timer className="w-3.5 h-3.5 ml-2 text-muted-foreground" />
-                )}
               </Button>
             )}
+            {!gracePeriodElapsed &&
+              liveState === KlerosEscState.CONFIRMED_PENDING &&
+              graceEndSeconds != null && (
+                <p className="text-xs text-muted-foreground text-center inline-flex items-center justify-center gap-1.5">
+                  <Timer className="w-3.5 h-3.5" />
+                  {t('tradeDetail.releaseAvailableIn', {
+                    seconds:
+                      graceEndSeconds > nowSecsBig
+                        ? (graceEndSeconds - nowSecsBig).toString()
+                        : '0',
+                  })}
+                </p>
+              )}
 
             {showExecuteRuling && (
               <Button
@@ -686,6 +883,22 @@ export function TradeDetailPage() {
                   <ShieldAlert className="w-4 h-4 mr-2" />
                   {t('tradeDetail.raiseDispute')}
                 </Link>
+              </Button>
+            )}
+
+            {showCancel && (
+              <Button
+                onClick={handleCancelTrade}
+                disabled={isTxBusy}
+                variant="ghost"
+                className="rounded-full text-muted-foreground hover:text-destructive"
+              >
+                {isTxBusy ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <XCircle className="w-4 h-4 mr-2" />
+                )}
+                {isTxBusy ? getTxLabel(t, txStage) : t('tradeDetail.cancelTrade')}
               </Button>
             )}
 

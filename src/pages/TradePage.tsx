@@ -25,6 +25,7 @@ import {
   isFactoryConfigured,
 } from '@/lib/contracts'
 import { parseUnits } from 'viem'
+import { errorMessage } from '@/lib/errorMessage'
 
 const CURRENCY_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
 const currencySymbol = (code: string) => CURRENCY_SYMBOLS[code] ?? ''
@@ -166,11 +167,50 @@ export function TradePage() {
       // The factory pins a single token; the escrow holds tradeAmount in base
       // units (wei-equivalent). Without this, amounts < 1 token were floored
       // to 0 / integers and every trade under-collateralized the escrow.
-      const tokenAddress = (await publicClient.readContract({
-        address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
-        abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
-        functionName: 'token',
-      })) as `0x${string}`
+      //
+      // Also read the pinned treasury + Kleros court configuration in the
+      // same round-trip so the server-side indexer / Trade list has the
+      // immutable escrow fields without re-reading the chain per row (B-10).
+      const factoryAddress = KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`
+      const [
+        tokenAddress,
+        treasuryAddress,
+        klerosCourtAddr,
+        klerosPart1,
+        klerosPart2,
+      ] = (await Promise.all([
+        publicClient.readContract({
+          address: factoryAddress,
+          abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
+          functionName: 'token',
+        }),
+        publicClient.readContract({
+          address: factoryAddress,
+          abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
+          functionName: 'treasury',
+        }),
+        publicClient.readContract({
+          address: factoryAddress,
+          abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
+          functionName: 'klerosCourt',
+        }),
+        publicClient.readContract({
+          address: factoryAddress,
+          abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
+          functionName: 'klerosExtraDataPart1',
+        }),
+        publicClient.readContract({
+          address: factoryAddress,
+          abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
+          functionName: 'klerosExtraDataPart2',
+        }),
+      ])) as [
+        `0x${string}`,
+        `0x${string}`,
+        `0x${string}`,
+        `0x${string}`,
+        `0x${string}`,
+      ]
       const decimals = (await publicClient.readContract({
         address: tokenAddress,
         abi: ERC20_ABI as Abi,
@@ -246,7 +286,11 @@ export function TradePage() {
         throw new Error(t('trade.errorFailedToDeploy'))
       }
 
-      // Persist the trade to Supabase with on-chain metadata.
+      // Persist the trade to Supabase with on-chain metadata. B-10: also write
+      //   - treasury_address (fee recipient; was always NULL before)
+//   - creator (msg.sender of createEscrow)
+//   - kleros_court_addr + extraData parts (so the indexer / trades list can
+//     skip the on-chain multicall for these immutable per-escrow fields)
       setStage('saving')
       const trade = await createTrade({
         offer_id: offer.id,
@@ -260,18 +304,21 @@ export function TradePage() {
         payment_method: paymentMethod,
         payment_details: {},
         platform_fee_bps: Number(offer.platform_fee_bps) || 50,
+        treasury_address: treasuryAddress,
         taker_role: isMakerBuyer ? 'seller' : 'buyer',
         // The Trade type already has `escrow_contract_addr` (string | null).
         escrow_contract_addr: deployedAddress,
+        creator: address,
+        kleros_court_addr: klerosCourtAddr,
+        kleros_extra_data_part1: klerosPart1,
+        kleros_extra_data_part2: klerosPart2,
       })
 
       toast.success(t('trade.successDeployed'))
       navigate(`/app/trades/${trade.id}`)
     } catch (error) {
       console.error('Error opening trade:', error)
-      toast.error(
-        error instanceof Error ? error.message : t('trade.errorGeneric'),
-      )
+      toast.error(errorMessage(error, 'trade', t, 'errorFailedToDeploy'))
     } finally {
       setStage('idle')
     }

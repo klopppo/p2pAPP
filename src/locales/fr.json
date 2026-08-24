@@ -139,6 +139,16 @@
     "completionRate": "Taux de complétion",
     "verification": "Vérification",
     "reputation": "Réputation",
+    "ratingsBreakdown": "Détail des évaluations",
+    "noRatingsYet": "Aucune évaluation pour le moment.",
+    "noReputationYet": "Aucune activité de réputation.",
+    "repTrustworthiness": "Fiabilité",
+    "repReliability": " Constance",
+    "repCommunication": "Communication",
+    "repSpeed": "Rapidité",
+    "repProfessionalism": "Professionnalisme",
+    "repPointsEarned": "Points gagnés",
+    "repPointsLost": "Points perdus",
     "yourActiveOffers": "Vos offres actives",
     "activeOffers": "Offres actives",
     "noActiveOffers": "Aucune offre active.",
@@ -286,6 +296,7 @@
     "executeRuling": "Exécuter la décision",
     "finalizeEscrow": "Finaliser le séquestre",
     "timeoutDispute": "Expirer le litige (30j)",
+    "appeal": "Faire appel",
     "backToDisputesButton": "Retour aux litiges",
     "connectWalletDescription": "Connectez le portefeuille de l'acheteur ou du vendeur pour interagir avec ce litige.",
     "rulingExecuted": "Décision exécutée — fonds distribués selon Kleros.",
@@ -294,6 +305,8 @@
     "escrowFinalizedError": "Échec de la finalisation : {{message}}",
     "disputeTimedOut": "Expiration du litige — règle par défaut appliquée.",
     "disputeTimedOutError": "Échec de l'expiration : {{message}}",
+    "appealFunded": "Appel financé — nouvelle tour Kleros en cours.",
+    "appealFundedError": "Échec de l'appel : {{message}}",
     "onChainDisclaimer": "Le clone KlerosEsc et le tribunal Kleros sont la source de vérité. La ligne Supabase reflète l'état on-chain pour un affichage rapide et pour stocker les CID IPFS qui ne tiennent pas on-chain.",
     "refused": "Refusé (annulation automatique)",
     "buyerWinsPenalty": "L'acheteur gagne, caution du vendeur confisquée",
@@ -442,7 +455,10 @@
     "releaseSuccess": "Échange libéré — fonds distribués.",
     "releaseFailed": "Échec de la libération : {{message}}",
     "rulingExecutedSuccess": "Décision exécutée — échange résolu.",
-    "rulingExecutedFailed": "Échec de l'exécution de la décision : {{message}}"
+    "rulingExecutedFailed": "Échec de l'exécution de la décision : {{message}}",
+    "cancelTrade": "Annuler (contrepartie inactive)",
+    "cancelSuccess": "Échange annulé — cautions restituées.",
+    "cancelFailed": "Échec de l'annulation : {{message}}"
   },
   "editProfile": {
     "title": "Modifier le profil",
@@ -514,7 +530,6 @@
     "stageSubmittingEvidence": "Soumission des preuves…",
     "stageSaving": "Enregistrement du litige…",
     "errorConnectWallet": "Connectez votre portefeuille pour déposer un litige.",
-    "errorFactoryNotReady": "Adresse de la factory non configurée (VITE_KLEROS_ESCROW_FACTORY).",
     "errorPickEscrow": "Sélectionnez un séquestre à contester.",
     "errorUploadProof": "Téléchargez au moins une image de preuve.",
     "errorRpcClient": "Le client RPC public n'est pas prêt. Veuillez réessayer.",
@@ -602,5 +617,17 @@
     "blockscan": "Blockscan",
     "eth": "ETH",
     "backTo": "Retour à {{target}}"
+  },
+  "errors": {
+    "cancelledByUser": "Annulé — aucune transaction envoyée.",
+    "networkError": "Erreur réseau — veuillez réessayer.",
+    "reverted": "Transaction annulée : {{reason}}",
+    "fallback": "Une erreur est survenue — réessayez."
+  },
+  "chainGuard": {
+    "title": "Mauvais réseau",
+    "description": "Votre portefeuille est sur la mauvaise chaîne EVM. Basculez vers {{chain}} pour continuer.",
+    "switchCta": "Basculer vers {{chain}}",
+    "switchError": "Bascule impossible : {{message}}"
   }
 }

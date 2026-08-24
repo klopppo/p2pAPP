@@ -139,6 +139,16 @@
     "completionRate": "Tasa de finalización",
     "verification": "Verificación",
     "reputation": "Reputación",
+    "ratingsBreakdown": "Desglose de calificaciones",
+    "noRatingsYet": "Aún no hay calificaciones.",
+    "noReputationYet": "Aún no hay actividad de reputación.",
+    "repTrustworthiness": "Fiabilidad",
+    "repReliability": "Confiabilidad",
+    "repCommunication": "Comunicación",
+    "repSpeed": "Velocidad",
+    "repProfessionalism": "Profesionalismo",
+    "repPointsEarned": "Puntos ganados",
+    "repPointsLost": "Puntos perdidos",
     "yourActiveOffers": "Sus ofertas activas",
     "activeOffers": "Ofertas activas",
     "noActiveOffers": "No hay ofertas activas.",
@@ -286,6 +296,7 @@
     "executeRuling": "Ejecutar fallo",
     "finalizeEscrow": "Finalizar custodia",
     "timeoutDispute": "Tiempo de espera de disputa (30d)",
+    "appeal": "Apelar el fallo",
     "backToDisputesButton": "Volver a disputas",
     "connectWalletDescription": "Conecte la billetera del comprador o vendedor para interactuar con esta disputa.",
     "rulingExecuted": "Fallo ejecutado — fondos distribuidos según Kleros.",
@@ -294,6 +305,8 @@
     "escrowFinalizedError": "Error al finalizar: {{message}}",
     "disputeTimedOut": "La disputa expiró — se aplicó la regla predeterminada.",
     "disputeTimedOutError": "Error en el tiempo de espera: {{message}}",
+    "appealFunded": "Apelación financiada — nueva ronda de Kleros en curso.",
+    "appealFundedError": "Error en la apelación: {{message}}",
     "onChainDisclaimer": "El clon de KlerosEsc y el tribunal de Kleros son la fuente de verdad. La fila de Supabase refleja el estado en cadena para el listado rápido y para almacenar CID de IPFS que no caben en cadena.",
     "refused": "Rechazada (cancelación automática)",
     "buyerWinsPenalty": "El comprador gana, depósito del vendedor confiscado",
@@ -442,7 +455,10 @@
     "releaseSuccess": "Operación liberada — fondos distribuidos.",
     "releaseFailed": "Error al liberar: {{message}}",
     "rulingExecutedSuccess": "Fallo ejecutado — operación resuelta.",
-    "rulingExecutedFailed": "Error al ejecutar el fallo: {{message}}"
+    "rulingExecutedFailed": "Error al ejecutar el fallo: {{message}}",
+    "cancelTrade": "Cancelar (contraparte inactiva)",
+    "cancelSuccess": "Operación cancelada — depósitos devueltos.",
+    "cancelFailed": "Cancelación fallida: {{message}}"
   },
   "editProfile": {
     "title": "Editar perfil",
@@ -514,7 +530,6 @@
     "stageSubmittingEvidence": "Enviando evidencia…",
     "stageSaving": "Guardando disputa…",
     "errorConnectWallet": "Conecte su billetera para presentar una disputa.",
-    "errorFactoryNotReady": "Dirección de fábrica no configurada (VITE_KLEROS_ESCROW_FACTORY).",
     "errorPickEscrow": "Seleccione una custodia para disputar.",
     "errorUploadProof": "Suba al menos una imagen de prueba.",
     "errorRpcClient": "El cliente RPC público no está listo. Inténtelo de nuevo.",
@@ -602,5 +617,17 @@
     "blockscan": "Blockscan",
     "eth": "ETH",
     "backTo": "Volver a {{target}}"
+  },
+  "errors": {
+    "cancelledByUser": "Cancelado — no se envió ninguna transacción.",
+    "networkError": "Error de red — reintente por favor.",
+    "reverted": "Transacción revertida: {{reason}}",
+    "fallback": "Algo salió mal — inténtelo de nuevo."
+  },
+  "chainGuard": {
+    "title": "Red incorrecta",
+    "description": "Tu billetera está en la cadena EVM equivocada. Cambia a {{chain}} para continuar.",
+    "switchCta": "Cambiar a {{chain}}",
+    "switchError": "No se pudo cambiar automáticamente: {{message}}"
   }
 }

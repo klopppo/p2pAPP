@@ -3,6 +3,31 @@ import { http } from 'wagmi'
 import { mainnet, sepolia } from 'wagmi/chains'
 
 /**
+ * Validate that `VITE_EXPECTED_CHAIN_ID` matches a chain the wagmi config
+ * actually supports. If the env var is set to a chain we haven't added
+ * below, the `switchChain()` call from ChainGuard will silently fail with
+ * "Chain not configured." catching that early means the developer can
+ * fix it instead of debugging a confusing revert downstream.
+ */
+const expectedChainIdEnv = import.meta.env.VITE_EXPECTED_CHAIN_ID?.trim()
+const expectedChainId = expectedChainIdEnv ? Number(expectedChainIdEnv) : null
+
+const SUPPORTED_CHAINS = [mainnet, sepolia] as const
+
+if (
+  expectedChainId != null &&
+  Number.isFinite(expectedChainId) &&
+  expectedChainId > 0 &&
+  !SUPPORTED_CHAINS.some((c) => c.id === expectedChainId)
+) {
+  console.error(
+    `[wagmi] VITE_EXPECTED_CHAIN_ID=${expectedChainId} is not in the supported chains ` +
+      `list (${SUPPORTED_CHAINS.map((c) => `${c.id}=${c.name}`).join(', ')}). ` +
+      `Add the missing chain to src/wagmi.ts or pick a supported id.`,
+  )
+}
+
+/**
  * WalletConnect project id.
  *
  * Required for WalletConnect (mobile wallets, QR pairing, WC-based flows) to
@@ -41,3 +66,11 @@ export const config = getDefaultConfig({
     [sepolia.id]: http(),
   },
 })
+
+/**
+ * Surface the deployed-factory chain early so the ChainGuard banner can
+ * read it. We keep this list intentionally small (the two chains the
+ * factory ever ships to); adding Polygon etc. means importing more wagmi
+ * chains here AND setting `VITE_EXPECTED_CHAIN_ID` to that network.
+ */
+export const supportedChainIds = new Set<number>([mainnet.id, sepolia.id])
