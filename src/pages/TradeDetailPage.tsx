@@ -429,10 +429,20 @@ export function TradeDetailPage() {
     liveState === KlerosEscState.CONFIRMED_PENDING && gracePeriodElapsed === true
   const showExecuteRuling =
     liveState === KlerosEscState.RULING_RECEIVED
+  // raiseDispute is callable from FUNDED (no grace window) and from
+  // CONFIRMED_PENDING while still inside the grace window. After the
+  // grace window closes (now >= confirmationTime + gracePeriod),
+  // KlerosEsc.raiseDispute reverts with DisputeWindowClosed() — we
+  // mirror that boundary here so the user doesn't click into a
+  // guaranteed revert.
+  const disputeWindowClosed =
+    liveState === KlerosEscState.CONFIRMED_PENDING &&
+    gracePeriodElapsed === true
   const showRaiseDispute =
     (liveState === KlerosEscState.FUNDED ||
       liveState === KlerosEscState.CONFIRMED_PENDING) &&
-    (isBuyer || isSeller)
+    (isBuyer || isSeller) &&
+    !disputeWindowClosed
 
   // Funding-phase timelock cancel. Per KlerosEsc.cancelTrade():
   //   buyer  → buyerSecurityDeposited && !fundsLocked && now >= buyerDepositTime + 1 day
