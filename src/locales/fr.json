@@ -164,7 +164,8 @@
     "last30Days": "30 derniers jours",
     "trades": "Échanges",
     "volume": "Volume",
-    "totalVolume": "Volume total"
+    "totalVolume": "Volume total",
+    "loading": "Chargement…"
   },
   "trades": {
     "title": "Échanges",
@@ -203,7 +204,9 @@
     "escrowPendingRelease": "En attente de libération",
     "escrowDisputed": "En litige",
     "escrowReleased": "Libéré",
-    "escrowRefunded": "Remboursé"
+    "escrowRefunded": "Remboursé",
+    "escrowFunded": "Financé",
+    "escrowCancelled": "Annulé"
   },
   "chat": {
     "messages": "Messages",
@@ -328,7 +331,13 @@
     "closed": "Fermé",
     "buyer": "Acheteur",
     "seller": "Vendeur",
-    "tradeAmount": "Montant de l'échange"
+    "tradeAmount": "Montant de l'échange",
+    "submitEvidence": "Soumettre une preuve",
+    "submitMoreEvidence": "Soumettre plus de preuves",
+    "submittingEvidence": "Soumission de la preuve…",
+    "evidenceRound": "Tour {{n}}",
+    "evidenceSubmittedSuccess": "Preuve soumise",
+    "evidenceSubmittedError": "Échec de la soumission de la preuve"
   },
   "openOffer": {
     "viewOffer": "Voir l'offre",
@@ -458,7 +467,9 @@
     "rulingExecutedFailed": "Échec de l'exécution de la décision : {{message}}",
     "cancelTrade": "Annuler (contrepartie inactive)",
     "cancelSuccess": "Échange annulé — cautions restituées.",
-    "cancelFailed": "Échec de l'annulation : {{message}}"
+    "cancelFailed": "Échec de l'annulation : {{message}}",
+    "releaseAvailableIn": "Libération disponible dans {{seconds}}",
+    "tradeRemovedOrNoAccess": "Cet échange a peut-être été supprimé ou vous n'y avez pas accès."
   },
   "editProfile": {
     "title": "Modifier le profil",
@@ -484,7 +495,15 @@
     "saveChanges": "Enregistrer les modifications",
     "errorConnectWallet": "Connectez d'abord votre portefeuille",
     "successSaved": "Profil enregistré",
-    "errorSaveFailed": "Échec de l'enregistrement du profil"
+    "errorSaveFailed": "Échec de l'enregistrement du profil",
+    "avatar": "Photo de profil",
+    "avatarHint": "Cliquez sur la photo pour en télécharger une nouvelle (max 5 Mo)",
+    "avatarUploaded": "Photo de profil téléchargée",
+    "avatarUploadError": "Échec du téléchargement de la photo",
+    "avatarUploading": "Téléchargement…",
+    "avatarTypeError": "Veuillez choisir une image",
+    "avatarSizeError": "L'image doit faire 5 Mo ou moins",
+    "removeAvatar": "Supprimer la photo"
   },
   "disputePage": {
     "title": "Ouvrir un litige",
@@ -546,7 +565,7 @@
     "rejectAll": "Tout refuser",
     "allowAll": "Tout autoriser",
     "preferencesTitle": "Préférences de cookies",
-    "preferencesDescription": "Gérez vos préférences de cookies. Les cookies nécessaires sont toujours activés car ils sont essentiels au bon fonctionnement du site.",
+    "preferencesDescription": "Mémorisent vos paramètres et choix pour une meilleure expérience.",
     "back": "Retour",
     "savePreferences": "Enregistrer les préférences",
     "necessary": "Nécessaires",
@@ -555,8 +574,7 @@
     "analyticsDescription": "Nous aident à comprendre comment les visiteurs interagissent avec le site.",
     "marketing": "Marketing",
     "marketingDescription": "Utilisés pour diffuser des publicités pertinentes et suivre les performances des campagnes.",
-    "preferences": "Préférences",
-    "preferencesDescription": "Mémorisent vos paramètres et choix pour une meilleure expérience."
+    "preferences": "Préférences"
   },
   "wallet": {
     "connectWallet": "Connecter le portefeuille",

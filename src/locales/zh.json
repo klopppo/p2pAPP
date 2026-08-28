@@ -164,7 +164,8 @@
     "last30Days": "近 30 天",
     "trades": "交易",
     "volume": "交易量",
-    "totalVolume": "总交易量"
+    "totalVolume": "总交易量",
+    "loading": "加载中…"
   },
   "trades": {
     "title": "交易",
@@ -203,7 +204,9 @@
     "escrowPendingRelease": "等待释放",
     "escrowDisputed": "争议中",
     "escrowReleased": "已释放",
-    "escrowRefunded": "已退款"
+    "escrowRefunded": "已退款",
+    "escrowFunded": "已全额资助",
+    "escrowCancelled": "已取消"
   },
   "chat": {
     "messages": "消息",
@@ -328,7 +331,13 @@
     "closed": "已关闭",
     "buyer": "买家",
     "seller": "卖家",
-    "tradeAmount": "交易金额"
+    "tradeAmount": "交易金额",
+    "submitEvidence": "提交证据",
+    "submitMoreEvidence": "提交更多证据",
+    "submittingEvidence": "正在提交证据…",
+    "evidenceRound": "第 {{n}} 轮",
+    "evidenceSubmittedSuccess": "证据已提交",
+    "evidenceSubmittedError": "提交证据失败"
   },
   "openOffer": {
     "viewOffer": "查看报价",
@@ -458,7 +467,9 @@
     "rulingExecutedFailed": "执行裁决失败：{{message}}",
     "cancelTrade": "取消（对方未响应）",
     "cancelSuccess": "交易已取消——保证金已退还。",
-    "cancelFailed": "取消失败：{{message}}"
+    "cancelFailed": "取消失败：{{message}}",
+    "releaseAvailableIn": "{{seconds}} 后可释放",
+    "tradeRemovedOrNoAccess": "此交易可能已被移除或您没有访问权限。"
   },
   "editProfile": {
     "title": "编辑资料",
@@ -484,7 +495,15 @@
     "saveChanges": "保存更改",
     "errorConnectWallet": "请先连接钱包",
     "successSaved": "资料已保存",
-    "errorSaveFailed": "保存资料失败"
+    "errorSaveFailed": "保存资料失败",
+    "avatar": "头像",
+    "avatarHint": "点击图片上传新头像（5MB 以内）",
+    "avatarUploaded": "头像已上传",
+    "avatarUploadError": "上传头像失败",
+    "avatarUploading": "上传中…",
+    "avatarTypeError": "请选择图片文件",
+    "avatarSizeError": "图片大小不能超过 5MB",
+    "removeAvatar": "移除头像"
   },
   "disputePage": {
     "title": "发起争议",
@@ -546,7 +565,7 @@
     "rejectAll": "全部拒绝",
     "allowAll": "全部允许",
     "preferencesTitle": "Cookie 偏好设置",
-    "preferencesDescription": "管理您的 Cookie 偏好。必要 Cookie 始终启用，因为它们对网站正常运行至关重要。",
+    "preferencesDescription": "记住您的设置和选择，以提供更好的体验。",
     "back": "返回",
     "savePreferences": "保存偏好",
     "necessary": "必要",
@@ -555,8 +574,7 @@
     "analyticsDescription": "帮助我们了解访客如何与网站互动。",
     "marketing": "营销",
     "marketingDescription": "用于投放相关广告和跟踪营销活动效果。",
-    "preferences": "偏好",
-    "preferencesDescription": "记住您的设置和选择，以提供更好的体验。"
+    "preferences": "偏好"
   },
   "wallet": {
     "connectWallet": "连接钱包",

@@ -164,7 +164,8 @@
     "last30Days": "Son 30 Gün",
     "trades": "İşlemler",
     "volume": "Hacim",
-    "totalVolume": "Toplam Hacim"
+    "totalVolume": "Toplam Hacim",
+    "loading": "Yükleniyor…"
   },
   "trades": {
     "title": "İşlemler",
@@ -203,7 +204,9 @@
     "escrowPendingRelease": "Serbest bırakma bekleniyor",
     "escrowDisputed": "Uyuşmazlıkta",
     "escrowReleased": "Serbest bırakıldı",
-    "escrowRefunded": "İade edildi"
+    "escrowRefunded": "İade edildi",
+    "escrowFunded": "Fonlandı",
+    "escrowCancelled": "İptal edildi"
   },
   "chat": {
     "messages": "Mesajlar",
@@ -328,7 +331,13 @@
     "closed": "Kapatıldı",
     "buyer": "Alıcı",
     "seller": "Satıcı",
-    "tradeAmount": "İşlem tutarı"
+    "tradeAmount": "İşlem tutarı",
+    "submitEvidence": "Kanıt gönder",
+    "submitMoreEvidence": "Daha fazla kanıt gönder",
+    "submittingEvidence": "Kanıt gönderiliyor…",
+    "evidenceRound": "Tur {{n}}",
+    "evidenceSubmittedSuccess": "Kanıt gönderildi",
+    "evidenceSubmittedError": "Kanıt gönderilemedi"
   },
   "openOffer": {
     "viewOffer": "Teklifi Görüntüle",
@@ -458,7 +467,9 @@
     "rulingExecutedFailed": "Karar uygulanamadı: {{message}}",
     "cancelTrade": "İptal (karşı taraf yanıt vermiyor)",
     "cancelSuccess": "İşlem iptal edildi — depozitolar iade edildi.",
-    "cancelFailed": "İptal başarısız: {{message}}"
+    "cancelFailed": "İptal başarısız: {{message}}",
+    "releaseAvailableIn": "Serbest bırakma {{seconds}} içinde",
+    "tradeRemovedOrNoAccess": "Bu işlem kaldırılmış olabilir veya erişim yetkiniz olmayabilir."
   },
   "editProfile": {
     "title": "Profili Düzenle",
@@ -484,7 +495,15 @@
     "saveChanges": "Değişiklikleri Kaydet",
     "errorConnectWallet": "Önce cüzdanınızı bağlayın",
     "successSaved": "Profil kaydedildi",
-    "errorSaveFailed": "Profil kaydedilemedi"
+    "errorSaveFailed": "Profil kaydedilemedi",
+    "avatar": "Profil fotoğrafı",
+    "avatarHint": "Yeni bir fotoğraf yüklemek için fotoğrafa tıklayın (en fazla 5MB)",
+    "avatarUploaded": "Profil fotoğrafı yüklendi",
+    "avatarUploadError": "Fotoğraf yüklenemedi",
+    "avatarUploading": "Yükleniyor…",
+    "avatarTypeError": "Lütfen bir görsel dosyası seçin",
+    "avatarSizeError": "Görsel en fazla 5MB olmalı",
+    "removeAvatar": "Fotoğrafı kaldır"
   },
   "disputePage": {
     "title": "Uyuşmazlık Aç",
@@ -546,7 +565,7 @@
     "rejectAll": "Tümünü Reddet",
     "allowAll": "Tümüne İzin Ver",
     "preferencesTitle": "Çerez Tercihleri",
-    "preferencesDescription": "Çerez tercihlerinizi yönetin. Gerekli çerezler, sitenin düzgün çalışması için gerekli olduğundan her zaman etkindir.",
+    "preferencesDescription": "Daha iyi bir deneyim için ayarlarınızı ve seçimlerinizi hatırlar.",
     "back": "Geri",
     "savePreferences": "Tercihleri Kaydet",
     "necessary": "Gerekli",
@@ -555,8 +574,7 @@
     "analyticsDescription": "Ziyaretçilerin siteyle nasıl etkileşimde bulunduğunu anlamamıza yardımcı olur.",
     "marketing": "Pazarlama",
     "marketingDescription": "İlgili reklamları sunmak ve kampanya performansını takip etmek için kullanılır.",
-    "preferences": "Tercihler",
-    "preferencesDescription": "Daha iyi bir deneyim için ayarlarınızı ve seçimlerinizi hatırlar."
+    "preferences": "Tercihler"
   },
   "wallet": {
     "connectWallet": "Cüzdan Bağla",

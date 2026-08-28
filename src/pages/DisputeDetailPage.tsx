@@ -985,37 +985,61 @@ export function DisputeDetailPage() {
           <Text variant="h4" className="font-bold mb-2">
             {t('disputeDetail.legacyEvidence')}
           </Text>
-          <ul className="space-y-2">
-            {evidenceRows.map((row) => (
-              <li
-                key={row.id}
-                className="flex items-center gap-2 text-sm rounded-lg border border-border bg-background/60 px-3 py-2"
-              >
-                <span className="text-muted-foreground text-xs">
-                  {row.submitted_by ?? 'unknown'}
-                </span>
-                <span className="text-xs text-muted-foreground shrink-0">
-                  round {row.evidence_group_id ?? 0}
-                </span>
-                <span className="font-mono truncate flex-1">
-                  {(row.ipfs_cid ?? '').slice(0, 18)}…
-                </span>
-                {row.tx_hash && (
-                  <a
-                    href={`https://etherscan.io/tx/${row.tx_hash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-primary hover:underline shrink-0"
-                  >
-                    tx
-                  </a>
-                )}
-                <span className="text-xs text-muted-foreground">
-                  {formatDateTime(row.submitted_at)}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {evidenceRows.map((row) => {
+              const src = row.ipfs_url || (row.ipfs_cid ? `${GATEWAY}/${row.ipfs_cid}` : null)
+              return (
+                <div
+                  key={row.id}
+                  className="rounded-xl overflow-hidden border border-border bg-background/60"
+                >
+                  {src ? (
+                    <a
+                      href={src}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block group"
+                    >
+                      <div className="aspect-square">
+                        <img
+                          src={src}
+                          alt={row.submitted_by ?? 'evidence'}
+                          loading="lazy"
+                          className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
+                        />
+                      </div>
+                    </a>
+                  ) : (
+                    <div className="flex items-center justify-center aspect-square text-muted-foreground">
+                      <ImageIcon className="w-6 h-6" />
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 px-2 py-1.5 text-xs">
+                    <span className="text-muted-foreground capitalize shrink-0">
+                      {row.submitted_by ?? 'unknown'}
+                    </span>
+                    <span className="text-muted-foreground shrink-0">
+                      {t('disputeDetail.evidenceRound', { n: Number(row.evidence_group_id ?? 0) })}
+                    </span>
+                    {row.tx_hash && (
+                      <a
+                        href={`https://etherscan.io/tx/${row.tx_hash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline inline-flex items-center gap-0.5 shrink-0"
+                      >
+                        tx
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                    <span className="text-muted-foreground ml-auto truncate">
+                      {formatDateTime(row.submitted_at)}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </Card>
       )}
 

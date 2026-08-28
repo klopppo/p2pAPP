@@ -369,20 +369,19 @@ export function ProfilePage() {
                 <TableHead className="text-right">
                   <SortableHeader label={t('profile.tableMaxAmount')} sortField="maxAmount" sortKey={sortKey} onToggle={toggleSort} />
                 </TableHead>
-                <TableHead>{t('profile.tableAction')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {offersLoading ? (
                 <TableRow className="border-b border-border/50">
-                  <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
                     <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />
                     {t('profile.loadingOffers')}
                   </TableCell>
                 </TableRow>
               ) : filteredOffers.length === 0 ? (
                 <TableRow className="border-b border-border/50">
-                  <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
                     {t('profile.noActiveOffers')}{isOwnProfile && <Button className="rounded-full shadow-none ml-2" onClick={() => navigate('/app/create-offer')}>{t('profile.createOne')}</Button>}
                   </TableCell>
                 </TableRow>
@@ -402,11 +401,6 @@ export function ProfilePage() {
                     <TableCell className="text-right font-mono">{offer.priceDisplay}</TableCell>
                     <TableCell className="text-right font-mono">{offer.currency}{offer.minAmount.toLocaleString()}</TableCell>
                     <TableCell className="text-right font-mono">{offer.currency}{offer.maxAmount.toLocaleString()}</TableCell>
-                    <TableCell>
-                      <Button size="sm" className="rounded-full shadow-none" onClick={(e) => { e.stopPropagation(); navigate(`/app/offer/${offer.id}/edit`) }}>
-                        Edit
-                      </Button>
-                    </TableCell>
                   </TableRow>
                 ))
               )}

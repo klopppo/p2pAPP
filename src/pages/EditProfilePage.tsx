@@ -11,14 +11,17 @@ import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Pencil, Loader2 } from 'lucide-react'
+import { Pencil, Loader2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useUserProfile } from '@/hooks/useOffers'
 import { updateUserProfile } from '@/lib/supabase'
+import { uploadToIpfs } from '@/lib/ipfs'
+
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024
 
 interface ProfileForm {
   nickname: string
-  avatarUrl: string
+  avatarUrl: string | null
   bio: string
   location: string
   website: string
@@ -47,8 +50,11 @@ export function EditProfilePage() {
 
   const [form, setForm] = useState<ProfileForm>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const hydrated = useRef(false)
   const wasOnboarding = useRef(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
 
   useEffect(() => {
     if (!profile || hydrated.current) return
@@ -66,8 +72,51 @@ export function EditProfilePage() {
     })
   }, [profile])
 
+  useEffect(() => {
+    return () => {
+      if (avatarPreview) URL.revokeObjectURL(avatarPreview)
+    }
+  }, [avatarPreview])
+
   const update = <K extends keyof ProfileForm>(key: K, value: ProfileForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }))
+
+  const handleAvatarFile = async (file: File | undefined) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error(t('editProfile.avatarTypeError'))
+      return
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      toast.error(t('editProfile.avatarSizeError'))
+      return
+    }
+    setUploadingAvatar(true)
+    try {
+      const previewUrl = URL.createObjectURL(file)
+      setAvatarPreview(previewUrl)
+      const uploaded = await uploadToIpfs(file, file.name)
+      setForm((prev) => ({ ...prev, avatarUrl: uploaded.url }))
+      toast.success(t('editProfile.avatarUploaded'))
+    } catch (err) {
+      console.error('[EditProfilePage] avatar upload failed:', err)
+      setAvatarPreview(null)
+      toast.error(t('editProfile.avatarUploadError'))
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
+
+  const handleRemoveAvatar = () => {
+    setForm((prev) => ({ ...prev, avatarUrl: null }))
+    if (avatarPreview) {
+      URL.revokeObjectURL(avatarPreview)
+      setAvatarPreview(null)
+    }
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const currentAvatarSrc = avatarPreview ?? (form.avatarUrl || undefined)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -141,14 +190,53 @@ export function EditProfilePage() {
         <form onSubmit={handleSubmit} className="space-y-3">
           <Card className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl">
             <div className="flex items-center gap-6 mb-4">
-              <div className="relative group cursor-pointer">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage src={form.avatarUrl || undefined} />
-                  <AvatarFallback>{(form.nickname.slice(0, 2) || '??').toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Pencil className="w-5 h-5 text-white" />
+              <div className="flex flex-col items-center gap-2">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => fileInputRef.current?.click()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      fileInputRef.current?.click()
+                    }
+                  }}
+                  className="relative group cursor-pointer"
+                >
+                  <Avatar className="h-24 w-24">
+                    <AvatarImage src={currentAvatarSrc} />
+                    <AvatarFallback>{(form.nickname.slice(0, 2) || '??').toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    {uploadingAvatar ? (
+                      <Loader2 className="w-5 h-5 text-white animate-spin" />
+                    ) : (
+                      <Pencil className="w-5 h-5 text-white" />
+                    )}
+                  </div>
                 </div>
+                {form.avatarUrl && !uploadingAvatar && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="rounded-full text-muted-foreground h-7 px-2 text-xs"
+                    onClick={handleRemoveAvatar}
+                  >
+                    <Trash2 className="w-3 h-3 mr-1" />
+                    {t('editProfile.removeAvatar')}
+                  </Button>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleAvatarFile(e.target.files?.[0])}
+                />
+                <p className="text-xs text-muted-foreground text-center max-w-[9rem]">
+                  {t('editProfile.avatarHint')}
+                </p>
               </div>
               <div className="flex-1 flex flex-col gap-3">
                 <div>

@@ -9,6 +9,43 @@
 
 ---
 
+## Profile avatar upload + UX/parity fixes — 2026-08-28
+
+Closed the P0 avatar gap and the P1 surface issues found in the end-to-end
+flow audit (offers → trade → escrow → dispute → profile).
+
+**Avatar upload (P0)** — `EditProfilePage.tsx`
+- The hover "pencil" overlay now acts as a real upload trigger: clicking the
+  avatar (or tabbing + Enter) opens a hidden `<input type="file" accept="image/*">`.
+- Validates MIME type + ≤5MB, uploads via `uploadToIpfs` (the same Helia path
+  used by the dispute flow), shows a live preview via `URL.createObjectURL`
+  with a spinner, and persists the gateway URL into `users.avatar_url` (the
+  `updateUserProfile` data layer already handled `avatarUrl`).
+- Added a "Remove picture" action and an object-URL cleanup effect.
+- New i18n keys `editProfile.avatar*` / `removeAvatar` in all 5 locales.
+
+**Dispute evidence gallery (P1)** — `DisputeDetailPage.tsx`
+- The image gallery previously read `parsed.evidence` from the `description`
+  blob, which the create-flow never populates — so images never rendered.
+- The `dispute_evidence` section now renders an actual `<img>` gallery built
+  from each row's `ipfs_url` (`ipfs_cid` gateway fallback), keeping round,
+  submitter, timestamp and Etherscan tx deep-link metadata.
+
+**Missing i18n keys (P1)** — all 5 locales (`en/es/fr/tr/zh`)
+- Added 11 previously-missing keys that were rendering as raw strings:
+  `disputeDetail.{submitEvidence,submitMoreEvidence,submittingEvidence,evidenceRound,evidenceSubmittedSuccess,evidenceSubmittedError}`, `profile.loading`, `tradeDetail.{releaseAvailableIn,tradeRemovedOrNoAccess}`, `trades.{escrowFunded,escrowCancelled}`.
+- Verified programmatically: no key drift across locales; `releaseAvailableIn`
+  interpolation uses `{{seconds}}` to match `TradeDetailPage.tsx:860`.
+
+**Dead "Edit offer" button (P1)** — `ProfilePage.tsx`
+- Removed the offer-row Edit button that navigated to a non-existent
+  `/app/offer/:id/edit` route, plus the now-empty Action column header and the
+  `colSpan` 6→5 empty-state cells.
+
+**Verification**: `npm run typecheck` clean, `npm run build` clean (only
+pre-existing `INVALID_ANNOTATION`/chunk-size warnings from `node_modules`),
+ESLint clean on all touched files.
+
 ## Debug checklist pass — 2026-08-24
 
 Closed the three gaps from the cross-stack debugging checklist (chainId

@@ -164,7 +164,8 @@
     "last30Days": "Últimos 30 días",
     "trades": "Operaciones",
     "volume": "Volumen",
-    "totalVolume": "Volumen total"
+    "totalVolume": "Volumen total",
+    "loading": "Cargando…"
   },
   "trades": {
     "title": "Operaciones",
@@ -203,7 +204,9 @@
     "escrowPendingRelease": "Pendiente de liberación",
     "escrowDisputed": "En disputa",
     "escrowReleased": "Liberada",
-    "escrowRefunded": "Reembolsada"
+    "escrowRefunded": "Reembolsada",
+    "escrowFunded": "Financiada",
+    "escrowCancelled": "Cancelada"
   },
   "chat": {
     "messages": "Mensajes",
@@ -328,7 +331,13 @@
     "closed": "Cerrada",
     "buyer": "Comprador",
     "seller": "Vendedor",
-    "tradeAmount": "Monto de la operación"
+    "tradeAmount": "Monto de la operación",
+    "submitEvidence": "Presentar prueba",
+    "submitMoreEvidence": "Presentar más pruebas",
+    "submittingEvidence": "Presentando prueba…",
+    "evidenceRound": "Ronda {{n}}",
+    "evidenceSubmittedSuccess": "Prueba presentada",
+    "evidenceSubmittedError": "Error al presentar la prueba"
   },
   "openOffer": {
     "viewOffer": "Ver oferta",
@@ -458,7 +467,9 @@
     "rulingExecutedFailed": "Error al ejecutar el fallo: {{message}}",
     "cancelTrade": "Cancelar (contraparte inactiva)",
     "cancelSuccess": "Operación cancelada — depósitos devueltos.",
-    "cancelFailed": "Cancelación fallida: {{message}}"
+    "cancelFailed": "Cancelación fallida: {{message}}",
+    "releaseAvailableIn": "Liberación disponible en {{seconds}}",
+    "tradeRemovedOrNoAccess": "Esta operación puede que haya sido eliminada o que no tenga acceso."
   },
   "editProfile": {
     "title": "Editar perfil",
@@ -484,7 +495,15 @@
     "saveChanges": "Guardar cambios",
     "errorConnectWallet": "Conecte su billetera primero",
     "successSaved": "Perfil guardado",
-    "errorSaveFailed": "Error al guardar el perfil"
+    "errorSaveFailed": "Error al guardar el perfil",
+    "avatar": "Foto de perfil",
+    "avatarHint": "Haz clic en la foto para subir una nueva (máx. 5MB)",
+    "avatarUploaded": "Foto de perfil subida",
+    "avatarUploadError": "Error al subir la foto",
+    "avatarUploading": "Subiendo…",
+    "avatarTypeError": "Elige un archivo de imagen",
+    "avatarSizeError": "La imagen debe pesar 5MB o menos",
+    "removeAvatar": "Quitar foto"
   },
   "disputePage": {
     "title": "Abrir una disputa",
@@ -546,7 +565,7 @@
     "rejectAll": "Rechazar todas",
     "allowAll": "Permitir todas",
     "preferencesTitle": "Preferencias de cookies",
-    "preferencesDescription": "Administre sus preferencias de cookies. Las cookies necesarias siempre están habilitadas ya que son esenciales para el funcionamiento del sitio.",
+    "preferencesDescription": "Recuerdan su configuración y elecciones para una mejor experiencia.",
     "back": "Volver",
     "savePreferences": "Guardar preferencias",
     "necessary": "Necesarias",
@@ -555,8 +574,7 @@
     "analyticsDescription": "Nos ayudan a comprender cómo los visitantes interactúan con el sitio.",
     "marketing": "Marketing",
     "marketingDescription": "Se utilizan para mostrar anuncios relevantes y rastrear el rendimiento de campañas.",
-    "preferences": "Preferencias",
-    "preferencesDescription": "Recuerdan su configuración y elecciones para una mejor experiencia."
+    "preferences": "Preferencias"
   },
   "wallet": {
     "connectWallet": "Conectar billetera",

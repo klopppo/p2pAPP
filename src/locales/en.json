@@ -164,7 +164,8 @@
     "last30Days": "Last 30 Days",
     "trades": "Trades",
     "volume": "Volume",
-    "totalVolume": "Total Volume"
+    "totalVolume": "Total Volume",
+    "loading": "Loading…"
   },
   "trades": {
     "title": "Trades",
@@ -203,7 +204,9 @@
     "escrowPendingRelease": "Pending release",
     "escrowDisputed": "Disputed",
     "escrowReleased": "Released",
-    "escrowRefunded": "Refunded"
+    "escrowRefunded": "Refunded",
+    "escrowFunded": "Funded",
+    "escrowCancelled": "Cancelled"
   },
   "chat": {
     "messages": "Messages",
@@ -328,7 +331,13 @@
     "closed": "Closed",
     "buyer": "Buyer",
     "seller": "Seller",
-    "tradeAmount": "Trade amount"
+    "tradeAmount": "Trade amount",
+    "submitEvidence": "Submit evidence",
+    "submitMoreEvidence": "Submit more evidence",
+    "submittingEvidence": "Submitting evidence…",
+    "evidenceRound": "Round {{n}}",
+    "evidenceSubmittedSuccess": "Evidence submitted",
+    "evidenceSubmittedError": "Failed to submit evidence"
   },
   "openOffer": {
     "viewOffer": "View Offer",
@@ -458,7 +467,9 @@
     "rulingExecutedFailed": "Execute ruling failed: {{message}}",
     "cancelTrade": "Cancel (counterparty stalled)",
     "cancelSuccess": "Trade cancelled — deposits returned.",
-    "cancelFailed": "Cancel failed: {{message}}"
+    "cancelFailed": "Cancel failed: {{message}}",
+    "releaseAvailableIn": "Release available in {{seconds}}",
+    "tradeRemovedOrNoAccess": "This trade may have been removed or you don't have access."
   },
   "editProfile": {
     "title": "Edit Profile",
@@ -484,7 +495,15 @@
     "saveChanges": "Save Changes",
     "errorConnectWallet": "Connect your wallet first",
     "successSaved": "Profile saved",
-    "errorSaveFailed": "Failed to save profile"
+    "errorSaveFailed": "Failed to save profile",
+    "avatar": "Profile picture",
+    "avatarHint": "Click the picture to upload a new one (max 5MB)",
+    "avatarUploaded": "Profile picture uploaded",
+    "avatarUploadError": "Failed to upload picture",
+    "avatarUploading": "Uploading…",
+    "avatarTypeError": "Please choose an image file",
+    "avatarSizeError": "Image must be 5MB or smaller",
+    "removeAvatar": "Remove picture"
   },
   "disputePage": {
     "title": "Open a Dispute",
@@ -546,7 +565,7 @@
     "rejectAll": "Reject All",
     "allowAll": "Allow All",
     "preferencesTitle": "Cookie Preferences",
-    "preferencesDescription": "Manage your cookie preferences. Necessary cookies are always enabled as they are essential for the site to function properly.",
+    "preferencesDescription": "Remember your settings and choices for a better experience.",
     "back": "Back",
     "savePreferences": "Save Preferences",
     "necessary": "Necessary",
@@ -555,8 +574,7 @@
     "analyticsDescription": "Help us understand how visitors interact with the site.",
     "marketing": "Marketing",
     "marketingDescription": "Used to deliver relevant ads and track campaign performance.",
-    "preferences": "Preferences",
-    "preferencesDescription": "Remember your settings and choices for a better experience."
+    "preferences": "Preferences"
   },
   "wallet": {
     "connectWallet": "Connect Wallet",
