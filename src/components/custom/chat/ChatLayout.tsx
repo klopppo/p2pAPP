@@ -72,8 +72,14 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
     if (!activeId || !user || !messages.data || messages.data.length === 0) return
     const last = messages.data[messages.data.length - 1]
     if (!last) return
+    // Skip the optimistic temp-* ids from `useSendMessage.onMutate` —
+    // writing them to `last_read_message_id` makes the unread-count
+    // query fall back to the 1970-01-01 timestamp and spike the badge
+    // until onSuccess swaps the real id in. Once the swap happens the
+    // effect re-runs and we mark the real id.
+    if (last.id.startsWith('temp-')) return
     mark(activeId)
-    markRead(last.id)
+    void markRead(last.id).catch(() => undefined)
   }, [activeId, user, messages.data, mark, markRead])
 
   const [draft, setDraft] = useState('')

@@ -10,10 +10,13 @@ import { useCurrentUser } from './useCurrentUser'
  * cursor.
  *
  * Realtime: subscribes to `INSERT`s on `messages` filtered by conversation_id
- * so the active chat receives new messages without polling.
+ * so the active chat receives new messages without polling. We additionally
+ * skip our own echoes (handled optimistically by `useSendMessage.onMutate`)
+ * to avoid rendering our own message twice.
  */
 export function useMessages(conversationId: string | null | undefined) {
   const qc = useQueryClient()
+  const { data: user } = useCurrentUser()
 
   const query = useQuery({
     queryKey: ['messages', conversationId],
@@ -24,6 +27,7 @@ export function useMessages(conversationId: string | null | undefined) {
 
   useEffect(() => {
     if (!conversationId) return
+    const meId = user?.id
     const channel = supabase
       .channel(`messages:${conversationId}`)
       .on(
@@ -35,20 +39,30 @@ export function useMessages(conversationId: string | null | undefined) {
           filter: `conversation_id=eq.${conversationId}`,
         },
         (payload) => {
+          // Supabase `postgres_changes` does not deliver joined relations,
+          // so `payload.new` is a bare `messages` row — `sender` is undefined.
+          // The MessageBubble renderer doesn't actually consume
+          // `message.sender` (it uses the partner avatar from props), so
+          // null is safe. Cast to the broader shape for the cache update.
           const incoming = payload.new as MessageWithSender
+          // Skip our own echoes — the optimistic insert in `useSendMessage`
+          // already added this row under a `temp-*` id, and `onSuccess`
+          // swaps the temp id for the real one. Appending here would
+          // render the message twice on slow networks where realtime
+          // arrives before onSuccess.
+          if (meId && incoming.sender_id === meId) {
+            return
+          }
           // Server-side join arrives as a bare row — synthesise the sender
           // shape from current cache if needed (we'll refresh on next mutation).
           qc.setQueryData<MessageWithSender[]>(['messages', conversationId], (prev) => {
             const list = prev ?? []
             if (list.some((m) => m.id === incoming.id)) return list
-            const sender =
-              (incoming as MessageWithSender & { sender?: MessageWithSender['sender'] | null })
-                .sender ?? null
             return [
               ...list,
               {
                 ...incoming,
-                sender,
+                sender: null,
               } as MessageWithSender,
             ]
           })
@@ -59,7 +73,7 @@ export function useMessages(conversationId: string | null | undefined) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [conversationId, qc])
+  }, [conversationId, qc, user?.id])
 
   const loadOlder = async () => {
     if (!conversationId) return
@@ -128,9 +142,15 @@ export function useSendMessage(conversationId: string | null | undefined) {
     onSuccess: (saved, _vars, ctx) => {
       if (!conversationId || !ctx) return
       const key = ['messages', conversationId]
-      qc.setQueryData<MessageWithSender[]>(key, (prev) =>
-        (prev ?? []).map((m) => (m.id === ctx.tempId ? (saved as MessageWithSender) : m))
-      )
+      // Swap the optimistic temp-* id for the real one. Filter out the
+      // temp row first (not just by id) so a realtime INSERT that slipped
+      // through the meId-skip path can't leave two copies behind.
+      qc.setQueryData<MessageWithSender[]>(key, (prev) => {
+        const list = (prev ?? []).filter((m) => m.id !== ctx.tempId)
+        const realId = (saved as MessageWithSender).id
+        if (list.some((m) => m.id === realId)) return list
+        return [...list, saved as MessageWithSender]
+      })
       // Fire-and-forget: mark this message as read for the sender.
       markConversationRead({
         conversationId,

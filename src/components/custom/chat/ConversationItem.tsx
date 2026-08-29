@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 
 interface Props {
   conversation: ConversationView
+  currentUserId: string | null | undefined
   active: boolean
   locallyRead?: boolean
   onSelect: (id: string) => void
@@ -16,11 +17,20 @@ interface Props {
  * unread badge. Uses `bg-primary` for the badge to match the existing chat
  * visual language.
  */
-export function ConversationItem({ conversation, active, locallyRead, onSelect }: Props) {
+export function ConversationItem({
+  conversation,
+  currentUserId,
+  active,
+  locallyRead,
+  onSelect,
+}: Props) {
   const other: ConversationWithParticipant | undefined = useMemo(() => {
-    const me = conversation.participants[0]
-    return conversation.participants.find((p) => p.user_id !== me?.user_id)
-  }, [conversation.participants])
+    // PostgREST doesn't guarantee participant ordering. Filter by the
+    // explicit currentUserId from props so the sidebar consistently
+    // shows the counterparty regardless of which row comes back first.
+    if (!currentUserId) return conversation.participants[1]
+    return conversation.participants.find((p) => p.user_id !== currentUserId)
+  }, [conversation.participants, currentUserId])
 
   const name = other?.user.nickname?.trim() || shortAddress(other?.user.wallet_address ?? '')
   const preview = conversation.last_message_preview ?? 'Trade opened — say hi'
