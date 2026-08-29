@@ -17,6 +17,10 @@ interface TypingUser {
  *
  * The returned `notifyTyping` is debounced internally — call it freely from
  * the input's onChange.
+ *
+ * On unmount (component swap, conversation switch, page nav) we fire a
+ * final `stop_typing` broadcast so the partner doesn't see "Alice is
+ * typing…" stuck on for the full 4-second auto-clear window.
  */
 export function useTypingIndicator(
   conversationId: string | null | undefined,
@@ -25,6 +29,7 @@ export function useTypingIndicator(
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([])
   const channelRef = useRef<RealtimeChannel | null>(null)
   const lastSentRef = useRef(0)
+  const isTypingRef = useRef(false)
 
   useEffect(() => {
     if (!conversationId) return
@@ -52,11 +57,27 @@ export function useTypingIndicator(
     channelRef.current = channel
 
     return () => {
+      // Fire a final stop_typing so the partner's "Alice is typing…" badge
+      // clears immediately when the user switches chats or leaves the
+      // page. Best-effort — fire-and-forget.
+      if (isTypingRef.current && identity?.userId) {
+        try {
+          channel.send({
+            type: 'broadcast',
+            event: 'stop_typing',
+            payload: { user_id: identity.userId },
+          })
+        } catch {
+          // Channel may already be torn down — the partner's auto-clear
+          // timer (4s) covers the worst case.
+        }
+      }
       supabase.removeChannel(channel)
       channelRef.current = null
       setTypingUsers([])
+      isTypingRef.current = false
     }
-  }, [conversationId, identity?.userId])
+  }, [conversationId, identity])
 
   // Auto-clear stale typing entries after 4s of silence per user.
   useEffect(() => {
@@ -75,6 +96,7 @@ export function useTypingIndicator(
     // Throttle to one broadcast per 1.5s so we don't spam the channel.
     if (now - lastSentRef.current < 1500) return
     lastSentRef.current = now
+    isTypingRef.current = true
     channelRef.current.send({
       type: 'broadcast',
       event: 'typing',
@@ -84,6 +106,7 @@ export function useTypingIndicator(
 
   const notifyStopTyping = useCallback(() => {
     if (!channelRef.current || !identity) return
+    isTypingRef.current = false
     channelRef.current.send({
       type: 'broadcast',
       event: 'stop_typing',
@@ -101,8 +124,17 @@ interface PresenceUser {
 }
 
 /**
- * Online presence for the participants of a conversation. Driven by the
- * presence channel attached to the broadcast channel above.
+ * Online presence for the participants of a conversation. Driven by a
+ * Supabase Realtime presence channel scoped to the conversation id.
+ *
+ * Subscribes to three presence events so the green dot / typing indicator
+ * never sticks when a partner disconnects:
+ *   - 'sync'    : full state dump from the server (re-baseline)
+ *   - 'join'    : someone just connected (no-op — `sync` will catch it)
+ *   - 'leave'   : someone just disconnected (drop them from local
+ *                 state immediately so the dot disappears; the server
+ *                 doesn't always re-broadcast `sync` for the last
+ *                 departing user when their tab closes)
  */
 export function useConversationPresence(
   conversationId: string | null | undefined,
@@ -117,14 +149,28 @@ export function useConversationPresence(
       config: { presence: { key: identity.userId } },
     })
 
+    const syncFromState = () => {
+      const state = channel.presenceState<PresenceUser>()
+      const list: PresenceUser[] = []
+      Object.values(state).forEach((entries) => {
+        (entries as PresenceUser[]).forEach((p) => list.push(p))
+      })
+      setOnline(list)
+    }
+
     channel
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState<PresenceUser>()
-        const list: PresenceUser[] = []
-        Object.values(state).forEach((entries) => {
-          (entries as PresenceUser[]).forEach((p) => list.push(p))
-        })
-        setOnline(list)
+      .on('presence', { event: 'sync' }, syncFromState)
+      .on('presence', { event: 'leave' }, ({ leftPresences }) => {
+        // The connection-closed peer is in `leftPresences`. Remove them
+        // by id without waiting for the server's next `sync` (which
+        // doesn't always fire for the last leaver). supabase-js typing
+        // widens the payload to `{[key: string]: any}` so we cast through
+        // unknown — same shape we used to track the user via `track()`.
+        const leftIds = new Set(
+          (leftPresences as unknown as PresenceUser[]).map((p) => p.user_id)
+        )
+        if (leftIds.size === 0) return
+        setOnline((prev) => prev.filter((p) => !leftIds.has(p.user_id)))
       })
       .subscribe(async (status: string) => {
         if (status === 'SUBSCRIBED') {

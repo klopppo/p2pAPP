@@ -591,16 +591,6 @@ export interface Message {
   created_at: string
 }
 
-export interface MessageAttachment {
-  id: string
-  storage_path: string
-  mime: string
-  size_bytes: number
-  sha256: string | null
-  uploaded_by: string
-  created_at: string
-}
-
 /**
  * Conversation joined with participants + the other party's profile, the
  * linked trade summary, and the current user's unread count. This is the
