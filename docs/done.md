@@ -9,6 +9,26 @@
 
 ---
 
+## Avatar uploads move from IPFS → Supabase Storage — 2026-08-29
+
+Fixed: avatars uploaded in `EditProfilePage` saved fine but never rendered on
+`/profile`, because the browser Helia node doesn't pin the CID, so the public
+`ipfs.io` gateway returned 404 for the saved URL.
+
+- `supabase/migrations/20260829000000_avatars_storage_bucket.sql` — new public
+  `avatars` Storage bucket + permissive RLS (mirrors the pre-SIWE `users`
+  policy model; lockdown later with wallet-signed JWT).
+- `src/lib/supabase/index.ts` — `uploadAvatar(file, walletAddress)` uploads to
+  the `avatars` bucket and returns a public object URL.
+- `src/pages/EditProfilePage.tsx` — `handleAvatarFile` now calls `uploadAvatar`
+  instead of `uploadToIpfs`. The in-app object-URL preview and the
+  `users.avatar_url` persist path are unchanged, so `/profile` now resolves the
+  Storage URL and shows the image. Dispute evidence still uses `uploadToIpfs`.
+- `.env.example` — no new keys required (no external pinning service).
+
+**Verification**: `npm run typecheck` clean, ESLint clean on touched files.
+Requires `supabase db push` to create the bucket before first upload.
+
 ## Profile avatar upload + UX/parity fixes — 2026-08-28
 
 Closed the P0 avatar gap and the P1 surface issues found in the end-to-end

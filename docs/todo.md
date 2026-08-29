@@ -28,7 +28,7 @@
 - [x] **`reason` / `reason_category` duplication** — `DisputePage` now writes a short code to `reason` (`no_payment`, `payment_released`, `unresponsive`, `wrong_amount`, `fraud`, `other`) and the localized label to `reason_category`. _(2026-08-22)_
 - [x] **i18n key drift** — `DisputePage` now uses `disputePage.factoryNotConfigured` consistently; orphan `errorFactoryNotReady` keys removed from en/es/fr/tr/zh. _(2026-08-22)_
 - [ ] **Decide §17-19 of `database-relational-schema.md`** — migrate `dispute_steps`, `dispute_resolutions`, `dispute_appeals` + `dispute_category` / `dispute_winner` / `escrow_action` enums, or trim the doc to match what's shipped.
-- [ ] **Pinata pinning** — `src/lib/ipfs.ts` returns a CID via Helia but doesn't pin. Add Pinata (or defer to server-side pinner as planned). _[Paused — server-side pinning TBD]_.
+- [x] **Avatar uploads → Supabase Storage** — replaced the Helia `uploadToIpfs` (unpinned → 404 on `/profile`) with `uploadAvatar()` to a public `avatars` Storage bucket; migration `20260829000000_avatars_storage_bucket.sql`. The old "Pinata pinning" item is superseded — no external pinning service needed for avatars. Dispute evidence still uses `uploadToIpfs`. _(2026-08-29)_
 
 ## 🆕 P0/P1 surfaced in the 2026-08-24 cross-audit (see `contract-execution-status.md` §B + `dispute-status.md`)
 

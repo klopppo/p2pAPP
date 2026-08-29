@@ -14,8 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Pencil, Loader2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useUserProfile } from '@/hooks/useOffers'
-import { updateUserProfile } from '@/lib/supabase'
-import { uploadToIpfs } from '@/lib/ipfs'
+import { updateUserProfile, uploadAvatar } from '@/lib/supabase'
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024
 
@@ -93,9 +92,10 @@ export function EditProfilePage() {
     }
     setUploadingAvatar(true)
     try {
+      if (!address) throw new Error('No wallet address')
       const previewUrl = URL.createObjectURL(file)
       setAvatarPreview(previewUrl)
-      const uploaded = await uploadToIpfs(file, file.name)
+      const uploaded = await uploadAvatar(file, address)
       setForm((prev) => ({ ...prev, avatarUrl: uploaded.url }))
       toast.success(t('editProfile.avatarUploaded'))
     } catch (err) {

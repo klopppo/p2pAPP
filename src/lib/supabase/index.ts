@@ -295,6 +295,39 @@ export async function updateUserProfile(
   return user
 }
 
+const AVATAR_BUCKET = 'avatars'
+
+/**
+ * Upload a user's avatar image to Supabase Storage and return a public URL.
+ *
+ * Replaces the old IPFS/Helia path: a browser Helia node never pins the CID to
+ * the public network, so `https://ipfs.io/ipfs/<cid>` returned 404 and avatars
+ * never rendered on /profile. Storage object URLs are always retrievable.
+ */
+export async function uploadAvatar(
+  file: File,
+  walletAddress: string,
+): Promise<{ url: string; path: string }> {
+  const addr = walletAddress.toLowerCase()
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'png'
+  const path = `${addr}-${Date.now()}.${ext}`
+
+  const { error: uploadErr } = await supabase.storage
+    .from(AVATAR_BUCKET)
+    .upload(path, file, { upsert: true, cacheControl: '3600' })
+
+  if (uploadErr) {
+    console.error('[uploadAvatar] upload error:', uploadErr)
+    throw uploadErr
+  }
+
+  const { data } = supabase.storage
+    .from(AVATAR_BUCKET)
+    .getPublicUrl(path)
+
+  return { url: data.publicUrl, path }
+}
+
 /**
  * @deprecated Use `ensureUser` (sync) or `updateUserProfile` (edit).
  */
