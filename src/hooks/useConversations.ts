@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, listConversations, getConversation, getConversationByTradeId, markConversationRead } from '@/lib/supabase'
 import { useCurrentUser } from './useCurrentUser'
+import { uniqueRealtimeTopic } from '@/lib/realtimeTopic'
 
 /**
  * All conversations the current user participates in, newest activity first.
@@ -21,13 +22,17 @@ export function useConversations() {
     queryKey: ['conversations', user?.id],
     queryFn: () => listConversations(user!.id),
     enabled: !!user,
+    // Poll fallback for environments without Realtime publication on
+    // `conversations` (see useMessages). Realtime invalidations keep this
+    // fresh when the publication is enabled.
+    refetchInterval: 15_000,
   })
 
   useEffect(() => {
     if (!user) return
 
     const channel = supabase
-      .channel(`conversations:user:${user.id}`)
+      .channel(uniqueRealtimeTopic(`conversations:user:${user.id}`))
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'conversations' },
@@ -55,12 +60,14 @@ export function useConversation(conversationId: string | null | undefined) {
     queryKey: ['conversation', conversationId, user?.id],
     queryFn: () => getConversation(conversationId!, user!.id),
     enabled: !!conversationId && !!user,
+    staleTime: 30_000,
+    refetchInterval: 15_000,
   })
 
   useEffect(() => {
     if (!conversationId) return
     const channel = supabase
-      .channel(`conversation:${conversationId}`)
+      .channel(uniqueRealtimeTopic(`conversation:${conversationId}`))
       .on(
         'postgres_changes',
         {

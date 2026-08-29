@@ -82,6 +82,12 @@ export function CreateOfferPage() {
 
     try {
       const me = await ensureUser(address)
+      if (!me) {
+        // No SIWE session for this wallet yet — write flow can't proceed.
+        toast.error(t('createOffer.errorConnectWallet'))
+        setIsSubmitting(false)
+        return
+      }
 
       // Prepare offer data
       // NOTE: available_regions is CHAR(2)[] (ISO country codes), so map the

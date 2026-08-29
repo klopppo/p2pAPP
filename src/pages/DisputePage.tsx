@@ -36,7 +36,6 @@ import {
 import {
   createDispute,
   generateDisputeId,
-  getUserByWallet,
   ensureUser,
   getTradeByEscrowAddress,
   insertDisputeEvidence,
@@ -273,9 +272,12 @@ const effectiveEscrow =
 
       // 2) Resolve the filer's Supabase user id (create-if-missing) so the DB
       //    row satisfies the foreign key on disputes.buyer_id.
-      await ensureUser(address)
-      const user = await getUserByWallet(address)
-      if (!user) throw new Error('Could not resolve Supabase user for this wallet.')
+      const me = await ensureUser(address)
+      if (!me) {
+        toast.error(t('disputePage.errorConnectWallet'))
+        setStage('idle')
+        return
+      }
 
       // 2b) Resolve the linked trade (escrow address → trades.escrow_contract_addr)
       //     so the dispute references the real trade uuid and the actual

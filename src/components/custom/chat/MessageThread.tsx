@@ -38,7 +38,7 @@ export function MessageThread({
   }, [messages.length])
 
   return (
-    <div ref={containerRef} className="flex-1 overflow-y-auto space-y-4 min-h-0">
+    <div ref={containerRef} className="flex-1 overflow-y-auto space-y-4 min-h-0 no-scrollbar">
       {messages.length > 0 && (
         <div className="flex justify-center">
           <button

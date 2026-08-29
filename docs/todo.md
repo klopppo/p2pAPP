@@ -5,6 +5,66 @@
 
 ---
 
+## 🔴 High priority — Security P1 (see `security-audit.md` for detail)
+
+> P0 items shipped 2026-08-29 (email relay + reputation RPC). The SIWE edge
+> function + RLS rewrite shipped 2026-08-29 but **requires a coordinated
+> deploy** (see ⚠ cutover below). Penetration-test matrix + vitest suite
+> shipped 2026-08-30 (see `penetration-test-matrix.md`; `npm run test --
+> tests/security`). Remaining roadmap below is tracked here.
+
+- [x] **Penetration-test suite + matrix doc** — `tests/security/*` (63 tests:
+      escrow allow/deny × ABI surface × client gates; RLS policy simulator +
+      posture assertions; siwe-auth/send-email deny/allow) + `docs/penetration-test-matrix.md`. _(2026-08-30)_
+
+- [x] **Live test runbook** — `docs/live-test-checklist.md` (automated gates +
+      manual 2-browser pass: auth, RLS cross-user, chat/notify, trade,
+      dispute, retention). Automated gates P; manual pass pending user
+      execution. _(2026-08-30)_
+
+- [x] **⚠ SIWE + RLS cutover (deploy)** — `supabase functions deploy
+      siwe-auth --no-verify-jwt` → `supabase db push` (20260829000002 + 20260830000000)
+      → client ship, done **live 2026-08-30**. Sign-in + a full trade flow were
+      exercised on the deployed build. _(code+SQL landed 2026-08-29)_
+- [ ] **Resend key rotation** — key present in `.env.local` (gitignored);
+      move to `supabase secrets set`, placeholder in tracked env files, rotate. _(ops)_
+- [x] **SIWE edge function + JWT mint** — `supabase/functions/siwe-auth`
+      (nonce issue/verify, viem signature check, GoTrue auth user provisioning,
+      HS256 JWT with `wallet_address` claim). _(2026-08-29, deploy above)_
+- [x] **Rewrite the 26 permissive RLS policies** — users → offers → trades →
+      chat → notifications → disputes/ratings/reputation, all scoped via
+      `public.current_user_id()` (JWT `wallet_address` claim); default-deny
+      catch-all; avatars storage owner-scoped. _(2026-08-29, deploy above)_
+- [ ] **Escrow address verification** — verify `escrowByBuyer`/`escrowBySeller`
+      (or `implementation()` match) against the factory before every
+      approve/deposit/dispute call; hard-fail on mismatch; remove
+      `queryEscrow` URL bypass; exact-amount approvals instead of `maxUint256`.
+- [ ] **Message writes server-enforced** — `sender_id` from JWT only; client
+      `kind` rejected (no forged system messages); participant check.
+- [ ] **Mirror writes indexer-only** — `updateTradeStatus` /
+      `updateDisputeOnChain` / ratings / reputation moves behind SIGNATURE-
+      checked security-definer functions (or an indexer) — revoke from anon.
+
+## 🟡 Medium priority — Security P2 (see `security-audit.md`)
+
+- [ ] **Storage path-owner policy** for `avatars` bucket (`${auth.uid()}/...`);
+      `updateUserProfile` ownership check; `avatar_url` scheme allowlist.
+- [ ] **`crypto.randomUUID()`** for offer/trade/dispute ids (replaces
+      `Math.random()`).
+- [ ] **Typing/presence payload trimming** — drop `nickname` from typing
+      broadcasts; server-authorized channels after JWT.
+- [x] **Trigger hygiene (part 1)** — `set search_path` pinned on the three
+      chat SECURITY DEFINER triggers (in 20260829000002). Delete the shotgun
+      `alter function ... security definer` loop in `20260626000001:15-29`.
+      _(2026-08-29)_
+- [x] **Client hygiene (part 1)** — SIWE signature no longer persisted to
+      localStorage (`coffernode:siwe:last` stores address+issuedAt only).
+      _(2026-08-29)_
+- [ ] **Client hygiene (part 2)** — `userCache` → sessionStorage + LRU + purge
+      on sign-out.
+
+---
+
 ## 🔥 P0 — Dispute flow closure (see `dispute-status.md` for full detail)
 
 - [x] **Chain → DB sync helper** — `updateDisputeOnChain(state, klerosStatus, ruling?)` in `src/lib/supabase/index.ts`; wired into `executeRuling` / `finalize` / `timeoutDispute` / `appeal`. _(2026-08-22)_

@@ -9,6 +9,141 @@
 
 ---
 
+## Production build fix + live test runbook — 2026-08-30
+
+`npm run build` was failing (`tsc -b`): wagmi's `signMessage` is sync/void;
+`useSyncUser.ts` now uses `signMessageAsync` (Promise<`0x…`>) for the SIWE
+session. Build ✅ 25.3s. Added `docs/live-test-checklist.md` (automated gates
+P + manual 2-browser pass covering auth, RLS cross-user isolation, chat,
+trade, dispute, retention).
+
+## SIWE + RLS cutover deployed live — 2026-08-30
+
+`siwe-auth` edge function deployed (`--no-verify-jwt`) and all migrations
+pushed (`20260829000002` RLS rewrite, `20260830000000` retention). Live app now
+signs in via SIWE → server-verified → Supabase JWT with `wallet_address` claim;
+every policy authorizes through `public.current_user_id()`, default-deny
+catch-all active. Wallet connect verified working end-to-end on the deployed
+build.
+
+## Message retention (40 days) + scrollbar cleanup — 2026-08-30
+
+Nightly pg_cron purge of `messages` older than 40 days, FK-safe
+(`notifications` cascade off purged rows, dangling
+`conversation_participants.last_read_message_id` reset first, sidebar preview
+re-derived so it never shows a deleted message) + `idx_messages_created_at` for
+the scan. UI: `no-scrollbar` utility in `src/index.css` applied to the chat
+thread + sidebar (scroll still works via wheel/touch). Migration
+`supabase/migrations/20260830000000_retain_messages_40_days.sql` — lands with
+`supabase db push` at the cutover deploy.
+
+## Deterministic message ordering + composite pagination cursor — 2026-08-30
+
+Messages are now ordered by `created_at` then `id` (ascending) everywhere, and
+all "older than / newer than" cursors (`listMessages` pagination, per-
+conversation unread counts) use a composite `(created_at, id)` predicate
+instead of a bare timestamp. `timestamptz` has millisecond resolution, so two
+messages landing in the same ms used to make history-loading drop the sibling
+(bare `lt`) and make unread badges undercount (bare `gt`). Realtime INSERTs
+are now merged into the cache in `(created_at, id)` order rather than arrival
+order, and `loadOlder` dedupes against the existing cache. Touched:
+`src/lib/supabase/index.ts` (`getMessageSortKey`, `listMessages`,
+`listConversations`), `src/hooks/useMessages.ts`.
+
+A code-verified (not live-probed) deep-check pass over who may call what across
+the three system surfaces. Run with `npm run test -- tests/security`; the doc in
+`docs/penetration-test-matrix.md` is the human-readable rendering and lists the
+residual gaps (§6).
+
+- `tests/security/escrow-matrix.ts` **(new)** — canonical allow/deny matrix for
+  KlerosEsc (39 fns: 13 mutating + 26 views), KlerosEscrowFactory (createEscrow +
+  views + 4 two-step admin setters), KlerosCourt (5 views), each entry tagged
+  with an evidence source (`contract-doc` / `abi` / `client-gate` / `unverified`).
+- `tests/security/escrow-access-control.spec.ts` **(new)** — ABI surface must
+  equal the matrix (mutating + view sets), floating-point-free constants
+  (`NUMBER_OF_CHOICES=4n`, rulings 0-4, grace 7d/365d, 1d cancel timelock, 30d
+  dispute timeout, deposits 1/10/15%), and client action gates must not expose a
+  caller the matrix denies.
+- `tests/security/rls-model.ts` **(new)** — replay engine over
+  `supabase/migrations/*.sql`: paren/`$$`-aware statement splitter (strips `--`
+  comments), policy create/drop parser, dynamic `do $$` RLS loops, SECURITY
+  DEFINER + `search_path` tracking.
+- `tests/security/rls-policy.spec.ts` **(new)** — asserts the final posture
+  (anon read on marketplace/profile, zero anon writes, claim-scoped writes,
+  party-scoped trades/disputes/chat, own-messages delete, sender-bound inserts,
+  siwe tables policy-free, avatars owner-path, ±10 delta bound), plus a
+  pre-cutover reality check that **proves** anon write access still exists on
+  the un-deployed baseline.
+- `tests/security/{siwe-auth,send-email}.spec.ts` **(new)** — deny/allow tables
+  exercising the shared pure modules.
+- `supabase/functions/_shared/siwe-core.ts`, `email-core.ts` **(new)** — pure
+  authorization logic extracted from the edge functions so the suite can import
+  it (no `Deno.*`); `rateLimited()` gained an injectable clock for window tests.
+- `supabase/functions/siwe-auth/index.ts`, `send-email/index.ts` — refactored to
+  import the shared modules (no behaviour change).
+- `vitest.config.ts` **(new)** — vitest 4 runner (installed with
+  `--legacy-peer-deps` due to the pre-existing `typescript ~6` /
+  `@web3icons/core` peer conflict).
+
+---
+
+## Security P1 — SIWE sessions + wallet RLS rewrite — 2026-08-29
+
+Wallet-authenticated identity + the RLS cutover it unlocks (see
+`docs/security-audit.md` §1/§2). Anon loses all write access; every table gets
+owner/party/self-scoped authorization.
+
+- `supabase/functions/siwe-auth/index.ts` **(new)** — server-side SIWE:
+  one-shot `siwe_nonces` (5 min TTL, address-bound), EIP-4361 parse +
+  viem `verifyMessage`, GoTrue auth-user provisioning linked via
+  `siwe_auth_links`, HS256 JWT via `jose` (`role: authenticated`, custom
+  `wallet_address` claim, 24h TTL), CORS host allowlist.
+- `supabase/migrations/20260829000002_siwe_auth_rls.sql` **(new)** — rewrites
+  the permissive policies on users/offers/trades/trade_events/
+  conversations/conversation_participants/messages/message_attachments/
+  notifications/notification_preferences/disputes/dispute_evidence/
+  trade_ratings + reputation tables; avatars storage owner-bound by path;
+  RLS-scoped `current_user_id()` helper (JWT `wallet_address` → `users.id`);
+  `search_path` pinned on the three chat SECURITY DEFINER triggers.
+- `src/lib/supabase/index.ts` — `signInWithWallet` now signs via
+  `siwe-auth` and installs a real session (`setSession`); `ensureUser` is
+  read-mostly (returns `null` pre-session); new `getSessionWallet` /
+  `isSignedInAs` / `ensureWalletSession`; SIWE signature no longer persisted
+  to localStorage; localhost falls back to client-verify until the edge fn
+  ships.
+- `src/hooks/useSyncUser.ts` — signs in on wallet connect, tears the session
+  down on disconnect.
+- Pages: `null`-safe `ensureUser` guards (TradePage/CreateOfferPage/DisputePage).
+
+> ⚠ **Deploy pending (coordinated):** deploy `siwe-auth` → `supabase db push`
+> → ship client; test sign-in + one full trade flow on staging first.
+
+---
+
+## Security P0 hardening — 2026-08-29
+
+First wave of the full-stack security audit (`docs/security-audit.md`). Closes
+the most exploitable off-chain paths without waiting for the SIWE/JWT rewrite.
+
+- `supabase/functions/send-email/index.ts` — recipient is now **resolved
+  server-side** from `notification_preferences` (never client-supplied `to`),
+  `html` refused (text-only relay), per-recipient rate limit (2/60s), CRLF
+  stripping + length caps, CORS locked to `coffernode.app` + localhost, Supabase
+  client headers required. This was an open spam/phishing relay.
+- `src/lib/notifications/channels/email.ts` — sends `{ user_id, subject, text }`
+  only; no addresses leave the client; dry-run log no longer prints addresses.
+- `supabase/migrations/20260829000001_security_p0_hardening.sql` —
+  `increment_reputation_score` was an anon-callable SECURITY DEFINER sink
+  (arbitrary user_id/delta). Deltas now hard-bounded to ±10, NULL user_id
+  rejected. Legit UI deltas (±2) unchanged.
+- `docs/security-audit.md` — full audit of every flow (auth, offers,
+  trades/escrow, disputes/ratings, chat/real-time, notifications/email,
+  profile/storage) with severity-ranked findings and a P1/P2 roadmap.
+
+**Verification**: `npm run typecheck` clean. P0 items are deliberately
+behavior-preserving until SIWE/JWT lands; Resend key rotation + P1 items
+tracked in `docs/todo.md`.
+
 ## Avatar uploads move from IPFS → Supabase Storage — 2026-08-29
 
 Fixed: avatars uploaded in `EditProfilePage` saved fine but never rendered on

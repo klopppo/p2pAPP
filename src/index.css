@@ -165,6 +165,17 @@ body {
   .glass-panel {
     @apply bg-background/50 backdrop-blur-xl shadow-xl border border-border/50;
   }
+
+  /* Hide scrollbars entirely while keeping the area scrollable (wheel, touch,
+     keyboard all still work). Used on chat bubbles + sidebar so the thread
+     looks like a native messaging app. */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* Non-custodial graphic animations (see NonCustodialGraphic.tsx) */

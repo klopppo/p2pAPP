@@ -92,7 +92,7 @@ const SocialLinks = ({ className = '' }: { className?: string }) => (
  * Top-level navigation. `requiresAuth: true` items are hidden when no wallet
  * is connected — they need a wallet identity to be meaningful (and
  * `messages` needs it to query conversations at all). Items without the
- * flag stay visible so visitors can still discover `offers` / `profile`.
+ * flag (`offers`) stay visible so visitors can still browse the marketplace.
  */
 const NAV_LINKS: ReadonlyArray<{
   labelKey: string
@@ -103,7 +103,7 @@ const NAV_LINKS: ReadonlyArray<{
   { labelKey: 'nav.messages', to: '/app/messages', icon: MessageCircle, requiresAuth: true },
   { labelKey: 'nav.trades', to: '/app/trades', icon: ArrowLeftRight, requiresAuth: true },
   { labelKey: 'nav.offers', to: '/app/offers', icon: Tag },
-  { labelKey: 'nav.profile', to: '/app/profile', icon: User },
+  { labelKey: 'nav.profile', to: '/app/profile', icon: User, requiresAuth: true },
 ]
 
 const RESOURCE_LINKS: ReadonlyArray<

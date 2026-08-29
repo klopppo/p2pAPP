@@ -12,6 +12,7 @@ import {
 } from '@/lib/supabase'
 import type { NotificationChannel } from '@/types/database'
 import { useCurrentUser } from './useCurrentUser'
+import { uniqueRealtimeTopic } from '@/lib/realtimeTopic'
 
 /**
  * Newest-first notifications for the bell dropdown. Live-updated via
@@ -31,7 +32,7 @@ export function useNotifications() {
   useEffect(() => {
     if (!user) return
     const channel = supabase
-      .channel(`notifications:user:${user.id}`)
+      .channel(uniqueRealtimeTopic(`notifications:user:${user.id}`))
       .on(
         'postgres_changes',
         {
@@ -79,7 +80,7 @@ export function useUnreadCount() {
   useEffect(() => {
     if (!user) return
     const channel = supabase
-      .channel(`notifications-unread:${user.id}`)
+      .channel(uniqueRealtimeTopic(`notifications-unread:${user.id}`))
       .on(
         'postgres_changes',
         {

@@ -3,6 +3,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, listMessages, sendMessage, markConversationRead } from '@/lib/supabase'
 import type { MessageKind, MessageWithSender } from '@/types/database'
 import { useCurrentUser } from './useCurrentUser'
+import { uniqueRealtimeTopic } from '@/lib/realtimeTopic'
+
+/** Ascending (oldest→newest) comparator; ties broken by id (matches
+ *  the deterministic `created_at ASC, id ASC` order from `listMessages`). */
+function byTimeAsc(a: Pick<MessageWithSender, 'created_at' | 'id'>, b: Pick<MessageWithSender, 'created_at' | 'id'>) {
+  const t = a.created_at.localeCompare(b.created_at)
+  if (t !== 0) return t
+  return a.id.localeCompare(b.id)
+}
 
 /**
  * Paginated message list for a conversation. Initial load is the latest 50
@@ -23,13 +32,18 @@ export function useMessages(conversationId: string | null | undefined) {
     queryFn: () => listMessages(conversationId!, { limit: 50 }),
     enabled: !!conversationId,
     staleTime: 30_000,
+    // Poll fallback: if the project has no Supabase Realtime publication on
+    // `messages` (or RLS blocks the INSERT broadcast), live chat still works —
+    // this mirrors the notifications hook's 60s refetch, tightened to chat
+    // cadence. Realtime (when present) makes these fetches no-ops.
+    refetchInterval: 5_000,
   })
 
   useEffect(() => {
     if (!conversationId) return
     const meId = user?.id
     const channel = supabase
-      .channel(`messages:${conversationId}`)
+      .channel(uniqueRealtimeTopic(`messages:${conversationId}`))
       .on(
         'postgres_changes',
         {
@@ -55,16 +69,14 @@ export function useMessages(conversationId: string | null | undefined) {
           }
           // Server-side join arrives as a bare row — synthesise the sender
           // shape from current cache if needed (we'll refresh on next mutation).
+          // Insert in (created_at, id) order, not arrival order — realtime
+          // events can be delivered out of sequence under load.
           qc.setQueryData<MessageWithSender[]>(['messages', conversationId], (prev) => {
             const list = prev ?? []
             if (list.some((m) => m.id === incoming.id)) return list
-            return [
-              ...list,
-              {
-                ...incoming,
-                sender: null,
-              } as unknown as MessageWithSender,
-            ]
+            const next = [...list, { ...incoming, sender: null } as unknown as MessageWithSender]
+            next.sort(byTimeAsc)
+            return next
           })
           qc.invalidateQueries({ queryKey: ['conversations'] })
         }
@@ -81,10 +93,13 @@ export function useMessages(conversationId: string | null | undefined) {
     if (!list || list.length === 0) return
     const oldest = list[0]
     const older = await listMessages(conversationId, { limit: 50, before: oldest.id })
-    qc.setQueryData<MessageWithSender[]>(['messages', conversationId], (prev) => [
-      ...older,
-      ...(prev ?? []),
-    ])
+    qc.setQueryData<MessageWithSender[]>(['messages', conversationId], (prev) => {
+      const current = prev ?? []
+      const existing = new Set(current.map((m) => m.id))
+      const fresh = older.filter((m) => !existing.has(m.id))
+      if (fresh.length === 0) return prev
+      return [...fresh, ...current]
+    })
   }
 
   const hasMore = (query.data?.length ?? 0) >= 50

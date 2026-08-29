@@ -47,7 +47,7 @@ export function ConversationList({ activeId, locallyReadIds, onSelect }: Props) 
           Conversations from your active and past trades.
         </p>
       </div>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto no-scrollbar">
         {isLoading && (
           <div className="space-y-2 p-3">
             {Array.from({ length: 5 }).map((_, i) => (

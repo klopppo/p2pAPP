@@ -189,13 +189,19 @@ import { getCachedUser, setCachedUser, invalidateUserCache, clearAllUserCache } 
  * Ensure a user row exists for the given wallet address.
  *
  * This is the "sync" path — called on every wallet connect. It only inserts
- * a new row if one doesn't exist, and updates `last_active_at`. It does
- * NOT touch profile fields (nickname, bio, etc.) so existing profiles are
- * never overwritten.
+ * a new row if one doesn't exist (post-SIWE, the `siwe-auth` edge function
+ * creates new rows at sign-in time, so this read usually just hits), and
+ * updates `last_active_at`. It does NOT touch profile fields (nickname, bio,
+ * etc.) so existing profiles are never overwritten.
+ *
+ * RLS note: after the SIWE RLS rewrite, the `users` INSERT is only allowed for
+ * a row whose `wallet_address` equals the signed-in session's wallet claim.
+ * If no session exists yet for this wallet we return null instead of throwing
+ * (sign-in happens via `ensureWalletSession`, triggered on connect).
  *
  * Reads from cache first; writes cache after DB read.
  */
-export async function ensureUser(walletAddress: string): Promise<User> {
+export async function ensureUser(walletAddress: string): Promise<User | null> {
   const addr = walletAddress.toLowerCase()
 
   // 1. Check cache first
@@ -215,7 +221,8 @@ export async function ensureUser(walletAddress: string): Promise<User> {
   }
 
   if (existing) {
-    // 3a. Row exists — just touch last_active_at (fire-and-forget, don't block)
+    // 3a. Row exists — just touch last_active_at (fire-and-forget, don't block).
+    //     Only meaningful once signed in (RLS requires a session to UPDATE).
     supabase
       .from('users')
       .update({ last_active_at: new Date().toISOString() })
@@ -229,7 +236,12 @@ export async function ensureUser(walletAddress: string): Promise<User> {
     return user
   }
 
-  // 3b. New user — insert with defaults
+  // 3b. New user — insert with defaults, but only when the signed-in wallet
+  //     matches (RLS will reject anything else). Missing row + no matching
+  //     session = user hasn't completed SIWE yet; return null quietly.
+  const sessionWallet = await getSessionWallet()
+  if (sessionWallet !== addr) return null
+
   const { data: inserted, error: insertErr } = await supabase
     .from('users')
     .insert({ wallet_address: addr, last_active_at: new Date().toISOString() })
@@ -1394,8 +1406,10 @@ export async function listConversations(userId: string) {
       .eq('conversation_id', conv.id)
       .neq('sender_id', userId)
     if (lastReadId) {
-      const cursor = await getMessageCreatedAt(lastReadId)
-      q = q.gt('created_at', cursor)
+      const cursor = await getMessageSortKey(lastReadId)
+      q = q.or(
+        `and(created_at.gt.${cursor.created_at},id.gt.${cursor.id}),created_at.gt.${cursor.created_at}`
+      )
     }
     const { count } = await q
     const unread = count ?? 0
@@ -1420,17 +1434,20 @@ export async function listConversations(userId: string) {
 }
 
 /**
- * Helper: created_at of a message by id. Used for the unread-count query
- * inside listConversations; cached at the module level is overkill for now.
+ * Helper: (created_at, id) sort key of a message. Used as a composite cursor
+ * for pagination and unread counts. A bare-timestamp cursor is lossy: two
+ * messages can share the same millisecond (timestamptz has ms resolution),
+ * so `created_at.lt./gt.` alone silently drops or double-counts the sibling.
+ * Ties are broken by id (uuid has a total order in Postgres).
  */
-async function getMessageCreatedAt(messageId: string): Promise<string> {
+async function getMessageSortKey(messageId: string): Promise<{ created_at: string; id: string }> {
   const { data, error } = await supabase
     .from('messages')
     .select('created_at')
     .eq('id', messageId)
     .single()
-  if (error || !data) return '1970-01-01T00:00:00Z'
-  return (data as { created_at: string }).created_at
+  if (error || !data) return { created_at: '1970-01-01T00:00:00Z', id: messageId }
+  return { created_at: (data as { created_at: string }).created_at, id: messageId }
 }
 
 /**
@@ -1474,6 +1491,9 @@ export async function listMessages(
 ) {
   const limit = options.limit ?? 50
 
+  // ORDER BY is deterministic: `created_at DESC, id DESC` so messages that
+  // share the same millisecond (timestamptz has ms resolution) never reorder
+  // nondeterministically or flip pages.
   let query = supabase
     .from('messages')
     .select(
@@ -1482,11 +1502,16 @@ export async function listMessages(
     )
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(limit)
 
   if (options.before) {
-    const ts = await getMessageCreatedAt(options.before)
-    query = query.lt('created_at', ts)
+    const cursor = await getMessageSortKey(options.before)
+    // Composite cursor: strictly older than (created_at, id), i.e.
+    //   created_at < ts  OR  (created_at = ts AND id < boundary).
+    query = query.or(
+      `and(created_at.lt.${cursor.created_at},id.lt.${cursor.id}),created_at.lt.${cursor.created_at}`
+    )
   }
 
   const { data, error } = await query
@@ -1710,14 +1735,17 @@ export async function isAuthenticated(): Promise<boolean> {
 /**
  * Sign in with wallet (SIWE — Sign-In With Ethereum).
  *
- * Replaces the legacy magic-link OTP flow (which sent a one-time email to
- * the virtual `0x…@wallet.p2p` address). The new flow uses a
- * personal_sign signature challenge → viem verifies it locally → on success
- * the `users` row is upserted. No email server, no round-trip; works in
- * any environment with a connected wallet.
+ * Server-backed flow: the `siwe-auth` edge function issues a one-shot nonce,
+ * we build the EIP-4361 challenge, the wallet signs it, and the edge verifies
+ * the signature and mints a Supabase JWT (sub = users.id, custom claim
+ * `wallet_address`) that we install via `supabase.auth.setSession`. All RLS
+ * policies authorize through that JWT (see
+ * migrations/20260829000002_siwe_auth_rls.sql).
  *
- * The signature covers a one-shot nonce + an `Issued At` timestamp so a
- * replayed challenge can't be re-used.
+ * Local-dev fallback: when the edge function isn't reachable AND the app is
+ * served from localhost (pre-deploy dev), we verify the signature in-browser
+ * with viem and skip the session — the permissive pre-migration RLS makes the
+ * app still work during development.
  */
 export async function signInWithWallet(
   walletAddress: string,
@@ -1731,45 +1759,185 @@ export async function signInWithWallet(
     chainId?: number
     appName?: string
   },
-): Promise<void> {
+): Promise<User | null> {
   const { signMessage, chainId, appName } = options
+  const addr = walletAddress.toLowerCase() as `0x${string}`
+
+  try {
+    // 1. One-shot nonce from the server.
+    const { data: nonceRes, error: nonceErr } = await supabase.functions.invoke(
+      'siwe-auth',
+      { body: { action: 'nonce', address: addr } },
+    )
+    if (nonceErr || !nonceRes?.nonce) throw nonceErr ?? new Error('no nonce')
+    const nonce = String(nonceRes.nonce)
+    if (!/^[a-zA-Z0-9_-]{8,64}$/.test(nonce)) throw new Error('bad nonce')
+
+    // 2. Build + sign the challenge.
+    const { message, issuedAt } = buildSiweChallengeLocal(addr, {
+      nonce,
+      chainId,
+      appName,
+    })
+    const signature = await signMessage({ message })
+
+    // 3. Server verifies the signature and mints a real Supabase JWT.
+    const { data, error } = await supabase.functions.invoke('siwe-auth', {
+      body: { action: 'verify', message, signature },
+    })
+    if (error || !data?.access_token) {
+      throw error ?? new Error('siwe-auth did not return a token')
+    }
+
+    // Install the session. `refresh_token` is a placeholder: our JWT is the
+    // source of truth and re-signing (not refresh) is how a session renews,
+    // so this value is never used for anything meaningful.
+    const { error: sessionErr } = await supabase.auth.setSession({
+      access_token: data.access_token as string,
+      refresh_token: 'siwe-wallet-session',
+    })
+    if (sessionErr) throw sessionErr
+
+    setSiweMarker({ address: addr, issuedAt }) // never persist the signature
+
+    // The edge function upserted the row keyed by wallet; read it back.
+    return await ensureUser(addr)
+  } catch (err) {
+    // Dev-only fallback BEFORE the edge function / RLS migration are deployed:
+    // verify the signature in-browser and proceed without a JWT session.
+    if (isLocalDev() && isEdgeUnavailable(err)) {
+      return legacyClientSignIn(addr, options)
+    }
+    throw err
+  }
+}
+
+/**
+ * Pre-edge-function dev fallback: client-side verify + marker only, no JWT.
+ * Mirrors the old pre-SIWE behavior so local dev keeps working until the
+ * migration is pushed.
+ */
+async function legacyClientSignIn(
+  addr: `0x${string}`,
+  options: {
+    signMessage: (args: { message: string }) => Promise<`0x${string}`>
+    verifyMessage?: (args: {
+      message: string
+      signature: `0x${string}`
+      address: `0x${string}`
+    }) => Promise<boolean>
+    chainId?: number
+    appName?: string
+  },
+): Promise<User | null> {
   const verifyMessageFn =
     options.verifyMessage ??
     (async (a) => (await import('viem')).verifyMessage(a))
-
-  const addr = walletAddress.toLowerCase() as `0x${string}`
-  const { message, nonce, issuedAt } = buildSiweChallengeLocal(addr, {
-    chainId,
-    appName,
+  const { message, issuedAt } = buildSiweChallengeLocal(addr, {
+    chainId: options.chainId,
+    appName: options.appName,
   })
-
-  // 1. Ask the wallet to personal_sign the challenge.
-  const signature = await signMessage({ message })
-
-  // 2. Verify locally (no server). The verifyMessage helper is the same
-  //    algorithm an edge function would run, just in-browser.
-  const valid = await verifyMessageFn({
-    message,
-    signature,
-    address: addr,
-  })
+  const signature = await options.signMessage({ message })
+  const valid = await verifyMessageFn({ message, signature, address: addr })
   if (!valid) {
-    const err = new Error('SIWE signature did not verify — refusing to sign in.')
-    err.name = 'SiweRejectedError'
-    throw err
+    throw new SiweRejectedError('SIWE signature did not verify — refusing to sign in.')
+  }
+  setSiweMarker({ address: addr, issuedAt })
+  return ensureUser(addr)
+}
+
+function setSiweMarker(marker: { address: string; issuedAt: string }): void {
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem('coffernode:siwe:last', JSON.stringify(marker))
+  }
+}
+
+function isLocalDev(): boolean {
+  if (typeof window === 'undefined') return false
+  return ['localhost', '127.0.0.1'].includes(window.location.hostname)
+}
+
+function isEdgeUnavailable(err: unknown): boolean {
+  const e = err as { type?: string; status?: number }
+  return e?.type === 'FunctionsFetchError' || e?.status === 404
+}
+
+class SiweRejectedError extends Error {
+  override name = 'SiweRejectedError'
+}
+
+/**
+ * Returns the lowercased wallet address claimed in the active Supabase JWT,
+ * or null when there is no session (or the claim is missing).
+ */
+export async function getSessionWallet(): Promise<string | null> {
+  const session = await getSession()
+  if (!session?.access_token) return null
+  const payload = decodeJwtPayload(session.access_token)
+  const wallet = payload?.wallet_address
+  return typeof wallet === 'string' && wallet ? wallet.toLowerCase() : null
+}
+
+/**
+ * Best-effort base64url JWT payload decode (client-side display only — RLS
+ * is what authorizes, and the server re-validates the signature).
+ */
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const [, payload] = token.split('.')
+    if (!payload) return null
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      '=',
+    )
+    return JSON.parse(atob(padded)) as Record<string, unknown>
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Returns true when the connected wallet already has a valid Supabase session
+ * minted against it.
+ */
+export async function isSignedInAs(walletAddress: string): Promise<boolean> {
+  const addr = walletAddress.toLowerCase()
+  return (await getSessionWallet()) === addr
+}
+
+/**
+ * Ensure a session exists for the connected wallet: sign in (SIWE) if needed,
+ * then resolve the user row. This is the entry point called on wallet connect.
+ *
+ * Returns `{ session, user }` — `session=false` means the user declined or the
+ * sign-in failed (caller should keep the app in read-only mode).
+ */
+export async function ensureWalletSession(
+  walletAddress: string,
+  options: {
+    signMessage: (args: { message: string }) => Promise<`0x${string}`>
+    chainId?: number
+    appName?: string
+  },
+): Promise<{ session: boolean; user: User | null }> {
+  const addr = walletAddress.toLowerCase()
+
+  if (await isSignedInAs(addr)) {
+    // Already signed in for this wallet — just resolve the row.
+    return { session: true, user: await ensureUser(addr) }
   }
 
-  // 3. Touch the users row (idempotent).
-  await ensureUser(walletAddress)
-
-  // Stash the SIWE session markers so the dev tools / session panel can
-  // display the latest login. Real JWT minting will replace this once we
-  // land an edge function in a follow-up.
-  if (typeof window !== 'undefined') {
-    window.localStorage.setItem(
-      'coffernode:siwe:last',
-      JSON.stringify({ address: addr, nonce, issuedAt, signature }),
-    )
+  try {
+    await signInWithWallet(addr, options)
+    return { session: true, user: await ensureUser(addr) }
+  } catch (err) {
+    if (err instanceof SiweRejectedError) {
+      console.warn('[ensureWalletSession] sign-in rejected:', err.message)
+    } else {
+      console.error('[ensureWalletSession] sign-in failed:', err)
+    }
+    return { session: false, user: null }
   }
 }
 
@@ -1780,11 +1948,11 @@ export async function signInWithWallet(
  */
 function buildSiweChallengeLocal(
   address: `0x${string}`,
-  options: { chainId?: number; appName?: string } = {},
+  options: { chainId?: number; appName?: string; nonce?: string } = {},
 ): { nonce: string; message: string; issuedAt: string } {
   const issuedAt = new Date().toISOString()
-  // Lazy nonce — keep the function side-effect-free for SSR/test.
-  const nonce = localNonce()
+  // Server-issued nonce when signing in; random fallback in dev.
+  const nonce = options.nonce ?? localNonce()
   const appName = options.appName ?? 'CofferNode'
   const chainLine = options.chainId != null ? `\nChain ID: ${options.chainId}` : ''
   const message =
@@ -1817,9 +1985,8 @@ function localNonce(bytes = 16): string {
 }
 
 /**
- * Drop the SIWE session marker (if any). Currently a no-op for Supabase
- * Auth (no session was minted) but exposed so the navbar profile menu can
- * call it.
+ * Drop the SIWE session marker (if any). Kept for the profile menu; a real
+ * sign-out should use `signOut` which also clears the Supabase session.
  */
 export async function signOutSiweMarker(): Promise<void> {
   if (typeof window !== 'undefined') {
@@ -1828,7 +1995,7 @@ export async function signOutSiweMarker(): Promise<void> {
 }
 
 /**
- * Sign out
+ * Sign out — clears the Supabase session and all caches.
  */
 export async function signOut() {
   clearAllUserCache()

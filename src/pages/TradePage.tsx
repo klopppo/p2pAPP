@@ -144,6 +144,13 @@ export function TradePage() {
     setStage('creating-escrow')
     try {
       const me = await ensureUser(address)
+      if (!me) {
+        // Wallet is connected but no SIWE session was established — ask the
+        // user to sign back in before opening a trade.
+        toast.error(t('trade.errorConnectWallet'))
+        setStage('idle')
+        return
+      }
       if (me.id === offer.seller_id) {
         toast.error(t('trade.errorOwnOffer'))
         setStage('idle')
@@ -160,6 +167,16 @@ export function TradePage() {
       // connected address.
       const buyerWallet = isMakerBuyer ? sellerAddr : address
       const sellerWallet = isMakerBuyer ? address : sellerAddr
+      const buyerWalletValid = /^0x[a-fA-F0-9]{40}$/.test(buyerWallet)
+      const sellerWalletValid = /^0x[a-fA-F0-9]{40}$/.test(sellerWallet)
+      if (!buyerWalletValid || !sellerWalletValid) {
+        toast.error(t('trade.errorInvalidWallet'))
+        setStage('idle')
+        return
+      }
+
+      
+
 
       const cryptoAmount = amountNum / price // human-units (e.g. 1.5 ETH)
 
