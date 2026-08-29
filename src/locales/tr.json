@@ -469,7 +469,9 @@
     "cancelSuccess": "İşlem iptal edildi — depozitolar iade edildi.",
     "cancelFailed": "İptal başarısız: {{message}}",
     "releaseAvailableIn": "Serbest bırakma {{seconds}} içinde",
-    "tradeRemovedOrNoAccess": "Bu işlem kaldırılmış olabilir veya erişim yetkiniz olmayabilir."
+    "tradeRemovedOrNoAccess": "Bu işlem kaldırılmış olabilir veya erişim yetkiniz olmayabilir.",
+    "messageCounterpart": "Karşı tarafa mesaj",
+    "messageCounterpartTitle": "Karşı tarafla sohbeti aç"
   },
   "editProfile": {
     "title": "Profili Düzenle",

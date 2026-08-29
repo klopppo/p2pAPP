@@ -469,7 +469,9 @@
     "cancelSuccess": "交易已取消——保证金已退还。",
     "cancelFailed": "取消失败：{{message}}",
     "releaseAvailableIn": "{{seconds}} 后可释放",
-    "tradeRemovedOrNoAccess": "此交易可能已被移除或您没有访问权限。"
+    "tradeRemovedOrNoAccess": "此交易可能已被移除或您没有访问权限。",
+    "messageCounterpart": "给对方发消息",
+    "messageCounterpartTitle": "打开与对方的聊天"
   },
   "editProfile": {
     "title": "编辑资料",

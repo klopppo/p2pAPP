@@ -469,7 +469,9 @@
     "cancelSuccess": "Trade cancelled — deposits returned.",
     "cancelFailed": "Cancel failed: {{message}}",
     "releaseAvailableIn": "Release available in {{seconds}}",
-    "tradeRemovedOrNoAccess": "This trade may have been removed or you don't have access."
+    "tradeRemovedOrNoAccess": "This trade may have been removed or you don't have access.",
+    "messageCounterpart": "Message counterpart",
+    "messageCounterpartTitle": "Open the chat with your counterpart"
   },
   "editProfile": {
     "title": "Edit Profile",

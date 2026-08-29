@@ -469,7 +469,9 @@
     "cancelSuccess": "Échange annulé — cautions restituées.",
     "cancelFailed": "Échec de l'annulation : {{message}}",
     "releaseAvailableIn": "Libération disponible dans {{seconds}}",
-    "tradeRemovedOrNoAccess": "Cet échange a peut-être été supprimé ou vous n'y avez pas accès."
+    "tradeRemovedOrNoAccess": "Cet échange a peut-être été supprimé ou vous n'y avez pas accès.",
+    "messageCounterpart": "Message au partenaire",
+    "messageCounterpartTitle": "Ouvrir le chat avec le partenaire"
   },
   "editProfile": {
     "title": "Modifier le profil",

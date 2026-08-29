@@ -63,7 +63,7 @@ export function useMessages(conversationId: string | null | undefined) {
               {
                 ...incoming,
                 sender: null,
-              } as MessageWithSender,
+              } as unknown as MessageWithSender,
             ]
           })
           qc.invalidateQueries({ queryKey: ['conversations'] })

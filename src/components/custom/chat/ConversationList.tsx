@@ -1,8 +1,10 @@
 import { useTranslation } from 'react-i18next'
+import { useMemo } from 'react'
 import { MessageCircle } from 'lucide-react'
 import { useConversations } from '@/hooks/useConversations'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { ConversationItem } from './ConversationItem'
+import { createOurTeamConversation, OUR_TEAM_ID } from './ourTeam'
 import { Text } from '@/components/ui/text'
 import { Skeleton } from './Skeleton'
 
@@ -16,11 +18,24 @@ interface Props {
  * The chat sidebar — full list of conversations the current user participates
  * in, sorted by last_message_at desc. Hidden on mobile when a conversation is
  * selected (the right pane takes over).
+ *
+ * The synthetic `ourTeam` virtual contact (welcome system thread) is
+ * prepended when the user is connected — there's no DB row, just a static
+ * welcome pointing to the platform Discord.
  */
 export function ConversationList({ activeId, locallyReadIds, onSelect }: Props) {
   const { t } = useTranslation()
   const { data: user } = useCurrentUser()
   const { data, isLoading, isError } = useConversations()
+
+  const items = useMemo(() => {
+    const real = data ?? []
+    if (!user) return real
+    const ourTeam = createOurTeamConversation(user)
+    // De-dupe if a real conversation ever happens to share the ourTeam id.
+    if (real.some((c) => c.id === OUR_TEAM_ID)) return real
+    return [ourTeam, ...real]
+  }, [data, user])
 
   return (
     <div className="w-[380px] flex-shrink-0 bg-muted/60 backdrop-blur-sm flex flex-col min-h-0">
@@ -43,7 +58,7 @@ export function ConversationList({ activeId, locallyReadIds, onSelect }: Props) 
         {isError && (
           <div className="p-6 text-sm text-destructive">Failed to load conversations.</div>
         )}
-        {data && data.length === 0 && (
+        {!isLoading && items.length === 0 && (
           <div className="p-8 text-center text-sm text-muted-foreground space-y-3">
             <MessageCircle className="w-8 h-8 mx-auto opacity-50" />
             <p>No conversations yet.</p>
@@ -52,17 +67,16 @@ export function ConversationList({ activeId, locallyReadIds, onSelect }: Props) 
             </p>
           </div>
         )}
-        {data &&
-          data.map((c) => (
-            <ConversationItem
-              key={c.id}
-              conversation={c}
-              currentUserId={user?.id ?? null}
-              active={c.id === activeId}
-              locallyRead={locallyReadIds.has(c.id)}
-              onSelect={onSelect}
-            />
-          ))}
+        {items.map((c) => (
+          <ConversationItem
+            key={c.id}
+            conversation={c}
+            currentUserId={user?.id ?? null}
+            active={c.id === activeId}
+            locallyRead={locallyReadIds.has(c.id)}
+            onSelect={onSelect}
+          />
+        ))}
       </div>
     </div>
   )

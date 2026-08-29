@@ -22,6 +22,7 @@ import {
   Timer,
   ExternalLink,
   XCircle,
+  MessageCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -37,6 +38,7 @@ import {
   Ruling,
   type KlerosEscStateValue,
 } from '@/lib/contracts'
+import { useConversationByTradeId } from '@/hooks/useConversations'
 import { useEscrowEventWatcher, useEscrowState } from '@/hooks/useDisputes'
 import {
   EscrowStatus,
@@ -586,6 +588,16 @@ export function TradeDetailPage() {
     liveState === KlerosEscState.COMPLETED ? trade?.id : undefined,
   )
 
+  // Chat counterpart — conversation is created by the
+  // create_conversation_for_trade trigger on trade insert.
+  const { data: conversation } = useConversationByTradeId(
+    trade?.id ?? null,
+  )
+  const messageCounterpart =
+    !!trade && isConnected && !!conversation?.id
+      ? `/app/messages/${conversation.id}`
+      : null
+
   if (isLoading) {
     return (
       <section className="flex items-center justify-center py-20 text-muted-foreground">
@@ -892,6 +904,20 @@ export function TradeDetailPage() {
                 >
                   <ShieldAlert className="w-4 h-4 mr-2" />
                   {t('tradeDetail.raiseDispute')}
+                </Link>
+              </Button>
+            )}
+
+            {messageCounterpart && (
+              <Button
+                asChild
+                variant="ghost"
+                className="rounded-full"
+                title={t('tradeDetail.messageCounterpartTitle')}
+              >
+                <Link to={messageCounterpart}>
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  {t('tradeDetail.messageCounterpart')}
                 </Link>
               </Button>
             )}

@@ -9,7 +9,7 @@ import { LandingPage } from './pages/LandingPage'
 import { OffersPage } from './pages/OffersPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { EditProfilePage } from './pages/EditProfilePage'
-import { ChatPage } from './pages/ChatPage'
+import { ChatLayout } from './components/custom/chat/ChatLayout'
 import { CreateOfferPage } from './pages/CreateOfferPage'
 import { OpenOfferPage } from './pages/OpenOfferPage'
 import { TradePage } from './pages/TradePage'
@@ -53,8 +53,8 @@ function App() {
                 <Route path="profile" element={<ProfilePage />} />
                 <Route path="profile/:walletAddress" element={<ProfilePage />} />
                 <Route path="profile/edit" element={<EditProfilePage />} />
-                <Route path="messages" element={<ChatPage />} />
-                <Route path="messages/:conversationId" element={<ChatPage />} />
+                <Route path="messages" element={<ChatLayout />} />
+                <Route path="messages/:conversationId" element={<ChatLayout />} />
                 <Route path="create-offer" element={<CreateOfferPage />} />
                 <Route path="offer/:id" element={<OpenOfferPage />} />
                 <Route path="trade/:id" element={<TradePage />} />

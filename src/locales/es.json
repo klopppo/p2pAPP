@@ -469,7 +469,9 @@
     "cancelSuccess": "Operación cancelada — depósitos devueltos.",
     "cancelFailed": "Cancelación fallida: {{message}}",
     "releaseAvailableIn": "Liberación disponible en {{seconds}}",
-    "tradeRemovedOrNoAccess": "Esta operación puede que haya sido eliminada o que no tenga acceso."
+    "tradeRemovedOrNoAccess": "Esta operación puede que haya sido eliminada o que no tenga acceso.",
+    "messageCounterpart": "Mensaje a la contraparte",
+    "messageCounterpartTitle": "Abrir el chat con la contraparte"
   },
   "editProfile": {
     "title": "Editar perfil",

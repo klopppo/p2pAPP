@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { MessageCircle } from 'lucide-react'
 import {
   useConversations,
   useConversation,
@@ -15,6 +16,13 @@ import { MessageThread } from './MessageThread'
 import { MessageComposer } from './MessageComposer'
 import { TypingIndicator } from './TypingIndicator'
 import { EmptyState } from './EmptyState'
+import {
+  createOurTeamConversation,
+  OUR_TEAM_ID,
+  OUR_TEAM_WELCOME,
+  OUR_TEAM_DISCORD,
+} from './ourTeam'
+import type { ConversationView, MessageWithSender } from '@/types/database'
 import { Loader2 } from 'lucide-react'
 
 interface Props {
@@ -31,6 +39,11 @@ interface Props {
  * Two-pane chat shell. Wires together all chat hooks (conversations, messages,
  * typing, presence) and renders either the conversation list + active
  * conversation, or an empty state.
+ *
+ * The `ourTeam` virtual conversation (synthetic welcome pointing at the
+ * platform Discord) is handled inline — there's no DB row, so the
+ * conversation query never returns, and the composer is hidden (no thread
+ * to send to).
  *
  * Layout matches the original ChatPage exactly:
  *   - desktop: fixed 380px sidebar + flex-1 chat pane
@@ -51,25 +64,59 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   const fallbackId = conversations.data?.[0]?.id ?? null
   const activeId = forcedId ?? routeId ?? pinnedId ?? fallbackId
 
-  const convQuery = useConversation(activeId)
-  const messages = useMessages(activeId)
-  const send = useSendMessage(activeId)
-  const markRead = useMarkRead(activeId)
+  // Skip the DB hooks entirely for the synthetic ourTeam thread — no
+  // rows to read.
+  const isOurTeam = activeId === OUR_TEAM_ID
+
+  const convQuery = useConversation(isOurTeam ? null : activeId)
+  const messages = useMessages(isOurTeam ? null : activeId)
+  const send = useSendMessage(isOurTeam ? null : activeId)
+  const markRead = useMarkRead(isOurTeam ? null : activeId)
   const identity = user ? { userId: user.id, nickname: user.nickname } : null
-  const typing = useTypingIndicator(activeId, identity)
-  const online = useConversationPresence(activeId, identity)
+  const typing = useTypingIndicator(isOurTeam ? null : activeId, identity)
+  const online = useConversationPresence(isOurTeam ? null : activeId, identity)
 
   const partner = useMemo(() => {
+    if (!user) return null
+    if (isOurTeam) return null
     const conv = convQuery.data
-    if (!conv || !user) return null
+    if (!conv) return null
     return conv.participants.find((p) => p.user_id !== user.id) ?? null
-  }, [convQuery.data, user])
+  }, [convQuery.data, user, isOurTeam])
 
   const partnerOnline = !!partner && online.some((o) => o.user_id === partner.user_id)
 
+  // Synthetic conversation (for ChatHeader) + synthetic messages for the
+  // ourTeam thread. Computed every render but cheap — no DB read.
+  const ourTeamConv: ConversationView | null = user ? createOurTeamConversation(user) : null
+  const ourTeamMessages = useMemo<MessageWithSender[]>(() => {
+    if (!isOurTeam || !user) return []
+    const now = new Date().toISOString()
+    const senderId = '00000000-0000-0000-0000-000000000000' // sentinel id
+    return [
+      {
+        id: 'ourTeam-welcome',
+        conversation_id: OUR_TEAM_ID,
+        sender_id: senderId,
+        body: OUR_TEAM_WELCOME,
+        kind: 'system',
+        created_at: now,
+        sender: {
+          id: senderId,
+          wallet_address: '',
+          nickname: 'ourTeam',
+          avatar_url: null,
+          verification_level: 'trusted',
+        },
+      },
+    ]
+  }, [isOurTeam, user])
+
   // Once messages render, mark the conversation read so the badge clears.
+  // Skip the synthetic ourTeam thread — there's no DB row to mark.
   useEffect(() => {
-    if (!activeId || !user || !messages.data || messages.data.length === 0) return
+    if (!activeId || !user || isOurTeam) return
+    if (!messages.data || messages.data.length === 0) return
     const last = messages.data[messages.data.length - 1]
     if (!last) return
     // Skip the optimistic temp-* ids from `useSendMessage.onMutate` —
@@ -80,13 +127,13 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
     if (last.id.startsWith('temp-')) return
     mark(activeId)
     void markRead(last.id).catch(() => undefined)
-  }, [activeId, user, messages.data, mark, markRead])
+  }, [activeId, user, messages.data, mark, markRead, isOurTeam])
 
   const [draft, setDraft] = useState('')
 
   const handleSend = () => {
     const body = draft.trim()
-    if (!body) return
+    if (!body || isOurTeam) return
     send.mutate({ body })
     setDraft('')
   }
@@ -121,7 +168,8 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
     )
   }
 
-  const noConversations = !!conversations.data && conversations.data.length === 0
+  const noConversations =
+    !!conversations.data && conversations.data.length === 0 && !isOurTeam
   const showSidebar = !activeId || !forcedId
 
   return (
@@ -138,7 +186,9 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
         )}
 
         {activeId ? (
-          convQuery.isLoading ? (
+          isOurTeam && ourTeamConv ? (
+            <OurTeamPane messages={ourTeamMessages} onBack={handleBack} />
+          ) : convQuery.isLoading ? (
             <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
               <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Loading conversation…
             </div>
@@ -191,5 +241,67 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
         )}
       </div>
     </section>
+  )
+}
+
+/**
+ * Right pane for the synthetic ourTeam thread. Renders the welcome
+ * message + a Discord link, hides the composer (no DB row to send to),
+ * and disables the typing indicator.
+ */
+function OurTeamPane({
+  messages,
+  onBack,
+}: {
+  messages: MessageWithSender[]
+  onBack: () => void
+}) {
+  const { data: user } = useCurrentUser()
+  const headerBack = (
+    <button
+      type="button"
+      onClick={onBack}
+      className="md:hidden text-muted-foreground hover:text-foreground text-sm"
+    >
+      ← Back
+    </button>
+  )
+  return (
+    <div className="flex-1 bg-background/20 p-4 flex flex-col min-h-0">
+      {/* Inline minimal header so the welcome thread reads correctly. */}
+      <div className="flex items-center gap-3 pb-3 border-b border-border/40">
+        {headerBack}
+        <div className="h-10 w-10 rounded-full bg-primary/15 text-primary flex items-center justify-center shrink-0">
+          <MessageCircle className="w-5 h-5" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold">ourTeam</p>
+          <p className="text-xs text-muted-foreground">CofferNode support</p>
+        </div>
+      </div>
+
+      <MessageThread
+        messages={messages}
+        currentUserId={user?.id ?? ''}
+        partnerAvatarUrl={null}
+        partnerInitial="OT"
+        loading={false}
+        onLoadOlder={() => undefined}
+      />
+
+      <div className="pt-4 border-t border-border/50 flex flex-wrap gap-2">
+        <a
+          href={OUR_TEAM_DISCORD}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
+        >
+          Open Discord
+        </a>
+        <span className="text-xs text-muted-foreground self-center">
+          Live community support — Discord is the fastest channel.
+        </span>
+      </div>
+    </div>
   )
 }
