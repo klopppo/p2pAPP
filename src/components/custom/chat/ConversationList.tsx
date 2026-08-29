@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { MessageCircle } from 'lucide-react'
 import { useConversations } from '@/hooks/useConversations'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { ConversationItem } from './ConversationItem'
 import { Text } from '@/components/ui/text'
 import { Skeleton } from './Skeleton'
@@ -18,6 +19,7 @@ interface Props {
  */
 export function ConversationList({ activeId, locallyReadIds, onSelect }: Props) {
   const { t } = useTranslation()
+  const { data: user } = useCurrentUser()
   const { data, isLoading, isError } = useConversations()
 
   return (
@@ -55,6 +57,7 @@ export function ConversationList({ activeId, locallyReadIds, onSelect }: Props) 
             <ConversationItem
               key={c.id}
               conversation={c}
+              currentUserId={user?.id ?? null}
               active={c.id === activeId}
               locallyRead={locallyReadIds.has(c.id)}
               onSelect={onSelect}

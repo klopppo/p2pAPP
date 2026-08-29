@@ -184,6 +184,9 @@ export const KLEROS_ESC_ABI = parseAbi([
  *  Owners operate through a multisig via `cast` today (see
  *  docs/factory-admin-runbook.md); these entries are here so a future admin
  *  page can drive them without ABI drift.
+ *
+ *  Also includes the events the factory emits so `decodeEventLog` /
+ *  `parseEventLogs` can identify them in receipts.
  */
 export const KLEROS_ESCROW_FACTORY_ABI = parseAbi([
   'function createEscrow(address buyer, address seller, uint256 gracePeriod, uint256 tradeAmount, uint256 securityDepositPct) external returns (address)',
@@ -209,6 +212,22 @@ export const KLEROS_ESCROW_FACTORY_ABI = parseAbi([
   'function setTreasury(address _treasury) external',
   'function acceptTreasury() external',
   'function owner() external view returns (address)',
+  // Events emitted by the factory — see KlerosEscrowFactory.sol:50-74.
+  // Without these entries viem's decodeEventLog throws AbiEventNotFoundError
+  // for every log in the receipt and the caller falls through to the
+  // escrowCountByBuyer fallback (which is race-prone for concurrent trades).
+  // Three indexed topics (buyer, seller, creator) followed by the data
+  // payload (escrowAddress, escrowTreasury, gracePeriod, feeBps, tradeAmount,
+  // securityDepositPct).
+  'event EscrowCreated(address indexed buyer, address indexed seller, address indexed creator, address escrowAddress, address escrowTreasury, uint256 gracePeriod, uint256 feeBps, uint256 tradeAmount, uint256 securityDepositPct)',
+  // Immutable-config stamp emitted on the same proxy address right after.
+  'event KlerosEscrowConfigured(address indexed escrowAddress, address indexed klerosCourt, bytes32 klerosExtraDataPart1, bytes32 klerosExtraDataPart2)',
+  // Admin events — useful if a future admin page wants to watch fee /
+  // treasury changes without polling.
+  'event FeeUpdated(uint256 newFeeBps)',
+  'event PendingFeeSet(uint256 pendingFeeBps)',
+  'event TreasuryUpdated(address newTreasury)',
+  'event TreasuryChangeRequested(address indexed newTreasury)',
 ]) satisfies Abi
 
 /** IKlerosCourt — ERC-792 subset used for fee estimation and (optionally)

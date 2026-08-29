@@ -6,9 +6,12 @@ import { useCurrentUser } from './useCurrentUser'
 /**
  * All conversations the current user participates in, newest activity first.
  *
- * Wires a Supabase Realtime channel on `conversations` and `messages` so the
- * sidebar updates without polling: a new message anywhere bumps the
- * conversation's `last_message_at`, the sidebar re-sorts automatically.
+ * Wires a single Supabase Realtime channel on `conversations` only — the
+ * `bump_conversation_last_message` trigger updates `last_message_at` and
+ * `last_message_preview` server-side on every new message, so a per-message
+ * subscription here would be wasteful (every insert in the whole `messages`
+ * table would invalidate this query). Per-conversation realtime lives in
+ * `useMessages` for the active chat.
  */
 export function useConversations() {
   const { data: user } = useCurrentUser()
@@ -28,11 +31,6 @@ export function useConversations() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'conversations' },
-        () => qc.invalidateQueries({ queryKey: ['conversations', user.id] })
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
         () => qc.invalidateQueries({ queryKey: ['conversations', user.id] })
       )
       .subscribe()
