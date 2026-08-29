@@ -15,9 +15,12 @@
 --    Dropping it removes a dead schema surface.
 --
 -- 4. message_kind enum's 'payment_hint' value was defined but no UI ever
---    emits it. Drop the enum value (PG ≥ 10 supports DROP VALUE when no
---    row references it). Wrapped in a do-block so an older deploy with a
---    straggler row doesn't fail the migration.
+--    emits it. Intentionally NOT dropped here: ALTER TYPE ... DROP VALUE
+--    cannot run inside a transaction block, and supabase applies every
+--    migration file inside a transaction (all-or-nothing, tracked in
+--    supabase_migrations.schema_migrations). The value lingers as an
+--    unused-but-valid label; drop it out-of-band with the manual command
+--    noted in section 4.
 
 -- ---------------------------------------------------------------------------
 -- 1. Wider trigger scope.
@@ -31,7 +34,6 @@ language plpgsql
 security definer
 as $$
 declare
-  v_other_id uuid;
   v_other_body text;
   v_other_at   timestamptz;
 begin
@@ -133,26 +135,17 @@ end $$;
 drop table if exists public.message_attachments;
 
 -- ---------------------------------------------------------------------------
--- 4. Drop 'payment_hint' from message_kind enum (PG ≥ 10).
---    No v1 row has been written with this kind; guarded for older
---    deployments where a straggler row may still exist.
+-- 4. message_kind 'payment_hint' — deliberately kept.
+--    ALTER TYPE ... DROP VALUE cannot execute inside a transaction block, and
+--    supabase runs each migration file in a transaction, so dropping the enum
+--    value from a migration is not reliably possible. The value was never
+--    emitted by the UI, so it remains harmlessly as an unused label (kept in
+--    sync with MessageKind.PAYMENT_HINT in src/types/database.ts).
+--
+--    To drop it out-of-band (NOT via `supabase db push` / a migration), run on
+--    a maintenance connection after confirming no row uses it:
+--
+--      select count(*) from public.messages where kind = 'payment_hint';
+--      --                     ^ 0 required, otherwise the value is still in use
+--      alter type message_kind drop value 'payment_hint';
 -- ---------------------------------------------------------------------------
-
-do $$
-begin
-  if exists (
-    select 1 from pg_enum e
-      join pg_type t on t.oid = e.enumtypid
-    where t.typname = 'message_kind' and e.enumlabel = 'payment_hint'
-  ) then
-    -- Block the migration if any row still references the value, so we don't
-    -- accidentally nuke data via CASCADE on dependent indexes.
-    if exists (
-      select 1 from public.messages where kind = 'payment_hint'
-    ) then
-      raise notice 'Skipping DROP VALUE ''payment_hint'' on message_kind — rows still reference it';
-    else
-      alter type message_kind drop value if exists 'payment_hint';
-    end if;
-  end if;
-end $$;
