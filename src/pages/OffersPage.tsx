@@ -34,6 +34,7 @@ interface Offer {
   minAmount: number
   maxAmount: number
   isPositive: boolean
+  isPrivate: boolean
   seller: SellerPreview
   paymentMethods: string[]
 }
@@ -55,6 +56,7 @@ interface OfferRow {
   price_per_unit: number | string
   min_amount: number | string
   max_amount: number | string
+  is_private?: boolean
   payment_methods?: string[] | null
   tags?: string[] | null
   seller?: {
@@ -86,6 +88,7 @@ function mapOfferRow(o: OfferRow): Offer {
     minAmount: Number(o.min_amount) || 0,
     maxAmount: Number(o.max_amount) || 0,
     isPositive: o.type === 'buy',
+    isPrivate: Boolean(o.is_private),
     seller: {
       name: o.seller?.nickname ?? sellerAddr,
       address: sellerAddr,
@@ -305,12 +308,19 @@ export function OffersPage() {
                           </SellerHoverCard>
                         </TableCell>
                         <TableCell>
+                          <div className="flex items-center gap-2">
                           <Badge
                             variant={offer.type === 'buy' ? 'default' : 'secondary'}
                             className="rounded-full"
                           >
                             {offer.type}
                           </Badge>
+                          {offer.isPrivate && (
+                            <Badge variant="outline" className="rounded-full">
+                              {t('offers.private')}
+                            </Badge>
+                          )}
+                          </div>
                         </TableCell>
                         <TableCell className="font-medium">{offer.token}</TableCell>
                         <TableCell className="text-right font-mono">{offer.priceDisplay}</TableCell>

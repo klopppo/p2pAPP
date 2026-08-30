@@ -9,6 +9,33 @@
 
 ---
 
+## Private offers (target-only) implemented — 2026-08-30
+
+Offers now support `is_private` + `target_user` (wallet address, DB-enforced
+consistency CHECK). RLS restricts reads of private rows to the seller and the
+target only (`offers_select_public` = `is_private = false`,
+`offers_select_private_parties`); an AFTER INSERT security-definer trigger
+`notify_private_offer_target` drops a `trade_update` notification to the
+target. UI: CreateOffer sends the fields + validates the address,
+Offers/Profile/OpenOffer show a "Private" badge, and the bell routes
+`payload.offer_id` to `/app/offer/:id`. Migration
+`supabase/migrations/20260830000001_offers_private_target.sql`.
+
+---
+
+## Offer unit mapping fixed on Create Offer (buy/sell) — 2026-08-30
+
+`CreateOfferPage` was storing `crypto_amount = maxAmount` (fiat value) and
+`fiat_amount = maxAmount * price` — nonsense units. Now min/max stay fiat and
+the crypto quantity is derived (`crypto_amount = maxAmount / price`,
+`fiat_amount = maxAmount`), matching the trade flow. Added a per-asset standard
+decimals map (BTC 8, ETH/DAI 18, stablecoins 6) to round derived quantities, a
+live "≈ X BTC" preview under max amount, and a fiat-units hint. i18n keys
+`createOffer.amountInFiat` + `createOffer.cryptoEstimate` added in all 5
+locales. `src/pages/CreateOfferPage.tsx`, `src/locales/*.json`.
+
+---
+
 ## Production build fix + live test runbook — 2026-08-30
 
 `npm run build` was failing (`tsc -b`): wagmi's `signMessage` is sync/void;

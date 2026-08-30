@@ -148,6 +148,20 @@ describe("final RLS posture: allow/deny per table × role × command", () => {
     expect(scoped).toEqual([])
   })
 
+  it("offers: private rows are readable only by the seller or the pinned target wallet", () => {
+    const selectPols = policiesFor("offers").filter((p) => p.cmd === "select")
+    const pub = selectPols.find((p) => p.roles.includes("anon"))
+    expect(pub, "public marketplace read must exclude private rows").toBeDefined()
+    expect(pub!.using).toMatch(/is_private\s*=\s*false/)
+
+    const priv = selectPols.find((p) => p.name === "offers_select_private_parties")
+    expect(priv, "private-offer read policy").toBeDefined()
+    expect(priv!.roles).toEqual(["authenticated"])
+    expect(priv!.using).toMatch(/is_private\s*=\s*true/)
+    expect(priv!.using).toMatch(/target_user/)
+    expect(priv!.using).toMatch(/current_user_id\(\)|auth\.jwt\(/)
+  })
+
   it("messages: sender_id is server-wallet-bound on insert (NO message spoofing possible)", () => {
     const insert = policiesFor("messages").find((p) => p.cmd === "insert")
     expect(insert).toBeDefined()

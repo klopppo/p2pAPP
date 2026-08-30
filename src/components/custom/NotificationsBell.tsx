@@ -43,6 +43,8 @@ export function NotificationsBell() {
     if (n.conversation_id) navigate(`/app/messages/${n.conversation_id}`)
     else if (n.trade_id) navigate(`/app/trade/${n.trade_id}`)
     else if (n.kind === 'dispute_update') navigate('/app/disputes')
+    else if (n.payload?.offer_id)
+      navigate(`/app/offer/${String(n.payload.offer_id)}`)
   }
 
   const count = unread.data ?? 0

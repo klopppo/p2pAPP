@@ -249,6 +249,13 @@ export interface Offer {
   payment_methods: string[]
   available_regions: string[]
 
+  /** Target-only offer (migration 20260830000001). Private rows are readable
+   *  only by the seller and `target_user`; a target_user always implies
+   *  is_private = true (DB CHECK). */
+  is_private: boolean
+  /** 20-byte ETH address of the single candidate who may accept this offer. */
+  target_user: string | null
+
   platform_fee_bps: number
   network_fee: number
 

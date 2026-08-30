@@ -41,6 +41,7 @@ interface Offer {
   minAmount: number
   maxAmount: number
   isPositive: boolean
+  isPrivate: boolean
   seller: {
     name: string
     address: string
@@ -131,6 +132,7 @@ export function ProfilePage() {
         crypto_amount: number | string
         min_amount: number | string
         max_amount: number | string
+        is_private?: boolean
         tags?: string[]
         payment_methods?: string[]
         seller?: {
@@ -157,6 +159,7 @@ export function ProfilePage() {
         minAmount: Number(row.min_amount) || 0,
         maxAmount: Number(row.max_amount) || 0,
         isPositive: row.type === 'buy',
+        isPrivate: Boolean(row.is_private),
         seller: {
           name: row.seller?.nickname ?? sellerAddr,
           address: sellerAddr,
@@ -393,9 +396,16 @@ export function ProfilePage() {
                     className="hover:bg-muted/50 transition-colors border-b border-border/50 cursor-pointer"
                   >
                     <TableCell>
+                      <div className="flex items-center gap-2">
                       <Badge variant={offer.type === 'buy' ? 'default' : 'secondary'} className="rounded-full">
                         {offer.type}
                       </Badge>
+                      {offer.isPrivate && (
+                        <Badge variant="outline" className="rounded-full">
+                          {t('offers.private')}
+                        </Badge>
+                      )}
+                      </div>
                     </TableCell>
                     <TableCell className="font-medium">{offer.token}</TableCell>
                     <TableCell className="text-right font-mono">{offer.priceDisplay}</TableCell>

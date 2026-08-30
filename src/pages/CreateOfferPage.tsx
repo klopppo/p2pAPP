@@ -19,6 +19,28 @@ import { Label } from '@/components/ui/label'
 import { Check, ChevronDown, Loader2 } from 'lucide-react'
 import { createOffer, ensureUser } from '@/lib/supabase'
 
+// Standard unit-of-measure decimals per asset. offers.crypto_amount /
+// min/max_amount are NUMERIC(30,18) but stored in the asset's natural human
+// units (e.g. 0.5 ETH), so derived crypto quantities are rounded to the
+// token's standard precision before persisting / previewing.
+const TOKEN_DECIMALS: Record<string, number> = {
+  BTC: 8,
+  ETH: 18,
+  USDC: 6,
+  USDT: 6,
+  DAI: 18,
+  EUR: 2,
+  USD: 2,
+  GBP: 2,
+}
+const tokenDecimals = (token: string) => TOKEN_DECIMALS[token] ?? 8
+const roundTo = (value: number, decimals: number) => Number(value.toFixed(decimals))
+const roundFiat = (value: number) => roundTo(value, 2)
+const formatTokenAmount = (value: number, token: string) =>
+  value.toLocaleString('en-US', {
+    maximumFractionDigits: Math.min(tokenDecimals(token), 12),
+  })
+
 interface OfferForm {
   type: 'buy' | 'sell'
   token: string
@@ -77,6 +99,13 @@ export function CreateOfferPage() {
       toast.error(t('createOffer.errorMaxLessThanMin'))
       return
     }
+    if (
+      formData.isPrivate &&
+      !/^0x[a-fA-F0-9]{40}$/.test(formData.targetUser.trim())
+    ) {
+      toast.error(t('createOffer.errorTargetUserInvalid'))
+      return
+    }
 
     setIsSubmitting(true)
 
@@ -93,16 +122,29 @@ export function CreateOfferPage() {
       // NOTE: available_regions is CHAR(2)[] (ISO country codes), so map the
       // human-readable location. grace_period_hours has no DB column, so it is
       // intentionally not sent (the form field stays for future use).
+      //
+      // Units: min/max are entered in fiat (EUR). The crypto quantity is
+      // derived from the price per unit — same inverse relationship the trade
+      // flow uses (crypto_amount = fiat_amount / price_per_unit) — and rounded
+      // to the asset's standard decimals.
+      const cryptoAmount = roundTo(
+        formData.maxAmount / formData.price,
+        tokenDecimals(formData.token),
+      )
       const offerData = {
         seller_id: me.id,
         type: formData.type,
         crypto_token: formData.token,
-        crypto_amount: formData.maxAmount, // Using max amount for now
+        crypto_amount: cryptoAmount,
         fiat_currency: 'EUR',
-        fiat_amount: formData.maxAmount * formData.price,
+        fiat_amount: roundFiat(formData.maxAmount),
         price_per_unit: formData.price,
-        min_amount: formData.minAmount,
-        max_amount: formData.maxAmount,
+        min_amount: roundFiat(formData.minAmount),
+        max_amount: roundFiat(formData.maxAmount),
+        is_private: formData.isPrivate,
+        target_user: formData.isPrivate
+          ? formData.targetUser.trim().toLowerCase()
+          : null,
         payment_methods: [formData.paymentMethod],
         description: formData.description.trim() || null,
         available_regions:
@@ -238,6 +280,10 @@ export function CreateOfferPage() {
                   </div>
 
                   {/* Amount Range */}
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      {t('createOffer.amountInFiat', { currency: 'EUR' })}
+                    </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="minAmount" className="text-base font-semibold mb-2 block">
@@ -264,7 +310,16 @@ export function CreateOfferPage() {
                         className="rounded-full border border-border"
                         placeholder="50000"
                       />
+                      {formData.price > 0 && formData.maxAmount > 0 && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {t('createOffer.cryptoEstimate', {
+                            amount: formatTokenAmount(formData.maxAmount / formData.price, formData.token),
+                            token: formData.token,
+                          })}
+                        </p>
+                      )}
                     </div>
+                  </div>
                   </div>
 
                   {/* Payment and Location */}

@@ -551,6 +551,16 @@ CREATE TABLE offers (
     payment_methods     TEXT[] NOT NULL,
     available_regions   CHAR(2)[] NOT NULL DEFAULT '{}',
 
+    is_private          BOOLEAN NOT NULL DEFAULT false,
+    target_user         VARCHAR(42),
+    CONSTRAINT offers_private_consistency_check CHECK (
+      (is_private = false AND target_user IS NULL)
+      OR (is_private = true AND target_user IS NOT NULL)
+    ),
+    CONSTRAINT offers_target_user_address_check CHECK (
+      target_user IS NULL OR target_user ~ '^0x[a-fA-F0-9]{40}$'
+    ),
+
     platform_fee_bps    INT NOT NULL DEFAULT 50 CHECK (platform_fee_bps BETWEEN 0 AND 5000),
     network_fee         NUMERIC(20,8) NOT NULL DEFAULT 0,
 

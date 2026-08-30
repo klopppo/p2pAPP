@@ -138,9 +138,16 @@ export function OpenOfferPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 items-start">
                 <div className="space-y-1.5">
                    <Text variant="small" className="text-muted-foreground">{t('openOffer.type')}</Text>
+                  <div className="flex flex-wrap items-center gap-2">
                   <Badge variant={offer.type === 'buy' ? 'default' : 'secondary'} className="rounded-full">
                     {offer.type} {offer.crypto_token}
                   </Badge>
+                  {offer.is_private && (
+                    <Badge variant="outline" className="rounded-full">
+                      {t('offers.private')}
+                    </Badge>
+                  )}
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                    <Text variant="small" className="text-muted-foreground">{t('openOffer.pricePerUnit', { token: offer.crypto_token })}</Text>
