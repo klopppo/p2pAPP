@@ -1659,6 +1659,90 @@ export async function markAllNotificationsRead(userId: string) {
   }
 }
 
+/**
+ * Backfill notifications for private (target-only) offers that were created
+ * while the target wallet had not signed in yet.
+ *
+ * The `notify_private_offer_target` DB trigger (migration 20260830000001) can
+ * only notify a target that already has a `users` row — for a *candidate*
+ * target (never connected) it silently skips. So the moment the wallet signs
+ * in and a `users` row exists, we look up any active private offers pinned to
+ * this wallet that have no notification yet and insert one. This satisfies
+ * the flow requirement: a private offer to a candidate target surfaces *only*
+ * to them, and they get a notification when they connect.
+ *
+ * Idempotent: we skip offers that already have a `trade_update` notification
+ * carrying the same `payload.offer_id` (covers the immediate-trigger case and
+ * repeated connects). RLS scopes the `offers` read to the JWT's wallet claim,
+ * so this can never leak another wallet's private offers.
+ */
+export async function backfillPendingPrivateOffers(
+  userId: string,
+  walletAddress: string
+): Promise<void> {
+  const target = walletAddress.toLowerCase()
+
+  const { data: offers, error: offersErr } = await supabase
+    .from('offers')
+    .select('id, type, crypto_token, max_amount, fiat_currency, expires_at')
+    .eq('is_private', true)
+    .eq('target_user', target)
+    .eq('status', OfferStatus.ACTIVE)
+
+  if (offersErr) {
+    // Private rows are RLS-filtered; a signed-in non-target gets [] silently.
+    console.error('[backfillPendingPrivateOffers] read error:', offersErr)
+    throw offersErr
+  }
+
+  const pending = offers ?? []
+
+  // Existing notifications keyed by their payload.offer_id, so we don't
+  // double-notify when the trigger already fired (registered target) or on a
+  // repeated connect.
+  const { data: existing, error: notifErr } = await supabase
+    .from('notifications')
+    .select('payload')
+    .eq('user_id', userId)
+    .eq('kind', 'trade_update')
+
+  if (notifErr) {
+    console.error('[backfillPendingPrivateOffers] notif read error:', notifErr)
+    throw notifErr
+  }
+
+  const notifiedOfferIds = new Set<string>(
+    (existing ?? [])
+      .map((n) =>
+        typeof n.payload === 'object' && n.payload !== null
+          ? (n.payload as { offer_id?: unknown }).offer_id
+          : undefined
+      )
+      .filter((id): id is string => typeof id === 'string')
+  )
+
+  const toInsert = pending.filter((o) => !notifiedOfferIds.has(o.id))
+  if (toInsert.length === 0) return
+
+  const { error: insertErr } = await supabase.from('notifications').insert(
+    toInsert.map((o) => ({
+      user_id: userId,
+      kind: 'trade_update',
+      title: 'You received a private offer',
+      body: `${o.type.toUpperCase()} ${o.crypto_token} · max ${o.max_amount} ${o.fiat_currency}`,
+      payload: {
+        offer_id: o.id,
+        url: `/app/offer/${o.id}`,
+      },
+    }))
+  )
+
+  if (insertErr) {
+    console.error('[backfillPendingPrivateOffers] insert error:', insertErr)
+    throw insertErr
+  }
+}
+
 export async function getNotificationPreferences(userId: string) {
   const { data, error } = await supabase
     .from('notification_preferences')
@@ -1923,14 +2007,27 @@ export async function ensureWalletSession(
 ): Promise<{ session: boolean; user: User | null }> {
   const addr = walletAddress.toLowerCase()
 
+  const resolveSession = async (): Promise<{ session: boolean; user: User | null }> => {
+    const user = await ensureUser(addr)
+    if (user) {
+      // Surface any private offers that targeted this wallet before it ever
+      // connected (the DB trigger can't notify a not-yet-registered target).
+      // Fire-and-forget: never let a notification hiccup block sign-in.
+      backfillPendingPrivateOffers(user.id, addr).catch((err) =>
+        console.error('[ensureWalletSession] private-offer backfill failed:', err)
+      )
+    }
+    return { session: true, user }
+  }
+
   if (await isSignedInAs(addr)) {
     // Already signed in for this wallet — just resolve the row.
-    return { session: true, user: await ensureUser(addr) }
+    return resolveSession()
   }
 
   try {
     await signInWithWallet(addr, options)
-    return { session: true, user: await ensureUser(addr) }
+    return resolveSession()
   } catch (err) {
     if (err instanceof SiweRejectedError) {
       console.warn('[ensureWalletSession] sign-in rejected:', err.message)
