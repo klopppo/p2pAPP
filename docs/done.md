@@ -9,6 +9,33 @@
 
 ---
 
+## Trader rating: lucide Star icon instead of raw `★` glyph — 2026-08-30
+
+Replaced the raw text `★` character + `—` fallback in the OpenOffer and Trade
+pages with the lucide `Star` icon (filled, primary) + the decimal rating, and a
+localized "No ratings yet" label when `avg_rating` is absent/zero (was a bare
+`—`). i18n keys `openOffer.noRating` + `trade.noRating` added in all 5 locales.
+Files: `src/pages/OpenOfferPage.tsx`, `src/pages/TradePage.tsx`,
+`src/locales/*.json`.
+
+---
+
+## Private offers: notify the candidate target on first connect — 2026-08-30
+
+Closed the gap where a *candidate* target (wallet never connected → no
+`users` row) got a private offer but no notification and no surfaced
+visibility: the DB trigger `notify_private_offer_target` can only notify a
+registered `users.id`, so it skipped. Now `ensureWalletSession` calls new
+`backfillPendingPrivateOffers(userId, wallet)` — after sign-in it reads any
+active private offers pinned to the wallet (RLS-scoped, no cross-wallet leak)
+and inserts a `trade_update` notification for those with no existing
+`payload.offer_id`, so the offer is visible *only* to the target and they get
+the bell/email notification the moment they connect. Idempotent (skips offers
+already notified by the trigger or on repeated connects). Files:
+`src/lib/supabase/index.ts`.
+
+---
+
 ## Private offers (target-only) implemented — 2026-08-30
 
 Offers now support `is_private` + `target_user` (wallet address, DB-enforced
