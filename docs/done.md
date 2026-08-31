@@ -9,7 +9,18 @@
 
 ---
 
-## Trader rating: lucide Star icon instead of raw `★` glyph — 2026-08-30
+## Fix "Maximum update depth exceeded" — infinite re-render sources — 2026-08-31
+
+Hardened six `useEffect` dependency arrays that re-ran effects on every render
+or created unstable references, eliminating chat/notification/esrow re-connect
+loops and redundant writes. Changes:
+- `src/components/custom/chat/ChatLayout.tsx` — `identity` object now memoized (`useMemo`) so `useTypingIndicator`/`useConversationPresence` stop tearing down/re-subscribing Supabase channels each render; added `lastMarkedRef` to de-dupe `markRead` calls across refetch.
+- `src/pages/TradeDetailPage.tsx` — `useEscrowEventWatcher` callback wrapped in `useCallback` so the contract-event watcher isn't re-subscribed on every render.
+- `src/components/custom/NotificationDispatcherHost.tsx` — reads latest `prefs.data` via ref instead of putting the array in the effect dep array (`user?.id` dep only).
+- `src/components/custom/NotificationsBell.tsx` — refetch effect depends on stable `useUnreadCount().refetch` instead of the whole query object.
+- `src/hooks/useConversations.ts` / `useNotifications.ts` — realtime effect deps narrowed to `user?.id`.
+
+---
 
 Replaced the raw text `★` character + `—` fallback in the OpenOffer and Trade
 pages with the lucide `Star` icon (filled, primary) + the decimal rating, and a

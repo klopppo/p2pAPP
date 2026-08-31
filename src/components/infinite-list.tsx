@@ -13,12 +13,6 @@ export function useInfiniteList({
 
   const bias = useMemo(() => {
     const bias = Math.max(0, (initialItems?.length ?? 0) - pageSize)
-    if (bias !== pageSize && bias !== 0) {
-      console.warn(
-        `[useInfiniteList] bias (${bias}) differs from pageSize (${pageSize}). ` +
-          `This will cause instantly displayed items to be appended with more items when the next page loads.`
-      )
-    }
     return bias
   }, [initialItems?.length, pageSize])
 

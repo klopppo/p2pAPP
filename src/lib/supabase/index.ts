@@ -176,7 +176,6 @@ export async function getUserByWallet(walletAddress: string) {
       // No rows found - this is expected for new users
       return null
     }
-    console.error('Error fetching user:', error)
     throw error
   }
 
@@ -216,7 +215,6 @@ export async function ensureUser(walletAddress: string): Promise<User | null> {
     .maybeSingle()
 
   if (readErr) {
-    console.error('[ensureUser] read error:', readErr)
     throw readErr
   }
 
@@ -227,9 +225,7 @@ export async function ensureUser(walletAddress: string): Promise<User | null> {
       .from('users')
       .update({ last_active_at: new Date().toISOString() })
       .eq('wallet_address', addr)
-      .then(({ error }) => {
-        if (error) console.warn('[ensureUser] last_active_at update failed:', error)
-      })
+      .then(() => {})
 
     const user = existing as User
     setCachedUser(user)
@@ -249,7 +245,6 @@ export async function ensureUser(walletAddress: string): Promise<User | null> {
     .single()
 
   if (insertErr) {
-    console.error('[ensureUser] insert error:', insertErr)
     throw insertErr
   }
 
@@ -297,7 +292,6 @@ export async function updateUserProfile(
     .single()
 
   if (error) {
-    console.error('[updateUserProfile] error:', error)
     throw error
   }
 
@@ -329,7 +323,6 @@ export async function uploadAvatar(
     .upload(path, file, { upsert: true, cacheControl: '3600' })
 
   if (uploadErr) {
-    console.error('[uploadAvatar] upload error:', uploadErr)
     throw uploadErr
   }
 
@@ -372,7 +365,6 @@ export async function updateUserReputation(userId: string, delta: number) {
   })
 
   if (error) {
-    console.error('Error updating reputation:', error)
     throw error
   }
 }
@@ -397,7 +389,6 @@ export async function getActiveOffers(limit = 50, offset = 0) {
     .range(offset, offset + limit - 1)
 
   if (error) {
-    console.error('Error fetching offers:', error)
     throw error
   }
 
@@ -424,7 +415,6 @@ export async function getOffersBySeller(sellerId: string, status?: OfferStatus) 
   const { data, error } = await query
 
   if (error) {
-    console.error('Error fetching seller offers:', error)
     throw error
   }
 
@@ -460,7 +450,6 @@ export async function getOfferById(id: string) {
     if (error.code === 'PGRST116') {
       return null
     }
-    console.error('Error fetching offer:', error)
     throw error
   }
 
@@ -483,7 +472,6 @@ export async function createOffer(offerData: Partial<Offer>) {
     .single()
 
   if (error) {
-    console.error('Error creating offer:', error)
     throw error
   }
 
@@ -532,7 +520,6 @@ export async function getActiveTradesByBuyer(buyerId: string) {
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching trades:', error)
     throw error
   }
 
@@ -556,7 +543,6 @@ export async function getActiveTradesBySeller(sellerId: string) {
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching trades:', error)
     throw error
   }
 
@@ -583,7 +569,6 @@ export async function getTradeByTradeId(tradeId: string) {
     if (error.code === 'PGRST116') {
       return null
     }
-    console.error('Error fetching trade:', error)
     throw error
   }
 
@@ -609,7 +594,6 @@ export async function getTradeById(id: string) {
 
   if (error) {
     if (error.code === 'PGRST116') return null
-    console.error('Error fetching trade by id:', error)
     throw error
   }
 
@@ -640,7 +624,6 @@ export async function upsertTradeEscrowStatus(
     .single()
 
   if (error) {
-    console.error('Error updating trade escrow status:', error)
     throw error
   }
 
@@ -698,7 +681,6 @@ export async function updateTradeStatus(
     .single()
 
   if (error) {
-    console.error('Error updating trade status:', error)
     throw error
   }
 
@@ -744,7 +726,6 @@ export async function setTradeEscrowStatus(
     .single()
 
   if (error) {
-    console.error('Error setting trade escrow status:', error)
     throw error
   }
 
@@ -807,7 +788,6 @@ export async function createTrade(input: CreateTradeInput) {
     .single()
 
   if (error) {
-    console.error('Error creating trade:', error)
     throw error
   }
 
@@ -843,7 +823,6 @@ export async function getTradesByUser(userId: string) {
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching user trades:', error)
     throw error
   }
 
@@ -863,7 +842,6 @@ export async function getTradeByEscrowAddress(escrowAddress: string) {
     .maybeSingle()
 
   if (error) {
-    console.error('Error fetching trade by escrow:', error)
     throw error
   }
 
@@ -889,7 +867,6 @@ export async function logTradeEvent(
   })
 
   if (error) {
-    console.error('Error logging trade event:', error)
     throw error
   }
 }
@@ -914,7 +891,6 @@ export async function createKYCApplication(userId: string, kycData: Partial<KYCA
     .single()
 
   if (error) {
-    console.error('Error creating KYC application:', error)
     throw error
   }
 
@@ -935,7 +911,6 @@ export async function getKYCApplicationByUser(userId: string) {
     if (error.code === 'PGRST116') {
       return null
     }
-    console.error('Error fetching KYC application:', error)
     throw error
   }
 
@@ -1009,7 +984,6 @@ export async function updateDisputeOnChain(
     .single()
 
   if (error) {
-    console.error('Error updating dispute on-chain state:', error)
     throw error
   }
   return data
@@ -1032,7 +1006,6 @@ export async function createDispute(disputeData: Partial<Dispute>) {
     .single()
 
   if (error) {
-    console.error('Error creating dispute:', error)
     throw error
   }
 
@@ -1125,7 +1098,6 @@ export async function insertDisputeEvidence(
     .insert(rows)
     .select()
   if (error) {
-    console.error('Error inserting dispute evidence:', error)
     throw error
   }
   return data ?? []
@@ -1141,7 +1113,6 @@ export async function getDisputesByTrade(tradeId: string) {
     .eq('trade_id', tradeId)
 
   if (error) {
-    console.error('Error fetching disputes:', error)
     throw error
   }
 
@@ -1166,7 +1137,6 @@ export async function getDisputesByUser(userId: string) {
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching user disputes:', error)
     throw error
   }
 
@@ -1198,7 +1168,6 @@ export async function getDisputeById(id: string) {
 
   if (error) {
     if (error.code === 'PGRST116') return null
-    console.error('Error fetching dispute:', error)
     throw error
   }
 
@@ -1223,7 +1192,6 @@ export async function submitTradeRating(ratingData: Partial<TradeRating>) {
     .single()
 
   if (error) {
-    console.error('Error submitting rating:', error)
     throw error
   }
 
@@ -1245,7 +1213,6 @@ export async function getRatingsForTrade(tradeId: string) {
     .order('submitted_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching ratings:', error)
     throw error
   }
 
@@ -1267,7 +1234,6 @@ export async function getRatingsByUser(userId: string) {
     .order('submitted_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching user ratings:', error)
     throw error
   }
 
@@ -1286,7 +1252,6 @@ export async function getReputationScores(userId: string) {
     .maybeSingle()
 
   if (error) {
-    console.error('Error fetching reputation scores:', error)
     throw error
   }
   return data
@@ -1304,7 +1269,6 @@ export async function hasUserRatedTrade(tradeId: string, userId: string) {
     .maybeSingle()
 
   if (error) {
-    console.error('Error checking rating:', error)
     throw error
   }
 
@@ -1342,7 +1306,6 @@ export async function getConversationByTradeId(tradeId: string) {
 
   if (error) {
     if (error.code === 'PGRST116') return null
-    console.error('Error fetching conversation by trade:', error)
     throw error
   }
 
@@ -1382,7 +1345,6 @@ export async function listConversations(userId: string) {
     .order('joined_at', { ascending: false })
 
   if (error) {
-    console.error('Error listing conversations:', error)
     throw error
   }
 
@@ -1472,7 +1434,6 @@ export async function getConversation(conversationId: string, userId: string) {
 
   if (error) {
     if (error.code === 'PGRST116') return null
-    console.error('Error fetching conversation:', error)
     throw error
   }
 
@@ -1517,7 +1478,6 @@ export async function listMessages(
   const { data, error } = await query
 
   if (error) {
-    console.error('Error listing messages:', error)
     throw error
   }
 
@@ -1559,7 +1519,6 @@ export async function sendMessage(input: {
     .single()
 
   if (error) {
-    console.error('Error sending message:', error)
     throw error
   }
 
@@ -1588,7 +1547,6 @@ export async function markConversationRead(input: {
     .eq('user_id', input.userId)
 
   if (error) {
-    console.error('Error marking conversation read:', error)
     throw error
   }
 }
@@ -1609,7 +1567,6 @@ export async function listNotifications(userId: string, limit = 50) {
     .limit(limit)
 
   if (error) {
-    console.error('Error listing notifications:', error)
     throw error
   }
 
@@ -1627,7 +1584,6 @@ export async function getUnreadNotificationCount(userId: string) {
     .is('read_at', null)
 
   if (error) {
-    console.error('Error counting notifications:', error)
     throw error
   }
 
@@ -1641,7 +1597,6 @@ export async function markNotificationRead(notificationId: string) {
     .eq('id', notificationId)
 
   if (error) {
-    console.error('Error marking notification read:', error)
     throw error
   }
 }
@@ -1654,7 +1609,6 @@ export async function markAllNotificationsRead(userId: string) {
     .is('read_at', null)
 
   if (error) {
-    console.error('Error marking all notifications read:', error)
     throw error
   }
 }
@@ -1691,7 +1645,6 @@ export async function backfillPendingPrivateOffers(
 
   if (offersErr) {
     // Private rows are RLS-filtered; a signed-in non-target gets [] silently.
-    console.error('[backfillPendingPrivateOffers] read error:', offersErr)
     throw offersErr
   }
 
@@ -1707,7 +1660,6 @@ export async function backfillPendingPrivateOffers(
     .eq('kind', 'trade_update')
 
   if (notifErr) {
-    console.error('[backfillPendingPrivateOffers] notif read error:', notifErr)
     throw notifErr
   }
 
@@ -1738,7 +1690,6 @@ export async function backfillPendingPrivateOffers(
   )
 
   if (insertErr) {
-    console.error('[backfillPendingPrivateOffers] insert error:', insertErr)
     throw insertErr
   }
 }
@@ -1750,7 +1701,6 @@ export async function getNotificationPreferences(userId: string) {
     .eq('user_id', userId)
 
   if (error) {
-    console.error('Error fetching notification preferences:', error)
     throw error
   }
 
@@ -1781,7 +1731,6 @@ export async function upsertNotificationPreference(input: {
     )
 
   if (error) {
-    console.error('Error upserting notification preference:', error)
     throw error
   }
 }
@@ -1800,7 +1749,6 @@ export async function ensureDefaultNotificationPreferences(userId: string) {
     .from('notification_preferences')
     .upsert(rows, { onConflict: 'user_id,channel', ignoreDuplicates: true })
   if (error) {
-    console.error('Error ensuring default notification preferences:', error)
   }
 }
 
@@ -2013,9 +1961,7 @@ export async function ensureWalletSession(
       // Surface any private offers that targeted this wallet before it ever
       // connected (the DB trigger can't notify a not-yet-registered target).
       // Fire-and-forget: never let a notification hiccup block sign-in.
-      backfillPendingPrivateOffers(user.id, addr).catch((err) =>
-        console.error('[ensureWalletSession] private-offer backfill failed:', err)
-      )
+      backfillPendingPrivateOffers(user.id, addr).catch(() => {})
     }
     return { session: true, user }
   }
@@ -2030,9 +1976,7 @@ export async function ensureWalletSession(
     return resolveSession()
   } catch (err) {
     if (err instanceof SiweRejectedError) {
-      console.warn('[ensureWalletSession] sign-in rejected:', err.message)
     } else {
-      console.error('[ensureWalletSession] sign-in failed:', err)
     }
     return { session: false, user: null }
   }
@@ -2098,7 +2042,6 @@ export async function signOut() {
   clearAllUserCache()
   const { error } = await supabase.auth.signOut()
   if (error) {
-    console.error('Error signing out:', error)
     throw error
   }
 }

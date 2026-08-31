@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -246,7 +246,6 @@ export function TradeDetailPage() {
       )
       refetchEscrow()
     } catch (err) {
-      console.error('[TradeDetailPage] fund failed:', err)
       toast.error(
         which === 'buyer'
           ? errorMessage(err, 'tradeDetail', t, 'depositFailed')
@@ -515,54 +514,58 @@ export function TradeDetailPage() {
   // shared watcher here so counterparty `cancelTrade` / `release` / `lockFunds`
   // / deposit events show up without a manual page refresh. Only relevant
   // financing-phase + dispute-lifecycle events are dispatched by name.
-  useEscrowEventWatcher(escrowAddress, (name) => {
-    if (
-      name === 'Released' ||
-      name === 'TradeCancelled' ||
-      name === 'FundsReturned' ||
-      name === 'TradeFullyFunded' ||
-      name === 'BuyerSecurityDeposited' ||
-      name === 'SellerSecurityDeposited' ||
-      name === 'SellerFundsLocked' ||
-      name === 'Confirmed'
-    ) {
-      refetchEscrow()
-      // Mirror the financing-phase transition into Supabase so the trades
-      // list + dispute page see the new state immediately.
-      if (name === 'TradeFullyFunded') {
-        setTradeEscrowStatus(trade!.id, EscrowStatus.FUNDED, {
-          escrowEventType: TradeEventType.ESCROW_FUNDED,
-        }).catch(() => undefined)
-      } else if (name === 'Confirmed') {
-        setTradeEscrowStatus(trade!.id, EscrowStatus.CONFIRMED, {
-          escrowEventType: TradeEventType.ESCROW_CONFIRMED,
-        }).catch(() => undefined)
-      } else if (name === 'BuyerSecurityDeposited') {
-        upsertTradeEscrowStatus(
-          trade!.id,
-          EscrowStatus.BUYER_DEPOSITED,
-        ).catch(() => undefined)
-      } else if (
+  const handleEscrowEvent = useCallback(
+    (name: string) => {
+      if (
+        name === 'Released' ||
+        name === 'TradeCancelled' ||
+        name === 'FundsReturned' ||
+        name === 'TradeFullyFunded' ||
+        name === 'BuyerSecurityDeposited' ||
         name === 'SellerSecurityDeposited' ||
-        name === 'SellerFundsLocked'
+        name === 'SellerFundsLocked' ||
+        name === 'Confirmed'
       ) {
-        upsertTradeEscrowStatus(
-          trade!.id,
-          EscrowStatus.SELLER_DEPOSITED,
-        ).catch(() => undefined)
-      } else if (name === 'TradeCancelled') {
-        updateTradeStatus(trade!.id, 'cancelled', {
-          escrowStatus: EscrowStatus.CANCELLED,
-          escrowEventType: TradeEventType.ESCROW_CANCELLED,
-        }).catch(() => undefined)
-      } else if (name === 'Released') {
-        updateTradeStatus(trade!.id, 'completed', {
-          escrowStatus: EscrowStatus.RELEASED,
-          escrowEventType: TradeEventType.ESCROW_RELEASED,
-        }).catch(() => undefined)
+        refetchEscrow()
+        // Mirror the financing-phase transition into Supabase so the trades
+        // list + dispute page see the new state immediately.
+        if (name === 'TradeFullyFunded') {
+          setTradeEscrowStatus(trade!.id, EscrowStatus.FUNDED, {
+            escrowEventType: TradeEventType.ESCROW_FUNDED,
+          }).catch(() => undefined)
+        } else if (name === 'Confirmed') {
+          setTradeEscrowStatus(trade!.id, EscrowStatus.CONFIRMED, {
+            escrowEventType: TradeEventType.ESCROW_CONFIRMED,
+          }).catch(() => undefined)
+        } else if (name === 'BuyerSecurityDeposited') {
+          upsertTradeEscrowStatus(
+            trade!.id,
+            EscrowStatus.BUYER_DEPOSITED,
+          ).catch(() => undefined)
+        } else if (
+          name === 'SellerSecurityDeposited' ||
+          name === 'SellerFundsLocked'
+        ) {
+          upsertTradeEscrowStatus(
+            trade!.id,
+            EscrowStatus.SELLER_DEPOSITED,
+          ).catch(() => undefined)
+        } else if (name === 'TradeCancelled') {
+          updateTradeStatus(trade!.id, 'cancelled', {
+            escrowStatus: EscrowStatus.CANCELLED,
+            escrowEventType: TradeEventType.ESCROW_CANCELLED,
+          }).catch(() => undefined)
+        } else if (name === 'Released') {
+          updateTradeStatus(trade!.id, 'completed', {
+            escrowStatus: EscrowStatus.RELEASED,
+            escrowEventType: TradeEventType.ESCROW_RELEASED,
+          }).catch(() => undefined)
+        }
       }
-    }
-  })
+    },
+    [escrowAddress, trade, refetchEscrow],
+  )
+  useEscrowEventWatcher(escrowAddress, handleEscrowEvent)
 
   // ── Rating section ─────────────────────────────────────────────────────
   const { data: currentUser } = useCurrentUser()

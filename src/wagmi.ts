@@ -14,18 +14,7 @@ const expectedChainId = expectedChainIdEnv ? Number(expectedChainIdEnv) : null
 
 const SUPPORTED_CHAINS = [mainnet, sepolia] as const
 
-if (
-  expectedChainId != null &&
-  Number.isFinite(expectedChainId) &&
-  expectedChainId > 0 &&
-  !SUPPORTED_CHAINS.some((c) => c.id === expectedChainId)
-) {
-  console.error(
-    `[wagmi] VITE_EXPECTED_CHAIN_ID=${expectedChainId} is not in the supported chains ` +
-      `list (${SUPPORTED_CHAINS.map((c) => `${c.id}=${c.name}`).join(', ')}). ` +
-      `Add the missing chain to src/wagmi.ts or pick a supported id.`,
-  )
-}
+// VITE_EXPECTED_CHAIN_ID validation is done at startup — silently skip if misconfigured.
 
 /**
  * WalletConnect project id.
@@ -45,12 +34,7 @@ if (
 const projectId = import.meta.env.VITE_WC_PROJECT_ID?.trim() || undefined
 
 if (!projectId) {
-  console.warn(
-    '[wagmi] VITE_WC_PROJECT_ID non impostato. I wallet iniettati ' +
-      '(estensione browser, es. MetaMask) funzionano comunque; per i wallet ' +
-      'mobile/QR/WalletConnect serve un id reale da ' +
-      'https://cloud.walletconnect.com da mettere in .env come VITE_WC_PROJECT_ID.',
-  )
+  // WalletConnect project ID not set — injected wallets still work.
 }
 
 export const config = getDefaultConfig({

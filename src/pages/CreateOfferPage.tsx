@@ -162,7 +162,6 @@ export function CreateOfferPage() {
       toast.success(t('createOffer.successCreated'))
       navigate('/app/offers')
     } catch (error) {
-      console.error('Error creating offer:', error)
       toast.error(
         error instanceof Error ? error.message : t('createOffer.errorGeneric')
       )

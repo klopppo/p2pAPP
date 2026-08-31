@@ -33,9 +33,10 @@ export function NotificationsBell() {
 
   // Refresh the unread count when the dropdown opens so freshly-arrived
   // items don't look stale.
+  const refetchUnread = unread.refetch
   useEffect(() => {
-    if (open) unread.refetch()
-  }, [open, unread])
+    if (open) refetchUnread()
+  }, [open, refetchUnread])
 
   const handleSelect = async (n: Notification) => {
     setOpen(false)

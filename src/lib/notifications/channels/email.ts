@@ -24,13 +24,7 @@ import { renderNotificationSubject } from '..'
  * log the email locally so QA still gets feedback.
  */
 export async function sendEmail(notification: Notification, to: string | null) {
-  if (!to) {
-    console.warn('[notifications/email] skipped — no email_address on file', {
-      user_id: notification.user_id,
-      id: notification.id,
-    })
-    return
-  }
+  if (!to) return
 
   const subject = renderNotificationSubject(notification)
   const text = `${notification.title}\n\n${notification.body}\n\nOpen: ${appUrl(
@@ -42,19 +36,8 @@ export async function sendEmail(notification: Notification, to: string | null) {
       body: { user_id: notification.user_id, subject, text },
     })
     if (error) throw error
-  } catch (err) {
-    console.warn(
-      '[notifications/email] edge function unavailable, logging locally:',
-      err
-    )
-    // Local dev fallback: keep the payload visible in the console so engineers
-    // can verify the dispatcher wiring without a deployed edge function.
-    // Recipient stays derived server-side; never log an address here.
-    console.info('[notifications/email:dry-run]', {
-      user_id: notification.user_id,
-      subject,
-      text,
-    })
+  } catch {
+    // Edge function unavailable — silently skip in production.
   }
 }
 

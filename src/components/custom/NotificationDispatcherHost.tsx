@@ -19,6 +19,8 @@ export function NotificationDispatcherHost() {
   const prefs = useNotificationPreferences()
   const qc = useQueryClient()
   const seen = useRef<Set<string>>(new Set())
+  const prefsRef = useRef(prefs.data)
+  prefsRef.current = prefs.data
 
   useEffect(() => {
     if (!user) return
@@ -38,18 +40,15 @@ export function NotificationDispatcherHost() {
           if (seen.current.has(n.id)) return
           seen.current.add(n.id)
 
-          const prefsMap = prefs.data
-            ? Object.fromEntries(prefs.data.map((p) => [p.channel, p.enabled]))
+          const currentPrefs = prefsRef.current
+          const prefsMap = currentPrefs
+            ? Object.fromEntries(currentPrefs.map((p) => [p.channel, p.enabled]))
             : { inapp: true, email: false }
-          const contacts: Record<string, string | null> = prefs.data
+          const contacts: Record<string, string | null> = currentPrefs
             ? Object.fromEntries(
-                prefs.data.map((p) => [p.channel, p.email_address])
+                currentPrefs.map((p) => [p.channel, p.email_address])
               )
             : {}
-          // `User.email` lives on the private profile (UserPrivate) which the
-          // public `useCurrentUser` does not load. NotificationPreferences
-          // already carries the email contact when the user opted in; if it
-          // isn't present the dispatch layer skips the email channel.
 
           await dispatchNotification({
             notification: n,
@@ -57,7 +56,6 @@ export function NotificationDispatcherHost() {
             contacts,
           })
 
-          // Make sure the bell feed picks up the new row.
           qc.invalidateQueries({ queryKey: ['notifications', user.id] })
           qc.invalidateQueries({ queryKey: ['notifications:unread', user.id] })
         }
@@ -67,7 +65,7 @@ export function NotificationDispatcherHost() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user, prefs.data, qc])
+  }, [user?.id, qc])
 
   return null
 }

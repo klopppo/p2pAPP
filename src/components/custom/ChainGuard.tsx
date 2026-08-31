@@ -40,7 +40,6 @@ export function ChainGuard() {
     } catch (err) {
       // wagmi throws if the wallet doesn't support wallet_switchEthereumChain
       // (rare; some injected wallets). The error is surfaced via `switchError`.
-      console.warn('[ChainGuard] switchChain failed:', err)
     }
   }
 

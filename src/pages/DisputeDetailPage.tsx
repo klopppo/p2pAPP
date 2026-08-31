@@ -286,7 +286,6 @@ export function DisputeDetailPage() {
           // indexer will reconcile via the Evidence event topic.
         }
       } catch (err) {
-        console.warn(`[DisputeDetailPage] handleEscrowEvent(${eventName}) failed:`, err)
       } finally {
         if (
           eventName === 'RulingReceived' ||
@@ -444,9 +443,7 @@ export function DisputeDetailPage() {
         escrowState: KlerosEscState.RULING_EXECUTED,
         klerosDisputeStatus: 2,
         onChainRuling: ruling,
-      }).catch((err) =>
-        console.warn('[DisputeDetailPage] updateDisputeOnChain(executeRuling):', err),
-      )
+      }).catch(() => {})
       // Mirror the trade payout (B-3, B-7): rulings 1/3 → buyer wins
       // (refund), 0/2/4 → seller wins (release).
       if (trade?.id && ruling != null) {
@@ -456,9 +453,7 @@ export function DisputeDetailPage() {
           escrowStatus: buyerWins ? EscrowStatus.REFUNDED : EscrowStatus.RELEASED,
           txHash: hash,
           escrowEventType: TradeEventType.RULING_EXECUTED,
-        }).catch((err) =>
-          console.warn('[DisputeDetailPage] mirrorDisputeToTrade(executeRuling):', err),
-        )
+        }).catch(() => {})
       }
       toast.success(t('disputeDetail.rulingExecuted'))
       refetchEscrowState()
@@ -481,9 +476,7 @@ export function DisputeDetailPage() {
         escrowState: KlerosEscState.COMPLETED,
         status: DisputeStatus.RESOLVED,
         resolvedAt: new Date().toISOString(),
-      }).catch((err) =>
-        console.warn('[DisputeDetailPage] updateDisputeOnChain(finalize):', err),
-      )
+      }).catch(() => {})
       // Mirror the trade-side outcome at finalize time (B-7).
       if (trade?.id) {
         const ruling = escrowState?.currentRuling != null
@@ -495,9 +488,7 @@ export function DisputeDetailPage() {
           escrowStatus: buyerWins ? EscrowStatus.REFUNDED : EscrowStatus.RELEASED,
           txHash: hash,
           escrowEventType: TradeEventType.DISPUTE_FINALIZED,
-        }).catch((err) =>
-          console.warn('[DisputeDetailPage] mirrorDisputeToTrade(finalize):', err),
-        )
+        }).catch(() => {})
       }
       toast.success(t('disputeDetail.escrowFinalized'))
       refetchEscrowState()
@@ -521,9 +512,7 @@ export function DisputeDetailPage() {
         escrowState: KlerosEscState.COMPLETED,
         status: DisputeStatus.CLOSED,
         resolvedAt: new Date().toISOString(),
-      }).catch((err) =>
-        console.warn('[DisputeDetailPage] updateDisputeOnChain(timeoutDispute):', err),
-      )
+      }).catch(() => {})
       // Mirror the trade-side outcome (B-7): the disputer loses. Use
       // `escrowState.disputer` to determine the winner without re-reading.
       if (trade?.id && escrowState?.disputer) {
@@ -539,9 +528,7 @@ export function DisputeDetailPage() {
             winner === 'seller' ? EscrowStatus.RELEASED : EscrowStatus.REFUNDED,
           txHash: hash,
           escrowEventType: TradeEventType.DISPUTE_TIMED_OUT,
-        }).catch((err) =>
-          console.warn('[DisputeDetailPage] mirrorDisputeToTrade(timeoutDispute):', err),
-        )
+        }).catch(() => {})
       }
       toast.success(t('disputeDetail.disputeTimedOut'))
       refetchEscrowState()
@@ -577,9 +564,7 @@ export function DisputeDetailPage() {
         klerosDisputeStatus: 1,
         onChainRuling: null,
         status: DisputeStatus.ESCALATED,
-      }).catch((err) =>
-        console.warn('[DisputeDetailPage] updateDisputeOnChain(appeal):', err),
-      )
+      }).catch(() => {})
       toast.success(t('disputeDetail.appealFunded'))
       refetchEscrowState()
     } catch (err) {
@@ -1121,7 +1106,6 @@ function SubmitMoreEvidence({
       await insertDisputeEvidence(disputeId, rows, filerRole, Number(evidenceGroupId))
       toast.success(t('disputeDetail.evidenceSubmittedSuccess'))
     } catch (err) {
-      console.warn('[DisputeDetailPage] submitEvidence failed:', err)
       toast.error(errorMessage(err, 'disputeDetail', t, 'evidenceSubmittedError'))
     } finally {
       setBusy(false)

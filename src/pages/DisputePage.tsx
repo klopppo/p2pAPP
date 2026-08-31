@@ -321,7 +321,6 @@ const effectiveEscrow =
           klerosDisputeId = args.klerosDisputeID.toString()
         }
       } catch (decodeErr) {
-        console.warn('[DisputePage] DisputeRaised event not decoded:', decodeErr)
       }
 
       // 5) Submit the IPFS evidence bytes32 on-chain (ERC-1497 Evidence event).
@@ -340,7 +339,6 @@ const effectiveEscrow =
       } catch (evidenceErr) {
         // The dispute itself is raised; evidence submission is best-effort
         // and can be retried from the detail page. Don't fail the whole flow.
-        console.warn('[DisputePage] submitEvidence failed:', evidenceErr)
         toast.warning(
           t('disputePage.warningEvidenceFailed'),
         )
@@ -410,7 +408,6 @@ const effectiveEscrow =
         filerRole ?? 'neutral',
         0,
       ).catch((err) => {
-        console.warn('[DisputePage] insertDisputeEvidence failed:', err)
       })
 
       // B-9 (belt-and-braces) — also bump via updateDisputeOnChain in case
@@ -435,7 +432,6 @@ const effectiveEscrow =
       toast.success(t('disputePage.successFiled'))
       navigate(`/app/disputes/${dispute.id}`)
     } catch (err) {
-      console.error('[DisputePage] submit failed:', err)
       toast.error(errorMessage(err, 'disputePage', t))
     } finally {
       setStage('idle')

@@ -334,7 +334,6 @@ export function TradePage() {
       toast.success(t('trade.successDeployed'))
       navigate(`/app/trades/${trade.id}`)
     } catch (error) {
-      console.error('Error opening trade:', error)
       toast.error(errorMessage(error, 'trade', t, 'errorFailedToDeploy'))
     } finally {
       setStage('idle')

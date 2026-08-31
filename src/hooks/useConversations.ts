@@ -43,7 +43,7 @@ export function useConversations() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user, qc])
+  }, [user?.id, qc])
 
   return query
 }

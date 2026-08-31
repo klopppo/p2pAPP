@@ -99,7 +99,6 @@ export function EditProfilePage() {
       setForm((prev) => ({ ...prev, avatarUrl: uploaded.url }))
       toast.success(t('editProfile.avatarUploaded'))
     } catch (err) {
-      console.error('[EditProfilePage] avatar upload failed:', err)
       setAvatarPreview(null)
       toast.error(t('editProfile.avatarUploadError'))
     } finally {
@@ -145,7 +144,6 @@ export function EditProfilePage() {
         navigate(-1)
       }
     } catch (err) {
-      console.error('Error saving profile:', err)
       toast.error(t('editProfile.errorSaveFailed'))
     } finally {
       setSaving(false)

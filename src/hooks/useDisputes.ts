@@ -251,7 +251,6 @@ export function useArbitrationCost(escrowAddress: `0x${string}` | undefined) {
           args: [extraData],
         })) as bigint
       } catch (err) {
-        console.warn('[useArbitrationCost] failed:', err)
         return null
       }
     },
@@ -326,7 +325,6 @@ export function useAppealInfo(
           appealable: disputeStatus === 1n && inWindow,
         }
       } catch (err) {
-        console.warn('[useAppealInfo] failed:', err)
         return null
       }
     },

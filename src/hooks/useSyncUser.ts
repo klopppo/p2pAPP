@@ -47,7 +47,6 @@ export function useSyncUser() {
         // read-only for this wallet.
       })
       .catch((error) => {
-        console.error('[useSyncUser] Failed to sync user to Supabase:', error)
         // Reset so a later re-render can retry.
         syncedAddress.current = null
       })

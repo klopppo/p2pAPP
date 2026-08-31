@@ -57,7 +57,7 @@ export function useNotifications() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user, qc])
+  }, [user?.id, qc])
 
   return query
 }
@@ -95,7 +95,7 @@ export function useUnreadCount() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user, qc])
+  }, [user?.id, qc])
 
   return query
 }

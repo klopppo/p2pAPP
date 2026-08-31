@@ -83,7 +83,6 @@ export function useSubmitRating() {
             reputationDeltaForScore(ratingData.score),
           )
         } catch (err) {
-          console.warn('[useSubmitRating] reputation update failed:', err)
         }
       }
       return data

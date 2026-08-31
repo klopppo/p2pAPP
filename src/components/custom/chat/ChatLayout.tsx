@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { MessageCircle } from 'lucide-react'
 import {
@@ -72,7 +72,10 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   const messages = useMessages(isOurTeam ? null : activeId)
   const send = useSendMessage(isOurTeam ? null : activeId)
   const markRead = useMarkRead(isOurTeam ? null : activeId)
-  const identity = user ? { userId: user.id, nickname: user.nickname } : null
+  const identity = useMemo(
+    () => (user ? { userId: user.id, nickname: user.nickname } : null),
+    [user?.id, user?.nickname],
+  )
   const typing = useTypingIndicator(isOurTeam ? null : activeId, identity)
   const online = useConversationPresence(isOurTeam ? null : activeId, identity)
 
@@ -114,6 +117,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
 
   // Once messages render, mark the conversation read so the badge clears.
   // Skip the synthetic ourTeam thread — there's no DB row to mark.
+  const lastMarkedRef = useRef<string | null>(null)
   useEffect(() => {
     if (!activeId || !user || isOurTeam) return
     if (!messages.data || messages.data.length === 0) return
@@ -126,7 +130,10 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
     // effect re-runs and we mark the real id.
     if (last.id.startsWith('temp-')) return
     mark(activeId)
-    void markRead(last.id).catch(() => undefined)
+    if (lastMarkedRef.current !== last.id) {
+      lastMarkedRef.current = last.id
+      void markRead(last.id).catch(() => undefined)
+    }
   }, [activeId, user, messages.data, mark, markRead, isOurTeam])
 
   const [draft, setDraft] = useState('')
