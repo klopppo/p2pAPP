@@ -369,7 +369,8 @@
     "escrowProtectionDescription": "Tous les échanges sont protégés par notre système de séquestre. Les fonds ne sont libérés qu'après que les deux parties ont confirmé l'échange.",
     "offerExpires": "L'offre expire le {{date}}",
     "trades": "échanges",
-    "unverified": "non vérifié"
+    "unverified": "non vérifié",
+    "noRating": "Aucune évaluation pour le moment"
   },
   "trade": {
     "buyToken": "Acheter {{token}}",
@@ -408,7 +409,8 @@
     "errorOwnOffer": "Vous ne pouvez pas échanger avec votre propre offre.",
     "errorFailedToDeploy": "Impossible de résoudre l'adresse du séquestre déployé.",
     "successDeployed": "Séquestre déployé — financez l'échange pour continuer.",
-    "errorGeneric": "Échec de l'ouverture de l'échange. Veuillez réessayer."
+    "errorGeneric": "Échec de l'ouverture de l'échange. Veuillez réessayer.",
+    "noRating": "Aucune évaluation pour le moment"
   },
   "tradeDetail": {
     "loadingTrade": "Chargement de l'échange…",

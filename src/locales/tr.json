@@ -369,7 +369,8 @@
     "escrowProtectionDescription": "Tüm işlemler emanet sistemimiz tarafından korunur. Fonlar yalnızca her iki taraf da ticareti onayladıktan sonra serbest bırakılır.",
     "offerExpires": "Teklif {{date}} tarihinde sona eriyor",
     "trades": "işlem",
-    "unverified": "doğrulanmamış"
+    "unverified": "doğrulanmamış",
+    "noRating": "Henüz değerlendirme yok"
   },
   "trade": {
     "buyToken": "{{token}} Al",
@@ -408,7 +409,8 @@
     "errorOwnOffer": "Kendi teklifinizle ticaret yapamazsınız.",
     "errorFailedToDeploy": "Konuşlandırılan emanet adresi çözümlenemedi.",
     "successDeployed": "Emanet konuşlandırıldı — ticareti devam ettirmek için fonlayın.",
-    "errorGeneric": "İşlem açılamadı. Lütfen tekrar deneyin."
+    "errorGeneric": "İşlem açılamadı. Lütfen tekrar deneyin.",
+    "noRating": "Henüz değerlendirme yok"
   },
   "tradeDetail": {
     "loadingTrade": "İşlem yükleniyor…",

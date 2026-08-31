@@ -369,7 +369,8 @@
     "escrowProtectionDescription": "所有交易均受托管系统保护。资金仅在双方确认交易后释放。",
     "offerExpires": "报价将于 {{date}} 过期",
     "trades": "笔交易",
-    "unverified": "未验证"
+    "unverified": "未验证",
+    "noRating": "暂无评价"
   },
   "trade": {
     "buyToken": "买入 {{token}}",
@@ -408,7 +409,8 @@
     "errorOwnOffer": "不能交易自己的报价。",
     "errorFailedToDeploy": "无法解析已部署的托管合约地址。",
     "successDeployed": "托管合约已部署——请注入资金以继续。",
-    "errorGeneric": "发起交易失败，请重试。"
+    "errorGeneric": "发起交易失败，请重试。",
+    "noRating": "暂无评价"
   },
   "tradeDetail": {
     "loadingTrade": "正在加载交易…",

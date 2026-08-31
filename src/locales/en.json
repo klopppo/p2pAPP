@@ -369,7 +369,8 @@
     "escrowProtectionDescription": "All trades are protected by our escrow system. Funds are only released after both parties confirm the trade.",
     "offerExpires": "Offer expires {{date}}",
     "trades": "trades",
-    "unverified": "unverified"
+    "unverified": "unverified",
+    "noRating": "No ratings yet"
   },
   "trade": {
     "buyToken": "Buy {{token}}",
@@ -408,7 +409,8 @@
     "errorOwnOffer": "You can't trade your own offer.",
     "errorFailedToDeploy": "Failed to resolve the deployed escrow address.",
     "successDeployed": "Escrow deployed — fund the trade to continue.",
-    "errorGeneric": "Failed to open trade. Please try again."
+    "errorGeneric": "Failed to open trade. Please try again.",
+    "noRating": "No ratings yet"
   },
   "tradeDetail": {
     "loadingTrade": "Loading trade…",

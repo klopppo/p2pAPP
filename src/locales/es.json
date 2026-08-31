@@ -369,7 +369,8 @@
     "escrowProtectionDescription": "Todas las operaciones están protegidas por nuestro sistema de custodia. Los fondos solo se liberan después de que ambas partes confirmen la operación.",
     "offerExpires": "La oferta expira el {{date}}",
     "trades": "operaciones",
-    "unverified": "no verificado"
+    "unverified": "no verificado",
+    "noRating": "Sin valoraciones todavía"
   },
   "trade": {
     "buyToken": "Comprar {{token}}",
@@ -408,7 +409,8 @@
     "errorOwnOffer": "No puede operar con su propia oferta.",
     "errorFailedToDeploy": "Error al resolver la dirección de custodia desplegada.",
     "successDeployed": "Custodia desplegada — financie la operación para continuar.",
-    "errorGeneric": "Error al abrir la operación. Por favor, inténtelo de nuevo."
+    "errorGeneric": "Error al abrir la operación. Por favor, inténtelo de nuevo.",
+    "noRating": "Sin valoraciones todavía"
   },
   "tradeDetail": {
     "loadingTrade": "Cargando operación…",

@@ -13,7 +13,7 @@ import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
-import { ShieldCheck, Clock, Globe, Tag, Loader2 } from 'lucide-react'
+import { ShieldCheck, Clock, Globe, Tag, Loader2, Star } from 'lucide-react'
 import { useOffer } from '@/hooks/useOffers'
 import { createTrade, ensureUser } from '@/lib/supabase'
 import {
@@ -376,8 +376,12 @@ export function TradePage() {
                 </div>
                 <div className="flex items-center gap-4 text-sm">
                   <div className="flex items-center gap-1">
-                    <span className="text-primary">★</span>
-                    <span className="font-medium">{Number(seller?.avg_rating) || '—'}</span>
+                    <Star className="w-4 h-4 fill-primary text-primary" />
+                    {Number(seller?.avg_rating) ? (
+                      <span className="font-medium">{Number(seller?.avg_rating).toFixed(1)}</span>
+                    ) : (
+                      <span className="text-muted-foreground">{t('trade.noRating')}</span>
+                    )}
                   </div>
                   <span className="text-muted-foreground">·</span>
                   <span>

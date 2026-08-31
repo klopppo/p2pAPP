@@ -8,7 +8,7 @@ import { Text } from '@/components/ui/text'
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import { AddressWithActions } from '@/components/custom/AddressWithActions'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Clock, Shield, Loader2 } from 'lucide-react'
+import { Clock, Shield, Loader2, Star } from 'lucide-react'
 import { useOffer } from '@/hooks/useOffers'
 
 
@@ -108,8 +108,12 @@ export function OpenOfferPage() {
                   </div>
                   <div className="flex items-center gap-4 text-sm">
                     <div className="flex items-center gap-1">
-                      <span className="text-yellow-500">★</span>
-                      <span>{Number(seller?.avg_rating) || '—'}</span>
+                      <Star className="w-4 h-4 fill-primary text-primary" />
+                      {Number(seller?.avg_rating) ? (
+                        <span>{Number(seller?.avg_rating).toFixed(1)}</span>
+                      ) : (
+                        <span className="text-muted-foreground">{t('openOffer.noRating')}</span>
+                      )}
                     </div>
                      <div>{(seller?.total_trades ?? 0).toLocaleString()} {t('openOffer.trades')}</div>
                     {sellerAddr && (
