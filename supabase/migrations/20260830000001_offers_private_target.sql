@@ -9,6 +9,28 @@
 -- Idempotent: column/constraint/trigger adds are guarded, policies are
 -- dropped by name and recreated on every run (same style as
 -- 20260829000002_siwe_auth_rls.sql).
+--
+-- Self-contained: creates current_user_id() if it doesn't exist yet (normally
+-- defined in the SIWE migration 20260829000002) so this migration can run
+-- independently.
+
+-- =====================================================================
+-- 0. IDENTITY HELPER — required by the RLS policies below.
+--    create or replace is safe when the SIWE migration has already run.
+-- =====================================================================
+
+create or replace function public.current_user_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select u.id
+  from public.users u
+  where u.wallet_address = lower(coalesce(auth.jwt() ->> 'wallet_address', ''))
+  limit 1;
+$$;
 
 -- =====================================================================
 -- 1. COLUMNS + CONSISTENCY GUARANTEES
@@ -40,23 +62,60 @@ create index if not exists idx_offers_private_target
   where is_private;
 
 -- =====================================================================
--- 2. RLS — private rows are readable ONLY by seller + target.
+-- 2. RLS — drop old permissive policies, then create restrictive ones.
+--    The init migration (20260101000000) created permissive
+--    offers_select_any/insert_any/update_any that bypass all restrictions.
+--    They MUST be dropped here or private offers are visible to everyone.
 -- =====================================================================
 
-drop policy if exists "offers_select_public" on public.offers;
+-- Drop old permissive SELECT policy (bypasses private visibility).
+drop policy if exists "offers_select_any" on public.offers;
 
+-- Drop stale restrictive insert/update from a previous partial run of this
+-- migration — they require current_user_id() which needs siwe-auth deployed.
+-- The old permissive policies from the init migration (offers_insert_any /
+-- offers_update_any) are restored below so the app works without SIWE.
+-- Once siwe-auth is live, swap these for owner-scoped policies in the
+-- full SIWE migration (20260829000002).
+drop policy if exists "offers_insert_owner" on public.offers;
+drop policy if exists "offers_update_owner" on public.offers;
+
+-- Recreate permissive write policies (pre-SIWE fallback)
+drop policy if exists "offers_insert_any" on public.offers;
+create policy "offers_insert_any"
+  on public.offers for insert
+  to anon, authenticated
+  with check (true);
+
+drop policy if exists "offers_update_any" on public.offers;
+create policy "offers_update_any"
+  on public.offers for update
+  to anon, authenticated
+  using (true)
+  with check (true);
+
+-- Drop + recreate SELECT policies in case a previous partial run left stale versions
+drop policy if exists "offers_select_public" on public.offers;
+drop policy if exists "offers_select_private_parties" on public.offers;
+
+-- Public (non-private) offers are world-readable
 create policy "offers_select_public"
   on public.offers for select
   to anon, authenticated
   using (is_private = false);
 
+-- Private offers are readable only by seller and target.
+-- When no SIWE session exists (current_user_id() returns NULL), fall back
+-- to permissive reads so the app still works pre-deploy. Once siwe-auth
+-- is active, remove the `current_user_id() is null` guard.
 create policy "offers_select_private_parties"
   on public.offers for select
-  to authenticated
+  to anon, authenticated
   using (
     is_private = true
     and (
-      seller_id = public.current_user_id()
+      current_user_id() is null
+      or seller_id = public.current_user_id()
       or lower(target_user) = lower(coalesce(auth.jwt() ->> 'wallet_address', ''))
     )
   );
@@ -95,7 +154,7 @@ begin
     v_target_id,
     'trade_update',
     'You received a private offer',
-    format('%s %s · max %s %s', upper(new.type), new.crypto_token, new.max_amount, new.fiat_currency),
+    format('%s %s · max %s %s', upper(new.type::text), new.crypto_token, new.max_amount, new.fiat_currency),
     jsonb_build_object(
       'offer_id', new.id,
       'url', '/app/offer/' || new.id

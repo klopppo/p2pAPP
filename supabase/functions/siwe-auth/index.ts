@@ -150,6 +150,9 @@ async function issueNonce(
 // Verification + JWT mint
 // ---------------------------------------------------------------------------
 
+
+
+
 async function verifyAndMint(
   body: SignInRequest,
   supabaseUrl: string,
@@ -286,6 +289,7 @@ async function getOrCreateAuthUser(
   addr: string
 ): Promise<string> {
   const email = `${addr.replace(/^0x/, "")}@${WALLET_EMAIL_DOMAIN}`
+  
 
   // Fast path: known link.
   const { data: link } = await admin
@@ -346,3 +350,5 @@ function json(body: unknown, status = 200) {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   })
 }
+
+
