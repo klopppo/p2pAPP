@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { Button } from '@/components/ui/button'
+import { explorerBase } from '@/lib/explorer'
 import { Copy, ExternalLink, Loader2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -279,7 +280,7 @@ export function ProfilePage() {
               <Button
                 size="icon"
                 variant="ghost"
-                onClick={() => window.open(`https://blockscan.com/token/${walletAddr}`, '_blank', 'noopener')}
+                onClick={() => window.open(`${explorerBase.token}${walletAddr}`, '_blank', 'noopener')}
                 title={t('profile.openOnBlockscan')}
               >
                 <ExternalLink className="w-4 h-4" />

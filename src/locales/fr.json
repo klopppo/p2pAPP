@@ -247,7 +247,8 @@
     "errorMaxLessThanMin": "Le montant maximum doit être supérieur ou égal au montant minimum.",
     "errorTargetUserInvalid": "Saisissez une adresse Ethereum valide (0x...) pour l'offre privée.",
     "successCreated": "Offre créée avec succès !",
-    "errorGeneric": "Échec de la création de l'offre. Veuillez réessayer."
+    "errorGeneric": "Échec de la création de l'offre. Veuillez réessayer.",
+    "errorTargetUserSelf": "Une offre privée ne peut pas cibler votre propre portefeuille."
   },
   "disputes": {
     "title": "Litiges",

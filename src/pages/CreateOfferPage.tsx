@@ -106,6 +106,14 @@ export function CreateOfferPage() {
       toast.error(t('createOffer.errorTargetUserInvalid'))
       return
     }
+    if (
+      formData.isPrivate &&
+      address &&
+      formData.targetUser.trim().toLowerCase() === address.toLowerCase()
+    ) {
+      toast.error(t('createOffer.errorTargetUserSelf'))
+      return
+    }
 
     setIsSubmitting(true)
 

@@ -37,8 +37,8 @@ export function ChainGuard() {
     if (expectedChainId == null) return
     try {
       switchChain({ chainId: expectedChainId })
-    } catch (err) {
-      // wagmi throws if the wallet doesn't support wallet_switchEthereumChain
+    } catch (_err) {
+      console.warn('[ChainGuard.tsx] _err:', _err)// wagmi throws if the wallet doesn't support wallet_switchEthereumChain
       // (rare; some injected wallets). The error is surfaced via `switchError`.
     }
   }

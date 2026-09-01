@@ -39,6 +39,7 @@ import {
 } from '@/lib/supabase'
 import { uploadToIpfs } from '@/lib/ipfs'
 import { errorMessage } from '@/lib/errorMessage'
+import { explorerBase } from '@/lib/explorer'
 import { DisputeStatus, TradeStatus } from '@/types/database'
 
 type DisputeStatusValue =
@@ -237,7 +238,7 @@ export function DisputeDetailPage() {
               escrowStatus: buyerWins ? EscrowStatus.REFUNDED : EscrowStatus.RELEASED,
               txHash: '',
               escrowEventType: TradeEventType.RULING_EXECUTED,
-            }).catch(() => undefined)
+            }).catch((err) => { console.warn('[DisputeDetailPage.tsx]', err); return undefined })
           }
         } else if (eventName === 'Finalized') {
           await updateDisputeOnChain(disputed, {
@@ -268,7 +269,7 @@ export function DisputeDetailPage() {
                   : EscrowStatus.REFUNDED,
               txHash: '',
               escrowEventType: TradeEventType.DISPUTE_TIMED_OUT,
-            }).catch(() => undefined)
+            }).catch((err) => { console.warn('[DisputeDetailPage.tsx]', err); return undefined })
           }
         } else if (eventName === 'AppealFunded') {
           await updateDisputeOnChain(disputed, {
@@ -286,6 +287,7 @@ export function DisputeDetailPage() {
           // indexer will reconcile via the Evidence event topic.
         }
       } catch (err) {
+        console.warn('[DisputeDetailPage.tsx] err:', err)
       } finally {
         if (
           eventName === 'RulingReceived' ||
@@ -443,7 +445,7 @@ export function DisputeDetailPage() {
         escrowState: KlerosEscState.RULING_EXECUTED,
         klerosDisputeStatus: 2,
         onChainRuling: ruling,
-      }).catch(() => {})
+      }).catch((err) => { console.warn('[DisputeDetailPage.tsx]', err) })
       // Mirror the trade payout (B-3, B-7): rulings 1/3 → buyer wins
       // (refund), 0/2/4 → seller wins (release).
       if (trade?.id && ruling != null) {
@@ -453,7 +455,7 @@ export function DisputeDetailPage() {
           escrowStatus: buyerWins ? EscrowStatus.REFUNDED : EscrowStatus.RELEASED,
           txHash: hash,
           escrowEventType: TradeEventType.RULING_EXECUTED,
-        }).catch(() => {})
+        }).catch((err) => { console.warn('[DisputeDetailPage.tsx]', err) })
       }
       toast.success(t('disputeDetail.rulingExecuted'))
       refetchEscrowState()
@@ -476,7 +478,7 @@ export function DisputeDetailPage() {
         escrowState: KlerosEscState.COMPLETED,
         status: DisputeStatus.RESOLVED,
         resolvedAt: new Date().toISOString(),
-      }).catch(() => {})
+      }).catch((err) => { console.warn('[DisputeDetailPage.tsx]', err) })
       // Mirror the trade-side outcome at finalize time (B-7).
       if (trade?.id) {
         const ruling = escrowState?.currentRuling != null
@@ -488,7 +490,7 @@ export function DisputeDetailPage() {
           escrowStatus: buyerWins ? EscrowStatus.REFUNDED : EscrowStatus.RELEASED,
           txHash: hash,
           escrowEventType: TradeEventType.DISPUTE_FINALIZED,
-        }).catch(() => {})
+        }).catch((err) => { console.warn('[DisputeDetailPage.tsx]', err) })
       }
       toast.success(t('disputeDetail.escrowFinalized'))
       refetchEscrowState()
@@ -512,7 +514,7 @@ export function DisputeDetailPage() {
         escrowState: KlerosEscState.COMPLETED,
         status: DisputeStatus.CLOSED,
         resolvedAt: new Date().toISOString(),
-      }).catch(() => {})
+      }).catch((err) => { console.warn('[DisputeDetailPage.tsx]', err) })
       // Mirror the trade-side outcome (B-7): the disputer loses. Use
       // `escrowState.disputer` to determine the winner without re-reading.
       if (trade?.id && escrowState?.disputer) {
@@ -528,7 +530,7 @@ export function DisputeDetailPage() {
             winner === 'seller' ? EscrowStatus.RELEASED : EscrowStatus.REFUNDED,
           txHash: hash,
           escrowEventType: TradeEventType.DISPUTE_TIMED_OUT,
-        }).catch(() => {})
+        }).catch((err) => { console.warn('[DisputeDetailPage.tsx]', err) })
       }
       toast.success(t('disputeDetail.disputeTimedOut'))
       refetchEscrowState()
@@ -564,7 +566,7 @@ export function DisputeDetailPage() {
         klerosDisputeStatus: 1,
         onChainRuling: null,
         status: DisputeStatus.ESCALATED,
-      }).catch(() => {})
+      }).catch((err) => { console.warn('[DisputeDetailPage.tsx]', err) })
       toast.success(t('disputeDetail.appealFunded'))
       refetchEscrowState()
     } catch (err) {
@@ -615,7 +617,7 @@ export function DisputeDetailPage() {
                 {escrowAddress}
               </code>
               <a
-                href={`https://etherscan.io/address/${escrowAddress}`}
+                href={`${explorerBase.address}${escrowAddress}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-primary hover:underline inline-flex items-center gap-1 shrink-0"
@@ -651,7 +653,7 @@ export function DisputeDetailPage() {
                     {t('disputeDetail.klerosCourt')}
                   </Text>
                   <a
-                    href={`https://etherscan.io/address/${escrowState.klerosCourt}`}
+                    href={`${explorerBase.address}${escrowState.klerosCourt}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-mono text-xs text-primary hover:underline inline-flex items-center gap-1"
@@ -901,7 +903,7 @@ export function DisputeDetailPage() {
               <div className="flex justify-between gap-3 text-sm">
                 <span className="text-muted-foreground">{t('disputeDetail.raiseDisputeTx')}</span>
                 <a
-                  href={`https://etherscan.io/tx/${parsed.txHash}`}
+                  href={`${explorerBase.tx}${parsed.txHash}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-mono text-primary hover:underline inline-flex items-center gap-1"
@@ -915,7 +917,7 @@ export function DisputeDetailPage() {
               <div className="flex justify-between gap-3 text-sm">
                 <span className="text-muted-foreground">{t('disputeDetail.submitEvidenceTx')}</span>
                 <a
-                  href={`https://etherscan.io/tx/${parsed.evidenceTxHash}`}
+                  href={`${explorerBase.tx}${parsed.evidenceTxHash}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-mono text-primary hover:underline inline-flex items-center gap-1"
@@ -1008,7 +1010,7 @@ export function DisputeDetailPage() {
                     </span>
                     {row.tx_hash && (
                       <a
-                        href={`https://etherscan.io/tx/${row.tx_hash}`}
+                        href={`${explorerBase.tx}${row.tx_hash}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:underline inline-flex items-center gap-0.5 shrink-0"

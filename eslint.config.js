@@ -18,5 +18,18 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // Catch blocks (and the rare lone callback) often bind `err`/`_err`
+      // only to satisfy the type signature even though the body just shows a
+      // user-facing toast. Allow `_`-prefixed names to be unused.
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
+    },
   },
 ])

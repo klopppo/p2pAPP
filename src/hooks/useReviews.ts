@@ -82,8 +82,8 @@ export function useSubmitRating() {
             ratingData.rated_id,
             reputationDeltaForScore(ratingData.score),
           )
-        } catch (err) {
-        }
+        } catch (_err) {
+        console.warn('[useReviews.ts] _err:', _err);/* swallow */ }
       }
       return data
     },

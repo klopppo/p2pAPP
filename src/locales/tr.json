@@ -247,7 +247,8 @@
     "errorMaxLessThanMin": "Maksimum tutar minimum tutara eşit veya büyük olmalıdır.",
     "errorTargetUserInvalid": "Özel teklif için geçerli bir Ethereum adresi (0x...) girin.",
     "successCreated": "Teklif başarıyla oluşturuldu!",
-    "errorGeneric": "Teklif oluşturulamadı. Lütfen tekrar deneyin."
+    "errorGeneric": "Teklif oluşturulamadı. Lütfen tekrar deneyin.",
+    "errorTargetUserSelf": "Özel bir teklif kendi cüzdanınızı hedefleyemez."
   },
   "disputes": {
     "title": "Uyuşmazlıklar",

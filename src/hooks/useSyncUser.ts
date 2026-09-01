@@ -26,7 +26,11 @@ export function useSyncUser() {
     if (!isConnected || !address || !signMessageAsync) {
       // Wallet gone: tear down the Supabase session + caches so the stale
       // session can't keep authorizing reads/writes as the old wallet.
-      if (syncedAddress.current) void signOut().catch(() => { /* ignore */ })
+      if (syncedAddress.current) {
+        void signOut().catch((signOutErr) => {
+          console.warn('[useSyncUser] signOut on wallet disconnect failed:', signOutErr)
+        })
+      }
       syncedAddress.current = null
       return
     }
@@ -47,6 +51,7 @@ export function useSyncUser() {
         // read-only for this wallet.
       })
       .catch((error) => {
+        console.warn('[useSyncUser] ensureWalletSession failed:', error)
         // Reset so a later re-render can retry.
         syncedAddress.current = null
       })

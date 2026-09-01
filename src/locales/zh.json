@@ -247,7 +247,8 @@
     "errorMaxLessThanMin": "最高金额必须大于或等于最低金额。",
     "errorTargetUserInvalid": "请为私密报价输入有效的以太坊地址（0x...）。",
     "successCreated": "报价创建成功！",
-    "errorGeneric": "创建报价失败，请重试。"
+    "errorGeneric": "创建报价失败，请重试。",
+    "errorTargetUserSelf": "私人报价不能以自己的钱包为目标。"
   },
   "disputes": {
     "title": "争议",

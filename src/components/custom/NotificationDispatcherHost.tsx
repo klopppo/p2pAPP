@@ -19,8 +19,13 @@ export function NotificationDispatcherHost() {
   const prefs = useNotificationPreferences()
   const qc = useQueryClient()
   const seen = useRef<Set<string>>(new Set())
+  // Mirror `prefs.data` into a ref so the realtime subscription callback
+  // (which closes over the ref) always reads the latest preferences. Updating
+  // the ref inside a `useEffect` (not during render) keeps the component pure.
   const prefsRef = useRef(prefs.data)
-  prefsRef.current = prefs.data
+  useEffect(() => {
+    prefsRef.current = prefs.data
+  }, [prefs.data])
 
   useEffect(() => {
     if (!user) return

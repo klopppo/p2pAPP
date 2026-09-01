@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Copy, ExternalLink, User } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { explorerBase } from '@/lib/explorer'
 
 export interface SellerPreview {
   name: string
@@ -41,9 +42,7 @@ export function SellerHoverCard({ seller, children }: SellerHoverCardProps) {
   }
 
   const onOpen = (addr: string) => {
-    const base = 'https://blockscan.com/token/'
-    const url = `${base}${addr}`
-    window.open(url, '_blank', 'noopener')
+    window.open(`${explorerBase.token}${addr}`, '_blank', 'noopener')
   }
 
   return (

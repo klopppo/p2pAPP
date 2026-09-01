@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Text } from '@/components/ui/text'
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
+import { explorerBase } from '@/lib/explorer'
 import { AddressWithActions } from '@/components/custom/AddressWithActions'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Clock, Shield, Loader2, Star } from 'lucide-react'
@@ -95,7 +96,7 @@ export function OpenOfferPage() {
                         <Link to={`/app/profile/${sellerAddr}`}>
                           <Text variant="h4" className="truncate hover:underline">{middleTruncate(sellerAddr)}</Text>
                         </Link>
-                        <AddressWithActions address={sellerAddr} explorerBase="https://blockscan.com/token/" showText={false} />
+                        <AddressWithActions address={sellerAddr} explorerBase={explorerBase.token} showText={false} />
                       </div>
                     ) : (
                       <Link to={`/app/profile/${sellerAddr}`}>
@@ -117,7 +118,7 @@ export function OpenOfferPage() {
                     </div>
                      <div>{(seller?.total_trades ?? 0).toLocaleString()} {t('openOffer.trades')}</div>
                     {sellerAddr && (
-                      <AddressWithActions address={sellerAddr} explorerBase="https://blockscan.com/token/" />
+                      <AddressWithActions address={sellerAddr} explorerBase={explorerBase.token} />
                     )}
                   </div>
                 </div>

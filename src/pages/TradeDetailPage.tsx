@@ -50,6 +50,7 @@ import {
   upsertTradeEscrowStatus,
 } from '@/lib/supabase'
 import { errorMessage } from '@/lib/errorMessage'
+import { explorerBase } from '@/lib/explorer'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useTradeRatings, useHasRated } from '@/hooks/useReviews'
 import { ReviewForm } from '@/components/custom/ReviewForm'
@@ -223,8 +224,7 @@ export function TradeDetailPage() {
         trade!.id,
         newStatus,
         depositTxHash,
-      ).catch(() => {
-        /* non-fatal — the chain tx already happened */
+      ).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); /* non-fatal — the chain tx already happened */
       })
 
       // 3a) Seller path: after lockFunds the on-chain state moves from
@@ -236,7 +236,7 @@ export function TradeDetailPage() {
           trade!.id,
           EscrowStatus.FUNDED,
           { txHash: lockTxHash, escrowEventType: TradeEventType.ESCROW_FUNDED },
-        ).catch(() => undefined)
+        ).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); return undefined })
       }
 
       toast.success(
@@ -311,7 +311,7 @@ export function TradeDetailPage() {
       await setTradeEscrowStatus(trade!.id, EscrowStatus.CONFIRMED, {
         txHash,
         escrowEventType: TradeEventType.ESCROW_CONFIRMED,
-      }).catch(() => undefined)
+      }).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); return undefined })
       toast.success(t('tradeDetail.confirmSuccess'))
       refetchEscrow()
     } catch (err) {
@@ -337,8 +337,7 @@ export function TradeDetailPage() {
         escrowStatus: EscrowStatus.RELEASED,
         txHash,
         escrowEventType: TradeEventType.ESCROW_RELEASED,
-      }).catch(() => {
-        /* non-fatal — the chain tx already happened */
+      }).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); /* non-fatal — the chain tx already happened */
       })
       // Successful release bumps both parties' reputation slightly. The
       // RPC clamps the overall score to [0,100].
@@ -379,8 +378,7 @@ export function TradeDetailPage() {
         escrowStatus: buyerWins ? EscrowStatus.REFUNDED : EscrowStatus.RELEASED,
         txHash,
         escrowEventType: TradeEventType.ESCROW_RESOLVED,
-      }).catch(() => {
-        /* non-fatal — the chain tx already happened */
+      }).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); /* non-fatal — the chain tx already happened */
       })
       // Reputation: small bump to the winner, small penalty to the loser.
       if (trade) {
@@ -499,7 +497,7 @@ export function TradeDetailPage() {
         escrowStatus: EscrowStatus.CANCELLED,
         txHash,
         escrowEventType: TradeEventType.ESCROW_CANCELLED,
-      }).catch(() => undefined)
+      }).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); return undefined })
       toast.success(t('tradeDetail.cancelSuccess'))
       refetchEscrow()
     } catch (err) {
@@ -532,16 +530,16 @@ export function TradeDetailPage() {
         if (name === 'TradeFullyFunded') {
           setTradeEscrowStatus(trade!.id, EscrowStatus.FUNDED, {
             escrowEventType: TradeEventType.ESCROW_FUNDED,
-          }).catch(() => undefined)
+          }).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); return undefined })
         } else if (name === 'Confirmed') {
           setTradeEscrowStatus(trade!.id, EscrowStatus.CONFIRMED, {
             escrowEventType: TradeEventType.ESCROW_CONFIRMED,
-          }).catch(() => undefined)
+          }).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); return undefined })
         } else if (name === 'BuyerSecurityDeposited') {
           upsertTradeEscrowStatus(
             trade!.id,
             EscrowStatus.BUYER_DEPOSITED,
-          ).catch(() => undefined)
+          ).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); return undefined })
         } else if (
           name === 'SellerSecurityDeposited' ||
           name === 'SellerFundsLocked'
@@ -549,17 +547,17 @@ export function TradeDetailPage() {
           upsertTradeEscrowStatus(
             trade!.id,
             EscrowStatus.SELLER_DEPOSITED,
-          ).catch(() => undefined)
+          ).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); return undefined })
         } else if (name === 'TradeCancelled') {
           updateTradeStatus(trade!.id, 'cancelled', {
             escrowStatus: EscrowStatus.CANCELLED,
             escrowEventType: TradeEventType.ESCROW_CANCELLED,
-          }).catch(() => undefined)
+          }).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); return undefined })
         } else if (name === 'Released') {
           updateTradeStatus(trade!.id, 'completed', {
             escrowStatus: EscrowStatus.RELEASED,
             escrowEventType: TradeEventType.ESCROW_RELEASED,
-          }).catch(() => undefined)
+          }).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); return undefined })
         }
       }
     },
@@ -690,7 +688,7 @@ export function TradeDetailPage() {
                 {escrowAddress}
               </code>
               <a
-                href={`https://etherscan.io/address/${escrowAddress}`}
+                href={`${explorerBase.address}${escrowAddress}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-primary hover:underline inline-flex items-center gap-1 shrink-0"

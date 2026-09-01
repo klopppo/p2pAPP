@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
 import { Copy, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
+import { explorerBase as defaultExplorerBase } from '@/lib/explorer'
 
 type Props = {
   address: string
@@ -18,7 +19,7 @@ export const formatAddress = (addr: string) => (addr ? `${addr.slice(0, 6)}...${
 export function AddressWithActions({
   address,
   className = '',
-  explorerBase = 'https://etherscan.io/address/',
+  explorerBase = defaultExplorerBase.address,
   copyToastMessage,
   showText = true,
   textClassName = 'font-mono text-xs text-muted-foreground',

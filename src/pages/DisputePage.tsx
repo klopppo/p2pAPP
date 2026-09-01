@@ -321,7 +321,7 @@ const effectiveEscrow =
           klerosDisputeId = args.klerosDisputeID.toString()
         }
       } catch (decodeErr) {
-      }
+      console.warn('[DisputePage.tsx] decodeErr:', decodeErr);/* swallow */ }
 
       // 5) Submit the IPFS evidence bytes32 on-chain (ERC-1497 Evidence event).
       //    Buyer or seller only — enforced by the contract. May also be called
@@ -336,7 +336,7 @@ const effectiveEscrow =
           args: [evidenceBytes32],
         })
         await publicClient.waitForTransactionReceipt({ hash: evidenceTxHash })
-      } catch (evidenceErr) {
+      } catch (_evidenceErr) {
         // The dispute itself is raised; evidence submission is best-effort
         // and can be retried from the detail page. Don't fail the whole flow.
         toast.warning(
@@ -407,7 +407,8 @@ const effectiveEscrow =
         evidenceFiles,
         filerRole ?? 'neutral',
         0,
-      ).catch((err) => {
+      ).catch((insertErr) => {
+        console.warn('[DisputePage] insertDisputeEvidence failed:', insertErr)
       })
 
       // B-9 (belt-and-braces) — also bump via updateDisputeOnChain in case
@@ -416,7 +417,7 @@ const effectiveEscrow =
         status: DisputeStatus.IN_REVIEW,
         evidenceGroupId: 0,
         appealCount: 0,
-      }).catch(() => undefined)
+      }).catch((err) => { console.warn('[DisputePage.tsx]', err); return undefined })
 
       // 6b) Mirror the trade into `disputed` so the trades list stops showing
       //     it as a funding/active trade. Non-fatal — the dispute row is the
@@ -425,8 +426,7 @@ const effectiveEscrow =
         escrowStatus: 'disputed',
         txHash,
         escrowEventType: TradeEventType.ESCROW_DISPUTED,
-      }).catch(() => {
-        /* non-fatal — the dispute row already landed */
+      }).catch((err) => { console.warn('[DisputePage.tsx]', err); /* non-fatal — the dispute row already landed */
       })
 
       toast.success(t('disputePage.successFiled'))

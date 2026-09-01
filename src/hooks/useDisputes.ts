@@ -250,7 +250,7 @@ export function useArbitrationCost(escrowAddress: `0x${string}` | undefined) {
           functionName: 'arbitrationCost',
           args: [extraData],
         })) as bigint
-      } catch (err) {
+      } catch (_err) {
         return null
       }
     },
@@ -324,7 +324,7 @@ export function useAppealInfo(
           periodEnd,
           appealable: disputeStatus === 1n && inWindow,
         }
-      } catch (err) {
+      } catch (_err) {
         return null
       }
     },

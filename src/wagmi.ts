@@ -1,6 +1,6 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
 import { http } from 'wagmi'
-import { mainnet, sepolia } from 'wagmi/chains'
+import { mainnet, sepolia, type Chain } from 'wagmi/chains'
 
 /**
  * Validate that `VITE_EXPECTED_CHAIN_ID` matches a chain the wagmi config
@@ -14,7 +14,18 @@ const expectedChainId = expectedChainIdEnv ? Number(expectedChainIdEnv) : null
 
 const SUPPORTED_CHAINS = [mainnet, sepolia] as const
 
-// VITE_EXPECTED_CHAIN_ID validation is done at startup — silently skip if misconfigured.
+if (
+  expectedChainId != null &&
+  Number.isFinite(expectedChainId) &&
+  expectedChainId > 0 &&
+  !SUPPORTED_CHAINS.some((c) => c.id === expectedChainId)
+) {
+  console.error(
+    `[wagmi] VITE_EXPECTED_CHAIN_ID=${expectedChainId} is not in the supported chains ` +
+      `list (${SUPPORTED_CHAINS.map((c) => `${c.id}=${c.name}`).join(', ')}). ` +
+      `Add the missing chain to src/wagmi.ts or pick a supported id.`,
+  )
+}
 
 /**
  * WalletConnect project id.
@@ -34,7 +45,11 @@ const SUPPORTED_CHAINS = [mainnet, sepolia] as const
 const projectId = import.meta.env.VITE_WC_PROJECT_ID?.trim() || undefined
 
 if (!projectId) {
-  // WalletConnect project ID not set — injected wallets still work.
+  console.warn(
+    '[wagmi] VITE_WC_PROJECT_ID not set. Injected wallets (MetaMask etc.) still work; ' +
+      'WalletConnect/mobile/QR need a real id from https://cloud.walletconnect.com ' +
+      'set as VITE_WC_PROJECT_ID in .env.',
+  )
 }
 
 export const config = getDefaultConfig({
@@ -44,7 +59,7 @@ export const config = getDefaultConfig({
   projectId: projectId || 'demo-project-id',
   appDescription: 'CofferNode — trustless peer-to-peer crypto exchange',
   appUrl: import.meta.env.VITE_APP_URL ?? 'http://localhost:5173',
-  chains: [mainnet, sepolia],
+  chains: SUPPORTED_CHAINS as unknown as readonly [Chain, ...Chain[]],
   transports: {
     [mainnet.id]: http(),
     [sepolia.id]: http(),
@@ -57,4 +72,4 @@ export const config = getDefaultConfig({
  * factory ever ships to); adding Polygon etc. means importing more wagmi
  * chains here AND setting `VITE_EXPECTED_CHAIN_ID` to that network.
  */
-export const supportedChainIds = new Set<number>([mainnet.id, sepolia.id])
+export const supportedChainIds = new Set<number>(SUPPORTED_CHAINS.map((c) => c.id))

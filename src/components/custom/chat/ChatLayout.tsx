@@ -132,7 +132,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
     mark(activeId)
     if (lastMarkedRef.current !== last.id) {
       lastMarkedRef.current = last.id
-      void markRead(last.id).catch(() => undefined)
+      void markRead(last.id).catch((err) => { console.warn('[ChatLayout.tsx]', err); return undefined })
     }
   }, [activeId, user, messages.data, mark, markRead, isOurTeam])
 

@@ -247,7 +247,8 @@
     "errorMaxLessThanMin": "La cantidad máxima debe ser mayor o igual que la cantidad mínima.",
     "errorTargetUserInvalid": "Introduzca una dirección Ethereum válida (0x...) para la oferta privada.",
     "successCreated": "¡Oferta creada exitosamente!",
-    "errorGeneric": "Error al crear la oferta. Por favor, inténtelo de nuevo."
+    "errorGeneric": "Error al crear la oferta. Por favor, inténtelo de nuevo.",
+    "errorTargetUserSelf": "Una oferta privada no puede dirigirse a tu propia cartera."
   },
   "disputes": {
     "title": "Disputas",
