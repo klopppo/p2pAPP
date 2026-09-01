@@ -31,6 +31,11 @@ export function useDisputes() {
       return getDisputesByUser(user.id)
     },
     enabled: !!address,
+    // Surface status flips (in_review → escalated → resolved) without forcing
+    // a manual refresh. Cheap because the table is small and the query is
+    // filtered by user_id via PostgREST.
+    refetchInterval: 30_000,
+    staleTime: 15_000,
   })
 }
 
@@ -271,6 +276,11 @@ export function useAppealInfo(
   return useQuery({
     queryKey: ['appeal-info', escrowAddress, klerosDisputeId?.toString() ?? null],
     enabled: !!publicClient && !!escrowAddress && klerosDisputeId != null && klerosDisputeId > 0n,
+    // Poll the appeal window + status while the dispute is in flight so the
+    // countdown updates without a manual refresh; Kleros status transitions
+    // (Waiting → Appealable → Solved) are otherwise missed.
+    refetchInterval: 15_000,
+    staleTime: 5_000,
     queryFn: async () => {
       if (!publicClient || !escrowAddress || klerosDisputeId == null || klerosDisputeId <= 0n) {
         return null

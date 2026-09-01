@@ -565,7 +565,14 @@
     "errorNoTrade": "Bu emanet için işlem bulunamadı. Önce bir tekliften işlem açın.",
     "warningEvidenceFailed": "Uyuşmazlık açıldı ancak kanıt yükleme başarısız oldu. Detay sayfasından kanıt gönderin.",
     "successFiled": "Uyuşmazlık Kleros'ta açıldı.",
-    "errorGeneric": "Uyuşmazlık açılamadı: {{message}}"
+    "errorGeneric": "Uyuşmazlık açılamadı: {{message}}",
+    "errorEscrowStateLoading": "Veri yükleniyor — birazdan tekrar deneyin.",
+    "errorNotAParty": "Yalnızca alıcı veya satıcı bu işlem için itiraz açabilir.",
+    "errorDisputeWindowClosed": "İtiraz penceresi kapandı. Süre sona erdikten sonra fonlar otomatik serbest bırakılır.",
+    "errorInsufficientBalance": "Cüzdanda yeterli Sepolia ETH yok — {{required}} ETH gerekli, {{balance}} ETH var.",
+    "warningAlreadyRaised": "Bu işlem için zaten bir itiraz var — açılıyor.",
+    "warningSomeUploadsFailed": "{{total}} dosya yüklendi ama {{failed}} başarısız; itiraz elimizdeki kanıtlarla açılacak.",
+    "errorAllUploadsFailed": "Tüm kanıt yüklemeleri başarısız oldu. Bağlantınızı kontrol edip tekrar deneyin."
   },
   "cookieConsent": {
     "privacyTitle": "Gizliliğinize önem veriyoruz",

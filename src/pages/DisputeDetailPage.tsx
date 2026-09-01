@@ -1,6 +1,7 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
   ExternalLink,
@@ -189,6 +190,7 @@ export function DisputeDetailPage() {
   const { address, isConnected } = useAccount()
   const publicClient = usePublicClient()
   const { writeContractAsync, isPending: isWritePending } = useWriteContract()
+  const qc = useQueryClient()
 
   const parsed = parseDescription(dispute?.description)
   // Prefer the new DB column (`escrow_address`), fall back to the description
@@ -220,6 +222,10 @@ export function DisputeDetailPage() {
           const ruling = Number((args.ruling as bigint | number | undefined) ?? 0)
           await updateDisputeOnChain(disputed, {
             escrowState: KlerosEscState.RULING_RECEIVED,
+            // Kleros v1 transitions directly from Appealable → Solved on rule
+            // emission. Capture that here so the UI badge updates without
+            // waiting for the next refetch.
+            klerosDisputeStatus: 2,
             onChainRuling: ruling,
             rulingReceivedTime: new Date().toISOString(),
           })
@@ -297,6 +303,11 @@ export function DisputeDetailPage() {
           eventName === 'DisputeTimedOut'
         ) {
           refetchEscrowState()
+          // Invalidate the DB-cached dispute row + the disputes list so the
+          // detail page + sidebar list surfaces the new state without a
+          // manual refresh.
+          qc.invalidateQueries({ queryKey: ['dispute', disputed] })
+          qc.invalidateQueries({ queryKey: ['disputes'] })
         }
       }
     },
@@ -305,8 +316,8 @@ export function DisputeDetailPage() {
     // handler fresh without needing a destructured `trade` variable in
     // deps (which would TDZ because trade is declared below the early
     // returns).
-     
-    [dispute, refetchEscrowState],
+
+    [dispute, refetchEscrowState, qc],
   )
   useEscrowEventWatcher(escrowAddress || undefined, handleEscrowEvent)
 
@@ -315,6 +326,24 @@ export function DisputeDetailPage() {
     escrowAddress || undefined,
     escrowState?.klerosDisputeID ?? null,
   )
+
+  // 30-day DISPUTE_TIMEOUT — gate the button client-side so the user doesn't
+  // pay gas to revert. Held in state (not a render expression) because
+  // Date.now() is impure and React 19's purity check rejects it on the
+  // render path. A 30-second tick keeps the gate responsive without
+  // busy-polling. Placed BEFORE the early returns below to satisfy
+  // rules-of-hooks.
+  const DISPUTE_TIMEOUT_SECONDS = 30n * 24n * 60n * 60n
+  const [nowSeconds, setNowSeconds] = useState(() =>
+    BigInt(Math.floor(Date.now() / 1000)),
+  )
+  useEffect(() => {
+    const id = window.setInterval(
+      () => setNowSeconds(BigInt(Math.floor(Date.now() / 1000))),
+      30_000,
+    )
+    return () => window.clearInterval(id)
+  }, [])
 
   if (isLoading) {
     return (
@@ -435,12 +464,17 @@ export function DisputeDetailPage() {
         abi: KLEROS_ESC_ABI as Abi,
         functionName: 'executeRuling',
       })
-      await publicClient.waitForTransactionReceipt({ hash })
+      await publicClient.waitForTransactionReceipt({ hash, timeout: 90_000 })
       // Mirror: state → RULING_EXECUTED, Kleros status → Solved (2), cache the
-      // ruling. Dispute stays in_review until finalize() locks it.
-      const ruling = escrowState?.currentRuling != null
+      // ruling. Prefer the DB-cached `on_chain_ruling` over the live chain
+      // read so a stale `useEscrowState` doesn't flip the trade-side
+      // outcome right after execute.
+      const liveRuling = escrowState?.currentRuling != null
         ? Number(escrowState.currentRuling)
         : null
+      const cachedRuling =
+        dispute?.on_chain_ruling != null ? Number(dispute.on_chain_ruling) : null
+      const ruling = cachedRuling ?? liveRuling
       await updateDisputeOnChain(dispute.id, {
         escrowState: KlerosEscState.RULING_EXECUTED,
         klerosDisputeStatus: 2,
@@ -459,6 +493,8 @@ export function DisputeDetailPage() {
       }
       toast.success(t('disputeDetail.rulingExecuted'))
       refetchEscrowState()
+      qc.invalidateQueries({ queryKey: ['dispute', dispute.id] })
+      qc.invalidateQueries({ queryKey: ['disputes'] })
     } catch (err) {
       toast.error(errorMessage(err, 'disputeDetail', t, 'rulingExecutedError'))
     }
@@ -472,7 +508,7 @@ export function DisputeDetailPage() {
         abi: KLEROS_ESC_ABI as Abi,
         functionName: 'finalize',
       })
-      await publicClient.waitForTransactionReceipt({ hash })
+      await publicClient.waitForTransactionReceipt({ hash, timeout: 90_000 })
       // Mirror: state → COMPLETED, dispute → resolved with resolved_at.
       await updateDisputeOnChain(dispute.id, {
         escrowState: KlerosEscState.COMPLETED,
@@ -481,10 +517,19 @@ export function DisputeDetailPage() {
       }).catch((err) => { console.warn('[DisputeDetailPage.tsx]', err) })
       // Mirror the trade-side outcome at finalize time (B-7).
       if (trade?.id) {
-        const ruling = escrowState?.currentRuling != null
-          ? Number(escrowState.currentRuling)
-          : null
-        const buyerWins = ruling === 1 || ruling === 3
+        // Prefer the DB-cached winner from a prior timeout / execute path
+        // over recomputing from the ruling. Avoids overriding a stored
+        // outcome when the live chain read is stale.
+        const existingWinner = dispute?.winner
+        let buyerWins: boolean
+        if (existingWinner === 'buyer') buyerWins = true
+        else if (existingWinner === 'seller') buyerWins = false
+        else {
+          const ruling = escrowState?.currentRuling != null
+            ? Number(escrowState.currentRuling)
+            : null
+          buyerWins = ruling === 1 || ruling === 3
+        }
         await mirrorDisputeToTrade(trade.id, {
           tradeStatus: buyerWins ? TradeStatus.REFUNDED : TradeStatus.COMPLETED,
           escrowStatus: buyerWins ? EscrowStatus.REFUNDED : EscrowStatus.RELEASED,
@@ -507,20 +552,29 @@ export function DisputeDetailPage() {
         abi: KLEROS_ESC_ABI as Abi,
         functionName: 'timeoutDispute',
       })
-      await publicClient.waitForTransactionReceipt({ hash })
+      await publicClient.waitForTransactionReceipt({ hash, timeout: 90_000 })
       // Mirror: state → COMPLETED, dispute → closed (timeout is unilateral loss
-      // for the disputer, not a Kleros-mediated resolution).
+      // for the disputer, not a Kleros-mediated resolution). Compute the
+      // winner here too so the DB row is consistent with the watcher path
+      // (which always writes `winner`). The watcher's `DisputeTimedOut`
+      // handler still mirrors the trade side as a backstop.
+      const buyerWasDisputer =
+        !!escrowState?.disputer &&
+        escrowState.disputer.toLowerCase() === escrowState.buyer.toLowerCase()
+      const winner: 'buyer' | 'seller' | null = escrowState
+        ? buyerWasDisputer
+          ? 'seller'
+          : 'buyer'
+        : null
       await updateDisputeOnChain(dispute.id, {
         escrowState: KlerosEscState.COMPLETED,
         status: DisputeStatus.CLOSED,
+        winner,
         resolvedAt: new Date().toISOString(),
       }).catch((err) => { console.warn('[DisputeDetailPage.tsx]', err) })
       // Mirror the trade-side outcome (B-7): the disputer loses. Use
       // `escrowState.disputer` to determine the winner without re-reading.
-      if (trade?.id && escrowState?.disputer) {
-        const buyerWasDisputer =
-          escrowState.disputer.toLowerCase() === escrowState.buyer.toLowerCase()
-        const winner: 'buyer' | 'seller' = buyerWasDisputer ? 'seller' : 'buyer'
+      if (trade?.id && winner) {
         await mirrorDisputeToTrade(trade.id, {
           tradeStatus:
             winner === 'seller'
@@ -543,11 +597,22 @@ export function DisputeDetailPage() {
     liveEscrowStateValue === KlerosEscState.RULING_RECEIVED
   const canFinalize =
     liveEscrowStateValue === KlerosEscState.RULING_EXECUTED
-  // DISPUTE_TIMEOUT (30 days) check is best done in the contract; the UI just
-  // exposes the button and surfaces a revert if too early.
+
+  // 30-day DISPUTE_TIMEOUT — gate the button client-side so the user doesn't
+  // pay gas to revert. The "now" timestamp lives in state (declared above
+  // before the early returns) so we don't call Date.now() during render
+  // — React 19's purity check rejects impure render expressions.
+  const disputeTimestamp =
+    escrowState?.disputeTimestamp != null && escrowState.disputeTimestamp > 0n
+      ? escrowState.disputeTimestamp
+      : null
+  const timeoutReady =
+    disputeTimestamp != null &&
+    nowSeconds >= disputeTimestamp + DISPUTE_TIMEOUT_SECONDS
   const canTimeout =
-    liveEscrowStateValue === KlerosEscState.AWAITING_RULING ||
-    liveEscrowStateValue === KlerosEscState.RULING_RECEIVED
+    (liveEscrowStateValue === KlerosEscState.AWAITING_RULING ||
+      liveEscrowStateValue === KlerosEscState.RULING_RECEIVED) &&
+    timeoutReady
 
   const handleAppeal = async () => {
     if (!escrowAddress || !publicClient || !appealInfo?.appealCostWei) return
@@ -558,7 +623,7 @@ export function DisputeDetailPage() {
         functionName: 'appeal',
         value: appealInfo.appealCostWei,
       })
-      await publicClient.waitForTransactionReceipt({ hash })
+      await publicClient.waitForTransactionReceipt({ hash, timeout: 90_000 })
       // Mirror: state moves back to AWAITING_RULING for the new round; mark
       // the dispute as escalated.
       await updateDisputeOnChain(dispute.id, {
@@ -569,6 +634,8 @@ export function DisputeDetailPage() {
       }).catch((err) => { console.warn('[DisputeDetailPage.tsx]', err) })
       toast.success(t('disputeDetail.appealFunded'))
       refetchEscrowState()
+      qc.invalidateQueries({ queryKey: ['dispute', dispute.id] })
+      qc.invalidateQueries({ queryKey: ['disputes'] })
     } catch (err) {
       toast.error(errorMessage(err, 'disputeDetail', t, 'appealFundedError'))
     }

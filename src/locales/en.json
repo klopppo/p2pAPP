@@ -565,7 +565,14 @@
     "errorNoTrade": "No trade found for this escrow. Open a trade from an offer first.",
     "warningEvidenceFailed": "Dispute raised, but evidence upload failed. Submit evidence from the detail page.",
     "successFiled": "Dispute filed on Kleros.",
-    "errorGeneric": "Failed to file dispute: {{message}}"
+    "errorGeneric": "Failed to file dispute: {{message}}",
+    "errorEscrowStateLoading": "Loading trade data — try again in a moment.",
+    "errorNotAParty": "Only the buyer or seller can raise a dispute on this trade.",
+    "errorDisputeWindowClosed": "The dispute window has closed. Funds release automatically once the grace period ends.",
+    "errorInsufficientBalance": "Not enough Sepolia ETH in your wallet — need {{required}} ETH, have {{balance}} ETH.",
+    "warningAlreadyRaised": "A dispute for this trade already exists — opening it.",
+    "warningSomeUploadsFailed": "Uploaded {{total}} file(s) but {{failed}} failed; the dispute will be raised with what we have.",
+    "errorAllUploadsFailed": "All evidence uploads failed. Check your connection and try again."
   },
   "cookieConsent": {
     "privacyTitle": "We value your privacy",

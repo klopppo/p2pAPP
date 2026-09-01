@@ -565,7 +565,14 @@
     "errorNoTrade": "Aucun échange trouvé pour ce séquestre. Ouvrez d'abord un échange depuis une offre.",
     "warningEvidenceFailed": "Litige ouvert, mais le téléchargement de la preuve a échoué. Soumettez les preuves depuis la page de détail.",
     "successFiled": "Litige déposé sur Kleros.",
-    "errorGeneric": "Échec du dépôt du litige : {{message}}"
+    "errorGeneric": "Échec du dépôt du litige : {{message}}",
+    "errorEscrowStateLoading": "Chargement des données — réessayez dans un instant.",
+    "errorNotAParty": "Seul l'acheteur ou le vendeur peut ouvrir un litige sur cette opération.",
+    "errorDisputeWindowClosed": "La fenêtre de litige est fermée. Les fonds sont libérés automatiquement à la fin du délai de grâce.",
+    "errorInsufficientBalance": "Pas assez d'ETH Sepolia — besoin de {{required}} ETH, vous avez {{balance}} ETH.",
+    "warningAlreadyRaised": "Un litige existe déjà pour cette opération — ouverture.",
+    "warningSomeUploadsFailed": "{{total}} fichier(s) envoyé(s) mais {{failed}} échoué(s) ; le litige sera ouvert avec ce que nous avons.",
+    "errorAllUploadsFailed": "Tous les envois de preuves ont échoué. Vérifiez votre connexion et réessayez."
   },
   "cookieConsent": {
     "privacyTitle": "Nous respectons votre vie privée",

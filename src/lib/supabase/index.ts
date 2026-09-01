@@ -1084,8 +1084,11 @@ export async function mirrorDisputeToTrade(
 export interface DisputeEvidenceFile {
   cid: string
   url: string
-  name: string
-  size: number
+  /** Display name. May be undefined when the IPFS upload didn't surface a
+   *  filename, in which case the caller should fall back to the local
+   *  File object's `name`. */
+  name?: string
+  size?: number
   kind?: string
   /** keccak256(cid) as 0x-prefixed bytes32 — the value sent to
    *  `KlerosEsc.submitEvidence(bytes32)`. */

@@ -565,7 +565,14 @@
     "errorNoTrade": "No se encontró una operación para esta custodia. Abra una operación desde una oferta primero.",
     "warningEvidenceFailed": "Disputa presentada, pero falló la subida de evidencia. Envíe evidencia desde la página de detalles.",
     "successFiled": "Disputa presentada en Kleros.",
-    "errorGeneric": "Error al presentar la disputa: {{message}}"
+    "errorGeneric": "Error al presentar la disputa: {{message}}",
+    "errorEscrowStateLoading": "Cargando datos — inténtalo de nuevo en un momento.",
+    "errorNotAParty": "Solo el comprador o el vendedor puede abrir una disputa en esta operación.",
+    "errorDisputeWindowClosed": "La ventana de disputa está cerrada. Los fondos se liberan automáticamente cuando termina el período de gracia.",
+    "errorInsufficientBalance": "ETH insuficiente en tu cartera — necesitas {{required}} ETH, tienes {{balance}} ETH.",
+    "warningAlreadyRaised": "Ya existe una disputa para esta operación — abriéndola.",
+    "warningSomeUploadsFailed": "Se subieron {{total}} archivo(s) pero {{failed}} fallaron; la disputa se abrirá con lo que tenemos.",
+    "errorAllUploadsFailed": "Todas las subidas de evidencia fallaron. Revisa tu conexión e inténtalo de nuevo."
   },
   "cookieConsent": {
     "privacyTitle": "Valoramos su privacidad",

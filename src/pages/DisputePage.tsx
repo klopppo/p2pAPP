@@ -37,6 +37,7 @@ import {
   createDispute,
   generateDisputeId,
   ensureUser,
+  getDisputesByTrade,
   getTradeByEscrowAddress,
   insertDisputeEvidence,
   updateDisputeOnChain,
@@ -261,12 +262,83 @@ const effectiveEscrow =
       toast.error(t('disputePage.errorArbitrationFee'))
       return
     }
+    // Don't submit until we know the escrow state + filer role. Without
+    // escrowState we can't enforce the DisputeWindowClosed gate or tag the
+    // dispute with the correct raiser role.
+    if (!escrowState) {
+      toast.error(t('disputePage.errorEscrowStateLoading'))
+      return
+    }
+    if (filerRole == null) {
+      toast.error(t('disputePage.errorNotAParty'))
+      return
+    }
+    // KlerosEsc.raiseDispute reverts with DisputeWindowClosed() once the
+    // CONFIRMED_PENDING grace window has elapsed. Block the submit before
+    // charging gas + arbitration so the user doesn't pay to fail.
+    const graceElapsed =
+      escrowState.confirmationTime > 0n &&
+      BigInt(Math.floor(Date.now() / 1000)) >=
+        escrowState.confirmationTime + escrowState.gracePeriod
+    if (
+      escrowState.state === KlerosEscState.CONFIRMED_PENDING &&
+      graceElapsed
+    ) {
+      toast.error(t('disputePage.errorDisputeWindowClosed'))
+      return
+    }
+    // ETH balance preflight: the tx pays arbitrationFee + gas for the
+    // raiseDispute call + (best-effort) submitEvidence. ~0.005 ETH leaves
+    // headroom on Sepolia; surface the warning if the balance is lower.
+    const balance = (await publicClient.getBalance({ address })) as bigint
+    const required = arbitrationCostWei + 100000000000000n // arbitration + ~0.0001 ETH gas headroom
+    if (balance < required) {
+      toast.error(
+        t('disputePage.errorInsufficientBalance', {
+          required: Number(required) / 1e18,
+          balance: Number(balance) / 1e18,
+        }),
+      )
+      return
+    }
 
     setStage('uploading')
     try {
       // 1) Upload proof pictures to IPFS — the FIRST CID becomes the
-      //    on-chain evidence reference passed to submitEvidence().
-      const uploads = await Promise.all(files.map((f) => uploadToIpfs(f.file)))
+      //    on-chain evidence reference passed to submitEvidence(). We upload
+      //    each file independently so a single bad IPFS response doesn't
+      //    sink the whole batch — the surviving CIDs still ship.
+      const uploads: Array<{ cid: string; url: string; name?: string; size?: number }> = []
+      const failedUploads: Array<{ name: string; error: string }> = []
+      for (const f of files) {
+        try {
+          const upload = await uploadToIpfs(f.file)
+          uploads.push({
+            cid: upload.cid,
+            url: upload.url,
+            name: upload.name ?? f.file.name,
+            size: upload.size ?? f.file.size,
+          } as DisputeEvidenceFile)
+        } catch (uploadErr) {
+          console.warn(`[DisputePage] IPFS upload failed for ${f.file.name}:`, uploadErr)
+          failedUploads.push({
+            name: f.file.name,
+            error: uploadErr instanceof Error ? uploadErr.message : String(uploadErr),
+          })
+        }
+      }
+      if (uploads.length === 0) {
+        toast.error(t('disputePage.errorAllUploadsFailed'))
+        return
+      }
+      if (failedUploads.length > 0) {
+        toast.warning(
+          t('disputePage.warningSomeUploadsFailed', {
+            failed: failedUploads.length,
+            total: files.length,
+          }),
+        )
+      }
       const primaryCid = uploads[0].cid
       const evidenceBytes32 = await cidToBytes32(primaryCid)
 
@@ -291,6 +363,18 @@ const effectiveEscrow =
         throw new Error(`No trade linked to escrow ${effectiveEscrow}`)
       }
 
+      // Pre-flight: don't double-raise. If a dispute row already exists
+      // for this trade the DB `disputes.trade_id unique` constraint will
+      // throw a 23505 once we hit createDispute below. Route the user to
+      // the existing row instead.
+      const existing = await getDisputesByTrade(linkedTrade.id)
+      if (existing && existing.length > 0) {
+        const prior = existing[0]
+        toast.warning(t('disputePage.warningAlreadyRaised'))
+        navigate(`/app/disputes/${prior.id}`)
+        return
+      }
+
       // 3) Raise the dispute on-chain. raiseDispute() forwards ETH to the
       //    Kleros court internally; we only need to attach the fee.
       setStage('raising')
@@ -303,9 +387,12 @@ const effectiveEscrow =
 
       // 4) Wait for inclusion + decode the on-chain Kleros dispute ID assigned
       //    by KlerosCourt.createDispute() (via the DisputeRaised event).
+      //    Bound the wait so a Sepolia RPC stall doesn't leave the form
+      //    spinning at `stage='mining'` forever.
       setStage('mining')
       const receipt = await publicClient.waitForTransactionReceipt({
         hash: txHash,
+        timeout: 90_000,
       })
       let klerosDisputeId: string | null = null
       try {
@@ -335,10 +422,15 @@ const effectiveEscrow =
           functionName: 'submitEvidence',
           args: [evidenceBytes32],
         })
-        await publicClient.waitForTransactionReceipt({ hash: evidenceTxHash })
+        await publicClient.waitForTransactionReceipt({
+          hash: evidenceTxHash,
+          timeout: 90_000,
+        })
       } catch (_evidenceErr) {
         // The dispute itself is raised; evidence submission is best-effort
         // and can be retried from the detail page. Don't fail the whole flow.
+        console.warn('[DisputePage] submitEvidence failed:', _evidenceErr)
+        setStage('saving')
         toast.warning(
           t('disputePage.warningEvidenceFailed'),
         )

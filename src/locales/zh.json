@@ -565,7 +565,14 @@
     "errorNoTrade": "未找到此托管合约对应的交易。请先从报价发起交易。",
     "warningEvidenceFailed": "争议已发起，但证据上传失败。请在详情页面提交证据。",
     "successFiled": "争议已提交至 Kleros。",
-    "errorGeneric": "提交争议失败：{{message}}"
+    "errorGeneric": "提交争议失败：{{message}}",
+    "errorEscrowStateLoading": "正在加载数据 — 请稍后再试。",
+    "errorNotAParty": "只有买家或卖家才能为此交易发起争议。",
+    "errorDisputeWindowClosed": "争议窗口已关闭。宽限期结束后资金会自动释放。",
+    "errorInsufficientBalance": "钱包 Sepolia ETH 不足 — 需要 {{required}} ETH, 当前 {{balance}} ETH。",
+    "warningAlreadyRaised": "该交易已存在争议 — 正在打开。",
+    "warningSomeUploadsFailed": "已上传 {{total}} 个文件,但 {{failed}} 个失败;将用可用证据发起争议。",
+    "errorAllUploadsFailed": "所有证据上传失败。请检查连接后重试。"
   },
   "cookieConsent": {
     "privacyTitle": "我们重视您的隐私",
