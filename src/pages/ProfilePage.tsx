@@ -505,15 +505,8 @@ function ProfileReputationCard({ userId }: { userId: string }) {
           <Text variant="h3" className="mt-1">{rep.overall}<span className="text-sm text-muted-foreground ml-1">/ 100</span></Text>
         </div>
         <div className="space-y-2">
-          <RepRow label={t('profile.repTrustworthiness')} value={rep.trustworthiness} />
-          <RepRow label={t('profile.repReliability')} value={rep.reliability} />
           <RepRow label={t('profile.repCommunication')} value={rep.communication} />
           <RepRow label={t('profile.repSpeed')} value={rep.speed} />
-          <RepRow label={t('profile.repProfessionalism')} value={rep.professionalism} />
-        </div>
-        <div className="flex justify-between text-xs text-muted-foreground pt-2 border-t border-border/50">
-          <span>{t('profile.repPointsEarned')}: <span className="font-mono text-foreground">+{rep.points_earned}</span></span>
-          <span>{t('profile.repPointsLost')}: <span className="font-mono text-foreground">−{rep.points_lost}</span></span>
         </div>
       </CardContent>
     </Card>
