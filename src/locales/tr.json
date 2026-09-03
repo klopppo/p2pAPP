@@ -168,7 +168,8 @@
     "totalVolume": "Toplam Hacim",
     "loading": "Yükleniyor…",
     "message": "Mesaj",
-    "messageTitle": "Bu kullanıcıyla sohbeti aç"
+    "messageTitle": "Bu kullanıcıyla sohbeti aç",
+    "errorStartChat": "Sohbet başlatılamadı — lütfen tekrar deneyin."
   },
   "trades": {
     "title": "İşlemler",

@@ -23,6 +23,7 @@ import { ArrowUpDown } from 'lucide-react'
 import { useUserProfile, useOffersBySeller } from '@/hooks/useOffers'
 import { useConversations } from '@/hooks/useConversations'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { getOrCreateDirectConversation } from '@/lib/supabase'
 import { useTranslation } from 'react-i18next'
 import { ReviewList } from '@/components/custom/ReviewList'
 import { RatingBreakdown } from '@/components/custom/RatingBreakdown'
@@ -118,6 +119,7 @@ export function ProfilePage() {
   // user. Placed before the early returns below so rules-of-hooks is happy.
   const { data: conversations = [] } = useConversations()
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
+  const [startingChat, setStartingChat] = useState(false)
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -240,21 +242,16 @@ export function ProfilePage() {
   const lastActive = profile.last_active_at ? new Date(profile.last_active_at).toLocaleDateString() : '—'
   const memberSince = profile.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
-  // "Message" button — find a pre-existing conversation with this user via
-  // the current user's conversation list, then navigate to it. If none
-  // exists yet (v1 only auto-creates conversations at trade creation) the
-  // button is hidden — direct DMs require a prior trade to anchor the
-  // conversation row. Roadmap: an RPC that inserts a synthetic
-  // user-to-user conversation row. Placed BEFORE the early returns below
-  // to satisfy rules-of-hooks. (Hook call lives above with the others.)
+  // "Message" button — find any conversation with this user via the
+  // current user's conversation list. v1's `create_conversation_for_trade`
+  // trigger only creates conversation rows at trade creation, so a
+  // conversation exists iff the two users share a prior trade. Either
+  // buyer or seller of that trade qualifies as a participant.
+  // Placed BEFORE the early returns below to satisfy rules-of-hooks.
+  // (Hook call lives above with the others.)
   const existingConv = conversations.find((c) => {
-    if (c.trade_id) return false // only anchor to non-trade threads
     const ids = c.participants.map((p) => p.user_id)
-    return (
-      ids.length === 2 &&
-      ids.includes(user?.id ?? '') &&
-      ids.includes(profile.id)
-    )
+    return ids.includes(user?.id ?? '') && ids.includes(profile.id)
   })
   const canMessage = !!profile && !isOwnProfile && !!user
 
@@ -283,6 +280,38 @@ export function ProfilePage() {
               <MessageCircle className="w-3.5 h-3.5 mr-1" />
               {t('profile.message')}
             </Link>
+          </Button>
+        )}
+        {canMessage && !existingConv && (
+          <Button
+            size="sm"
+            className="rounded-full"
+            title={t('profile.messageTitle')}
+            disabled={startingChat}
+            onClick={async () => {
+              if (!user || !profile) return
+              setStartingChat(true)
+              try {
+                const convId = await getOrCreateDirectConversation(
+                  user.id,
+                  profile.id,
+                )
+                if (convId) navigate(`/app/messages/${convId}`)
+                else toast.error(t('profile.errorStartChat'))
+              } catch (err) {
+                console.warn('[ProfilePage] start chat failed:', err)
+                toast.error(t('profile.errorStartChat'))
+              } finally {
+                setStartingChat(false)
+              }
+            }}
+          >
+            {startingChat ? (
+              <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+            ) : (
+              <MessageCircle className="w-3.5 h-3.5 mr-1" />
+            )}
+            {t('profile.message')}
           </Button>
         )}
       </div>

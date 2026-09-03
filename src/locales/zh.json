@@ -168,7 +168,8 @@
     "totalVolume": "总交易量",
     "loading": "加载中…",
     "message": "发消息",
-    "messageTitle": "打开与该用户的聊天"
+    "messageTitle": "打开与该用户的聊天",
+    "errorStartChat": "无法开始聊天 — 请重试。"
   },
   "trades": {
     "title": "交易",

@@ -168,7 +168,8 @@
     "totalVolume": "Volumen total",
     "loading": "Cargando…",
     "message": "Mensaje",
-    "messageTitle": "Abrir el chat con este usuario"
+    "messageTitle": "Abrir el chat con este usuario",
+    "errorStartChat": "No se pudo iniciar el chat — inténtalo de nuevo."
   },
   "trades": {
     "title": "Operaciones",

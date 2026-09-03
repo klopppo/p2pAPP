@@ -1437,6 +1437,66 @@ export async function listConversations(userId: string) {
 }
 
 /**
+ * Create a direct (non-trade) conversation between the current user and
+ * `otherUserId`, returning the new conversation id. Idempotent: if a
+ * conversation already exists between the two users (any trade-anchored
+ * thread counts), its id is returned without creating a new row.
+ *
+ * v1's `create_conversation_for_trade` trigger only fires on trade
+ * insert, so two users who've never traded have no conversation row
+ * between them. This helper lets the ProfilePage 'Message' button spin
+ * one up on demand so the chat route resolves to a real conversation.
+ */
+export async function getOrCreateDirectConversation(
+  currentUserId: string,
+  otherUserId: string,
+): Promise<string | null> {
+  if (currentUserId === otherUserId) return null
+
+  // Look for an existing conversation (any trade-anchored one counts).
+  const { data: existing, error: listErr } = await supabase
+    .from('conversations')
+    .select('id, participants:conversation_participants(user_id)')
+    .is('trade_id', null)
+  if (listErr) {
+    console.error('[getOrCreateDirectConversation] list failed:', listErr)
+    return null
+  }
+  for (const row of existing ?? []) {
+    const ids = (row.participants ?? []).map(
+      (p: { user_id: string }) => p.user_id,
+    )
+    if (ids.includes(currentUserId) && ids.includes(otherUserId)) {
+      return row.id as string
+    }
+  }
+
+  // Create a fresh conversation + two participants. The trade_id column
+  // is nullable, so a non-trade-anchored row is legal.
+  const { data: conv, error: convErr } = await supabase
+    .from('conversations')
+    .insert({ trade_id: null, status: 'open' })
+    .select('id')
+    .single()
+  if (convErr || !conv) {
+    console.error('[getOrCreateDirectConversation] insert failed:', convErr)
+    return null
+  }
+  const convId = conv.id as string
+  const { error: partErr } = await supabase
+    .from('conversation_participants')
+    .insert([
+      { conversation_id: convId, user_id: currentUserId, role: 'buyer' },
+      { conversation_id: convId, user_id: otherUserId, role: 'seller' },
+    ])
+  if (partErr) {
+    console.error('[getOrCreateDirectConversation] participants failed:', partErr)
+    return null
+  }
+  return convId
+}
+
+/**
  * Helper: (created_at, id) sort key of a message. Used as a composite cursor
  * for pagination and unread counts. A bare-timestamp cursor is lossy: two
  * messages can share the same millisecond (timestamptz has ms resolution),

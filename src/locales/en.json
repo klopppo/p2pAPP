@@ -168,7 +168,8 @@
     "totalVolume": "Total Volume",
     "loading": "Loading…",
     "message": "Message",
-    "messageTitle": "Open the chat with this user"
+    "messageTitle": "Open the chat with this user",
+    "errorStartChat": "Couldn't start the chat — please try again."
   },
   "trades": {
     "title": "Trades",

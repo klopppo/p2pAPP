@@ -180,7 +180,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   const showSidebar = !activeId || !forcedId
 
   return (
-    <section className="flex-1 flex flex-col min-h-0">
+    <section className="flex-1 flex flex-col min-h-0 -mb-8">
       <div className="flex flex-1 min-h-0">
         {showSidebar && (
           <div className={activeId ? 'hidden md:block' : 'w-full md:w-auto'}>
@@ -204,7 +204,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
               Conversation not found.
             </div>
           ) : (
-            <div className="flex-1 bg-background/20 px-4 pt-4 pb-2 flex flex-col min-h-0">
+    <div className="flex-1 bg-background/20 px-6 pt-6 pb-3 flex flex-col min-h-0">
               <ChatHeader
                 conversation={convQuery.data}
                 currentUserId={user.id}
@@ -275,7 +275,7 @@ function OurTeamPane({
     </button>
   )
   return (
-    <div className="flex-1 bg-background/20 px-4 pt-4 pb-2 flex flex-col min-h-0">
+    <div className="flex-1 bg-background/20 px-6 pt-6 pb-3 flex flex-col min-h-0">
       {/* Inline minimal header so the welcome thread reads correctly. */}
       <div className="flex items-center gap-3 pb-3 border-b border-border/40">
         {headerBack}
