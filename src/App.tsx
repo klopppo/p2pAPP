@@ -1,6 +1,7 @@
+import { useEffect, useMemo } from 'react'
 import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { WagmiProvider } from 'wagmi'
+import { WagmiProvider, useAccount } from 'wagmi'
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit'
 import { Toaster } from 'sonner'
 import '@rainbow-me/rainbowkit/styles.css'
@@ -31,8 +32,37 @@ import DocsTermsOfService from './pages/docs/TermsOfService'
 import { UserSync } from './hooks/useSyncUser'
 import { TrustlessFlowOverlay } from './components/custom/TrustlessFlow'
 import { CookieConsent } from './components/custom/CookieConsent'
+import { persistQueryClient } from './lib/queryPersister'
 
-const queryClient = new QueryClient()
+/**
+ * One QueryClient for the lifetime of the page. `gcTime` is bumped to 24h
+ * so query snapshots survive a tab close / open cycle and match the
+ * `queryPersister` MAX_AGE_MS window.
+ */
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      gcTime: 1000 * 60 * 60 * 24, // 24h — align with persister window
+      staleTime: 1000 * 5, // 5s by default; individual queries can override
+      retry: 1,
+    },
+  },
+})
+
+/**
+ * Inner component — runs after `WagmiProvider` so `useAccount()` is
+ * available. The buster keys the persisted cache to the connected
+ * wallet so disconnecting / switching invalidates it without manual
+ * clearing.
+ */
+function QueryClientWithPersistence() {
+  const { address } = useAccount()
+  const buster = useMemo(() => `wallet:${address?.toLowerCase() ?? 'anon'}`, [address])
+  useEffect(() => {
+    return persistQueryClient(queryClient, () => buster)
+  }, [buster])
+  return null
+}
 
 function App() {
   return (
@@ -42,6 +72,7 @@ function App() {
           accentColor: 'hsl(var(--primary))',
           borderRadius: 'large',
         })}>
+          <QueryClientWithPersistence />
           <TrustlessFlowOverlay />
           <CookieConsent />
           <BrowserRouter>
