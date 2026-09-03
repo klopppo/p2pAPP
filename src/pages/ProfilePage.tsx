@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { Button } from '@/components/ui/button'
 import { explorerBase } from '@/lib/explorer'
@@ -255,10 +255,29 @@ export function ProfilePage() {
   })
   const canMessage = !!profile && !isOwnProfile && !!user
 
+  const startChat = async () => {
+    if (!user || !profile) return
+    setStartingChat(true)
+    try {
+      if (existingConv) {
+        navigate(`/app/messages/${existingConv.id}`)
+        return
+      }
+      const convId = await getOrCreateDirectConversation(user.id, profile.id)
+      if (convId) navigate(`/app/messages/${convId}`)
+      else toast.error(t('profile.errorStartChat'))
+    } catch (err) {
+      console.warn('[ProfilePage] start chat failed:', err)
+      toast.error(t('profile.errorStartChat'))
+    } finally {
+      setStartingChat(false)
+    }
+  }
+
   return (
     <section className="space-y-8">
-      <div className="flex gap-2">
-        {isOwnProfile && (
+      {isOwnProfile && (
+        <div className="flex">
           <Button
             size="sm"
             variant="outline"
@@ -268,53 +287,8 @@ export function ProfilePage() {
             <Pencil className="w-3.5 h-3.5 mr-1" />
             {t('profile.editProfile')}
           </Button>
-        )}
-        {canMessage && existingConv && (
-          <Button
-            asChild
-            size="sm"
-            className="rounded-full"
-            title={t('profile.messageTitle')}
-          >
-            <Link to={`/app/messages/${existingConv.id}`}>
-              <MessageCircle className="w-3.5 h-3.5 mr-1" />
-              {t('profile.message')}
-            </Link>
-          </Button>
-        )}
-        {canMessage && !existingConv && (
-          <Button
-            size="sm"
-            className="rounded-full"
-            title={t('profile.messageTitle')}
-            disabled={startingChat}
-            onClick={async () => {
-              if (!user || !profile) return
-              setStartingChat(true)
-              try {
-                const convId = await getOrCreateDirectConversation(
-                  user.id,
-                  profile.id,
-                )
-                if (convId) navigate(`/app/messages/${convId}`)
-                else toast.error(t('profile.errorStartChat'))
-              } catch (err) {
-                console.warn('[ProfilePage] start chat failed:', err)
-                toast.error(t('profile.errorStartChat'))
-              } finally {
-                setStartingChat(false)
-              }
-            }}
-          >
-            {startingChat ? (
-              <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-            ) : (
-              <MessageCircle className="w-3.5 h-3.5 mr-1" />
-            )}
-            {t('profile.message')}
-          </Button>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
         <Avatar className="h-24 w-24">
@@ -350,6 +324,22 @@ export function ProfilePage() {
               >
                 <ExternalLink className="w-4 h-4" />
               </Button>
+              {canMessage && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={startChat}
+                  disabled={startingChat}
+                  title={t('profile.messageTitle')}
+                  aria-label={t('profile.message')}
+                >
+                  {startingChat ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <MessageCircle className="w-4 h-4" />
+                  )}
+                </Button>
+              )}
             </div>
           </div>
           {profile.bio && (
