@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import { MessageCircle } from 'lucide-react'
+
+
 import {
   useConversations,
   useConversation,
@@ -16,6 +19,7 @@ import { MessageThread } from './MessageThread'
 import { MessageComposer } from './MessageComposer'
 import { TypingIndicator } from './TypingIndicator'
 import { EmptyState } from './EmptyState'
+import { ChatLoading } from './ChatLoading'
 import {
   createOurTeamConversation,
   OUR_TEAM_ID,
@@ -23,7 +27,6 @@ import {
   OUR_TEAM_DISCORD,
 } from './ourTeam'
 import type { ConversationView, MessageWithSender } from '@/types/database'
-import { Loader2 } from 'lucide-react'
 
 interface Props {
   /**
@@ -53,6 +56,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   const navigate = useNavigate()
   const { conversationId: routeId } = useParams<{ conversationId: string }>()
   const { data: user, isLoading: userLoading } = useCurrentUser()
+  const { t } = useTranslation()
   const conversations = useConversations()
   const { readIds, mark } = useLocallyReadConversations()
 
@@ -161,8 +165,8 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
 
   if (userLoading) {
     return (
-      <section className="flex-1 flex items-center justify-center p-8 text-muted-foreground text-sm">
-        <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Connecting…
+      <section className="flex-1 flex items-center justify-center p-8">
+        <ChatLoading size="lg" label={t('chat.connecting')} />
       </section>
     )
   }
@@ -178,6 +182,18 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   const noConversations =
     !!conversations.data && conversations.data.length === 0 && !isOurTeam
   const showSidebar = !activeId || !forcedId
+
+  // Page-level loading state. Until the conversation list resolves we don't
+  // know if there's an active conversation, so the right pane can't show
+  // a meaningful empty state. Render a centered spinner across the full
+  // chat area to make the hydration visible.
+  if (conversations.isLoading && !isOurTeam && !forcedId) {
+    return (
+      <section className="flex-1 flex items-center justify-center p-8">
+        <ChatLoading size="lg" label={t('chat.loading')} />
+      </section>
+    )
+  }
 
   return (
     <section className="flex-1 flex flex-col min-h-0 -mb-8">
@@ -196,12 +212,10 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
           isOurTeam && ourTeamConv ? (
             <OurTeamPane messages={ourTeamMessages} onBack={handleBack} />
           ) : convQuery.isLoading ? (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Loading conversation…
-            </div>
+            <ChatLoading size="lg" label={t('chat.loadingConversation')} />
           ) : !convQuery.data ? (
             <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-              Conversation not found.
+              {t('chat.conversationNotFound')}
             </div>
           ) : (
     <div className="flex-1 bg-background/20 px-6 pt-6 pb-3 flex flex-col min-h-0">

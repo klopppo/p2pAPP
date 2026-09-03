@@ -220,7 +220,11 @@
     "typeMessage": "Type a message...",
     "openDiscord": "Open Discord",
     "welcomeMessage": "👋 Welcome to CofferNode! You can contact us from here for any issues, questions, or support requests — replies usually land within a few hours. We're here to help, and for live community support see Discord below.",
-    "userPrefix": "User {{id}}"
+    "userPrefix": "User {{id}}",
+    "connecting": "Connecting…",
+    "loading": "Loading…",
+    "loadingConversation": "Loading conversation…",
+    "conversationNotFound": "Conversation not found."
   },
   "createOffer": {
     "title": "Create New Offer",

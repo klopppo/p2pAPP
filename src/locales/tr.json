@@ -220,7 +220,11 @@
     "typeMessage": "Bir mesaj yazın...",
     "openDiscord": "Discord'u Aç",
     "welcomeMessage": "👋 CofferNode'a hoş geldiniz! Herhangi bir sorun, soru veya destek talebi için buradan bize ulaşabilirsiniz — yanıtlar genellikle birkaç saat içinde gelir. Yardımcı olmak için buradayız ve canlı topluluk desteği için aşağıdaki Discord'a bakın.",
-    "userPrefix": "Kullanıcı {{id}}"
+    "userPrefix": "Kullanıcı {{id}}",
+    "connecting": "Bağlanıyor…",
+    "loading": "Yükleniyor…",
+    "loadingConversation": "Sohbet yükleniyor…",
+    "conversationNotFound": "Sohbet bulunamadı."
   },
   "createOffer": {
     "title": "Yeni Teklif Oluştur",

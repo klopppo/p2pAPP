@@ -220,7 +220,11 @@
     "typeMessage": "输入消息...",
     "openDiscord": "打开 Discord",
     "welcomeMessage": "👋 欢迎来到 CofferNode！您可以通过此渠道联系我们，处理任何问题、疑问或支持请求——通常会在几小时内回复。我们随时为您服务，如需实时社区支持，请查看下方的 Discord。",
-    "userPrefix": "用户 {{id}}"
+    "userPrefix": "用户 {{id}}",
+    "connecting": "连接中…",
+    "loading": "加载中…",
+    "loadingConversation": "加载对话中…",
+    "conversationNotFound": "未找到对话。"
   },
   "createOffer": {
     "title": "创建新报价",
