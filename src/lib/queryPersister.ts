@@ -3,16 +3,15 @@
  * the most recent snapshot of every list / detail page on reload, then
  * quietly revalidate from Supabase in the background.
  *
- * Approach: subscribe to the query cache and write the snapshot to
- * localStorage on every mutation / refetch / invalidation. On the next
- * page load, hydrate the cache before the first render so any subsequent
- * useQuery(...) call sees the cached data and serves it immediately.
+ * Approach: subscribe to the query cache and write the full snapshot to
+ * localStorage on every mutation (rAF-throttled to coalesce rapid
+ * invalidations). On the next page load, hydrate the cache BEFORE the
+ * first render so any subsequent useQuery(...) call sees the cached
+ * data and serves it immediately. `hydrateQueryCache` is exported as a
+ * standalone helper so the call site can run it synchronously at module
+ * init, *before* React mounts any component.
  *
- * Buster key includes the connected wallet address (when known) so
- * disconnecting / switching wallets invalidates the cache without manual
- * clearing. Stale data (older than MAX_AGE_MS) is discarded on read.
- *
- * No new dependency — TanStack Query's `getQueryCache().subscribe()` and
+ * No new dependency — TanStack Query's `getQueryCache()` /
  * `setQueryData()` cover everything we need.
  */
 import type { QueryClient } from '@tanstack/react-query'
@@ -58,37 +57,69 @@ function safeWrite(payload: PersistedClient): void {
 }
 
 /**
- * Mount the persister. Returns an unsubscribe function. Call once in the
- * app's root (after QueryClient is created) so the cache hydrates before
- * the first query fires.
+ * Hydrate the query cache synchronously. Call this AT MODULE INIT (before
+ * the React tree mounts) so the first useQuery() call sees cached data
+ * and doesn't fire a redundant Supabase request.
  *
- * `getBuster` is called whenever the buster is needed so that buster
- * changes (e.g. wallet switch) cause the next read to discard the cache.
+ * `getBuster` is called inside the function so the buster is always
+ * read fresh — mount the persister in a useEffect that depends on the
+ * buster, but call `hydrateQueryCache` once at module init with a known
+ * buster (e.g. 'anon' for the initial render, then the wallet-aware
+ * value once the wallet connects).
  */
-export function persistQueryClient(
+export function hydrateQueryCache(
+  client: QueryClient,
+  getBuster: () => string,
+): void {
+  const payload = safeRead()
+  if (!payload) {
+    if (typeof window !== 'undefined' && (window as { __coffernodeDebug?: boolean }).__coffernodeDebug) {
+      console.log('[queryPersister] no persisted cache found')
+    }
+    return
+  }
+  if (payload.buster !== getBuster()) {
+    if (typeof window !== 'undefined' && (window as { __coffernodeDebug?: boolean }).__coffernodeDebug) {
+      console.log(
+        `[queryPersister] cache buster mismatch (cached=${payload.buster}, current=${getBuster()}) — discarding`,
+      )
+    }
+    return
+  }
+  if (Date.now() - payload.savedAt > MAX_AGE_MS) {
+    if (typeof window !== 'undefined' && (window as { __coffernodeDebug?: boolean }).__coffernodeDebug) {
+      console.log(
+        `[queryPersister] cache expired (age=${Math.round((Date.now() - payload.savedAt) / 1000)}s > ${MAX_AGE_MS / 1000}s)`,
+      )
+    }
+    return
+  }
+  let hydrated = 0
+  for (const q of payload.queries) {
+    // setQueryData with an `updatedAt` override so React Query treats the
+    // entry as fresh-but-stale, triggering a background refetch on next
+    // mount but serving the snapshot immediately.
+    client.setQueryData(q.queryKey, q.data, {
+      updatedAt: q.dataUpdatedAt,
+    })
+    hydrated++
+  }
+  if (typeof window !== 'undefined' && (window as { __coffernodeDebug?: boolean }).__coffernodeDebug) {
+    console.log(
+      `[queryPersister] hydrated ${hydrated} queries (buster=${getBuster()}, age=${Math.round((Date.now() - payload.savedAt) / 1000)}s)`,
+    )
+  }
+}
+
+/**
+ * Mount the write-side subscription. Call this in a useEffect after the
+ * QueryClientProvider mounts. The buster is read fresh on every write so
+ * it stays in sync with wallet changes.
+ */
+export function attachQueryPersister(
   client: QueryClient,
   getBuster: () => string,
 ): () => void {
-  // Hydrate before the first render. Skip if the buster changed (cache
-  // belongs to a different user/wallet) or the entry is older than
-  // MAX_AGE_MS.
-  const payload = safeRead()
-  if (payload) {
-    if (payload.buster === getBuster() && Date.now() - payload.savedAt <= MAX_AGE_MS) {
-      for (const q of payload.queries) {
-        // setQueryData with a `updatedAt` override so React Query treats
-        // the entry as fresh-but-stale, triggering a background refetch
-        // on next mount but serving the snapshot immediately.
-        client.setQueryData(q.queryKey, q.data, {
-          updatedAt: q.dataUpdatedAt,
-        })
-      }
-    }
-  }
-
-  // Write on every cache mutation. Throttle with rAF to avoid hammering
-  // localStorage on rapid-fire invalidations (e.g. a chat page that
-  // receives 5 messages in a row).
   let rafId: number | null = null
   const writeSoon = () => {
     if (rafId != null) return
@@ -110,6 +141,11 @@ export function persistQueryClient(
           savedAt: Date.now(),
           queries,
         })
+        if (typeof window !== 'undefined' && (window as { __coffernodeDebug?: boolean }).__coffernodeDebug) {
+          console.log(
+            `[queryPersister] wrote ${queries.length} queries (buster=${getBuster()})`,
+          )
+        }
       } catch (err) {
         console.warn('[queryPersister] snapshot failed:', err)
       }
@@ -129,6 +165,18 @@ export function persistQueryClient(
     window.removeEventListener('pagehide', onHide)
     window.removeEventListener('beforeunload', onHide)
   }
+}
+
+/**
+ * Convenience helper for the common case: hydrate + attach in one call.
+ * Hydration runs synchronously; the write subscription is scheduled.
+ */
+export function persistQueryClient(
+  client: QueryClient,
+  getBuster: () => string,
+): () => void {
+  hydrateQueryCache(client, getBuster)
+  return attachQueryPersister(client, getBuster)
 }
 
 /**

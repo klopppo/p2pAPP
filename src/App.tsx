@@ -32,7 +32,7 @@ import DocsTermsOfService from './pages/docs/TermsOfService'
 import { UserSync } from './hooks/useSyncUser'
 import { TrustlessFlowOverlay } from './components/custom/TrustlessFlow'
 import { CookieConsent } from './components/custom/CookieConsent'
-import { persistQueryClient } from './lib/queryPersister'
+import { persistQueryClient, hydrateQueryCache } from './lib/queryPersister'
 
 /**
  * One QueryClient for the lifetime of the page. `gcTime` is bumped to 24h
@@ -50,6 +50,16 @@ const queryClient = new QueryClient({
 })
 
 /**
+ * Synchronous first-paint hydration. The user hasn't connected a wallet
+ * yet at module-init time so the buster is always 'anon' here; the
+ * effect-based hydration inside QueryClientWithPersistence re-runs with
+ * the real wallet address as soon as useAccount() resolves. This sync
+ * pass is what makes the first page render see cached data instead of
+ * firing empty Supabase requests.
+ */
+hydrateQueryCache(queryClient, () => 'wallet:anon')
+
+/**
  * Inner component — runs after `WagmiProvider` so `useAccount()` is
  * available. The buster keys the persisted cache to the connected
  * wallet so disconnecting / switching invalidates it without manual
@@ -57,7 +67,21 @@ const queryClient = new QueryClient({
  */
 function QueryClientWithPersistence() {
   const { address } = useAccount()
-  const buster = useMemo(() => `wallet:${address?.toLowerCase() ?? 'anon'}`, [address])
+  // Stable string so the effect deps don't churn on every render.
+  const buster = useMemo(
+    () => `wallet:${address?.toLowerCase() ?? 'anon'}`,
+    [address],
+  )
+  // Re-hydrate the cache every time the buster changes — on the very
+  // first mount, this is the only chance to populate the cache before
+  // any useQuery() fires (useEffect runs AFTER the first render).
+  // On a wallet change, the new buster invalidates the old cache so we
+  // need a fresh read with the new buster.
+  useEffect(() => {
+    hydrateQueryCache(queryClient, () => buster)
+  }, [buster])
+  // Write subscription — re-attaches when the buster changes so the
+  // next writes go out with the right key.
   useEffect(() => {
     return persistQueryClient(queryClient, () => buster)
   }, [buster])
