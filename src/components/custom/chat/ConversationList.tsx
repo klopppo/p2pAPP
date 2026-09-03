@@ -43,9 +43,6 @@ export function ConversationList({ activeId, locallyReadIds, onSelect }: Props) 
         <Text variant="h4" className="font-bold">
           {t('chat.messages')}
         </Text>
-        <p className="text-xs text-muted-foreground mt-1">
-          Conversations from your active and past trades.
-        </p>
       </div>
       <div className="flex-1 overflow-y-auto no-scrollbar">
         {isLoading && (
