@@ -1,5 +1,8 @@
+import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
+import { useAccount } from 'wagmi'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -11,6 +14,9 @@ import { AddressWithActions } from '@/components/custom/AddressWithActions'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Clock, Shield, Loader2, Star } from 'lucide-react'
 import { useOffer } from '@/hooks/useOffers'
+import { useConversations } from '@/hooks/useConversations'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { getOrCreateDirectConversation } from '@/lib/supabase'
 
 
 const CURRENCY_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
@@ -25,6 +31,10 @@ export function OpenOfferPage() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const { data: offer, isLoading, isError } = useOffer(id)
+  const { isConnected } = useAccount()
+  const { data: user } = useCurrentUser()
+  const { data: conversations = [] } = useConversations()
+  const [startingChat, setStartingChat] = useState(false)
 
   if (isLoading) {
     return (
@@ -59,6 +69,35 @@ export function OpenOfferPage() {
   const seller = offer.seller
   const sellerName = seller?.nickname ?? (seller?.wallet_address ?? 'Trader')
   const sellerAddr = seller?.wallet_address ?? ''
+
+  // Find an existing conversation between the viewer and this offer's
+  // seller (any thread that includes both as participants). v1 only
+  // auto-creates rows at trade creation, so this is empty for users
+  // who haven't traded — the startChat handler creates one on demand.
+  const existingConv = conversations.find((c) => {
+    const ids = c.participants.map((p) => p.user_id)
+    return seller?.id ? ids.includes(user?.id ?? '') && ids.includes(seller.id) : false
+  })
+  const canMessage =
+    !!seller && !!user && isConnected && user.id !== seller.id
+  const startChat = async () => {
+    if (!user || !seller) return
+    setStartingChat(true)
+    try {
+      if (existingConv) {
+        navigate(`/app/messages/${existingConv.id}`)
+        return
+      }
+      const convId = await getOrCreateDirectConversation(user.id, seller.id)
+      if (convId) navigate(`/app/messages/${convId}`)
+      else toast.error(t('openOffer.errorStartChat'))
+    } catch (err) {
+      console.warn('[OpenOfferPage] start chat failed:', err)
+      toast.error(t('openOffer.errorStartChat'))
+    } finally {
+      setStartingChat(false)
+    }
+  }
   const middleTruncate = (addr: string) => (addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : '')
 
   const regions = (offer.available_regions ?? [])
@@ -118,7 +157,20 @@ export function OpenOfferPage() {
                     </div>
                      <div>{(seller?.total_trades ?? 0).toLocaleString()} {t('openOffer.trades')}</div>
                     {sellerAddr && (
-                      <AddressWithActions address={sellerAddr} explorerBase={explorerBase.token} />
+                      <AddressWithActions
+                        address={sellerAddr}
+                        explorerBase={explorerBase.token}
+                        {...(canMessage
+                          ? {
+                              onMessage: startChat,
+                              messageDisabled: startingChat,
+                              messageLabel: startingChat
+                                ? t('openOffer.messageStarting')
+                                : t('openOffer.message'),
+                              messageTitle: t('openOffer.messageTitle'),
+                            }
+                          : {})}
+                      />
                     )}
                   </div>
                 </div>

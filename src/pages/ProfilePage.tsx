@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { Button } from '@/components/ui/button'
 import { explorerBase } from '@/lib/explorer'
-import { Copy, ExternalLink, Loader2, MessageCircle, Pencil } from 'lucide-react'
+import { Loader2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -24,6 +24,7 @@ import { useUserProfile, useOffersBySeller } from '@/hooks/useOffers'
 import { useConversations } from '@/hooks/useConversations'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { getOrCreateDirectConversation } from '@/lib/supabase'
+import { AddressWithActions } from '@/components/custom/AddressWithActions'
 import { useTranslation } from 'react-i18next'
 import { ReviewList } from '@/components/custom/ReviewList'
 import { RatingBreakdown } from '@/components/custom/RatingBreakdown'
@@ -76,9 +77,6 @@ function formatVolume(n: number | string | null | undefined): string {
   return `$${num.toLocaleString()}`
 }
 
-function formatAddress(addr: string): string {
-  return addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : ''
-}
 
 function SortableHeader({
   label,
@@ -302,45 +300,22 @@ export function ProfilePage() {
               {lastActive === '—' ? t('profile.offline') : t('profile.online')}
             </Badge>
           </div>
-          <div className="flex items-center gap-2 mt-1">
-            <Text variant="small" className="font-mono text-muted-foreground">{formatAddress(walletAddr)}</Text>
-            <div className="ml-1 flex items-center gap-1">
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => {
-                  navigator.clipboard.writeText(walletAddr)
-                  toast.success(t('profile.addressCopied'))
-                }}
-                title={t('profile.copyAddress')}
-              >
-                <Copy className="w-4 h-4" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => window.open(`${explorerBase.token}${walletAddr}`, '_blank', 'noopener')}
-                title={t('profile.openOnBlockscan')}
-              >
-                <ExternalLink className="w-4 h-4" />
-              </Button>
-              {canMessage && (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={startChat}
-                  disabled={startingChat}
-                  title={t('profile.messageTitle')}
-                  aria-label={t('profile.message')}
-                >
-                  {startingChat ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <MessageCircle className="w-4 h-4" />
-                  )}
-                </Button>
-              )}
-            </div>
+          <div className="mt-1">
+            <AddressWithActions
+              address={walletAddr}
+              explorerBase={explorerBase.token}
+              textClassName="font-mono text-xs text-muted-foreground"
+              {...(canMessage
+                ? {
+                    onMessage: startChat,
+                    messageDisabled: startingChat,
+                    messageLabel: startingChat
+                      ? t('profile.messageStarting')
+                      : t('profile.message'),
+                    messageTitle: t('profile.messageTitle'),
+                  }
+                : {})}
+            />
           </div>
           {profile.bio && (
             <Text variant="muted" className="mt-2 max-w-2xl">{profile.bio}</Text>

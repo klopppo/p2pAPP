@@ -169,7 +169,8 @@
     "loading": "Chargement…",
     "message": "Message",
     "messageTitle": "Ouvrir le chat avec cet utilisateur",
-    "errorStartChat": "Impossible de démarrer la conversation — réessayez."
+    "errorStartChat": "Impossible de démarrer la conversation — réessayez.",
+    "messageStarting": "Ouverture…"
   },
   "trades": {
     "title": "Échanges",
@@ -374,7 +375,11 @@
     "offerExpires": "L'offre expire le {{date}}",
     "trades": "échanges",
     "unverified": "non vérifié",
-    "noRating": "Aucune évaluation pour le moment"
+    "noRating": "Aucune évaluation pour le moment",
+    "message": "Message",
+    "messageTitle": "Message au vendeur",
+    "messageStarting": "Ouverture…",
+    "errorStartChat": "Impossible de démarrer la conversation — réessayez."
   },
   "trade": {
     "buyToken": "Acheter {{token}}",
@@ -636,7 +641,8 @@
   "addressActions": {
     "copyAddress": "Copier l'adresse",
     "openOnExplorer": "Ouvrir sur l'explorateur",
-    "copiedToast": "Adresse copiée"
+    "copiedToast": "Adresse copiée",
+    "messageTitle": "Message"
   },
   "common": {
     "loading": "Chargement…",

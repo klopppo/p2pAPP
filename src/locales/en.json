@@ -169,7 +169,8 @@
     "loading": "Loading…",
     "message": "Message",
     "messageTitle": "Open the chat with this user",
-    "errorStartChat": "Couldn't start the chat — please try again."
+    "errorStartChat": "Couldn't start the chat — please try again.",
+    "messageStarting": "Opening…"
   },
   "trades": {
     "title": "Trades",
@@ -374,7 +375,11 @@
     "offerExpires": "Offer expires {{date}}",
     "trades": "trades",
     "unverified": "unverified",
-    "noRating": "No ratings yet"
+    "noRating": "No ratings yet",
+    "message": "Message",
+    "messageTitle": "Message the seller",
+    "messageStarting": "Opening…",
+    "errorStartChat": "Couldn't start the chat — please try again."
   },
   "trade": {
     "buyToken": "Buy {{token}}",
@@ -636,7 +641,8 @@
   "addressActions": {
     "copyAddress": "Copy address",
     "openOnExplorer": "Open on explorer",
-    "copiedToast": "Address copied"
+    "copiedToast": "Address copied",
+    "messageTitle": "Message"
   },
   "common": {
     "loading": "Loading…",

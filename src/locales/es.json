@@ -169,7 +169,8 @@
     "loading": "Cargando…",
     "message": "Mensaje",
     "messageTitle": "Abrir el chat con este usuario",
-    "errorStartChat": "No se pudo iniciar el chat — inténtalo de nuevo."
+    "errorStartChat": "No se pudo iniciar el chat — inténtalo de nuevo.",
+    "messageStarting": "Abriendo…"
   },
   "trades": {
     "title": "Operaciones",
@@ -374,7 +375,11 @@
     "offerExpires": "La oferta expira el {{date}}",
     "trades": "operaciones",
     "unverified": "no verificado",
-    "noRating": "Sin valoraciones todavía"
+    "noRating": "Sin valoraciones todavía",
+    "message": "Mensaje",
+    "messageTitle": "Mensaje al vendedor",
+    "messageStarting": "Abriendo…",
+    "errorStartChat": "No se pudo iniciar el chat — inténtalo de nuevo."
   },
   "trade": {
     "buyToken": "Comprar {{token}}",
@@ -636,7 +641,8 @@
   "addressActions": {
     "copyAddress": "Copiar dirección",
     "openOnExplorer": "Abrir en explorador",
-    "copiedToast": "Dirección copiada"
+    "copiedToast": "Dirección copiada",
+    "messageTitle": "Mensaje"
   },
   "common": {
     "loading": "Cargando…",
