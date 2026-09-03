@@ -143,13 +143,8 @@
     "ratingsBreakdown": "Détail des évaluations",
     "noRatingsYet": "Aucune évaluation pour le moment.",
     "noReputationYet": "Aucune activité de réputation.",
-    "repTrustworthiness": "Fiabilité",
-    "repReliability": " Constance",
     "repCommunication": "Communication",
     "repSpeed": "Rapidité",
-    "repProfessionalism": "Professionnalisme",
-    "repPointsEarned": "Points gagnés",
-    "repPointsLost": "Points perdus",
     "yourActiveOffers": "Vos offres actives",
     "activeOffers": "Offres actives",
     "noActiveOffers": "Aucune offre active.",
@@ -166,7 +161,11 @@
     "trades": "Échanges",
     "volume": "Volume",
     "totalVolume": "Volume total",
-    "loading": "Chargement…"
+    "loading": "Chargement…",
+    "message": "Message",
+    "messageTitle": "Ouvrir le chat avec cet utilisateur",
+    "errorStartChat": "Impossible de démarrer la conversation — réessayez.",
+    "messageStarting": "Ouverture…"
   },
   "trades": {
     "title": "Échanges",
@@ -216,7 +215,11 @@
     "typeMessage": "Saisissez un message...",
     "openDiscord": "Ouvrir Discord",
     "welcomeMessage": "👋 Bienvenue sur CofferNode ! Vous pouvez nous contacter ici pour tout problème, question ou demande de support — les réponses arrivent généralement en quelques heures. Nous sommes là pour vous aider, et pour une assistance communautaire en direct, consultez Discord ci-dessous.",
-    "userPrefix": "Utilisateur {{id}}"
+    "userPrefix": "Utilisateur {{id}}",
+    "connecting": "Connexion…",
+    "loading": "Chargement…",
+    "loadingConversation": "Chargement de la conversation…",
+    "conversationNotFound": "Conversation introuvable."
   },
   "createOffer": {
     "title": "Créer une nouvelle offre",
@@ -371,7 +374,11 @@
     "offerExpires": "L'offre expire le {{date}}",
     "trades": "échanges",
     "unverified": "non vérifié",
-    "noRating": "Aucune évaluation pour le moment"
+    "noRating": "Aucune évaluation pour le moment",
+    "message": "Message",
+    "messageTitle": "Message au vendeur",
+    "messageStarting": "Ouverture…",
+    "errorStartChat": "Impossible de démarrer la conversation — réessayez."
   },
   "trade": {
     "buyToken": "Acheter {{token}}",
@@ -633,7 +640,8 @@
   "addressActions": {
     "copyAddress": "Copier l'adresse",
     "openOnExplorer": "Ouvrir sur l'explorateur",
-    "copiedToast": "Adresse copiée"
+    "copiedToast": "Adresse copiée",
+    "messageTitle": "Message"
   },
   "common": {
     "loading": "Chargement…",

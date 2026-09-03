@@ -143,13 +143,8 @@
     "ratingsBreakdown": "Ratings breakdown",
     "noRatingsYet": "No ratings yet.",
     "noReputationYet": "No reputation activity yet.",
-    "repTrustworthiness": "Trustworthiness",
-    "repReliability": "Reliability",
     "repCommunication": "Communication",
     "repSpeed": "Speed",
-    "repProfessionalism": "Professionalism",
-    "repPointsEarned": "Points earned",
-    "repPointsLost": "Points lost",
     "yourActiveOffers": "Your active offers",
     "activeOffers": "Active offers",
     "noActiveOffers": "No active offers.",
@@ -166,7 +161,11 @@
     "trades": "Trades",
     "volume": "Volume",
     "totalVolume": "Total Volume",
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "message": "Message",
+    "messageTitle": "Open the chat with this user",
+    "errorStartChat": "Couldn't start the chat — please try again.",
+    "messageStarting": "Opening…"
   },
   "trades": {
     "title": "Trades",
@@ -216,7 +215,11 @@
     "typeMessage": "Type a message...",
     "openDiscord": "Open Discord",
     "welcomeMessage": "👋 Welcome to CofferNode! You can contact us from here for any issues, questions, or support requests — replies usually land within a few hours. We're here to help, and for live community support see Discord below.",
-    "userPrefix": "User {{id}}"
+    "userPrefix": "User {{id}}",
+    "connecting": "Connecting…",
+    "loading": "Loading…",
+    "loadingConversation": "Loading conversation…",
+    "conversationNotFound": "Conversation not found."
   },
   "createOffer": {
     "title": "Create New Offer",
@@ -371,7 +374,11 @@
     "offerExpires": "Offer expires {{date}}",
     "trades": "trades",
     "unverified": "unverified",
-    "noRating": "No ratings yet"
+    "noRating": "No ratings yet",
+    "message": "Message",
+    "messageTitle": "Message the seller",
+    "messageStarting": "Opening…",
+    "errorStartChat": "Couldn't start the chat — please try again."
   },
   "trade": {
     "buyToken": "Buy {{token}}",
@@ -633,7 +640,8 @@
   "addressActions": {
     "copyAddress": "Copy address",
     "openOnExplorer": "Open on explorer",
-    "copiedToast": "Address copied"
+    "copiedToast": "Address copied",
+    "messageTitle": "Message"
   },
   "common": {
     "loading": "Loading…",

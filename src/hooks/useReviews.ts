@@ -68,7 +68,12 @@ export function useHasRated(
  * Submit a rating for a trade. Bumps the rated user's reputation via the
  * `increment_reputation_score` RPC after the row lands. Reputation update is
  * best-effort — a failure logs but doesn't roll back the rating itself.
- * Invalidates relevant caches on success.
+ *
+ * Optimistic cache: pushes the saved row into the `['trade-ratings', tradeId]`
+ * and `['user-reviews', ratedId]` cache so the rating appears in the
+ * trade detail / profile page immediately (no Supabase round-trip on the
+ * user's own action). Falls back to `invalidateQueries` if the
+ * `setQueryData` shape doesn't match the existing cache.
  */
 export function useSubmitRating() {
   const qc = useQueryClient()
@@ -87,16 +92,29 @@ export function useSubmitRating() {
       }
       return data
     },
-    onSuccess: (_data, variables) => {
-      if (variables.trade_id) {
-        qc.invalidateQueries({ queryKey: ['trade-ratings', variables.trade_id] })
+    onSuccess: (saved, variables) => {
+      if (variables.trade_id && saved) {
+        // Push the new rating into the trade's rating list so the row shows
+        // up immediately when the modal closes.
+        qc.setQueryData<TradeRating[]>(
+          ['trade-ratings', variables.trade_id],
+          (prev) => (prev ? [saved, ...prev] : [saved]),
+        )
         qc.invalidateQueries({
           queryKey: ['has-rated', variables.trade_id, variables.rater_id],
         })
       }
-      if (variables.rated_id) {
-        qc.invalidateQueries({ queryKey: ['user-reviews', variables.rated_id] })
+      if (variables.rated_id && saved) {
+        // Push the new rating into the rated user's review list so the
+        // profile page's RatingBreakdown updates without a round-trip.
+        qc.setQueryData<TradeRating[]>(
+          ['user-reviews', variables.rated_id],
+          (prev) => (prev ? [saved, ...prev] : [saved]),
+        )
         qc.invalidateQueries({ queryKey: ['user-profile'] })
+        // Reputation: also push the new overall score (or just invalidate so
+        // the next page view refetches the deltas).
+        qc.invalidateQueries({ queryKey: ['user-reputation', variables.rated_id] })
       }
     },
   })

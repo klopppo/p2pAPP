@@ -143,13 +143,8 @@
     "ratingsBreakdown": "Desglose de calificaciones",
     "noRatingsYet": "Aún no hay calificaciones.",
     "noReputationYet": "Aún no hay actividad de reputación.",
-    "repTrustworthiness": "Fiabilidad",
-    "repReliability": "Confiabilidad",
     "repCommunication": "Comunicación",
     "repSpeed": "Velocidad",
-    "repProfessionalism": "Profesionalismo",
-    "repPointsEarned": "Puntos ganados",
-    "repPointsLost": "Puntos perdidos",
     "yourActiveOffers": "Sus ofertas activas",
     "activeOffers": "Ofertas activas",
     "noActiveOffers": "No hay ofertas activas.",
@@ -166,7 +161,11 @@
     "trades": "Operaciones",
     "volume": "Volumen",
     "totalVolume": "Volumen total",
-    "loading": "Cargando…"
+    "loading": "Cargando…",
+    "message": "Mensaje",
+    "messageTitle": "Abrir el chat con este usuario",
+    "errorStartChat": "No se pudo iniciar el chat — inténtalo de nuevo.",
+    "messageStarting": "Abriendo…"
   },
   "trades": {
     "title": "Operaciones",
@@ -216,7 +215,11 @@
     "typeMessage": "Escriba un mensaje...",
     "openDiscord": "Abrir Discord",
     "welcomeMessage": "¡Bienvenido a CofferNode! Puede contactarnos desde aquí para cualquier problema, pregunta o solicitud de soporte — las respuestas suelen llegar en unas horas. Estamos aquí para ayudarle, y para soporte comunitario en vivo consulte Discord más abajo.",
-    "userPrefix": "Usuario {{id}}"
+    "userPrefix": "Usuario {{id}}",
+    "connecting": "Conectando…",
+    "loading": "Cargando…",
+    "loadingConversation": "Cargando conversación…",
+    "conversationNotFound": "Conversación no encontrada."
   },
   "createOffer": {
     "title": "Crear nueva oferta",
@@ -371,7 +374,11 @@
     "offerExpires": "La oferta expira el {{date}}",
     "trades": "operaciones",
     "unverified": "no verificado",
-    "noRating": "Sin valoraciones todavía"
+    "noRating": "Sin valoraciones todavía",
+    "message": "Mensaje",
+    "messageTitle": "Mensaje al vendedor",
+    "messageStarting": "Abriendo…",
+    "errorStartChat": "No se pudo iniciar el chat — inténtalo de nuevo."
   },
   "trade": {
     "buyToken": "Comprar {{token}}",
@@ -633,7 +640,8 @@
   "addressActions": {
     "copyAddress": "Copiar dirección",
     "openOnExplorer": "Abrir en explorador",
-    "copiedToast": "Dirección copiada"
+    "copiedToast": "Dirección copiada",
+    "messageTitle": "Mensaje"
   },
   "common": {
     "loading": "Cargando…",

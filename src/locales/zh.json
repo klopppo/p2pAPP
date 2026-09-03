@@ -143,13 +143,8 @@
     "ratingsBreakdown": "评分明细",
     "noRatingsYet": "暂无评分。",
     "noReputationYet": "暂无信誉活动。",
-    "repTrustworthiness": "可信度",
-    "repReliability": "可靠性",
     "repCommunication": "沟通",
     "repSpeed": "速度",
-    "repProfessionalism": "专业度",
-    "repPointsEarned": "获得积分",
-    "repPointsLost": "失去积分",
     "yourActiveOffers": "您的活跃报价",
     "activeOffers": "活跃报价",
     "noActiveOffers": "暂无活跃报价。",
@@ -166,7 +161,11 @@
     "trades": "交易",
     "volume": "交易量",
     "totalVolume": "总交易量",
-    "loading": "加载中…"
+    "loading": "加载中…",
+    "message": "发消息",
+    "messageTitle": "打开与该用户的聊天",
+    "errorStartChat": "无法开始聊天 — 请重试。",
+    "messageStarting": "打开中…"
   },
   "trades": {
     "title": "交易",
@@ -216,7 +215,11 @@
     "typeMessage": "输入消息...",
     "openDiscord": "打开 Discord",
     "welcomeMessage": "👋 欢迎来到 CofferNode！您可以通过此渠道联系我们，处理任何问题、疑问或支持请求——通常会在几小时内回复。我们随时为您服务，如需实时社区支持，请查看下方的 Discord。",
-    "userPrefix": "用户 {{id}}"
+    "userPrefix": "用户 {{id}}",
+    "connecting": "连接中…",
+    "loading": "加载中…",
+    "loadingConversation": "加载对话中…",
+    "conversationNotFound": "未找到对话。"
   },
   "createOffer": {
     "title": "创建新报价",
@@ -371,7 +374,11 @@
     "offerExpires": "报价将于 {{date}} 过期",
     "trades": "笔交易",
     "unverified": "未验证",
-    "noRating": "暂无评价"
+    "noRating": "暂无评价",
+    "message": "发消息",
+    "messageTitle": "给卖家发消息",
+    "messageStarting": "打开中…",
+    "errorStartChat": "无法开始聊天 — 请重试。"
   },
   "trade": {
     "buyToken": "买入 {{token}}",
@@ -633,7 +640,8 @@
   "addressActions": {
     "copyAddress": "复制地址",
     "openOnExplorer": "在浏览器中查看",
-    "copiedToast": "地址已复制"
+    "copiedToast": "地址已复制",
+    "messageTitle": "发消息"
   },
   "common": {
     "loading": "加载中…",

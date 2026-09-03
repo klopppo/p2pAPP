@@ -143,13 +143,8 @@
     "ratingsBreakdown": "Puan dökümü",
     "noRatingsYet": "Henüz puan yok.",
     "noReputationYet": "Henüz itibar etkinliği yok.",
-    "repTrustworthiness": "Güvenilirlik",
-    "repReliability": "Tutarlılık",
     "repCommunication": "İletişim",
     "repSpeed": "Hız",
-    "repProfessionalism": "Profesyonellik",
-    "repPointsEarned": "Kazanılan puan",
-    "repPointsLost": "Kaybedilen puan",
     "yourActiveOffers": "Aktif teklifleriniz",
     "activeOffers": "Aktif teklifler",
     "noActiveOffers": "Aktif teklif yok.",
@@ -166,7 +161,11 @@
     "trades": "İşlemler",
     "volume": "Hacim",
     "totalVolume": "Toplam Hacim",
-    "loading": "Yükleniyor…"
+    "loading": "Yükleniyor…",
+    "message": "Mesaj",
+    "messageTitle": "Bu kullanıcıyla sohbeti aç",
+    "errorStartChat": "Sohbet başlatılamadı — lütfen tekrar deneyin.",
+    "messageStarting": "Açılıyor…"
   },
   "trades": {
     "title": "İşlemler",
@@ -216,7 +215,11 @@
     "typeMessage": "Bir mesaj yazın...",
     "openDiscord": "Discord'u Aç",
     "welcomeMessage": "👋 CofferNode'a hoş geldiniz! Herhangi bir sorun, soru veya destek talebi için buradan bize ulaşabilirsiniz — yanıtlar genellikle birkaç saat içinde gelir. Yardımcı olmak için buradayız ve canlı topluluk desteği için aşağıdaki Discord'a bakın.",
-    "userPrefix": "Kullanıcı {{id}}"
+    "userPrefix": "Kullanıcı {{id}}",
+    "connecting": "Bağlanıyor…",
+    "loading": "Yükleniyor…",
+    "loadingConversation": "Sohbet yükleniyor…",
+    "conversationNotFound": "Sohbet bulunamadı."
   },
   "createOffer": {
     "title": "Yeni Teklif Oluştur",
@@ -371,7 +374,11 @@
     "offerExpires": "Teklif {{date}} tarihinde sona eriyor",
     "trades": "işlem",
     "unverified": "doğrulanmamış",
-    "noRating": "Henüz değerlendirme yok"
+    "noRating": "Henüz değerlendirme yok",
+    "message": "Mesaj",
+    "messageTitle": "Satıcıya mesaj",
+    "messageStarting": "Açılıyor…",
+    "errorStartChat": "Sohbet başlatılamadı — lütfen tekrar deneyin."
   },
   "trade": {
     "buyToken": "{{token}} Al",
@@ -633,7 +640,8 @@
   "addressActions": {
     "copyAddress": "Adresi kopyala",
     "openOnExplorer": "Gezginde aç",
-    "copiedToast": "Adres kopyalandı"
+    "copiedToast": "Adres kopyalandı",
+    "messageTitle": "Mesaj"
   },
   "common": {
     "loading": "Yükleniyor…",

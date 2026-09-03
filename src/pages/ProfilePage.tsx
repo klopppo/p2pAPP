@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { Button } from '@/components/ui/button'
 import { explorerBase } from '@/lib/explorer'
-import { Copy, ExternalLink, Loader2, Pencil } from 'lucide-react'
+import { Loader2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -21,6 +21,10 @@ import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import { Text } from '@/components/ui/text'
 import { ArrowUpDown } from 'lucide-react'
 import { useUserProfile, useOffersBySeller } from '@/hooks/useOffers'
+import { useConversations } from '@/hooks/useConversations'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { getOrCreateDirectConversation } from '@/lib/supabase'
+import { AddressWithActions } from '@/components/custom/AddressWithActions'
 import { useTranslation } from 'react-i18next'
 import { ReviewList } from '@/components/custom/ReviewList'
 import { RatingBreakdown } from '@/components/custom/RatingBreakdown'
@@ -73,9 +77,6 @@ function formatVolume(n: number | string | null | undefined): string {
   return `$${num.toLocaleString()}`
 }
 
-function formatAddress(addr: string): string {
-  return addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : ''
-}
 
 function SortableHeader({
   label,
@@ -110,9 +111,13 @@ export function ProfilePage() {
   const isOwnProfile = !urlWalletAddress || (targetAddress === connectedAddress)
 
   const { data: profile, isLoading: profileLoading, isError: profileError } = useUserProfile(targetAddress)
+  const { data: user } = useCurrentUser()
   const { data: offers, isLoading: offersLoading } = useOffersBySeller(profile?.id)
-
+  // Conversation list — used to find a pre-existing thread with the viewed
+  // user. Placed before the early returns below so rules-of-hooks is happy.
+  const { data: conversations = [] } = useConversations()
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
+  const [startingChat, setStartingChat] = useState(false)
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -235,6 +240,38 @@ export function ProfilePage() {
   const lastActive = profile.last_active_at ? new Date(profile.last_active_at).toLocaleDateString() : '—'
   const memberSince = profile.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
+  // "Message" button — find any conversation with this user via the
+  // current user's conversation list. v1's `create_conversation_for_trade`
+  // trigger only creates conversation rows at trade creation, so a
+  // conversation exists iff the two users share a prior trade. Either
+  // buyer or seller of that trade qualifies as a participant.
+  // Placed BEFORE the early returns below to satisfy rules-of-hooks.
+  // (Hook call lives above with the others.)
+  const existingConv = conversations.find((c) => {
+    const ids = c.participants.map((p) => p.user_id)
+    return ids.includes(user?.id ?? '') && ids.includes(profile.id)
+  })
+  const canMessage = !!profile && !isOwnProfile && !!user
+
+  const startChat = async () => {
+    if (!user || !profile) return
+    setStartingChat(true)
+    try {
+      if (existingConv) {
+        navigate(`/app/messages/${existingConv.id}`)
+        return
+      }
+      const convId = await getOrCreateDirectConversation(user.id, profile.id)
+      if (convId) navigate(`/app/messages/${convId}`)
+      else toast.error(t('profile.errorStartChat'))
+    } catch (err) {
+      console.warn('[ProfilePage] start chat failed:', err)
+      toast.error(t('profile.errorStartChat'))
+    } finally {
+      setStartingChat(false)
+    }
+  }
+
   return (
     <section className="space-y-8">
       {isOwnProfile && (
@@ -263,29 +300,22 @@ export function ProfilePage() {
               {lastActive === '—' ? t('profile.offline') : t('profile.online')}
             </Badge>
           </div>
-          <div className="flex items-center gap-2 mt-1">
-            <Text variant="small" className="font-mono text-muted-foreground">{formatAddress(walletAddr)}</Text>
-            <div className="ml-1 flex items-center gap-1">
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => {
-                  navigator.clipboard.writeText(walletAddr)
-                  toast.success(t('profile.addressCopied'))
-                }}
-                title={t('profile.copyAddress')}
-              >
-                <Copy className="w-4 h-4" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => window.open(`${explorerBase.token}${walletAddr}`, '_blank', 'noopener')}
-                title={t('profile.openOnBlockscan')}
-              >
-                <ExternalLink className="w-4 h-4" />
-              </Button>
-            </div>
+          <div className="mt-1">
+            <AddressWithActions
+              address={walletAddr}
+              explorerBase={explorerBase.token}
+              textClassName="font-mono text-xs text-muted-foreground"
+              {...(canMessage
+                ? {
+                    onMessage: startChat,
+                    messageDisabled: startingChat,
+                    messageLabel: startingChat
+                      ? t('profile.messageStarting')
+                      : t('profile.message'),
+                    messageTitle: t('profile.messageTitle'),
+                  }
+                : {})}
+            />
           </div>
           {profile.bio && (
             <Text variant="muted" className="mt-2 max-w-2xl">{profile.bio}</Text>
@@ -475,15 +505,8 @@ function ProfileReputationCard({ userId }: { userId: string }) {
           <Text variant="h3" className="mt-1">{rep.overall}<span className="text-sm text-muted-foreground ml-1">/ 100</span></Text>
         </div>
         <div className="space-y-2">
-          <RepRow label={t('profile.repTrustworthiness')} value={rep.trustworthiness} />
-          <RepRow label={t('profile.repReliability')} value={rep.reliability} />
           <RepRow label={t('profile.repCommunication')} value={rep.communication} />
           <RepRow label={t('profile.repSpeed')} value={rep.speed} />
-          <RepRow label={t('profile.repProfessionalism')} value={rep.professionalism} />
-        </div>
-        <div className="flex justify-between text-xs text-muted-foreground pt-2 border-t border-border/50">
-          <span>{t('profile.repPointsEarned')}: <span className="font-mono text-foreground">+{rep.points_earned}</span></span>
-          <span>{t('profile.repPointsLost')}: <span className="font-mono text-foreground">−{rep.points_lost}</span></span>
         </div>
       </CardContent>
     </Card>
