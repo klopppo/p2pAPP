@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { WagmiProvider, useAccount } from 'wagmi'
@@ -32,7 +32,7 @@ import DocsTermsOfService from './pages/docs/TermsOfService'
 import { UserSync } from './hooks/useSyncUser'
 import { TrustlessFlowOverlay } from './components/custom/TrustlessFlow'
 import { CookieConsent } from './components/custom/CookieConsent'
-import { persistQueryClient, hydrateQueryCache } from './lib/queryPersister'
+import { attachQueryPersister, hydrateQueryCache } from './lib/queryPersister'
 
 /**
  * One QueryClient for the lifetime of the page. `gcTime` is bumped to 24h
@@ -50,14 +50,15 @@ const queryClient = new QueryClient({
 })
 
 /**
- * Synchronous first-paint hydration. The user hasn't connected a wallet
- * yet at module-init time so the buster is always 'anon' here; the
- * effect-based hydration inside QueryClientWithPersistence re-runs with
- * the real wallet address as soon as useAccount() resolves. This sync
- * pass is what makes the first page render see cached data instead of
- * firing empty Supabase requests.
+ * Initial buster — always 'anon' at module init time because wagmi's
+ * useAccount() hasn't resolved yet. The real (wallet-specific) buster is
+ * applied later in QueryClientWithPersistence's useState initializer,
+ * which runs synchronously during the very first render, BEFORE any
+ * child component can fire its useQuery(). This eliminates the
+ * 'useEffect runs after first render' race that left the profile page
+ * showing a loading state for one frame.
  */
-hydrateQueryCache(queryClient, () => 'wallet:anon')
+const INITIAL_BUSTER = 'wallet:anon'
 
 /**
  * Inner component — runs after `WagmiProvider` so `useAccount()` is
@@ -72,19 +73,30 @@ function QueryClientWithPersistence() {
     () => `wallet:${address?.toLowerCase() ?? 'anon'}`,
     [address],
   )
-  // Re-hydrate the cache every time the buster changes — on the very
-  // first mount, this is the only chance to populate the cache before
-  // any useQuery() fires (useEffect runs AFTER the first render).
-  // On a wallet change, the new buster invalidates the old cache so we
-  // need a fresh read with the new buster.
-  useEffect(() => {
+  // The first-render buster: starts as INITIAL_BUSTER ('wallet:anon')
+  // because wagmi's useAccount() hasn't resolved yet. As soon as the
+  // wallet connects and address changes, the useState setter below
+  // re-runs the initializer with the real buster — synchronously, during
+  // render, before any child useQuery() can fire. This eliminates the
+  // 'useEffect runs after first render' race.
+  const [currentBuster, setBuster] = useState(() => {
+    hydrateQueryCache(queryClient, () => INITIAL_BUSTER)
+    return INITIAL_BUSTER
+  })
+  // When the wallet changes, re-hydrate with the new buster before any
+  // queries under the new buster fire. This is also synchronous because
+  // useState's initializer runs during the next render's setup phase.
+  if (buster !== currentBuster) {
     hydrateQueryCache(queryClient, () => buster)
-  }, [buster])
+    setBuster(buster) // setState during render — React accepts this for
+                      // derived state as long as the new value is stable
+                      // (it is — we just set it).
+  }
   // Write subscription — re-attaches when the buster changes so the
   // next writes go out with the right key.
   useEffect(() => {
-    return persistQueryClient(queryClient, () => buster)
-  }, [buster])
+    return attachQueryPersister(queryClient, () => currentBuster)
+  }, [currentBuster])
   return null
 }
 
