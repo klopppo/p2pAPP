@@ -166,7 +166,9 @@
     "trades": "交易",
     "volume": "交易量",
     "totalVolume": "总交易量",
-    "loading": "加载中…"
+    "loading": "加载中…",
+    "message": "发消息",
+    "messageTitle": "打开与该用户的聊天"
   },
   "trades": {
     "title": "交易",

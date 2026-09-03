@@ -166,7 +166,9 @@
     "trades": "Operaciones",
     "volume": "Volumen",
     "totalVolume": "Volumen total",
-    "loading": "Cargando…"
+    "loading": "Cargando…",
+    "message": "Mensaje",
+    "messageTitle": "Abrir el chat con este usuario"
   },
   "trades": {
     "title": "Operaciones",

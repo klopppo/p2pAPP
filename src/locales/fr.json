@@ -166,7 +166,9 @@
     "trades": "Échanges",
     "volume": "Volume",
     "totalVolume": "Volume total",
-    "loading": "Chargement…"
+    "loading": "Chargement…",
+    "message": "Message",
+    "messageTitle": "Ouvrir le chat avec cet utilisateur"
   },
   "trades": {
     "title": "Échanges",

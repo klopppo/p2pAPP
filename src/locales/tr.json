@@ -166,7 +166,9 @@
     "trades": "İşlemler",
     "volume": "Hacim",
     "totalVolume": "Toplam Hacim",
-    "loading": "Yükleniyor…"
+    "loading": "Yükleniyor…",
+    "message": "Mesaj",
+    "messageTitle": "Bu kullanıcıyla sohbeti aç"
   },
   "trades": {
     "title": "İşlemler",

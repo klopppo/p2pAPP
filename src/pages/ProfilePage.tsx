@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { Button } from '@/components/ui/button'
 import { explorerBase } from '@/lib/explorer'
-import { Copy, ExternalLink, Loader2, Pencil } from 'lucide-react'
+import { Copy, ExternalLink, Loader2, MessageCircle, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -21,6 +21,8 @@ import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import { Text } from '@/components/ui/text'
 import { ArrowUpDown } from 'lucide-react'
 import { useUserProfile, useOffersBySeller } from '@/hooks/useOffers'
+import { useConversations } from '@/hooks/useConversations'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useTranslation } from 'react-i18next'
 import { ReviewList } from '@/components/custom/ReviewList'
 import { RatingBreakdown } from '@/components/custom/RatingBreakdown'
@@ -110,8 +112,11 @@ export function ProfilePage() {
   const isOwnProfile = !urlWalletAddress || (targetAddress === connectedAddress)
 
   const { data: profile, isLoading: profileLoading, isError: profileError } = useUserProfile(targetAddress)
+  const { data: user } = useCurrentUser()
   const { data: offers, isLoading: offersLoading } = useOffersBySeller(profile?.id)
-
+  // Conversation list — used to find a pre-existing thread with the viewed
+  // user. Placed before the early returns below so rules-of-hooks is happy.
+  const { data: conversations = [] } = useConversations()
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const toggleSort = (key: SortKey) => {
@@ -235,10 +240,28 @@ export function ProfilePage() {
   const lastActive = profile.last_active_at ? new Date(profile.last_active_at).toLocaleDateString() : '—'
   const memberSince = profile.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
+  // "Message" button — find a pre-existing conversation with this user via
+  // the current user's conversation list, then navigate to it. If none
+  // exists yet (v1 only auto-creates conversations at trade creation) the
+  // button is hidden — direct DMs require a prior trade to anchor the
+  // conversation row. Roadmap: an RPC that inserts a synthetic
+  // user-to-user conversation row. Placed BEFORE the early returns below
+  // to satisfy rules-of-hooks. (Hook call lives above with the others.)
+  const existingConv = conversations.find((c) => {
+    if (c.trade_id) return false // only anchor to non-trade threads
+    const ids = c.participants.map((p) => p.user_id)
+    return (
+      ids.length === 2 &&
+      ids.includes(user?.id ?? '') &&
+      ids.includes(profile.id)
+    )
+  })
+  const canMessage = !!profile && !isOwnProfile && !!user
+
   return (
     <section className="space-y-8">
-      {isOwnProfile && (
-        <div className="flex">
+      <div className="flex gap-2">
+        {isOwnProfile && (
           <Button
             size="sm"
             variant="outline"
@@ -248,8 +271,21 @@ export function ProfilePage() {
             <Pencil className="w-3.5 h-3.5 mr-1" />
             {t('profile.editProfile')}
           </Button>
-        </div>
-      )}
+        )}
+        {canMessage && existingConv && (
+          <Button
+            asChild
+            size="sm"
+            className="rounded-full"
+            title={t('profile.messageTitle')}
+          >
+            <Link to={`/app/messages/${existingConv.id}`}>
+              <MessageCircle className="w-3.5 h-3.5 mr-1" />
+              {t('profile.message')}
+            </Link>
+          </Button>
+        )}
+      </div>
 
       <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
         <Avatar className="h-24 w-24">

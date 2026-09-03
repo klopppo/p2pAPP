@@ -166,7 +166,9 @@
     "trades": "Trades",
     "volume": "Volume",
     "totalVolume": "Total Volume",
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "message": "Message",
+    "messageTitle": "Open the chat with this user"
   },
   "trades": {
     "title": "Trades",

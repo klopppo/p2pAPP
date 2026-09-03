@@ -9,13 +9,17 @@ interface Props {
   partnerAvatarUrl: string | null
   partnerInitial: string
   loading: boolean
+  /** When true, show the "Load older messages" button at the top. False when
+   *  the conversation has fewer than the page size (50) messages or the
+   *  page-back call has already returned a short batch. */
+  hasMore?: boolean
   onLoadOlder: () => void
 }
 
 /**
  * Auto-scrolling message list. Always pins to the bottom when the message
  * count changes (new send or realtime arrival) and offers an "older" loader
- * at the top for paginated history.
+ * at the top for paginated history (only when hasMore is true).
  */
 export function MessageThread({
   messages,
@@ -23,6 +27,7 @@ export function MessageThread({
   partnerAvatarUrl,
   partnerInitial,
   loading,
+  hasMore = false,
   onLoadOlder,
 }: Props) {
   const endRef = useRef<HTMLDivElement>(null)
@@ -39,7 +44,7 @@ export function MessageThread({
 
   return (
     <div ref={containerRef} className="flex-1 overflow-y-auto space-y-4 min-h-0 no-scrollbar">
-      {messages.length > 0 && (
+      {hasMore && (
         <div className="flex justify-center">
           <button
             type="button"
