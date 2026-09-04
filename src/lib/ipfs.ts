@@ -6,6 +6,8 @@ import { unixfs, type UnixFS } from '@helia/unixfs'
 const GATEWAY = import.meta.env.VITE_IPFS_GATEWAY ?? 'https://ipfs.io/ipfs/'
 
 let heliaPromise: Promise<{ helia: Helia; fs: UnixFS }> | null = null
+let inflightUploads = 0
+let teardownPromise: Promise<void> | null = null
 
 /** Lazily create a single in-browser Helia node + UnixFS (expensive, reuse). */
 async function getNode() {
@@ -37,27 +39,55 @@ export async function uploadToIpfs(
   file: File | Blob,
   name = (file as File).name ?? 'file',
 ): Promise<IpfsUploadResult> {
-  const { fs } = await getNode()
-  const bytes = new Uint8Array(await file.arrayBuffer())
-  const cid = await fs.addBytes(bytes)
-  const cidStr = cid.toString()
-  return {
-    cid: cidStr,
-    url: `${GATEWAY}${cidStr}`,
-    size: bytes.byteLength,
-    name,
+  inflightUploads++
+  try {
+    const { fs } = await getNode()
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    const cid = await fs.addBytes(bytes)
+    const cidStr = cid.toString()
+    return {
+      cid: cidStr,
+      url: `${GATEWAY}${cidStr}`,
+      size: bytes.byteLength,
+      name,
+    }
+  } finally {
+    inflightUploads--
   }
 }
 
 /** Pre-warm the Helia node (call on app idle) so first upload isn't slow. */
 export function warmUpIpfs() {
-  void getNode()
+  getNode().catch((err) => {
+    // Warm-up is best-effort; surface the failure so the first real upload
+    // isn't a silent surprise. The node will be retried lazily on demand.
+    console.warn('[IPFS] warm-up failed:', err)
+  })
 }
 
-/** Stop the Helia node (call on logout / teardown). */
-export async function teardownIpfs() {
-  if (!heliaPromise) return
-  const { helia } = await heliaPromise
-  await helia.stop()
-  heliaPromise = null
+/**
+ * Stop the Helia node (call on logout / teardown).
+ *
+ * Waits for any in-flight uploads to finish before `helia.stop()`; tearing the
+ * node down mid-`addBytes` aborts the write and can leave the caller believing
+ * an evidence CID landed in the network when it never propagated. Uploads are
+ * bounded by a 30s grace wait so a degenerate hang can't block logout forever.
+ */
+export async function teardownIpfs(): Promise<void> {
+  if (!teardownPromise) {
+    teardownPromise = (async () => {
+      const pending = heliaPromise
+      heliaPromise = null
+      if (!pending) return
+      const deadline = Date.now() + 30_000
+      while (inflightUploads > 0 && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+      const { helia } = await pending
+      await helia.stop()
+    })().finally(() => {
+      teardownPromise = null
+    })
+  }
+  return teardownPromise
 }

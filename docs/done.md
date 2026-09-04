@@ -9,6 +9,49 @@
 
 ---
 
+## Web3/messaging audit fixes: races, N+1, cursor + id hardening — 2026-09-04
+
+Batch of fixes from the cross-audit, shipped together (typecheck + lint clean).
+
+- **Escrow creation race** (`TradePage.tsx`) — the `EscrowCreated` decode fallback
+  no longer guesses via `escrowCountByBuyer - 1n`; it now matches the emitted
+  log's `buyer` + `seller` topics against the trade's counterparties, and only
+  falls back to the factory clone-scan when no log matches.
+- **IPFS teardown race** (`src/lib/ipfs.ts`) — `uploadToIpfs` tracks an in-flight
+  counter wrapped in try/finally; `teardownIpfs` waits up to 30s for uploads to
+  drain before `helia.stop()`, prevents concurrent double-stop.
+- **Unread-count N+1** (`src/lib/supabase/index.ts`) — `listConversations` no
+  longer fires one `count` query per thread; a new `security definer` RPC
+  `get_unread_conversation_counts(p_user_id)` returns every thread's unread in a
+  single round-trip, hard-gated to `current_user_id()`. Migration:
+  `20260904000000_get_unread_conversation_counts.sql`.
+- **Composite cursors** (`src/lib/supabase/index.ts`) — `listMessages` "before"
+  filter and the unread-count cursor were written as `and(a,b),a`, which collapses
+  to `a` (the `id` tiebreaker was dead). Now `and(created_at.[lt|gt].ts),
+  and(created_at.eq.ts,id.[lt|gt].id)`.
+- **Direct-conversation scan-all** (`getOrCreateDirectConversation`) — replaced
+  the full-table scan of `trade_id IS NULL` conversations with a
+  `conversation_participants` intersection (current user's threads → shared with
+  counterparty).
+- **State sync** — `updateDisputeOnChain` now honors explicit `resolvedAt: null`
+  (`!== undefined` instead of truthy check).
+- **Crypto-safe ids** — `generateOfferId`/`generateTradeId`/`generateDisputeId`
+  use `crypto.getRandomValues` (base36 suffix) instead of `Math.random()`.
+  _(closes `todo.md` "crypto.randomUUID()" item)_
+- **`useUserEscrows` multicall** (`src/hooks/useDisputes.ts`) — the two count reads
+  and every `escrowByBuyer`/`escrowBySeller` index read now go through viem
+  `multicall` (2 round-trips total) instead of one RPC per escrow.
+- **Dispute evidence uploads** (`DisputePage.tsx`) — IPFS uploads run through a
+  concurrency-3 worker pool instead of sequential awaits; per-file failures still
+  collected independently.
+- **TradeDetailPage hardening** (same batch, `src/pages/TradeDetailPage.tsx`) —
+  #1: `fundEscrow` waits for the `approve` tx receipt before depositing;
+  #6: the escrow-watcher callback depends on the `tradeId` primitive, not the
+  refetching `trade` object; #9: the second `nowSecsBig` timer was removed and
+  `showCancel` reuses the single live ticker.
+
+---
+
 ## Standardize SIWE authentication & eliminate client fallback — 2026-09-04
 
 Removed the development-only `legacyClientSignIn` fallback from `signInWithWallet`, making server-side cryptographic signature verification and JWT issuance via the `siwe-auth` Edge Function the mandatory, unified authentication standard across all environments.

@@ -308,25 +308,36 @@ const effectiveEscrow =
       //    on-chain evidence reference passed to submitEvidence(). We upload
       //    each file independently so a single bad IPFS response doesn't
       //    sink the whole batch — the surviving CIDs still ship.
+      //    Sequential awaits made batches with several photos take seconds
+      //    of wall-clock just waiting; we run a small fixed pool instead.
       const uploads: Array<{ cid: string; url: string; name?: string; size?: number }> = []
       const failedUploads: Array<{ name: string; error: string }> = []
-      for (const f of files) {
-        try {
-          const upload = await uploadToIpfs(f.file)
-          uploads.push({
-            cid: upload.cid,
-            url: upload.url,
-            name: upload.name ?? f.file.name,
-            size: upload.size ?? f.file.size,
-          } as DisputeEvidenceFile)
-        } catch (uploadErr) {
-          console.warn(`[DisputePage] IPFS upload failed for ${f.file.name}:`, uploadErr)
-          failedUploads.push({
-            name: f.file.name,
-            error: uploadErr instanceof Error ? uploadErr.message : String(uploadErr),
-          })
+      const CONCURRENCY = 3
+      const pool = [...(files ?? [])].map((f, i) => ({ f, i }))
+      let cursor = 0
+      async function worker() {
+        while (cursor < pool.length) {
+          const { f } = pool[cursor++]
+          try {
+            const upload = await uploadToIpfs(f.file)
+            uploads.push({
+              cid: upload.cid,
+              url: upload.url,
+              name: upload.name ?? f.file.name,
+              size: upload.size ?? f.file.size,
+            } as DisputeEvidenceFile)
+          } catch (uploadErr) {
+            console.warn(`[DisputePage] IPFS upload failed for ${f.file.name}:`, uploadErr)
+            failedUploads.push({
+              name: f.file.name,
+              error: uploadErr instanceof Error ? uploadErr.message : String(uploadErr),
+            })
+          }
         }
       }
+      await Promise.all(
+        Array.from({ length: Math.min(CONCURRENCY, files.length) }, () => worker()),
+      )
       if (uploads.length === 0) {
         toast.error(t('disputePage.errorAllUploadsFailed'))
         return

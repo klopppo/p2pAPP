@@ -432,6 +432,21 @@ export async function getOffersBySeller(sellerId: string, status?: OfferStatus) 
 }
 
 /**
+ * Crypto-safe base36 suffix for client-minted unique ids.
+ *
+ * Math.random()-based suffixes are predictable enough to collide or be
+ * enumerated by other parties; the Web Crypto RNG is the right tool here.
+ * Returns ~13 chars of base36 entropy (≈ 6 bytes).
+ */
+function randomIdSuffix(): string {
+  const buf = new Uint8Array(6)
+  crypto.getRandomValues(buf)
+  let n = 0n
+  for (const b of buf) n = (n << 8n) | BigInt(b)
+  return n.toString(36).toUpperCase()
+}
+
+/**
  * Generate a client-side unique `offer_id`.
  *
  * offers.offer_id is VARCHAR(40) NOT NULL UNIQUE with no DB default, and the
@@ -439,7 +454,7 @@ export async function getOffersBySeller(sellerId: string, status?: OfferStatus) 
  * Format: OFF-<base36 timestamp><random> (~18 chars, well within 40).
  */
 export function generateOfferId(): string {
-  return `OFF-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`.toUpperCase()
+  return `OFF-${Date.now().toString(36)}${randomIdSuffix()}`.toUpperCase()
 }
 
 /**
@@ -502,7 +517,7 @@ export async function createOffer(offerData: Partial<Offer>) {
  * Format: TRD-<base36 timestamp><random> (~18 chars, well within 40).
  */
 export function generateTradeId(): string {
-  return `TRD-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`.toUpperCase()
+  return `TRD-${Date.now().toString(36)}${randomIdSuffix()}`.toUpperCase()
 }
 
 /**
@@ -512,7 +527,7 @@ export function generateTradeId(): string {
  * 40-char varchar).
  */
 export function generateDisputeId(): string {
-  return `DSP-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`.toUpperCase()
+  return `DSP-${Date.now().toString(36)}${randomIdSuffix()}`.toUpperCase()
 }
 
 /**
@@ -984,7 +999,10 @@ export async function updateDisputeOnChain(
     dbUpdate.on_chain_ruling = update.onChainRuling
   }
   if (update.status) dbUpdate.status = update.status
-  if (update.resolvedAt) dbUpdate.resolved_at = update.resolvedAt
+  // resolvedAt is explicitly nullable — callers pass null to clear it (e.g.
+  // when a reopened dispute has no resolution). `!== undefined` preserves that
+  // intent, while `if (update.resolvedAt)` would silently drop null resets.
+  if (update.resolvedAt !== undefined) dbUpdate.resolved_at = update.resolvedAt
   if (update.evidenceGroupId !== undefined) {
     dbUpdate.evidence_group_id = update.evidenceGroupId
   }
@@ -1389,7 +1407,27 @@ export async function listConversations(userId: string) {
     throw error
   }
 
-  // Flatten the nested shape into ConversationView[] and compute unread counts.
+  // Compute unread counts for the user's conversations in ONE round-trip via a
+  // DB function (see <timestamp>_unread_conversation_counts.sql). The prior
+  // implementation issued a `count` query per conversation — N+1 waterfall
+  // that grew linearly with open threads and showed up as slow chat loads.
+  const unreadMap = new Map<string, number>()
+  try {
+    const { data: counts } = await supabase.rpc(
+      'get_unread_conversation_counts',
+      { p_user_id: userId },
+    )
+    for (const c of (counts ?? []) as Array<{
+      conversation_id: string
+      unread_count: number
+    }>) {
+      unreadMap.set(c.conversation_id, c.unread_count)
+    }
+  } catch (err) {
+    console.warn('[listConversations] unread count RPC failed, defaulting to 0:', err)
+  }
+
+  // Flatten the nested shape into ConversationView[] and apply unread counts.
   const out: ConversationView[] = []
   for (const row of (rows ?? []) as unknown as Array<{
     conversation: ConversationView | null
@@ -1399,30 +1437,13 @@ export async function listConversations(userId: string) {
 
     const participants = (conv.participants ?? []) as ConversationWithParticipant[]
     const me = participants.find((p) => p.user_id === userId)
-    const lastReadId = me?.last_read_message_id ?? null
-
-    // Count messages strictly newer than the user's last_read_message_id
-    // (and not authored by the user). One cheap query per conversation.
-    let q = supabase
-      .from('messages')
-      .select('id', { count: 'exact', head: true })
-      .eq('conversation_id', conv.id)
-      .neq('sender_id', userId)
-    if (lastReadId) {
-      const cursor = await getMessageSortKey(lastReadId)
-      q = q.or(
-        `and(created_at.gt.${cursor.created_at},id.gt.${cursor.id}),created_at.gt.${cursor.created_at}`
-      )
-    }
-    const { count } = await q
-    const unread = count ?? 0
 
     out.push({
       ...conv,
       participants,
       trade: conv.trade ?? null,
-      unread_count: unread,
-      last_read_message_id: lastReadId,
+      unread_count: unreadMap.get(conv.id) ?? 0,
+      last_read_message_id: me?.last_read_message_id ?? null,
     })
   }
 
@@ -1453,21 +1474,34 @@ export async function getOrCreateDirectConversation(
 ): Promise<string | null> {
   if (currentUserId === otherUserId) return null
 
-  // Look for an existing conversation (any trade-anchored one counts).
-  const { data: existing, error: listErr } = await supabase
-    .from('conversations')
-    .select('id, participants:conversation_participants(user_id)')
-    .is('trade_id', null)
-  if (listErr) {
-    console.error('[getOrCreateDirectConversation] list failed:', listErr)
+  // Find a shared conversation by intersecting the two users' participant
+  // rows. The old implementation scanned EVERY trade_id IS NULL conversation
+  // and matched client-side — an O(all direct convs) query that also load
+  // unrelated conversation ids into memory. Scoping to the current user's
+  // participant rows first cuts the working set to that user's threads.
+  const { data: myParts, error: partsErr } = await supabase
+    .from('conversation_participants')
+    .select('conversation_id')
+    .eq('user_id', currentUserId)
+  if (partsErr) {
+    console.error('[getOrCreateDirectConversation] participant lookup failed:', partsErr)
     return null
   }
-  for (const row of existing ?? []) {
-    const ids = (row.participants ?? []).map(
-      (p: { user_id: string }) => p.user_id,
-    )
-    if (ids.includes(currentUserId) && ids.includes(otherUserId)) {
-      return row.id as string
+  const myConvIds = (myParts ?? []).map(
+    (p: { conversation_id: string }) => p.conversation_id,
+  )
+  if (myConvIds.length > 0) {
+    const { data: shared, error: sharedErr } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id')
+      .eq('user_id', otherUserId)
+      .in('conversation_id', myConvIds)
+    if (sharedErr) {
+      console.error('[getOrCreateDirectConversation] shared lookup failed:', sharedErr)
+      return null
+    }
+    if (shared && shared.length > 0) {
+      return shared[0].conversation_id as string
     }
   }
 
@@ -1571,9 +1605,12 @@ export async function listMessages(
   if (options.before) {
     const cursor = await getMessageSortKey(options.before)
     // Composite cursor: strictly older than (created_at, id), i.e.
-    //   created_at < ts  OR  (created_at = ts AND id < boundary).
+    //   (created_at < ts)  OR  (created_at = ts AND id < boundary).
+    // The previous `and(a,b),a` shape collapsed to `a`, which dropped the
+    // `id` term entirely and let same-millisecond messages cross page
+    // boundaries un/lost. `eq` on the timestamp pins ties to the id.
     query = query.or(
-      `and(created_at.lt.${cursor.created_at},id.lt.${cursor.id}),created_at.lt.${cursor.created_at}`
+      `and(created_at.lt.${cursor.created_at}),and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`
     )
   }
 

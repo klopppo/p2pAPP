@@ -68,31 +68,24 @@ create index if not exists idx_offers_private_target
 --    They MUST be dropped here or private offers are visible to everyone.
 -- =====================================================================
 
--- Drop old permissive SELECT policy (bypasses private visibility).
+-- Drop old permissive policies and enforce SIWE owner-scoped writes.
 drop policy if exists "offers_select_any" on public.offers;
-
--- Drop stale restrictive insert/update from a previous partial run of this
--- migration — they require current_user_id() which needs siwe-auth deployed.
--- The old permissive policies from the init migration (offers_insert_any /
--- offers_update_any) are restored below so the app works without SIWE.
--- Once siwe-auth is live, swap these for owner-scoped policies in the
--- full SIWE migration (20260829000002).
-drop policy if exists "offers_insert_owner" on public.offers;
-drop policy if exists "offers_update_owner" on public.offers;
-
--- Recreate permissive write policies (pre-SIWE fallback)
 drop policy if exists "offers_insert_any" on public.offers;
-create policy "offers_insert_any"
-  on public.offers for insert
-  to anon, authenticated
-  with check (true);
-
 drop policy if exists "offers_update_any" on public.offers;
-create policy "offers_update_any"
+
+-- Owner-scoped write policies (SIWE authenticated via current_user_id)
+drop policy if exists "offers_insert_owner" on public.offers;
+create policy "offers_insert_owner"
+  on public.offers for insert
+  to authenticated
+  with check (seller_id = public.current_user_id());
+
+drop policy if exists "offers_update_owner" on public.offers;
+create policy "offers_update_owner"
   on public.offers for update
-  to anon, authenticated
-  using (true)
-  with check (true);
+  to authenticated
+  using (seller_id = public.current_user_id())
+  with check (seller_id = public.current_user_id());
 
 -- Drop + recreate SELECT policies in case a previous partial run left stale versions
 drop policy if exists "offers_select_public" on public.offers;
@@ -105,17 +98,13 @@ create policy "offers_select_public"
   using (is_private = false);
 
 -- Private offers are readable only by seller and target.
--- When no SIWE session exists (current_user_id() returns NULL), fall back
--- to permissive reads so the app still works pre-deploy. Once siwe-auth
--- is active, remove the `current_user_id() is null` guard.
 create policy "offers_select_private_parties"
   on public.offers for select
-  to anon, authenticated
+  to authenticated
   using (
     is_private = true
     and (
-      current_user_id() is null
-      or seller_id = public.current_user_id()
+      seller_id = public.current_user_id()
       or lower(target_user) = lower(coalesce(auth.jwt() ->> 'wallet_address', ''))
     )
   );

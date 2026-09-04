@@ -62,43 +62,50 @@ export function useUserEscrows() {
     queryFn: async (): Promise<`0x${string}`[]> => {
       if (!address || !publicClient || !factoryReady) return []
       const c = publicClient
-      const buyerCount = (await c.readContract({
-        address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
-        abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
-        functionName: 'escrowCountByBuyer',
-        args: [address],
-      })) as bigint
-      const sellerCount = (await c.readContract({
-        address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
-        abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
-        functionName: 'escrowCountBySeller',
-        args: [address],
-      })) as bigint
+      // Two reads for the counts (one multicall round-trip instead of two
+      // serialized calls), then a second multicall for every clone address.
+      // The previous loop issued one RPC per escrow — sequential waterfall
+      // that grew with trade history.
+      const [buyerCount, sellerCount] = (await c.multicall({
+        contracts: [
+          {
+            address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
+            abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
+            functionName: 'escrowCountByBuyer',
+            args: [address],
+          },
+          {
+            address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
+            abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
+            functionName: 'escrowCountBySeller',
+            args: [address],
+          },
+        ],
+        allowFailure: false,
+      })) as [bigint, bigint]
 
-      const buyerAdds: `0x${string}`[] = []
+      const indexCalls: Array<{
+        functionName: 'escrowByBuyer' | 'escrowBySeller'
+        index: bigint
+      }> = []
       for (let i = 0n; i < buyerCount; i++) {
-        buyerAdds.push(
-          (await c.readContract({
-            address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
-            abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
-            functionName: 'escrowByBuyer',
-            args: [address, i],
-          })) as `0x${string}`,
-        )
+        indexCalls.push({ functionName: 'escrowByBuyer', index: i })
       }
-      const sellerAdds: `0x${string}`[] = []
       for (let i = 0n; i < sellerCount; i++) {
-        sellerAdds.push(
-          (await c.readContract({
-            address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
-            abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
-            functionName: 'escrowBySeller',
-            args: [address, i],
-          })) as `0x${string}`,
-        )
+        indexCalls.push({ functionName: 'escrowBySeller', index: i })
       }
+      const addresses = (await c.multicall({
+        contracts: indexCalls.map((call) => ({
+          address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
+          abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
+          functionName: call.functionName,
+          args: [address, call.index],
+        })),
+        allowFailure: false,
+      })) as readonly `0x${string}`[]
+
       // De-dupe (a user could be both buyer and seller on the same escrow).
-      return Array.from(new Set([...buyerAdds, ...sellerAdds]))
+      return Array.from(new Set(addresses))
     },
   })
 }

@@ -259,9 +259,16 @@ export function TradePage() {
         hash: txHash,
       })
       // Decode the EscrowCreated event to extract the deployed clone address.
+      // Match by BOTH buyer and seller: under concurrent trade creation for the
+      // same wallet, the naive "first EscrowCreated in this receipt" or the
+      // `escrowCountByBuyer - 1` fallback can point at a clone that belongs to
+      // a DIFFERENT trade (the other tx may have mined first). The indexed
+      // buyer/seller topics are reliable identifiers, so verify them.
       const { decodeEventLog } = await import('viem')
       let deployedAddress: `0x${string}` | null = null
       const factoryAbi = KLEROS_ESCROW_FACTORY_ABI as Abi
+      const buyerWalletLc = buyerWallet.toLowerCase()
+      const sellerWalletLc = sellerWallet.toLowerCase()
       for (const log of receipt.logs) {
         try {
           const decoded = decodeEventLog({
@@ -270,9 +277,18 @@ export function TradePage() {
             topics: log.topics,
           })
           if (decoded.eventName === 'EscrowCreated') {
-            const args = decoded.args as { escrowAddress?: string }
-            if (args.escrowAddress) {
+            const args = decoded.args as {
+              escrowAddress?: string
+              buyer?: string
+              seller?: string
+            }
+            const buyerMatch =
+              !args.buyer || args.buyer.toLowerCase() === buyerWalletLc
+            const sellerMatch =
+              !args.seller || args.seller.toLowerCase() === sellerWalletLc
+            if (args.escrowAddress && buyerMatch && sellerMatch) {
               deployedAddress = args.escrowAddress as `0x${string}`
+              break
             }
           }
         } catch {
