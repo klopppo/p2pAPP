@@ -65,8 +65,12 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   // switch the active pane away from the one the user is reading.
   const [pinnedId, setPinnedId] = useState<string | null>(null)
 
+  useEffect(() => {
+    setPinnedId(null)
+  }, [routeId, forcedId])
+
   const fallbackId = conversations.data?.[0]?.id ?? null
-  const activeId = forcedId ?? routeId ?? pinnedId ?? fallbackId
+  const activeId = forcedId ?? pinnedId ?? routeId ?? fallbackId
 
   // Skip the DB hooks entirely for the synthetic ourTeam thread — no
   // rows to read.
@@ -160,7 +164,9 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
 
   const handleSelect = (id: string) => {
     setPinnedId(id)
-    if (forcedId) navigate(`/app/messages/${id}`)
+    if (!forcedId) {
+      navigate(`/app/messages/${id}`)
+    }
   }
 
   if (userLoading) {

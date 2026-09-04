@@ -9,6 +9,13 @@
 
 ---
 
+## Fix chat sidebar conversation selection bug — 2026-09-04
+
+Fixed an issue where clicking on conversations in the chat sidebar while visiting a direct chat URL (`/app/messages/:conversationId`) did not switch active chats due to `routeId` precedence and missing navigation logic. `ChatLayout` now correctly navigates on conversation selection, prioritizes user selection (`pinnedId`), and resets pinned state on route navigation.
+Files: `src/components/custom/chat/ChatLayout.tsx`.
+
+---
+
 ## Fix "Maximum update depth exceeded" — infinite re-render sources — 2026-08-31
 
 Hardened six `useEffect` dependency arrays that re-ran effects on every render
