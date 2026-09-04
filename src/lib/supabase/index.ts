@@ -1814,11 +1814,6 @@ export async function signInWithWallet(
   walletAddress: string,
   options: {
     signMessage: (args: { message: string }) => Promise<`0x${string}`>
-    verifyMessage?: (args: {
-      message: string
-      signature: `0x${string}`
-      address: `0x${string}`
-    }) => Promise<boolean>
     chainId?: number
     appName?: string
   },
@@ -1826,103 +1821,50 @@ export async function signInWithWallet(
   const { signMessage, chainId, appName } = options
   const addr = walletAddress.toLowerCase() as `0x${string}`
 
-  try {
-    // 1. One-shot nonce from the server.
-    const { data: nonceRes, error: nonceErr } = await supabase.functions.invoke(
-      'siwe-auth',
-      { body: { action: 'nonce', address: addr } },
-    )
-    if (nonceErr || !nonceRes?.nonce) throw nonceErr ?? new Error('no nonce')
-    const nonce = String(nonceRes.nonce)
-    if (!/^[a-zA-Z0-9_-]{8,64}$/.test(nonce)) throw new Error('bad nonce')
+  // 1. One-shot nonce from the server.
+  const { data: nonceRes, error: nonceErr } = await supabase.functions.invoke(
+    'siwe-auth',
+    { body: { action: 'nonce', address: addr } },
+  )
+  if (nonceErr || !nonceRes?.nonce) throw nonceErr ?? new Error('no nonce')
+  const nonce = String(nonceRes.nonce)
+  if (!/^[a-zA-Z0-9_-]{8,64}$/.test(nonce)) throw new Error('bad nonce')
 
-    // 2. Build + sign the challenge.
-    const { message, issuedAt } = buildSiweChallengeLocal(addr, {
-      nonce,
-      chainId,
-      appName,
-    })
-    const signature = await signMessage({ message })
-
-    // 3. Server verifies the signature and mints a real Supabase JWT.
-    const { data, error } = await supabase.functions.invoke('siwe-auth', {
-      body: { action: 'verify', message, signature },
-    })
-    if (error || !data?.access_token) {
-      throw error ?? new Error('siwe-auth did not return a token')
-    }
-
-    // Install the session. `refresh_token` is a placeholder: our JWT is the
-    // source of truth and re-signing (not refresh) is how a session renews,
-    // so this value is never used for anything meaningful.
-    const { error: sessionErr } = await supabase.auth.setSession({
-      access_token: data.access_token as string,
-      refresh_token: 'siwe-wallet-session',
-    })
-    if (sessionErr) throw sessionErr
-
-    setSiweMarker({ address: addr, issuedAt }) // never persist the signature
-
-    // The edge function upserted the row keyed by wallet; read it back.
-    return await ensureUser(addr)
-  } catch (err) {
-    // Dev-only fallback BEFORE the edge function / RLS migration are deployed:
-    // verify the signature in-browser and proceed without a JWT session.
-    if (isLocalDev() && isEdgeUnavailable(err)) {
-      return legacyClientSignIn(addr, options)
-    }
-    throw err
-  }
-}
-
-/**
- * Pre-edge-function dev fallback: client-side verify + marker only, no JWT.
- * Mirrors the old pre-SIWE behavior so local dev keeps working until the
- * migration is pushed.
- */
-async function legacyClientSignIn(
-  addr: `0x${string}`,
-  options: {
-    signMessage: (args: { message: string }) => Promise<`0x${string}`>
-    verifyMessage?: (args: {
-      message: string
-      signature: `0x${string}`
-      address: `0x${string}`
-    }) => Promise<boolean>
-    chainId?: number
-    appName?: string
-  },
-): Promise<User | null> {
-  const verifyMessageFn =
-    options.verifyMessage ??
-    (async (a) => (await import('viem')).verifyMessage(a))
+  // 2. Build + sign the challenge.
   const { message, issuedAt } = buildSiweChallengeLocal(addr, {
-    chainId: options.chainId,
-    appName: options.appName,
+    nonce,
+    chainId,
+    appName,
   })
-  const signature = await options.signMessage({ message })
-  const valid = await verifyMessageFn({ message, signature, address: addr })
-  if (!valid) {
-    throw new SiweRejectedError('SIWE signature did not verify — refusing to sign in.')
+  const signature = await signMessage({ message })
+
+  // 3. Server verifies the signature and mints a real Supabase JWT.
+  const { data, error } = await supabase.functions.invoke('siwe-auth', {
+    body: { action: 'verify', message, signature },
+  })
+  if (error || !data?.access_token) {
+    throw error ?? new Error('siwe-auth did not return a token')
   }
-  setSiweMarker({ address: addr, issuedAt })
-  return ensureUser(addr)
+
+  // Install the session. `refresh_token` is a placeholder: our JWT is the
+  // source of truth and re-signing (not refresh) is how a session renews,
+  // so this value is never used for anything meaningful.
+  const { error: sessionErr } = await supabase.auth.setSession({
+    access_token: data.access_token as string,
+    refresh_token: 'siwe-wallet-session',
+  })
+  if (sessionErr) throw sessionErr
+
+  setSiweMarker({ address: addr, issuedAt }) // never persist the signature
+
+  // The edge function upserted the row keyed by wallet; read it back.
+  return await ensureUser(addr)
 }
 
 function setSiweMarker(marker: { address: string; issuedAt: string }): void {
   if (typeof window !== 'undefined') {
     window.localStorage.setItem('coffernode:siwe:last', JSON.stringify(marker))
   }
-}
-
-function isLocalDev(): boolean {
-  if (typeof window === 'undefined') return false
-  return ['localhost', '127.0.0.1'].includes(window.location.hostname)
-}
-
-function isEdgeUnavailable(err: unknown): boolean {
-  const e = err as { type?: string; status?: number }
-  return e?.type === 'FunctionsFetchError' || e?.status === 404
 }
 
 class SiweRejectedError extends Error {

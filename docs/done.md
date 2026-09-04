@@ -9,6 +9,13 @@
 
 ---
 
+## Standardize SIWE authentication & eliminate client fallback — 2026-09-04
+
+Removed the development-only `legacyClientSignIn` fallback from `signInWithWallet`, making server-side cryptographic signature verification and JWT issuance via the `siwe-auth` Edge Function the mandatory, unified authentication standard across all environments.
+Files: `src/lib/supabase/index.ts`.
+
+---
+
 ## Fix chat sidebar conversation selection bug — 2026-09-04
 
 Fixed an issue where clicking on conversations in the chat sidebar while visiting a direct chat URL (`/app/messages/:conversationId`) did not switch active chats due to `routeId` precedence and missing navigation logic. `ChatLayout` now correctly navigates on conversation selection, prioritizes user selection (`pinnedId`), and resets pinned state on route navigation.
