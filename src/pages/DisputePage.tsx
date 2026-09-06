@@ -472,7 +472,7 @@ const effectiveEscrow =
         appeal_count: 0,
         raiser: filerRole ?? undefined,
         fee_paid_wei: arbitrationCostWei.toString(),
-        dispute_timestamp: new Date().toISOString(),
+        dispute_timestamp: BigInt(Math.floor(Date.now() / 1000)).toString(),
       })
 
       // 6a) Persist each uploaded file as a dispute_evidence row. Best-effort —

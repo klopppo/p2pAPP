@@ -227,7 +227,7 @@ export function DisputeDetailPage() {
             // waiting for the next refetch.
             klerosDisputeStatus: 2,
             onChainRuling: ruling,
-            rulingReceivedTime: new Date().toISOString(),
+            rulingReceivedTime: BigInt(Math.floor(Date.now() / 1000)).toString(),
           })
         } else if (eventName === 'RulingExecuted') {
           const ruling = Number((args.ruling as bigint | number | undefined) ?? 0)
