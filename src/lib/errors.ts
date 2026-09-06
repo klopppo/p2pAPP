@@ -55,11 +55,17 @@ export function extractWriteError(err: unknown): ExtractedWriteError {
 
   // 2) Chain mismatch — wagmi throws this when a connector is on the wrong
   //    chain and the call goes out anyway. Common cause of "reverted"
-  //    with no useful message.
+  //    with no useful message. Also catches MetaMask's UnrecognizedChainError
+  //    (a connector is configured for a chain the wallet doesn't know about,
+  //    e.g. Sepolia on a fresh MetaMask install), which surfaces during the
+  //    initial setup of a fresh dev environment.
   if (
     name === 'ChainMismatchError' ||
     name === 'SwitchChainError' ||
-    /chain mismatch|wrong network|unsupported chain/i.test(`${name} ${message}`)
+    name === 'UnrecognizedChainError' ||
+    /chain mismatch|wrong network|unsupported chain|unrecognized chain/i.test(
+      `${name} ${message}`,
+    )
   ) {
     return { kind: 'network', message: 'Wrong network — switch to the expected chain.', original }
   }
