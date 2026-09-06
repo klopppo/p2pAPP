@@ -186,15 +186,20 @@ export function TradeDetailPage() {
       })) as bigint
 
       if (currentAllowance < amountWei) {
-        await writeContractAsync({
+        // High #7 (audit 2026-08-24): wait for the approve to mine before
+        // firing the deposit. Without this, the deposit reverted mid-flight
+        // with the generic ERC20 "insufficient allowance" error and the
+        // user saw it as a deposit failure instead of a wallet-confirm step.
+        const approveHash = await writeContractAsync({
           address: tokenAddress,
           abi: ERC20_ABI as Abi,
           functionName: 'approve',
           args: [escrowAddress, maxUint256],
         })
-        // Note: real flow should `waitForTransactionReceipt` to be safe; we
-        // skip the wait here because the next deposit call would fail cleanly
-        // if the approve is still pending.
+        await publicClient.waitForTransactionReceipt({
+          hash: approveHash,
+          timeout: 90_000,
+        })
       }
 
       // 2) Call the appropriate deposit function on the escrow. The seller's
