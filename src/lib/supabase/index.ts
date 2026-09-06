@@ -390,8 +390,18 @@ export async function uploadDisputeEvidenceFile(
   // matches against, so a missing prefix causes the row insert to be
   // rejected. Strip any directory components from the user-supplied name
   // so a malicious filename can't escape the prefix.
+  // Strip path separators and ASCII control / DEL chars from the
+  // user-supplied filename so it can't escape the <dispute_id>/ prefix
+  // (a leading '.', '/', '\\', or NUL would change the resolved path).
   const safeBase = (file.name || 'evidence')
-    .replace(/[\\/\u0000-\u001F\u007F]+/g, '_')
+    .split('')
+    .map((ch) => {
+      const code = ch.charCodeAt(0)
+      if (ch === '/' || ch === '\\') return '_'
+      if (code <= 0x1f || code === 0x7f) return '_'
+      return ch
+    })
+    .join('')
     .replace(/^[.]+/, '')
     .slice(0, 80) || 'evidence'
   const ext = safeBase.includes('.')
@@ -1073,6 +1083,16 @@ export async function updateDisputeOnChain(
     winner?: 'buyer' | 'seller' | null
     disputeTimestamp?: string | null
     rulingReceivedTime?: string | null
+    /** Kleros Court-assigned dispute ID (from DisputeRaised event). */
+    klerosDisputeId?: string | null
+    /** raiseDispute() tx hash. */
+    txHash?: string | null
+    /** submitEvidence() tx hash for the primary evidence upload. */
+    txHashEvidence?: string | null
+    /** Path of the primary evidence file in dispute-evidence storage. */
+    evidenceCid?: string | null
+    /** Description blob (user text + on-chain metadata). */
+    description?: string | null
   },
 ) {
   const dbUpdate: Record<string, unknown> = {
@@ -1102,6 +1122,17 @@ export async function updateDisputeOnChain(
   if (update.rulingReceivedTime !== undefined) {
     dbUpdate.ruling_received_time = update.rulingReceivedTime
   }
+  if (update.klerosDisputeId !== undefined) {
+    dbUpdate.kleros_dispute_id = update.klerosDisputeId
+  }
+  if (update.txHash !== undefined) dbUpdate.tx_hash = update.txHash
+  if (update.txHashEvidence !== undefined) {
+    dbUpdate.tx_hash_evidence = update.txHashEvidence
+  }
+  if (update.evidenceCid !== undefined) {
+    dbUpdate.evidence_cid = update.evidenceCid
+  }
+  if (update.description !== undefined) dbUpdate.description = update.description
 
   const { data, error } = await supabase
     .from('disputes')
