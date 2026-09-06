@@ -202,7 +202,37 @@ export async function uploadToIpfs(
  * integrity checks. See `uploadDisputeEvidenceFile` in `src/lib/supabase`.
  */
 export function cidToBytes32(cid: string): `0x${string}` {
-  return keccak256(toBytes(`ipfs://${cid}`))
+  // Shape validation: reject empty/whitespace/oversized/control-character
+  // inputs before hashing. keccak256 of an empty string is a valid hash
+  // but a meaningless one — the resulting on-chain URI bytes32 would not
+  // match any real evidence row and would silently corrupt the audit trail.
+  if (typeof cid !== 'string') {
+    throw new TypeError('cidToBytes32: cid must be a string')
+  }
+  const trimmed = cid.trim()
+  if (trimmed.length === 0) {
+    throw new Error('cidToBytes32: cid must be a non-empty string')
+  }
+  // 256 char cap is well above any realistic storage path or CID and
+  // protects against runaway inputs.
+  if (trimmed.length > 256) {
+    throw new Error(
+      `cidToBytes32: cid is too long (${trimmed.length} chars, max 256)`,
+    )
+  }
+  // Reject control characters (incl. newlines / NULs) — they would corrupt
+  // the on-chain log and the Supabase object-name column. Allow standard
+  // printable ASCII plus the CID/storage-path alphabet (digits, letters,
+  // '-', '_', '.', '/', ':', '+').
+  if (/[\x00-\x1f\x7f]/.test(trimmed)) {
+    throw new Error('cidToBytes32: cid contains control characters')
+  }
+  if (!/^[A-Za-z0-9._/:+-]+$/.test(trimmed)) {
+    throw new Error(
+      `cidToBytes32: cid contains disallowed characters (got "${trimmed}")`,
+    )
+  }
+  return keccak256(toBytes(`ipfs://${trimmed}`))
 }
 
 /**
