@@ -192,6 +192,15 @@ export function DisputeDetailPage() {
   const { writeContractAsync, isPending: isWritePending } = useWriteContract()
   const qc = useQueryClient()
 
+  // Mirror the latest dispute into a ref so the event-watcher handler can
+  // read fresh values (appeal_count, evidence_group_id, …) without binding
+  // them into a useCallback dep array — a binding would rebuild the watcher
+  // subscription on every refetch and miss any events fired during the gap.
+  const disputeRef = useRef(dispute)
+  useEffect(() => {
+    disputeRef.current = dispute
+  }, [dispute])
+
   const parsed = parseDescription(dispute?.description)
   // Prefer the new DB column (`escrow_address`), fall back to the description
   // blob for rows written before the column existed.
@@ -280,13 +289,18 @@ export function DisputeDetailPage() {
             }).catch((err) => { console.warn('[DisputeDetailPage.tsx]', err); return undefined })
           }
         } else if (eventName === 'AppealFunded') {
+          // Read counters from the ref so a refetch that landed between the
+          // event emission and this handler running doesn't cause us to write
+          // a stale appeal_count / evidence_group_id (the closure-captured
+          // `dispute` would otherwise be one cache-bust behind reality).
+          const latest = disputeRef.current
           await updateDisputeOnChain(disputed, {
             escrowState: KlerosEscState.AWAITING_RULING,
             klerosDisputeStatus: 1,
             onChainRuling: null,
             status: DisputeStatus.ESCALATED,
-            appealCount: (dispute?.appeal_count ?? 0) + 1,
-            evidenceGroupId: (dispute?.evidence_group_id ?? 0) + 1,
+            appealCount: (latest?.appeal_count ?? 0) + 1,
+            evidenceGroupId: (latest?.evidence_group_id ?? 0) + 1,
           })
         } else if (eventName === 'Evidence') {
           // Best-effort: nothing to write beyond what `submitEvidence` tx did
