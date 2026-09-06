@@ -224,6 +224,7 @@ export function cidToBytes32(cid: string): `0x${string}` {
   // the on-chain log and the Supabase object-name column. Allow standard
   // printable ASCII plus the CID/storage-path alphabet (digits, letters,
   // '-', '_', '.', '/', ':', '+').
+  // eslint-disable-next-line no-control-regex
   if (/[\x00-\x1f\x7f]/.test(trimmed)) {
     throw new Error('cidToBytes32: cid contains control characters')
   }
