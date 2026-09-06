@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
-import { formatEther, keccak256, toBytes, type Abi } from 'viem'
+import { formatEther, type Abi } from 'viem'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -38,7 +38,7 @@ import {
   updateDisputeOnChain,
   insertDisputeEvidence,
 } from '@/lib/supabase'
-import { uploadToIpfs } from '@/lib/ipfs'
+import { uploadToIpfs, cidToBytes32 } from '@/lib/ipfs'
 import { errorMessage } from '@/lib/errorMessage'
 import { explorerBase } from '@/lib/explorer'
 import { DisputeStatus, TradeStatus } from '@/types/database'
@@ -1168,8 +1168,10 @@ function SubmitMoreEvidence({
     if (!file || !escrowAddress || !publicClient) return
     setBusy(true)
     try {
-      const upload = await uploadToIpfs(file)
-      const evidenceBytes32 = keccak256(toBytes(upload.cid)) as `0x${string}`
+      const upload = await uploadToIpfs(file, disputeId)
+      // On-chain URI bytes32 = keccak256("ipfs://" + cid) — matches the
+      // contract test in contrats/test/klerosTests.t.sol:2413,2425,2464.
+      const evidenceBytes32 = cidToBytes32(upload.cid)
       const txHash = await writeContractAsync({
         address: escrowAddress,
         abi: KLEROS_ESC_ABI as Abi,
@@ -1184,7 +1186,10 @@ function SubmitMoreEvidence({
           name: upload.name ?? file.name,
           size: upload.size ?? file.size,
           kind: file.type.split('/')[1] ?? 'image',
-          keccakBytes32: evidenceBytes32,
+          // Per audit #4 sub-fix: this column now holds the file-content
+          // hash (keccak256(fileBytes), not the on-chain URI hash) — see
+          // `uploadDisputeEvidenceFile` in src/lib/supabase.
+          keccakBytes32: upload.keccakBytes32,
           txHash,
           evidenceGroupId: Number(evidenceGroupId),
         },
