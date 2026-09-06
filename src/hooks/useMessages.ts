@@ -78,7 +78,7 @@ export function useMessages(conversationId: string | null | undefined) {
             next.sort(byTimeAsc)
             return next
           })
-          qc.invalidateQueries({ queryKey: ['conversations'] })
+          qc.invalidateQueries({ queryKey: ['conversations', user?.id] })
         }
       )
       .subscribe()
@@ -174,7 +174,7 @@ export function useSendMessage(conversationId: string | null | undefined) {
       }).catch(() => {
         // non-fatal
       })
-      qc.invalidateQueries({ queryKey: ['conversations'] })
+      qc.invalidateQueries({ queryKey: ['conversations', user?.id] })
     },
   })
 }

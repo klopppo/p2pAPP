@@ -111,7 +111,7 @@ export function useSubmitRating() {
           ['user-reviews', variables.rated_id],
           (prev) => (prev ? [saved, ...prev] : [saved]),
         )
-        qc.invalidateQueries({ queryKey: ['user-profile'] })
+        qc.invalidateQueries({ queryKey: ['user-profile', variables.rated_id] })
         // Reputation: also push the new overall score (or just invalidate so
         // the next page view refetches the deltas).
         qc.invalidateQueries({ queryKey: ['user-reputation', variables.rated_id] })

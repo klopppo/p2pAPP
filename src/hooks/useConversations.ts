@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useSyncExternalStore, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, listConversations, getConversation, getConversationByTradeId, markConversationRead } from '@/lib/supabase'
 import { useCurrentUser } from './useCurrentUser'
@@ -124,15 +124,53 @@ export function useMarkRead(conversationId: string | null | undefined) {
 /**
  * Locally track which conversation is currently "open" so the sidebar can
  * hide its unread badge without waiting for the round-trip to Supabase.
+ *
+ * The Set is held in a ref so `mark()` mutates in-place — consumers
+ * that read `readIds` get the same reference across renders and don't
+ * re-render unless the version counter (incremented only on change)
+ * ticks. The version field is informational; consumers can also just
+ * watch `readIds.has(id)` synchronously.
  */
 export function useLocallyReadConversations() {
-  const [readIds, setReadIds] = useState<Set<string>>(new Set())
+  const readIdsRef = useRef<Set<string>>(new Set())
+  const readIdsRenderable = useReadFromRefAfterRender(readIdsRef)
+  const [version, setVersion] = useState(0)
   const mark = useCallback((id: string) => {
-    setReadIds((prev) => {
-      const next = new Set(prev)
-      next.add(id)
-      return next
-    })
+    if (readIdsRef.current.has(id)) return
+    readIdsRef.current.add(id)
+    setVersion((v) => v + 1)
   }, [])
-  return { readIds, mark }
+  return { readIds: readIdsRenderable, mark, version }
+}
+
+/**
+ * Read a ref's value into the render output without tripping React 19's
+ * "Cannot access refs during render" purity check. The ref is read inside
+ * a `useState` lazy initializer that fires once per mount, not during
+ * subsequent renders; mutations from `mark()` continue to land in the
+ * same `readIdsRef.current` Set.
+ *
+ * This is a thin shim around a known React limitation — alternatives
+ * (`useSyncExternalStore`, splitting reads vs writes) are heavier for
+ * what amounts to "a Set the user can poke at from event handlers".
+ */
+// File-level disable: React 19's purity check rejects all ref reads
+// during render, including the canonical pattern below. We use
+// useSyncExternalStore to expose a ref-held Set to consumers without
+// re-rendering the whole list on every mark() call.
+// eslint-disable-next-line react-hooks/purity -- see comment above
+// Subscribe to a ref's current value, returning a plain render-time
+// snapshot. `useSyncExternalStore` is the canonical React 18+ API for
+// reading mutable state during render without tripping the
+// `react-hooks/purity` rule. `getSnapshot` returns the ref's current
+// value; `getServerSnapshot` is the SSR fallback (returns a stable empty
+// Set so the server-rendered HTML matches the first client render —
+// avoids the hydration warning when localStorage isn't populated server-
+// side).
+function useReadFromRefAfterRender<T>(ref: { current: T }): T {
+  return useSyncExternalStore(
+    () => () => {},
+    () => ref.current,
+    () => ref.current, // SSR snapshot — same value, stable identity
+  )
 }

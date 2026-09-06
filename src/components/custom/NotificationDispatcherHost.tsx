@@ -11,14 +11,25 @@ import type { Notification } from '@/types/database'
  * current user and fans each new row out to the enabled channels via
  * `dispatchNotification`. Renders nothing.
  *
- * Renders are deduped by `notification.id` so the same row never dispatches
- * twice across reconnects.
+ * Dedup: `notification.id` is recorded in a FIFO-capped `seen` Set (max
+ * `SEEN_MAX`) so reconnects don't dispatch the same row twice AND the Set
+ * can't grow unbounded over a long session.
+ *
+ * Gating: the realtime channel is only created once the prefs query has
+ * resolved (`prefs.isLoading === false`). Before that point we have no
+ * idea which channels the user has enabled and would dispatch to a
+ * hard-coded `{inapp:true, email:false}` default.
  */
+
+const SEEN_MAX = 500
+
 export function NotificationDispatcherHost() {
   const { data: user } = useCurrentUser()
   const prefs = useNotificationPreferences()
   const qc = useQueryClient()
   const seen = useRef<Set<string>>(new Set())
+  // FIFO order so we can evict the oldest entry once `SEEN_MAX` is reached.
+  const seenQueue = useRef<string[]>([])
   // Mirror `prefs.data` into a ref so the realtime subscription callback
   // (which closes over the ref) always reads the latest preferences. Updating
   // the ref inside a `useEffect` (not during render) keeps the component pure.
@@ -28,7 +39,10 @@ export function NotificationDispatcherHost() {
   }, [prefs.data])
 
   useEffect(() => {
-    if (!user) return
+    // Wait for prefs before subscribing — otherwise we'd dispatch to the
+    // hard-coded fallback (`{inapp:true,email:false}`) and the user might
+    // have inapp disabled.
+    if (!user || prefs.isLoading) return
 
     const channel = supabase
       .channel(`notif-dispatcher:${user.id}`)
@@ -44,6 +58,13 @@ export function NotificationDispatcherHost() {
           const n = payload.new as Notification
           if (seen.current.has(n.id)) return
           seen.current.add(n.id)
+          // FIFO eviction: once the window exceeds SEEN_MAX, drop the
+          // oldest id from both the Set and the queue.
+          seenQueue.current.push(n.id)
+          if (seenQueue.current.length > SEEN_MAX) {
+            const evict = seenQueue.current.shift()
+            if (evict !== undefined) seen.current.delete(evict)
+          }
 
           const currentPrefs = prefsRef.current
           const prefsMap = currentPrefs
@@ -70,7 +91,7 @@ export function NotificationDispatcherHost() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user?.id, qc])
+  }, [user?.id, prefs.isLoading, qc])
 
   return null
 }

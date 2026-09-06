@@ -347,20 +347,32 @@ export function DisputeDetailPage() {
   // 30-day DISPUTE_TIMEOUT — gate the button client-side so the user doesn't
   // pay gas to revert. Held in state (not a render expression) because
   // Date.now() is impure and React 19's purity check rejects it on the
-  // render path. A 30-second tick keeps the gate responsive without
-  // busy-polling. Placed BEFORE the early returns below to satisfy
-  // rules-of-hooks.
+  // render path. Tick only while the timeout gate could actually flip
+  // (escrow in AWAITING_RULING / RULING_RECEIVED AND disputeTimestamp
+  // known) — outside that window the value can't change the rendered UI,
+  // so we don't pay the 30-second tick. Placed BEFORE the early returns
+  // below to satisfy rules-of-hooks.
   const DISPUTE_TIMEOUT_SECONDS = 30n * 24n * 60n * 60n
   const [nowSeconds, setNowSeconds] = useState(() =>
     BigInt(Math.floor(Date.now() / 1000)),
   )
   useEffect(() => {
+    const ts = escrowState?.disputeTimestamp
+    const live = escrowState?.state
+    const gate =
+      !!ts &&
+      ts > 0n &&
+      (live === KlerosEscState.AWAITING_RULING ||
+        live === KlerosEscState.RULING_RECEIVED)
+    if (!gate) return
     const id = window.setInterval(
       () => setNowSeconds(BigInt(Math.floor(Date.now() / 1000))),
       30_000,
     )
     return () => window.clearInterval(id)
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- we read only
+    // these two scalars; the closure-captured `escrowState` object is fine.
+  }, [escrowState?.disputeTimestamp, escrowState?.state])
 
   if (isLoading) {
     return (

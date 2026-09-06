@@ -116,46 +116,84 @@ export function hydrateQueryCache(
  * QueryClientProvider mounts. The buster is read fresh on every write so
  * it stays in sync with wallet changes.
  */
+/**
+ * Whitelist of React Query namespaces that are safe to persist to
+ * localStorage. Anything not on this list (user-profile, current-user,
+ * trades, trade, dispute, user-escrows, escrow-state, arbitration-cost,
+ * appeal-info, notifications, messages, has-rated, user-reputation, ...)
+ * is dropped on write — those contain PII, payment details, escrow
+ * state, chat bodies, or auth signals we don't want to sit in
+ * localStorage across sessions / wallet switches.
+ */
+const PERSISTABLE_NAMESPACES: ReadonlySet<string> = new Set([
+  'offers', // marketplace list + offer detail
+  'conversation', // single conversation view
+  'conversations', // conversation list for a user
+  'user-reviews', // ratings received by a user (profile page)
+  'trade-ratings', // ratings on a specific trade
+  'notification-prefs', // per-channel enable/disable (no PII)
+])
+
+/**
+ * Mount the write-side subscription. Call this in a useEffect after the
+ * QueryClientProvider mounts. The buster is read fresh on every write so
+ * it stays in sync with wallet changes.
+ */
 export function attachQueryPersister(
   client: QueryClient,
   getBuster: () => string,
 ): () => void {
   let rafId: number | null = null
+  const writeNow = () => {
+    // Cancel any pending rAF so the synchronous write below doesn't get
+    // double-fired by a later callback.
+    if (rafId != null) {
+      window.cancelAnimationFrame(rafId)
+      rafId = null
+    }
+    try {
+      const cache = client.getQueryCache()
+      const all = cache.getAll()
+      const queries: PersistedQuery[] = []
+      for (const q of all) {
+        const firstKey = q.queryKey[0]
+        if (typeof firstKey !== 'string') continue
+        if (!PERSISTABLE_NAMESPACES.has(firstKey)) continue
+        queries.push({
+          queryKey: q.queryKey,
+          queryHash: q.queryHash,
+          data: q.state.data,
+          dataUpdatedAt: q.state.dataUpdatedAt,
+        })
+      }
+      safeWrite({
+        v: 1,
+        buster: getBuster(),
+        savedAt: Date.now(),
+        queries,
+      })
+      if (typeof window !== 'undefined' && (window as { __coffernodeDebug?: boolean }).__coffernodeDebug) {
+        console.log(
+          `[queryPersister] wrote ${queries.length}/${all.length} queries (buster=${getBuster()}) — rest filtered by namespace whitelist`,
+        )
+      }
+    } catch (err) {
+      console.warn('[queryPersister] snapshot failed:', err)
+    }
+  }
   const writeSoon = () => {
     if (rafId != null) return
     rafId = window.requestAnimationFrame(() => {
       rafId = null
-      try {
-        const cache = client.getQueryCache()
-        const queries: PersistedQuery[] = cache
-          .getAll()
-          .map((q) => ({
-            queryKey: q.queryKey,
-            queryHash: q.queryHash,
-            data: q.state.data,
-            dataUpdatedAt: q.state.dataUpdatedAt,
-          }))
-        safeWrite({
-          v: 1,
-          buster: getBuster(),
-          savedAt: Date.now(),
-          queries,
-        })
-        if (typeof window !== 'undefined' && (window as { __coffernodeDebug?: boolean }).__coffernodeDebug) {
-          console.log(
-            `[queryPersister] wrote ${queries.length} queries (buster=${getBuster()})`,
-          )
-        }
-      } catch (err) {
-        console.warn('[queryPersister] snapshot failed:', err)
-      }
+      writeNow()
     })
   }
 
   const unsub = client.getQueryCache().subscribe(writeSoon)
-  const onHide = () => writeSoon()
-  // pagehide covers mobile (bfcache flush); beforeunload covers desktop
-  // tab close. Both flush the pending rAF synchronously.
+  // pagehide (mobile/bfcache) and beforeunload (desktop tab close) must
+  // write SYNCHRONOUSLY — an rAF scheduled here will not flush before the
+  // page is torn down, so the latest snapshot would be lost.
+  const onHide = () => writeNow()
   window.addEventListener('pagehide', onHide)
   window.addEventListener('beforeunload', onHide)
 

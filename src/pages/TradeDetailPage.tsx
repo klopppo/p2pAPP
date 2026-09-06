@@ -453,7 +453,10 @@ export function TradeDetailPage() {
   //   seller → sellerSecurityDeposited && !buyerSecurityDeposited && now >= sellerDepositTime + 1 day
   // We surface the button when the connected wallet could plausibly call it
   // and let the contract revert if the timelock hasn't elapsed.
-  const nowSecsBig2 = useNowSecsBig()
+  // Reuse the single `nowSecsBig` from the funding-timelock effect above
+  // (hoisting a second interval here would tick the same wall clock twice
+  // per second for the same component).
+  const nowSecsBig2 = nowSecsBig
 
   const { showCancel } = useMemo(() => {
     const buyerOk =

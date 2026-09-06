@@ -1586,47 +1586,21 @@ export async function getOrCreateDirectConversation(
 ): Promise<string | null> {
   if (currentUserId === otherUserId) return null
 
-  // Look for an existing conversation (any trade-anchored one counts).
-  const { data: existing, error: listErr } = await supabase
-    .from('conversations')
-    .select('id, participants:conversation_participants(user_id)')
-    .is('trade_id', null)
-  if (listErr) {
-    console.error('[getOrCreateDirectConversation] list failed:', listErr)
+  // Server-side race-safe create via SECURITY DEFINER RPC (see migration
+  // 20260824000006_rls_column_restrict.sql). The RPC grabs a transaction-
+  // scoped advisory lock keyed on the sorted participant pair before
+  // reading, so two tabs racing to open the same direct chat serialize on
+  // it and the second one re-checks + returns the first one's row instead
+  // of inserting a duplicate.
+  const { data, error } = await supabase.rpc('get_or_create_direct_conversation', {
+    p_current_user_id: currentUserId,
+    p_other_user_id: otherUserId,
+  })
+  if (error) {
+    console.error('[getOrCreateDirectConversation] rpc failed:', error)
     return null
   }
-  for (const row of existing ?? []) {
-    const ids = (row.participants ?? []).map(
-      (p: { user_id: string }) => p.user_id,
-    )
-    if (ids.includes(currentUserId) && ids.includes(otherUserId)) {
-      return row.id as string
-    }
-  }
-
-  // Create a fresh conversation + two participants. The trade_id column
-  // is nullable, so a non-trade-anchored row is legal.
-  const { data: conv, error: convErr } = await supabase
-    .from('conversations')
-    .insert({ trade_id: null, status: 'open' })
-    .select('id')
-    .single()
-  if (convErr || !conv) {
-    console.error('[getOrCreateDirectConversation] insert failed:', convErr)
-    return null
-  }
-  const convId = conv.id as string
-  const { error: partErr } = await supabase
-    .from('conversation_participants')
-    .insert([
-      { conversation_id: convId, user_id: currentUserId, role: 'buyer' },
-      { conversation_id: convId, user_id: otherUserId, role: 'seller' },
-    ])
-  if (partErr) {
-    console.error('[getOrCreateDirectConversation] participants failed:', partErr)
-    return null
-  }
-  return convId
+  return (data as string | null) ?? null
 }
 
 /**

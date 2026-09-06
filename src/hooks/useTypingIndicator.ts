@@ -59,17 +59,24 @@ export function useTypingIndicator(
     return () => {
       // Fire a final stop_typing so the partner's "Alice is typing…" badge
       // clears immediately when the user switches chats or leaves the
-      // page. Best-effort — fire-and-forget.
+      // page. Best-effort — fire-and-forget. Swallow BOTH sync throws
+      // and async rejections so we don't generate an unhandled rejection
+      // if the channel has already been torn down.
       if (isTypingRef.current && identity?.userId) {
         try {
-          channel.send({
+          const sendPromise = channel.send({
             type: 'broadcast',
             event: 'stop_typing',
             payload: { user_id: identity.userId },
           })
+          if (
+            sendPromise &&
+            typeof (sendPromise as Promise<unknown>).catch === 'function'
+          ) {
+            ;(sendPromise as Promise<unknown>).catch(() => {})
+          }
         } catch {
-          // Channel may already be torn down — the partner's auto-clear
-          // timer (4s) covers the worst case.
+          // sync throw — handled
         }
       }
       supabase.removeChannel(channel)
@@ -79,16 +86,41 @@ export function useTypingIndicator(
     }
   }, [conversationId, identity])
 
-  // Auto-clear stale typing entries after 4s of silence per user.
+  // Auto-clear stale typing entries after 4s of silence PER USER. Track
+  // the last-received timestamp per user in a ref so each user's expiry
+  // is independent — a new `typing` event for Alice resets *only* Alice's
+  // timer, not Bob's. The effect runs a single ticker so we don't
+  // accumulate setTimeouts on every broadcast.
+  const lastSeenRef = useRef<Map<string, number>>(new Map())
+  useEffect(() => {
+    const now = Date.now()
+    const next = new Map<string, number>()
+    for (const u of typingUsers) {
+      const last = lastSeenRef.current.get(u.user_id) ?? now
+      next.set(u.user_id, last)
+    }
+    lastSeenRef.current = next
+  }, [typingUsers])
+
   useEffect(() => {
     if (typingUsers.length === 0) return
-    const timers = typingUsers.map((u) =>
-      setTimeout(() => {
-        setTypingUsers((prev) => prev.filter((p) => p.user_id !== u.user_id))
-      }, 4000)
-    )
-    return () => timers.forEach(clearTimeout)
-  }, [typingUsers])
+    const interval = window.setInterval(() => {
+      const cutoff = Date.now() - 4000
+      setTypingUsers((prev) => {
+        let changed = false
+        const filtered = prev.filter((u) => {
+          const last = lastSeenRef.current.get(u.user_id) ?? 0
+          if (last < cutoff) {
+            changed = true
+            return false
+          }
+          return true
+        })
+        return changed ? filtered : prev
+      })
+    }, 1000)
+    return () => window.clearInterval(interval)
+  }, [typingUsers.length === 0])
 
   const notifyTyping = useCallback(() => {
     if (!channelRef.current || !identity) return

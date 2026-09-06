@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { FC } from 'react'
 import { useAccount, useSignMessage } from 'wagmi'
 import { useNavigate } from 'react-router-dom'
+import { clearPersistedQueryCache } from '@/lib/queryPersister'
 import { ensureWalletSession, signOut } from '@/lib/supabase'
 
 /**
@@ -12,6 +13,13 @@ import { ensureWalletSession, signOut } from '@/lib/supabase'
  *      by the `siwe-auth` edge function → JWT → `ensureWalletSession`).
  *   2. Ensures a `users` row exists for the wallet.
  *
+ * Race fix: a monotonically increasing `token` is bumped on every
+ * (re)connect/disconnect. The async `ensureWalletSession` callback captures
+ * the token at call-time and only commits its result to the refs if the
+ * token still matches. Out-of-order resolutions are dropped on the floor.
+ * Without this, a connect→disconnect→reconnect cycle could let the original
+ * in-flight sign-in overwrite the new session with the old wallet's user row.
+ *
  * Onboarding: if the row has no profile yet (no nickname), the user is sent
  * straight to the Edit Profile page so they can create one.
  */
@@ -21,17 +29,26 @@ export function useSyncUser() {
   const syncedAddress = useRef<string | null>(null)
   const redirectedAddress = useRef<string | null>(null)
   const navigate = useNavigate()
+  // Token bumped on every wallet state change. Captured by async callbacks
+  // so stale resolutions from a prior address can no-op.
+  const tokenRef = useRef(0)
 
   useEffect(() => {
+    const myToken = ++tokenRef.current
+
     if (!isConnected || !address || !signMessageAsync) {
       // Wallet gone: tear down the Supabase session + caches so the stale
       // session can't keep authorizing reads/writes as the old wallet.
-      if (syncedAddress.current) {
+      // Bump the token first so any in-flight ensureWalletSession from the
+      // previous connect is ignored when it resolves.
+      const prev = syncedAddress.current
+      syncedAddress.current = null
+      if (prev) {
+        clearPersistedQueryCache()
         void signOut().catch((signOutErr) => {
           console.warn('[useSyncUser] signOut on wallet disconnect failed:', signOutErr)
         })
       }
-      syncedAddress.current = null
       return
     }
 
@@ -41,6 +58,8 @@ export function useSyncUser() {
 
     ensureWalletSession(address, { signMessage: signMessageAsync })
       .then(({ user }) => {
+        // Drop the result if a newer connect/disconnect has superseded us.
+        if (tokenRef.current !== myToken) return
         // No profile created yet → open the Edit Profile page to create one.
         // Only once per session, so closing the page doesn't loop the redirect.
         if (user && !user.nickname && redirectedAddress.current !== address) {
@@ -51,6 +70,7 @@ export function useSyncUser() {
         // read-only for this wallet.
       })
       .catch((error) => {
+        if (tokenRef.current !== myToken) return
         console.warn('[useSyncUser] ensureWalletSession failed:', error)
         // Reset so a later re-render can retry.
         syncedAddress.current = null
