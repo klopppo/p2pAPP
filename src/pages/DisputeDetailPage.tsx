@@ -222,10 +222,12 @@ export function DisputeDetailPage() {
           const ruling = Number((args.ruling as bigint | number | undefined) ?? 0)
           await updateDisputeOnChain(disputed, {
             escrowState: KlerosEscState.RULING_RECEIVED,
-            // Kleros v1 transitions directly from Appealable → Solved on rule
-            // emission. Capture that here so the UI badge updates without
-            // waiting for the next refetch.
-            klerosDisputeStatus: 2,
+            // Kleros transitions Waiting (0) → Appealable (1) when the jurors
+            // post their ruling via rule(). The ruling is final only once the
+            // appeal period elapses; until then either party can still post an
+            // appeal. Capture that here so the UI badge + appeal button update
+            // without waiting for the next refetch.
+            klerosDisputeStatus: 1,
             onChainRuling: ruling,
             rulingReceivedTime: BigInt(Math.floor(Date.now() / 1000)).toString(),
           })
