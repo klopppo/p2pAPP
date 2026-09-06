@@ -255,8 +255,13 @@ export function TradePage() {
           depositBps,
         ],
       })
+      // Bound the wait so a Sepolia RPC stall doesn't leave the form
+      // spinning at stage='mining' forever. Without this, a stalled RPC
+      // surfaces as a silent hang to the user until the toast fires much
+      // later (or never).
       const receipt = await publicClient.waitForTransactionReceipt({
         hash: txHash,
+        timeout: 90_000,
       })
       // Decode the EscrowCreated event to extract the deployed clone address.
       const { decodeEventLog } = await import('viem')
