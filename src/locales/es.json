@@ -579,7 +579,9 @@
     "errorInsufficientBalance": "ETH insuficiente en tu cartera — necesitas {{required}} ETH, tienes {{balance}} ETH.",
     "warningAlreadyRaised": "Ya existe una disputa para esta operación — abriéndola.",
     "warningSomeUploadsFailed": "Se subieron {{total}} archivo(s) pero {{failed}} fallaron; la disputa se abrirá con lo que tenemos.",
-    "errorAllUploadsFailed": "Todas las subidas de evidencia fallaron. Revisa tu conexión e inténtalo de nuevo."
+    "errorAllUploadsFailed": "Todas las subidas de evidencia fallaron. Revisa tu conexión e inténtalo de nuevo.",
+    "errorUploadTimeout": "Subida agotada — revisa tu conexión e inténtalo de nuevo.",
+    "errorRaiseReverted": "El envío on-chain fue revertido. Los archivos de evidencia se eliminaron; puedes intentarlo de nuevo."
   },
   "cookieConsent": {
     "privacyTitle": "Valoramos su privacidad",

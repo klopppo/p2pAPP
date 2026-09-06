@@ -1350,8 +1350,34 @@ export async function getDisputesByUser(userId: string) {
 /**
  * Get a single dispute by its primary UUID `id` (the `:id` route param on
  * the dispute detail viewer). Joins the trade, both parties, and all evidence
- * rows so the detail page can render without N+1 follow-ups.
+  * rows so the detail page can render without N+1 follow-ups.
+   */
+
+/**
+ * Delete a placeholder `disputes` row. Used by the dispute form when the
+ * on-chain `raiseDispute` call fails (rejected / reverted / RPC stall) —
+ * the placeholder row was created so the Supabase Storage RLS predicate
+ * (which keys on `disputes.id` for the upload bucket) would let evidence
+ * files in. Without this cleanup, the row would persist with
+ * `status='open'`, `tx_hash=null` and the per-trade preflight would block
+ * every retry — leaving the user permanently unable to file.
+ *
+ * Deletes `dispute_evidence` rows first (FK to `disputes` via cascade is
+ * declared, but the Storage objects they reference would orphan on the
+ * bucket; doing the manual cleanup is harmless and clearer in audit logs).
  */
+export async function deleteDisputePlaceholder(id: string): Promise<void> {
+  try {
+    await supabase.from('dispute_evidence').delete().eq('dispute_id', id)
+  } catch (err) {
+    console.warn('[deleteDisputePlaceholder] evidence delete failed:', err)
+  }
+  const { error } = await supabase.from('disputes').delete().eq('id', id)
+  if (error) {
+    console.warn('[deleteDisputePlaceholder] dispute delete failed:', error)
+  }
+}
+
 export async function getDisputeById(id: string) {
   const { data, error } = await supabase
     .from('disputes')

@@ -16,7 +16,11 @@
  */
 import type { QueryClient } from '@tanstack/react-query'
 
-const STORAGE_KEY = 'coffernode:react-query:v1'
+// Bumped to :v2 after the namespace-whitelist fix (audit M3 second half):
+// payloads written by the pre-fix build may contain PII from queries we
+// now filter out (user-profile, current-user, disputes, etc.). Discard
+// those on first load by treating the old key as stale.
+const STORAGE_KEY = 'coffernode:react-query:v2'
 const MAX_AGE_MS = 1000 * 60 * 60 * 24 // 24h
 
 interface PersistedQuery {
@@ -126,7 +130,8 @@ export function hydrateQueryCache(
  * localStorage across sessions / wallet switches.
  */
 const PERSISTABLE_NAMESPACES: ReadonlySet<string> = new Set([
-  'offers', // marketplace list + offer detail
+  'offers', // marketplace list (the /app/offers list)
+  'offer', // offer detail page (/app/offer/:id) — audit M4
   'conversation', // single conversation view
   'conversations', // conversation list for a user
   'user-reviews', // ratings received by a user (profile page)

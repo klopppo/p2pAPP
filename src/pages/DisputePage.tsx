@@ -35,6 +35,7 @@ import {
 } from '@/lib/contracts'
 import {
   createDispute,
+  deleteDisputePlaceholder,
   generateDisputeId,
   ensureUser,
   getDisputesByTrade,
@@ -428,13 +429,26 @@ const effectiveEscrow =
 
       // 3) Wait for inclusion + decode the on-chain Kleros dispute ID assigned
       //    by KlerosCourt.createDispute() (via the DisputeRaised event).
-      //    Bound the wait so a Sepolia RPC stall doesn\'t leave the form
-      //    spinning at `stage=\'mining\'` forever.
+      //    Bound the wait so a Sepolia RPC stall doesn't leave the form
+      //    spinning at `stage='mining'` forever.
       setStage('mining')
       const receipt = await publicClient.waitForTransactionReceipt({
         hash: txHash,
         timeout: 90_000,
       })
+
+      // Audit M6: if the on-chain raise reverted, the placeholder
+      // `disputes` row we just inserted (to satisfy the Storage RLS
+      // predicate) would otherwise persist and the per-trade preflight
+      // would block every retry — leaving the user permanently unable to
+      // file. Tear it down so they can try again.
+      if (receipt.status === 'reverted') {
+        await deleteDisputePlaceholder(dispute.id).catch((cleanupErr) => {
+          console.warn('[DisputePage] placeholder cleanup failed:', cleanupErr)
+        })
+        toast.error(t('disputePage.errorRaiseReverted'))
+        return
+      }
       let klerosDisputeId: string | null = null
       try {
         const logs = parseEventLogs({

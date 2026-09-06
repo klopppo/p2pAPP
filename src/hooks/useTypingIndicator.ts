@@ -46,6 +46,14 @@ export function useTypingIndicator(
           const others = prev.filter((u) => u.user_id !== payload.user_id)
           return [...others, { user_id: payload.user_id, nickname: payload.nickname ?? null }]
         })
+        // Stamp the per-user last-seen so the rolling 4s timer in the
+        // sync effect actually rolls — without this, the sync effect
+        // reconstructs the map from `typingUsers` but the timestamp we
+        // stored was the FIRST ping's, so the badge would clear after 4s
+        // and flicker back on the next broadcast.
+        if (typeof payload.ts === 'number') {
+          lastSeenRef.current.set(payload.user_id, payload.ts)
+        }
       })
       .on('broadcast', { event: 'stop_typing' }, (msg: { payload: unknown }) => {
         const payload = msg.payload as { user_id: string }
@@ -92,14 +100,16 @@ export function useTypingIndicator(
   // timer, not Bob's. The effect runs a single ticker so we don't
   // accumulate setTimeouts on every broadcast.
   const lastSeenRef = useRef<Map<string, number>>(new Map())
+  // Roll the per-user timestamp forward on every `typingUsers` change.
+  // The broadcast handler also writes to this map directly (see
+  // above) so the user actually gets a fresh timer on each keystroke.
   useEffect(() => {
     const now = Date.now()
-    const next = new Map<string, number>()
     for (const u of typingUsers) {
-      const last = lastSeenRef.current.get(u.user_id) ?? now
-      next.set(u.user_id, last)
+      if (!lastSeenRef.current.has(u.user_id)) {
+        lastSeenRef.current.set(u.user_id, now)
+      }
     }
-    lastSeenRef.current = next
   }, [typingUsers])
 
   useEffect(() => {

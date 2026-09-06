@@ -32,6 +32,16 @@ export function errorMessage(
   fallbackKey: string = 'errorGeneric',
 ): string {
   const extracted = extractWriteError(err)
+  // IPFS upload timeout has its own localized copy in disputePage (audit
+  // M5) — fall through to the page-specific key when the extract was
+  // thrown by `IpfsUploadTimeoutError`.
+  if (
+    extracted.kind === 'network' &&
+    extracted.original instanceof Error &&
+    extracted.original.name === 'IpfsUploadTimeoutError'
+  ) {
+    return t(`${page}.errorUploadTimeout`)
+  }
   switch (extracted.kind) {
     case 'cancelled':
       return t('errors.cancelledByUser')

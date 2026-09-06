@@ -579,7 +579,9 @@
     "errorInsufficientBalance": "Pas assez d'ETH Sepolia — besoin de {{required}} ETH, vous avez {{balance}} ETH.",
     "warningAlreadyRaised": "Un litige existe déjà pour cette opération — ouverture.",
     "warningSomeUploadsFailed": "{{total}} fichier(s) envoyé(s) mais {{failed}} échoué(s) ; le litige sera ouvert avec ce que nous avons.",
-    "errorAllUploadsFailed": "Tous les envois de preuves ont échoué. Vérifiez votre connexion et réessayez."
+    "errorAllUploadsFailed": "Tous les envois de preuves ont échoué. Vérifiez votre connexion et réessayez.",
+    "errorUploadTimeout": "Envoi expiré — vérifiez votre connexion et réessayez.",
+    "errorRaiseReverted": "L'envoi on-chain a été annulé. Les fichiers de preuve ont été supprimés ; réessayez."
   },
   "cookieConsent": {
     "privacyTitle": "Nous respectons votre vie privée",

@@ -579,7 +579,9 @@
     "errorInsufficientBalance": "Cüzdanda yeterli Sepolia ETH yok — {{required}} ETH gerekli, {{balance}} ETH var.",
     "warningAlreadyRaised": "Bu işlem için zaten bir itiraz var — açılıyor.",
     "warningSomeUploadsFailed": "{{total}} dosya yüklendi ama {{failed}} başarısız; itiraz elimizdeki kanıtlarla açılacak.",
-    "errorAllUploadsFailed": "Tüm kanıt yüklemeleri başarısız oldu. Bağlantınızı kontrol edip tekrar deneyin."
+    "errorAllUploadsFailed": "Tüm kanıt yüklemeleri başarısız oldu. Bağlantınızı kontrol edip tekrar deneyin.",
+    "errorUploadTimeout": "Yükleme zaman aşımına uğradı — bağlantınızı kontrol edip tekrar deneyin.",
+    "errorRaiseReverted": "On-chain gönderim geri alındı. Kanıt dosyaları silindi; tekrar deneyebilirsiniz."
   },
   "cookieConsent": {
     "privacyTitle": "Gizliliğinize önem veriyoruz",

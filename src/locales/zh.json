@@ -579,7 +579,9 @@
     "errorInsufficientBalance": "钱包 Sepolia ETH 不足 — 需要 {{required}} ETH, 当前 {{balance}} ETH。",
     "warningAlreadyRaised": "该交易已存在争议 — 正在打开。",
     "warningSomeUploadsFailed": "已上传 {{total}} 个文件,但 {{failed}} 个失败;将用可用证据发起争议。",
-    "errorAllUploadsFailed": "所有证据上传失败。请检查连接后重试。"
+    "errorAllUploadsFailed": "所有证据上传失败。请检查连接后重试。",
+    "errorUploadTimeout": "上传超时 — 请检查连接后重试。",
+    "errorRaiseReverted": "链上发起已回滚。证据文件已删除,您可以重试。"
   },
   "cookieConsent": {
     "privacyTitle": "我们重视您的隐私",

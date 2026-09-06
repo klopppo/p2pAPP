@@ -96,9 +96,20 @@ export function extractWriteError(err: unknown): ExtractedWriteError {
     name === 'HttpRequestError' ||
     name === 'TimeoutError' ||
     name === 'NetworkError' ||
+    name === 'IpfsUploadTimeoutError' ||
     /network request failed|fetch failed|rpc|timeout|504|503|connection/i.test(`${name} ${message}`)
   ) {
-    return { kind: 'network', message: 'Network error — please try again.', original }
+    return {
+      kind: 'network',
+      // Caller passes this through `errorMessage(err, page, t, key)` which
+      // maps to `errors.networkError` — except for the IPFS upload case
+      // where the page should show `disputePage.errorUploadTimeout`
+      // (not yet wired) so the i18n key lives in a per-page override.
+      message: name === 'IpfsUploadTimeoutError'
+        ? 'Upload timed out — check your connection and try again.'
+        : 'Network error — please try again.',
+      original,
+    }
   }
 
   // 5) Fallback. The caller decides whether to log `original` and how to

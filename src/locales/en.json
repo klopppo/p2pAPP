@@ -579,7 +579,9 @@
     "errorInsufficientBalance": "Not enough Sepolia ETH in your wallet — need {{required}} ETH, have {{balance}} ETH.",
     "warningAlreadyRaised": "A dispute for this trade already exists — opening it.",
     "warningSomeUploadsFailed": "Uploaded {{total}} file(s) but {{failed}} failed; the dispute will be raised with what we have.",
-    "errorAllUploadsFailed": "All evidence uploads failed. Check your connection and try again."
+    "errorAllUploadsFailed": "All evidence uploads failed. Check your connection and try again.",
+    "errorUploadTimeout": "Upload timed out — check your connection and try again.",
+    "errorRaiseReverted": "The on-chain raise was reverted. Any evidence files you uploaded have been removed; you can try again."
   },
   "cookieConsent": {
     "privacyTitle": "We value your privacy",
