@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAccount, usePublicClient } from 'wagmi'
 import type { Log } from 'viem'
@@ -10,6 +10,7 @@ import {
 import {
   KLEROS_COURT_ABI,
   KLEROS_ESC_ABI,
+  KLEROS_ESC_EVENTS_ABI,
   KLEROS_ESCROW_FACTORY_ABI,
   KLEROS_ESCROW_FACTORY_ADDRESS,
   encodeKlerosExtraData,
@@ -350,26 +351,42 @@ export function useEscrowEventWatcher(
   onEvent?: (name: string, args: Record<string, unknown>) => void,
 ) {
   const publicClient = usePublicClient()
+  // Hold the latest callback in a ref so changes to `onEvent` (e.g. an inline
+  // arrow or a `useCallback` whose deps rotate on every render) don't tear down
+  // and rebuild the watcher subscription on every render. That resubscribe
+  // storm would otherwise miss any events fired during the brief gap and
+  // thrash the RPC provider. We re-read the ref inside the handler, so the
+  // latest consumer always sees the event.
+  const onEventRef = useRef(onEvent)
   useEffect(() => {
-    if (!publicClient || !escrowAddress || !onEvent) return
+    onEventRef.current = onEvent
+  }, [onEvent])
+  useEffect(() => {
+    if (!publicClient || !escrowAddress) return
     const c = publicClient
     let cancelled = false
     // wagmi v2 types `onLogs` strictly per declared `events`; for our union
     // of event names we widen with a runtime duck-type check.
     const handler = (logs: Log[]) => {
       if (cancelled) return
+      const cb = onEventRef.current
+      if (!cb) return
       for (const log of logs) {
         const eventName = (log as unknown as { eventName?: string }).eventName
         if (eventName) {
           const args = (log as unknown as { args?: Record<string, unknown> })
             .args ?? {}
-          onEvent(eventName, args)
+          cb(eventName, args)
         }
       }
     }
     const unwatch = c.watchContractEvent({
       address: escrowAddress,
-      abi: KLEROS_ESC_ABI as Abi,
+      // Use the events-only ABI: the watcher only consumes logs, and including
+      // the full read+write ABI here bloats the filter set without exposing
+      // any new events. KLEROS_ESC_EVENTS_ABI is a strict subset typed for
+      // viem's decodeEventLog / parseEventLogs.
+      abi: KLEROS_ESC_EVENTS_ABI as Abi,
       onLogs: handler as unknown as Parameters<
         typeof c.watchContractEvent
       >[0]['onLogs'],
@@ -381,5 +398,5 @@ export function useEscrowEventWatcher(
       cancelled = true
       unwatch()
     }
-  }, [publicClient, escrowAddress, onEvent])
+  }, [publicClient, escrowAddress])
 }
