@@ -133,16 +133,12 @@ function parseDescription(raw: string | null | undefined): ParsedDescription {
   const idMatch = meta.match(/kleros_dispute_id:\s*(\S+)/)
   const cidMatch = meta.match(/evidence_cid:\s*(\S+)/)
   const feeMatch = meta.match(/arbitration_fee_wei:\s*(\d+)/)
-  const evMatch = meta.match(/evidence:\s*(\[[\s\S]*?\])(?:\n|$)/)
-
-  let evidence: ParsedDescription['evidence'] = []
-  if (evMatch) {
-    try {
-      evidence = JSON.parse(evMatch[1])
-    } catch {
-      evidence = []
-    }
-  }
+  // NB: there is no `evidence: [...]` JSON-array line in the
+  // description-blob format written by DisputePage.tsx (only the scalar
+  // metadata fields above + a single `evidence_cid:`). The old parser
+  // tried to match it anyway and JSON.parsed an empty array every call —
+  // removed: see audit #Low. Evidence rendering is sourced from
+  // `dispute.evidence` (the dispute_evidence table join) below.
 
   return {
     userText,
@@ -156,7 +152,12 @@ function parseDescription(raw: string | null | undefined): ParsedDescription {
       idMatch && idMatch[1] !== '(event not decoded)' ? idMatch[1] : null,
     evidenceCid: cidMatch?.[1] ?? null,
     arbitrationFeeWei: feeMatch?.[1] ?? null,
-    evidence,
+    // Always empty: the description blob never carried a JSON array of
+    // evidence files. The live gallery reads from `dispute.evidence`
+    // (dispute_evidence table join) further down. Kept on the type so
+    // the JSX guard `{parsed.evidence.length > 0 && ...}` still type-
+    // checks; it's a permanent false.
+    evidence: [],
   }
 }
 
