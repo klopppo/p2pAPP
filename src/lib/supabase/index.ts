@@ -341,6 +341,108 @@ export async function uploadAvatar(
 }
 
 /**
+ * Upload a dispute-evidence file to Supabase Storage and return both the
+ * storage metadata and the per-file keccak256 hash used for the DB row.
+ *
+ * The browser Helia node never pinned CIDs to the public network, so we
+ * replaced the IPFS path with Supabase Storage (audit #4). The bucket is
+ * PRIVATE — the returned `url` is a short-lived signed URL the dispute
+ * detail page passes to <img src>; the storage RLS policies in
+ * `migrations/20260824000007_storage_buckets.sql` ensure only the
+ * buyer/seller on the underlying dispute can mint one.
+ *
+ * `keccakBytes32` is `keccak256(fileBytes)` (NOT the on-chain URI hash).
+ * It lands in `dispute_evidence.keccak_bytes32` for off-chain integrity
+ * checks. The on-chain `submitEvidence(bytes32)` value is computed
+ * separately by `cidToBytes32(cid)` in `src/lib/ipfs.ts`.
+ *
+ * Storage path convention: `<disputeId>/<basename>-<timestamp>.<ext>`. The
+ * leading dispute UUID is what the Storage RLS predicate keys on (see
+ * `public.storage_object_dispute_id(name)`); a missing or malformed
+ * prefix will cause the insert to be rejected by RLS.
+ */
+export interface DisputeEvidenceUpload {
+  /** Storage path (also what we store in `dispute_evidence.ipfs_cid`). */
+  path: string
+  /** Signed URL resolvable in the browser for the configured TTL. */
+  url: string
+  /** Display name (passes through the File's name when present). */
+  name: string
+  /** Raw file size in bytes. */
+  size: number
+  /** `keccak256(fileBytes)` as 0x-prefixed bytes32 — the file_hash for
+   *  `dispute_evidence.keccak_bytes32`. Distinct from the on-chain URI
+   *  bytes32 (`keccak256("ipfs://" + path)`). */
+  keccakBytes32: `0x${string}`
+}
+
+const DISPUTE_EVIDENCE_BUCKET = 'dispute-evidence'
+/** Signed-URL TTL: 10 minutes — long enough for the detail page to render
+ *  the image, short enough to limit exposure if the URL leaks. */
+const DISPUTE_EVIDENCE_SIGNED_URL_TTL_SECONDS = 600
+
+export async function uploadDisputeEvidenceFile(
+  disputeId: string,
+  file: File,
+): Promise<DisputeEvidenceUpload> {
+  // Storage path: <dispute_id>/<basename>-<ts>.<ext>. The dispute UUID
+  // prefix is what the RLS predicate (`storage_object_dispute_id(name)`)
+  // matches against, so a missing prefix causes the row insert to be
+  // rejected. Strip any directory components from the user-supplied name
+  // so a malicious filename can't escape the prefix.
+  const safeBase = (file.name || 'evidence')
+    .replace(/[\\/\u0000-\u001F\u007F]+/g, '_')
+    .replace(/^[.]+/, '')
+    .slice(0, 80) || 'evidence'
+  const ext = safeBase.includes('.')
+    ? safeBase.slice(safeBase.lastIndexOf('.')).toLowerCase()
+    : ''
+  const stamp = Date.now().toString(36)
+  const rand = Math.random().toString(36).slice(2, 8)
+  const stem = safeBase.replace(new RegExp(`${ext}$`), '')
+  const path = `${disputeId}/${stem}-${stamp}-${rand}${ext}`
+
+  const bytes = new Uint8Array(await file.arrayBuffer())
+
+  const { error: uploadErr } = await supabase.storage
+    .from(DISPUTE_EVIDENCE_BUCKET)
+    .upload(path, file, {
+      upsert: false,
+      cacheControl: '3600',
+      contentType: file.type || undefined,
+    })
+
+  if (uploadErr) {
+    console.error('[uploadDisputeEvidenceFile] upload error:', uploadErr)
+    throw uploadErr
+  }
+
+  const { data: signed, error: signErr } = await supabase.storage
+    .from(DISPUTE_EVIDENCE_BUCKET)
+    .createSignedUrl(path, DISPUTE_EVIDENCE_SIGNED_URL_TTL_SECONDS)
+
+  if (signErr || !signed?.signedUrl) {
+    console.error('[uploadDisputeEvidenceFile] sign error:', signErr)
+    throw signErr ?? new Error('Failed to sign evidence URL')
+  }
+
+  // File-content hash. Use viem's keccak256 so the result matches the
+  // Solidity / contract-test encoding used elsewhere (EVM-keccak, NOT
+  // SHA3-256). Imported dynamically to keep startup cold-cost low — same
+  // pattern as `cidToBytes32` in src/lib/ipfs.ts.
+  const { keccak256 } = await import('viem')
+  const keccakBytes32 = keccak256(bytes) as `0x${string}`
+
+  return {
+    path,
+    url: signed.signedUrl,
+    name: file.name || path,
+    size: bytes.byteLength,
+    keccakBytes32,
+  }
+}
+
+/**
  * @deprecated Use `ensureUser` (sync) or `updateUserProfile` (edit).
  */
 export async function upsertUser(
