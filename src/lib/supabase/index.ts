@@ -364,8 +364,15 @@ export async function uploadAvatar(
 export interface DisputeEvidenceUpload {
   /** Storage path (also what we store in `dispute_evidence.ipfs_cid`). */
   path: string
-  /** Signed URL resolvable in the browser for the configured TTL. */
-  url: string
+  /**
+   * Signed URL resolvable in the browser for the configured TTL. We no
+   * longer mint one here — the page mints a fresh signed URL on every
+   * render via `getDisputeEvidenceSignedUrl(path)`. The field is kept on
+   * the return type for backward compat with call sites that destructure
+   * `url`; treat the value as undefined for any new code.
+   * @deprecated
+   */
+  url?: string
   /** Display name (passes through the File's name when present). */
   name: string
   /** Raw file size in bytes. */
@@ -427,14 +434,10 @@ export async function uploadDisputeEvidenceFile(
     throw uploadErr
   }
 
-  const { data: signed, error: signErr } = await supabase.storage
-    .from(DISPUTE_EVIDENCE_BUCKET)
-    .createSignedUrl(path, DISPUTE_EVIDENCE_SIGNED_URL_TTL_SECONDS)
-
-  if (signErr || !signed?.signedUrl) {
-    console.error('[uploadDisputeEvidenceFile] sign error:', signErr)
-    throw signErr ?? new Error('Failed to sign evidence URL')
-  }
+  // We deliberately DO NOT mint a signed URL here. Signed URLs expire
+  // (10 min by default), so persisting one would mean every image 404s
+  // after the first session. The browser asks for a fresh signed URL on
+  // each render via `getDisputeEvidenceSignedUrl(path)`.
 
   // File-content hash. Use viem's keccak256 so the result matches the
   // Solidity / contract-test encoding used elsewhere (EVM-keccak, NOT
@@ -445,11 +448,37 @@ export async function uploadDisputeEvidenceFile(
 
   return {
     path,
-    url: signed.signedUrl,
     name: file.name || path,
     size: bytes.byteLength,
     keccakBytes32,
+    // url omitted — see the deprecation note on DisputeEvidenceUpload.url.
   }
+}
+
+/**
+ * Mint a short-lived signed URL for an evidence file the browser already
+ * knows the storage path of. The signed URL expires after
+ * `DISPUTE_EVIDENCE_SIGNED_URL_TTL_SECONDS` (10 min by default) — long
+ * enough for an evidence review session, short enough that a leaked URL
+ * doesn't expose dispute material long-term.
+ *
+ * Used by DisputeDetailPage's evidence gallery so the row's `ipfs_url`
+ * column only needs to store the durable storage path (not a signed URL
+ * that expires). Re-minting on every render keeps the gallery working
+ * indefinitely.
+ */
+export async function getDisputeEvidenceSignedUrl(
+  path: string,
+  ttlSeconds: number = DISPUTE_EVIDENCE_SIGNED_URL_TTL_SECONDS,
+): Promise<string | null> {
+  const { data, error } = await supabase.storage
+    .from(DISPUTE_EVIDENCE_BUCKET)
+    .createSignedUrl(path, ttlSeconds)
+  if (error || !data?.signedUrl) {
+    console.error('[getDisputeEvidenceSignedUrl] sign failed:', error)
+    return null
+  }
+  return data.signedUrl
 }
 
 /**
@@ -1216,7 +1245,12 @@ export async function mirrorDisputeToTrade(
  */
 export interface DisputeEvidenceFile {
   cid: string
-  url: string
+  /**
+   * @deprecated No longer populated — signed URLs are minted on render
+   * via `getDisputeEvidenceSignedUrl(cid)`. Kept on the type only for
+   * backward compat with call sites that destructure it.
+   */
+  url?: string
   /** Display name. May be undefined when the IPFS upload didn't surface a
    *  filename, in which case the caller should fall back to the local
    *  File object's `name`. */
@@ -1250,7 +1284,11 @@ export async function insertDisputeEvidence(
     submitted_by: submittedBy,
     evidence_kind: f.kind ?? 'image',
     ipfs_cid: f.cid,
-    ipfs_url: f.url,
+    // Store the durable storage PATH (not a signed URL) — signed URLs
+    // expire in 10 min and would 404 every image after the first session.
+    // The browser asks for a fresh signed URL via
+    // getDisputeEvidenceSignedUrl(cid) on each render.
+    ipfs_url: f.cid,
     keccak_bytes32: f.keccakBytes32 ?? null,
     tx_hash: f.txHash ?? null,
     evidence_group_id: f.evidenceGroupId ?? evidenceGroupId ?? null,

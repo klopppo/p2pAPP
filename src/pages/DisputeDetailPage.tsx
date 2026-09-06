@@ -33,6 +33,7 @@ import { useDispute, useEscrowState, useAppealInfo, useEscrowEventWatcher } from
 import {
   type DisputeEvidenceFile,
   EscrowStatus,
+  getDisputeEvidenceSignedUrl,
   mirrorDisputeToTrade,
   TradeEventType,
   updateDisputeOnChain,
@@ -61,10 +62,6 @@ const STATUS_STYLES: Record<DisputeStatusValue, string> = {
   resolved: 'bg-green-500/15 text-green-600 dark:text-green-300',
   closed: 'bg-muted text-muted-foreground',
 }
-
-const GATEWAY = (
-  import.meta.env.VITE_IPFS_GATEWAY ?? 'https://ipfs.io/ipfs/'
-).replace(/\/$/, '')
 
 const ON_CHAIN_STATE_I18N: Record<number, string> = {
   [KlerosEscState.AWAITING_FUNDING]: 'disputeDetail.awaitingFunding',
@@ -181,6 +178,47 @@ function bytes(n: number) {
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+/**
+ * Per-row evidence thumbnail. Mints a fresh signed URL on each render so
+ * the image never expires (was: stored the signed URL on insert, 10-min
+ * expiry meant every image 404s after the first session — H2 audit).
+ */
+function EvidenceThumb({ path, name, size }: { path: string; name?: string; size?: number }) {
+  const [url, setUrl] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void getDisputeEvidenceSignedUrl(path).then((signed) => {
+      if (!cancelled) setUrl(signed)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [path])
+  return (
+    <a href={url ?? '#'} target="_blank" rel="noopener noreferrer" className="block group">
+      <div className="rounded-xl overflow-hidden border border-border bg-background/60 aspect-square">
+        {url ? (
+          <img
+            src={url}
+            alt={name ?? ''}
+            loading="lazy"
+            className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+            {name ?? '…'}
+          </div>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground truncate mt-1 flex items-center gap-1">
+        <ImageIcon className="w-3 h-3 shrink-0" />
+        <span className="truncate">{name ?? '…'}</span>
+        {size != null && <span className="shrink-0">· {bytes(size)}</span>}
+      </p>
+    </a>
+  )
 }
 
 export function DisputeDetailPage() {
@@ -961,27 +999,7 @@ export function DisputeDetailPage() {
           </Text>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {parsed.evidence.map((e, i) => (
-              <a
-                key={`${e.cid}-${i}`}
-                href={e.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block group"
-              >
-                <div className="rounded-xl overflow-hidden border border-border bg-background/60 aspect-square">
-                  <img
-                    src={`${GATEWAY}/${e.cid}`}
-                    alt={e.name}
-                    loading="lazy"
-                    className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground truncate mt-1 flex items-center gap-1">
-                  <ImageIcon className="w-3 h-3 shrink-0" />
-                  <span className="truncate">{e.name}</span>
-                  <span className="shrink-0">· {bytes(e.size)}</span>
-                </p>
-              </a>
+              <EvidenceThumb key={`${e.cid}-${i}`} path={e.cid} name={e.name} size={e.size} />
             ))}
           </div>
         </Card>
@@ -1032,15 +1050,9 @@ export function DisputeDetailPage() {
             {parsed.evidenceCid && (
               <div className="flex justify-between gap-3 text-sm">
                 <span className="text-muted-foreground">{t('disputeDetail.evidenceCid')}</span>
-                <a
-                  href={`${GATEWAY}/${parsed.evidenceCid}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-mono text-primary hover:underline inline-flex items-center gap-1 truncate"
-                >
+                <span className="font-mono inline-flex items-center gap-1 truncate text-muted-foreground">
                   {parsed.evidenceCid.slice(0, 10)}…{parsed.evidenceCid.slice(-4)}
-                  <ExternalLink className="w-3 h-3" />
-                </a>
+                </span>
               </div>
             )}
             {parsed.arbitrationFeeWei && (
@@ -1069,59 +1081,36 @@ export function DisputeDetailPage() {
             {t('disputeDetail.legacyEvidence')}
           </Text>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {evidenceRows.map((row) => {
-              const src = row.ipfs_url || (row.ipfs_cid ? `${GATEWAY}/${row.ipfs_cid}` : null)
-              return (
-                <div
-                  key={row.id}
-                  className="rounded-xl overflow-hidden border border-border bg-background/60"
-                >
-                  {src ? (
+            {evidenceRows.map((row) => (
+              <div
+                key={row.id}
+                className="rounded-xl overflow-hidden border border-border bg-background/60"
+              >
+                <EvidenceThumb path={row.ipfs_cid ?? row.ipfs_url ?? ''} />
+                <div className="flex items-center gap-2 px-2 py-1.5 text-xs">
+                  <span className="text-muted-foreground capitalize shrink-0">
+                    {row.submitted_by ?? 'unknown'}
+                  </span>
+                  <span className="text-muted-foreground shrink-0">
+                    {t('disputeDetail.evidenceRound', { n: Number(row.evidence_group_id ?? 0) })}
+                  </span>
+                  {row.tx_hash && (
                     <a
-                      href={src}
+                      href={`${explorerBase.tx}${row.tx_hash}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block group"
+                      className="text-primary hover:underline inline-flex items-center gap-0.5 shrink-0"
                     >
-                      <div className="aspect-square">
-                        <img
-                          src={src}
-                          alt={row.submitted_by ?? 'evidence'}
-                          loading="lazy"
-                          className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
-                        />
-                      </div>
+                      tx
+                      <ExternalLink className="w-3 h-3" />
                     </a>
-                  ) : (
-                    <div className="flex items-center justify-center aspect-square text-muted-foreground">
-                      <ImageIcon className="w-6 h-6" />
-                    </div>
                   )}
-                  <div className="flex items-center gap-2 px-2 py-1.5 text-xs">
-                    <span className="text-muted-foreground capitalize shrink-0">
-                      {row.submitted_by ?? 'unknown'}
-                    </span>
-                    <span className="text-muted-foreground shrink-0">
-                      {t('disputeDetail.evidenceRound', { n: Number(row.evidence_group_id ?? 0) })}
-                    </span>
-                    {row.tx_hash && (
-                      <a
-                        href={`${explorerBase.tx}${row.tx_hash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline inline-flex items-center gap-0.5 shrink-0"
-                      >
-                        tx
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
-                    <span className="text-muted-foreground ml-auto truncate">
-                      {formatDateTime(row.submitted_at)}
-                    </span>
-                  </div>
+                  <span className="text-muted-foreground ml-auto truncate">
+                    {formatDateTime(row.submitted_at)}
+                  </span>
                 </div>
-              )
-            })}
+              </div>
+            ))}
           </div>
         </Card>
       )}
@@ -1194,7 +1183,6 @@ function SubmitMoreEvidence({
       const rows: DisputeEvidenceFile[] = [
         {
           cid: upload.cid,
-          url: upload.url,
           name: upload.name ?? file.name,
           size: upload.size ?? file.size,
           kind: file.type.split('/')[1] ?? 'image',

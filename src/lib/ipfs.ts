@@ -71,15 +71,15 @@ export const warmUpIpfs = warmUpIpns
 /**
  * Shape returned from `uploadToIpfs`. Mirrors the legacy Helia shape so the
  * DisputePage / DisputeDetailPage call sites don't need to change their
- * destructuring.
+ * destructuring — but we no longer mint a signed URL at upload time.
+ * `cid` is the storage path; signed URLs are minted at render time via
+ * `getDisputeEvidenceSignedUrl(cid)` in `src/lib/supabase`.
  */
 export interface IpfsUploadResult {
   /** Storage path (`dispute-evidence/<disputeId>/<basename>-<ts>-<rand>.<ext>`).
    *  Stored in `dispute_evidence.ipfs_cid` — the column was originally for
    *  an IPFS CID; the name is kept for back-compat with existing rows. */
   cid: string
-  /** Short-lived signed URL resolvable in the browser. */
-  url: string
   /** Raw file size in bytes. */
   size: number
   /** Display name (File's name when present). */
@@ -103,38 +103,25 @@ export class IpfsUploadTimeoutError extends Error {
 }
 
 /**
- * Race an `uploadToIpfs` against an `AbortController` so a stuck Supabase
- * upload can't pin the dispute form at `stage='uploading'` forever.
- *
- * Cold-path budget (first upload in a tab, before warmUpIpns lands) is
- * generous — 120s — because the Supabase session may still be handshaking.
- * Warm-path budget is 30s.
+ * Race `work` against a timeout. The actual `AbortController` is a thin
+ * abstraction here because the Supabase Storage SDK doesn't accept an
+ * `AbortSignal` on `.upload()` — once the timeout fires, the page sees a
+ * `IpfsUploadTimeoutError` immediately even though the underlying HTTPS
+ * request may keep running until Supabase cleans it up.
  */
 async function withAbortTimeout<T>(work: Promise<T>, timeoutMs: number): Promise<T> {
-  const controller = new AbortController()
-  let timedOut = false
-  const timer = setTimeout(() => {
-    timedOut = true
-    controller.abort()
-  }, timeoutMs)
+  let reject!: (err: IpfsUploadTimeoutError) => void
+  const timeoutPromise = new Promise<T>((_, rej) => {
+    reject = rej
+  })
+  const timer = setTimeout(
+    () => reject(new IpfsUploadTimeoutError(timeoutMs)),
+    timeoutMs,
+  )
   try {
-    // The storage upload helpers don't take an AbortSignal, so we race them
-    // against a timeout reject. The underlying request may continue in the
-    // background — Supabase will clean it up on its own — but the page sees
-    // a friendly error within `timeoutMs`.
-    const result = await work
-    if (timedOut) {
-      throw new IpfsUploadTimeoutError(timeoutMs)
-    }
-    return result
-  } catch (err) {
-    if (timedOut) throw new IpfsUploadTimeoutError(timeoutMs)
-    throw err
+    return await Promise.race([work, timeoutPromise])
   } finally {
     clearTimeout(timer)
-    // Suppress unused-binding lint for `controller` — it's needed for the
-    // side-effect of `abort()`, even if the signal isn't read.
-    void controller
   }
 }
 
@@ -175,7 +162,6 @@ export async function uploadToIpfs(
 
   return {
     cid: result.path,
-    url: result.url,
     size: result.size,
     name: result.name,
     keccakBytes32: result.keccakBytes32,

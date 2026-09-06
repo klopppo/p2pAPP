@@ -362,7 +362,6 @@ const effectiveEscrow =
       //    isolated — the surviving uploads still ship.
       const uploads: Array<{
         cid: string
-        url: string
         name: string
         size: number
         keccakBytes32: `0x${string}`
@@ -379,7 +378,6 @@ const effectiveEscrow =
               const upload = await uploadToIpfs(f.file, dispute.id)
               uploads.push({
                 cid: upload.cid,
-                url: upload.url,
                 name: upload.name ?? f.file.name,
                 size: upload.size ?? f.file.size,
                 keccakBytes32: upload.keccakBytes32,
@@ -516,7 +514,6 @@ const effectiveEscrow =
       //     off-chain integrity check.
       const evidenceFiles: DisputeEvidenceFile[] = uploads.map((u, idx) => ({
         cid: u.cid,
-        url: u.url,
         name: u.name,
         size: u.size,
         keccakBytes32: u.keccakBytes32,
