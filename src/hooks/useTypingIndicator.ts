@@ -112,8 +112,14 @@ export function useTypingIndicator(
     }
   }, [typingUsers])
 
+  // The 4s rolling timer ticks every second while at least one user is
+  // typing. `isTypingActive` is the boolean dependency so the effect only
+  // re-runs on the false→true / true→false transitions — the inner `prev`
+  // callback always reads the latest `lastSeenRef.current` so we don't
+  // need a re-run when an individual typing ping arrives.
+  const isTypingActive = typingUsers.length > 0
   useEffect(() => {
-    if (typingUsers.length === 0) return
+    if (!isTypingActive) return
     const interval = window.setInterval(() => {
       const cutoff = Date.now() - 4000
       setTypingUsers((prev) => {
@@ -130,7 +136,7 @@ export function useTypingIndicator(
       })
     }, 1000)
     return () => window.clearInterval(interval)
-  }, [typingUsers.length === 0])
+  }, [isTypingActive])
 
   const notifyTyping = useCallback(() => {
     if (!channelRef.current || !identity) return

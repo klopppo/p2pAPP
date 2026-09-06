@@ -324,6 +324,12 @@ const effectiveEscrow =
       }
 
     setStage('uploading')
+    // Placeholder id is tracked locally so the finally block at the bottom
+    // of handleSubmit can clean it up on any failure path. Without this,
+    // a rejected MetaMask prompt or a reverted tx leaves the row behind —
+    // the per-trade preflight (getDisputesByTrade) then blocks every
+    // retry, locking the user out of the dispute flow.
+    let placeholderId: string | null = null
     try {
       // 0) Create the dispute row FIRST so its UUID can be the leading
       //    segment of every evidence object path. The Storage RLS
@@ -354,6 +360,9 @@ const effectiveEscrow =
         fee_paid_wei: arbitrationCostWei.toString(),
         dispute_timestamp: BigInt(Math.floor(Date.now() / 1000)).toString(),
       })
+      placeholderId = dispute.id
+
+      // 1) Upload proof pictures to dispute-evidence storage — the FIRST
 
       // 1) Upload proof pictures to dispute-evidence storage — the FIRST
       //    CID becomes the on-chain evidence reference passed to
@@ -558,10 +567,24 @@ const effectiveEscrow =
       })
 
       toast.success(t('disputePage.successFiled'))
+      // Success — the dispute row is now the source of truth. Clear the
+      // placeholder id so the finally block doesn't delete it.
+      placeholderId = null
       navigate(`/app/disputes/${dispute.id}`)
     } catch (err) {
       toast.error(errorMessage(err, 'disputePage', t))
     } finally {
+      // If the placeholder id is still set, an early-return / thrown error
+      // path above didn't clean up the row. Tear it down so the per-trade
+      // preflight doesn't permanently block the user from retrying. The
+      // helper also strips any uploaded files from the dispute-evidence
+      // bucket (Finding 2).
+      if (placeholderId) {
+        const orphanId = placeholderId
+        void deleteDisputePlaceholder(orphanId).catch((cleanupErr) => {
+          console.warn('[DisputePage] placeholder cleanup failed:', cleanupErr)
+        })
+      }
       setStage('idle')
     }
   }

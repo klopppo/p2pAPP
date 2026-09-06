@@ -165,7 +165,8 @@
     "message": "发消息",
     "messageTitle": "打开与该用户的聊天",
     "errorStartChat": "无法开始聊天 — 请重试。",
-    "messageStarting": "打开中…"
+    "messageStarting": "打开中…",
+    "errorUnknownUser": "该用户尚未完成登录 — 请稍后再试。"
   },
   "trades": {
     "title": "交易",
@@ -378,7 +379,8 @@
     "message": "发消息",
     "messageTitle": "给卖家发消息",
     "messageStarting": "打开中…",
-    "errorStartChat": "无法开始聊天 — 请重试。"
+    "errorStartChat": "无法开始聊天 — 请重试。",
+    "errorUnknownUser": "卖家尚未完成登录 — 请稍后再试。"
   },
   "trade": {
     "buyToken": "买入 {{token}}",

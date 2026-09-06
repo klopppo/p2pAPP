@@ -165,7 +165,8 @@
     "message": "Mesaj",
     "messageTitle": "Bu kullanıcıyla sohbeti aç",
     "errorStartChat": "Sohbet başlatılamadı — lütfen tekrar deneyin.",
-    "messageStarting": "Açılıyor…"
+    "messageStarting": "Açılıyor…",
+    "errorUnknownUser": "Bu kullanıcı henüz oturum açmadı — birkaç saniye sonra tekrar deneyin."
   },
   "trades": {
     "title": "İşlemler",
@@ -378,7 +379,8 @@
     "message": "Mesaj",
     "messageTitle": "Satıcıya mesaj",
     "messageStarting": "Açılıyor…",
-    "errorStartChat": "Sohbet başlatılamadı — lütfen tekrar deneyin."
+    "errorStartChat": "Sohbet başlatılamadı — lütfen tekrar deneyin.",
+    "errorUnknownUser": "Satıcı henüz oturum açmadı — birkaç saniye sonra tekrar deneyin."
   },
   "trade": {
     "buyToken": "{{token}} Al",

@@ -265,8 +265,15 @@ export function ProfilePage() {
       if (convId) navigate(`/app/messages/${convId}`)
       else toast.error(t('profile.errorStartChat'))
     } catch (err) {
-      console.warn('[ProfilePage] start chat failed:', err)
-      toast.error(t('profile.errorStartChat'))
+      // P0002 = "unknown user" — the other user has no public.users row yet
+      // (their wallet never finished SIWE, or the row is still being
+      // provisioned by a parallel tab).
+      if ((err as { code?: string }).code === 'P0002') {
+        toast.error(t('profile.errorUnknownUser'))
+      } else {
+        console.warn('[ProfilePage] start chat failed:', err)
+        toast.error(t('profile.errorStartChat'))
+      }
     } finally {
       setStartingChat(false)
     }

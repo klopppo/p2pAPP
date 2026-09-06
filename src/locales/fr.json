@@ -165,7 +165,8 @@
     "message": "Message",
     "messageTitle": "Ouvrir le chat avec cet utilisateur",
     "errorStartChat": "Impossible de démarrer la conversation — réessayez.",
-    "messageStarting": "Ouverture…"
+    "messageStarting": "Ouverture…",
+    "errorUnknownUser": "Cet utilisateur n'a pas encore terminé la connexion — réessayez dans quelques secondes."
   },
   "trades": {
     "title": "Échanges",
@@ -378,7 +379,8 @@
     "message": "Message",
     "messageTitle": "Message au vendeur",
     "messageStarting": "Ouverture…",
-    "errorStartChat": "Impossible de démarrer la conversation — réessayez."
+    "errorStartChat": "Impossible de démarrer la conversation — réessayez.",
+    "errorUnknownUser": "Le vendeur n'a pas encore terminé la connexion — réessayez dans quelques secondes."
   },
   "trade": {
     "buyToken": "Acheter {{token}}",

@@ -165,7 +165,8 @@
     "message": "Mensaje",
     "messageTitle": "Abrir el chat con este usuario",
     "errorStartChat": "No se pudo iniciar el chat — inténtalo de nuevo.",
-    "messageStarting": "Abriendo…"
+    "messageStarting": "Abriendo…",
+    "errorUnknownUser": "Este usuario aún no ha iniciado sesión — vuelve a intentarlo en unos segundos."
   },
   "trades": {
     "title": "Operaciones",
@@ -378,7 +379,8 @@
     "message": "Mensaje",
     "messageTitle": "Mensaje al vendedor",
     "messageStarting": "Abriendo…",
-    "errorStartChat": "No se pudo iniciar el chat — inténtalo de nuevo."
+    "errorStartChat": "No se pudo iniciar el chat — inténtalo de nuevo.",
+    "errorUnknownUser": "El vendedor aún no ha iniciado sesión — vuelve a intentarlo en unos segundos."
   },
   "trade": {
     "buyToken": "Comprar {{token}}",

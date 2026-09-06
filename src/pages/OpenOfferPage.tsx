@@ -92,8 +92,13 @@ export function OpenOfferPage() {
       if (convId) navigate(`/app/messages/${convId}`)
       else toast.error(t('openOffer.errorStartChat'))
     } catch (err) {
-      console.warn('[OpenOfferPage] start chat failed:', err)
-      toast.error(t('openOffer.errorStartChat'))
+      // P0002 = "unknown user" — the seller has no public.users row yet.
+      if ((err as { code?: string }).code === 'P0002') {
+        toast.error(t('openOffer.errorUnknownUser'))
+      } else {
+        console.warn('[OpenOfferPage] start chat failed:', err)
+        toast.error(t('openOffer.errorStartChat'))
+      }
     } finally {
       setStartingChat(false)
     }

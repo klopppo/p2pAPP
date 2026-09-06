@@ -1362,16 +1362,44 @@ export async function getDisputesByUser(userId: string) {
  * `status='open'`, `tx_hash=null` and the per-trade preflight would block
  * every retry — leaving the user permanently unable to file.
  *
- * Deletes `dispute_evidence` rows first (FK to `disputes` via cascade is
- * declared, but the Storage objects they reference would orphan on the
- * bucket; doing the manual cleanup is harmless and clearer in audit logs).
+ * Also tears down the matching objects in the dispute-evidence Storage
+ * bucket so they don't orphan forever. List+remove run before the
+ * disputes-row delete so the bucket RLS predicate (which joins on the
+ * disputes.id in the object path) still resolves for the caller's JWT.
  */
 export async function deleteDisputePlaceholder(id: string): Promise<void> {
+  // 1) Clean up the bucket objects. We do this even if the row delete
+  //    fails — orphaned Storage objects silently grow the bucket forever.
+  try {
+    const { data: objects, error: listErr } = await supabase.storage
+      .from(DISPUTE_EVIDENCE_BUCKET)
+      .list(id, { limit: 1000 })
+    if (!listErr && objects && objects.length > 0) {
+      const paths = objects
+        .map((o) => `${id}/${o.name}`)
+        .filter((p) => !p.includes('..'))
+      if (paths.length > 0) {
+        const { error: removeErr } = await supabase.storage
+          .from(DISPUTE_EVIDENCE_BUCKET)
+          .remove(paths)
+        if (removeErr) {
+          console.warn('[deleteDisputePlaceholder] storage remove failed:', removeErr)
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[deleteDisputePlaceholder] storage list failed:', err)
+  }
+
+  // 2) Clean up the dispute_evidence rows (FK cascade would also handle
+  //    this, but explicit is clearer in audit logs).
   try {
     await supabase.from('dispute_evidence').delete().eq('dispute_id', id)
   } catch (err) {
     console.warn('[deleteDisputePlaceholder] evidence delete failed:', err)
   }
+
+  // 3) Drop the placeholder dispute row itself.
   const { error } = await supabase.from('disputes').delete().eq('id', id)
   if (error) {
     console.warn('[deleteDisputePlaceholder] dispute delete failed:', error)
@@ -1662,6 +1690,14 @@ export async function getOrCreateDirectConversation(
   })
   if (error) {
     console.error('[getOrCreateDirectConversation] rpc failed:', error)
+    // P0002 = "unknown user" raised by the RPC for a missing other
+    // party. Rethrow a tagged error so the call site can surface a
+    // specific toast (profile.errorUnknownUser) instead of the generic
+    // "couldn't start the chat" copy.
+    const code = (error as { code?: string }).code
+    if (code === 'P0002') {
+      throw Object.assign(new Error('unknown user'), { code: 'P0002' })
+    }
     return null
   }
   return (data as string | null) ?? null
