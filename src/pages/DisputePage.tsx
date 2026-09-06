@@ -23,7 +23,7 @@ import {
   Loader2,
   ExternalLink,
 } from 'lucide-react'
-import { uploadToIpfs } from '@/lib/ipfs'
+import { uploadToIpfs, cidToBytes32 } from '@/lib/ipfs'
 import {
   KLEROS_ESC_ABI,
   KLEROS_ESC_EVENTS_ABI,
@@ -74,14 +74,9 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-/** Convert an IPFS CID (string) to a bytes32 that KlerosEsc.submitEvidence accepts.
- *  Uses keccak256 for collision-resistance; the CID is also stored in the
- *  Supabase row for off-chain display.
- */
-async function cidToBytes32(cid: string): Promise<`0x${string}`> {
-  const { keccak256, toBytes } = await import('viem')
-  return keccak256(toBytes(cid))
-}
+// cidToBytes32 is imported below from '@/lib/ipfs' (renamed: hashes
+// 'ipfs://' + cid to match the contract test encoding in
+// contrats/test/klerosTests.t.sol:2413,2425,2464).
 
 export function DisputePage() {
   const { t } = useTranslation()
@@ -302,31 +297,110 @@ const effectiveEscrow =
       return
     }
 
+    // Preflight: resolve user, linked trade, double-raise check BEFORE we
+    // touch the dispute-evidence bucket. The Storage RLS predicate keys
+    // on the leading dispute UUID in the object name and requires a real
+    // disputes row to exist, which means we have to create the row first
+    // (audit #4 sub-fix: reordering for RLS).
+    const me = await ensureUser(address)
+    if (!me) {
+        toast.error(t('disputePage.errorConnectWallet'))
+        setStage('idle')
+        return
+      }
+      const linkedTrade = await getTradeByEscrowAddress(effectiveEscrow)
+      if (!linkedTrade) {
+        toast.error(t('disputePage.errorNoTrade'))
+        setStage('idle')
+        return
+      }
+      const existing = await getDisputesByTrade(linkedTrade.id)
+      if (existing && existing.length > 0) {
+        const prior = existing[0]
+        toast.warning(t('disputePage.warningAlreadyRaised'))
+        navigate(`/app/disputes/${prior.id}`)
+        return
+      }
+
     setStage('uploading')
     try {
-      // 1) Upload proof pictures to IPFS — the FIRST CID becomes the
-      //    on-chain evidence reference passed to submitEvidence(). We upload
-      //    each file independently so a single bad IPFS response doesn't
-      //    sink the whole batch — the surviving CIDs still ship.
-      const uploads: Array<{ cid: string; url: string; name?: string; size?: number }> = []
+      // 0) Create the dispute row FIRST so its UUID can be the leading
+      //    segment of every evidence object path. The Storage RLS
+      //    predicate (`storage_object_dispute_id(name)`) joins on
+      //    disputes.id, so the row has to exist before any upload. We
+      //    don\'t yet know kleros_dispute_id or the tx hash — those
+      //    land via updateDisputeOnChain after raiseDispute lands.
+      const dispute = await createDispute({
+        dispute_id: generateDisputeId(),
+        trade_id: linkedTrade.id,
+        buyer_id: linkedTrade.buyer_id,
+        seller_id: linkedTrade.seller_id,
+        reason,
+        reason_category: DISPUTE_REASONS.find((r) => r.value === reason)?.label ?? reason,
+        description,
+        can_appeal: true,
+        appeal_deadline: null,
+        escrow_address: effectiveEscrow,
+        kleros_dispute_id: null,
+        tx_hash: null,
+        tx_hash_evidence: null,
+        evidence_cid: null,
+        escrow_state: KlerosEscState.AWAITING_RULING,
+        status: DisputeStatus.OPEN,
+        evidence_group_id: 0,
+        appeal_count: 0,
+        raiser: filerRole ?? undefined,
+        fee_paid_wei: arbitrationCostWei.toString(),
+        dispute_timestamp: BigInt(Math.floor(Date.now() / 1000)).toString(),
+      })
+
+      // 1) Upload proof pictures to dispute-evidence storage — the FIRST
+      //    CID becomes the on-chain evidence reference passed to
+      //    submitEvidence(). Bounded concurrency (3 at a time) so a
+      //    batch of 10 files doesn\'t open 10 simultaneous PUTs against
+      //    the Supabase edge (audit #9 sub-bug). Per-file failures are
+      //    isolated — the surviving uploads still ship.
+      const uploads: Array<{
+        cid: string
+        url: string
+        name: string
+        size: number
+        keccakBytes32: `0x${string}`
+      }> = []
       const failedUploads: Array<{ name: string; error: string }> = []
-      for (const f of files) {
-        try {
-          const upload = await uploadToIpfs(f.file)
-          uploads.push({
-            cid: upload.cid,
-            url: upload.url,
-            name: upload.name ?? f.file.name,
-            size: upload.size ?? f.file.size,
-          } as DisputeEvidenceFile)
-        } catch (uploadErr) {
-          console.warn(`[DisputePage] IPFS upload failed for ${f.file.name}:`, uploadErr)
-          failedUploads.push({
-            name: f.file.name,
-            error: uploadErr instanceof Error ? uploadErr.message : String(uploadErr),
-          })
-        }
-      }
+      const concurrency = 3
+      const queue = files.slice()
+      const workers = Array.from(
+        { length: Math.min(concurrency, queue.length) || 1 },
+        async () => {
+          while (queue.length) {
+            const f = queue.shift()!
+            try {
+              const upload = await uploadToIpfs(f.file, dispute.id)
+              uploads.push({
+                cid: upload.cid,
+                url: upload.url,
+                name: upload.name ?? f.file.name,
+                size: upload.size ?? f.file.size,
+                keccakBytes32: upload.keccakBytes32,
+              })
+            } catch (uploadErr) {
+              console.warn(
+                `[DisputePage] evidence upload failed for ${f.file.name}:`,
+                uploadErr,
+              )
+              failedUploads.push({
+                name: f.file.name,
+                error:
+                  uploadErr instanceof Error
+                    ? uploadErr.message
+                    : String(uploadErr),
+              })
+            }
+          }
+        },
+      )
+      await Promise.allSettled(workers)
       if (uploads.length === 0) {
         toast.error(t('disputePage.errorAllUploadsFailed'))
         return
@@ -340,42 +414,11 @@ const effectiveEscrow =
         )
       }
       const primaryCid = uploads[0].cid
-      const evidenceBytes32 = await cidToBytes32(primaryCid)
+      // On-chain URI bytes32 = keccak256("ipfs://" + cid) — matches the
+      // contract test in contrats/test/klerosTests.t.sol:2413,2425,2464.
+      const evidenceBytes32 = cidToBytes32(primaryCid)
 
-      // 2) Resolve the filer's Supabase user id (create-if-missing) so the DB
-      //    row satisfies the foreign key on disputes.buyer_id.
-      const me = await ensureUser(address)
-      if (!me) {
-        toast.error(t('disputePage.errorConnectWallet'))
-        setStage('idle')
-        return
-      }
-
-      // 2b) Resolve the linked trade (escrow address → trades.escrow_contract_addr)
-      //     so the dispute references the real trade uuid and the actual
-      //     counterparty — not the filer twice, and not a 0x address in a
-      //     uuid FK column.
-      const linkedTrade = await getTradeByEscrowAddress(effectiveEscrow)
-      if (!linkedTrade) {
-        toast.error(
-          t('disputePage.errorNoTrade'),
-        )
-        throw new Error(`No trade linked to escrow ${effectiveEscrow}`)
-      }
-
-      // Pre-flight: don't double-raise. If a dispute row already exists
-      // for this trade the DB `disputes.trade_id unique` constraint will
-      // throw a 23505 once we hit createDispute below. Route the user to
-      // the existing row instead.
-      const existing = await getDisputesByTrade(linkedTrade.id)
-      if (existing && existing.length > 0) {
-        const prior = existing[0]
-        toast.warning(t('disputePage.warningAlreadyRaised'))
-        navigate(`/app/disputes/${prior.id}`)
-        return
-      }
-
-      // 3) Raise the dispute on-chain. raiseDispute() forwards ETH to the
+      // 2) Raise the dispute on-chain. raiseDispute() forwards ETH to the
       //    Kleros court internally; we only need to attach the fee.
       setStage('raising')
       const txHash = await writeContractAsync({
@@ -385,10 +428,10 @@ const effectiveEscrow =
         value: arbitrationCostWei,
       })
 
-      // 4) Wait for inclusion + decode the on-chain Kleros dispute ID assigned
+      // 3) Wait for inclusion + decode the on-chain Kleros dispute ID assigned
       //    by KlerosCourt.createDispute() (via the DisputeRaised event).
-      //    Bound the wait so a Sepolia RPC stall doesn't leave the form
-      //    spinning at `stage='mining'` forever.
+      //    Bound the wait so a Sepolia RPC stall doesn\'t leave the form
+      //    spinning at `stage=\'mining\'` forever.
       setStage('mining')
       const receipt = await publicClient.waitForTransactionReceipt({
         hash: txHash,
@@ -408,11 +451,12 @@ const effectiveEscrow =
           klerosDisputeId = args.klerosDisputeID.toString()
         }
       } catch (decodeErr) {
-      console.warn('[DisputePage.tsx] decodeErr:', decodeErr);/* swallow */ }
+        console.warn('[DisputePage.tsx] decodeErr:', decodeErr)
+      }
 
-      // 5) Submit the IPFS evidence bytes32 on-chain (ERC-1497 Evidence event).
-      //    Buyer or seller only — enforced by the contract. May also be called
-      //    later by either party via the detail page.
+      // 4) Submit the on-chain evidence bytes32 (ERC-1497 Evidence event).
+      //    Buyer or seller only — enforced by the contract. May also be
+      //    called later by either party via the detail page.
       setStage('submitting-evidence')
       let evidenceTxHash: `0x${string}` | null = null
       try {
@@ -428,23 +472,26 @@ const effectiveEscrow =
         })
       } catch (_evidenceErr) {
         // The dispute itself is raised; evidence submission is best-effort
-        // and can be retried from the detail page. Don't fail the whole flow.
+        // and can be retried from the detail page. Don\'t fail the whole flow.
         console.warn('[DisputePage] submitEvidence failed:', _evidenceErr)
-        setStage('saving')
-        toast.warning(
-          t('disputePage.warningEvidenceFailed'),
-        )
+        toast.warning(t('disputePage.warningEvidenceFailed'))
       }
 
-      // 6) Persist the dispute to Supabase with on-chain metadata.
+      // 5) Persist on-chain metadata + status on the dispute row created
+      //    in step 0. B-9: bump to IN_REVIEW immediately so the list
+      //    page filter surfaces this row. The description blob is
+      //    back-compat with DisputeDetailPage.parseDescription (older
+      //    rows still key on the in-blob values; new rows prefer the
+      //    dedicated columns).
       setStage('saving')
-      const dispute = await createDispute({
-        dispute_id: generateDisputeId(),
-        trade_id: linkedTrade.id,
-        buyer_id: linkedTrade.buyer_id,
-        seller_id: linkedTrade.seller_id,
-        reason,
-        reason_category: DISPUTE_REASONS.find((r) => r.value === reason)?.label ?? reason,
+      await updateDisputeOnChain(dispute.id, {
+        klerosDisputeId,
+        txHash,
+        txHashEvidence: evidenceTxHash,
+        evidenceCid: primaryCid,
+        status: DisputeStatus.IN_REVIEW,
+        evidenceGroupId: 0,
+        appealCount: 0,
         description: [
           description,
           `--- on-chain ---`,
@@ -456,41 +503,26 @@ const effectiveEscrow =
           `severity: ${SEVERITY_TO_APPLEVEL[severity]} (${severity})`,
           `evidence_cid: ${primaryCid}`,
         ].join('\n\n'),
-        can_appeal: true,
-        appeal_deadline: null,
-        escrow_address: effectiveEscrow,
-        kleros_dispute_id: klerosDisputeId,
-        tx_hash: txHash,
-        tx_hash_evidence: evidenceTxHash,
-        evidence_cid: primaryCid,
-        escrow_state: KlerosEscState.AWAITING_RULING,
-        // B-9: start at IN_REVIEW so the `DisputesListPage` "In review"
-        // filter surfaces this dispute immediately (instead of leaving it
-        // stuck at 'open' until someone visits the detail page).
-        status: DisputeStatus.IN_REVIEW,
-        evidence_group_id: 0,
-        appeal_count: 0,
-        raiser: filerRole ?? undefined,
-        fee_paid_wei: arbitrationCostWei.toString(),
-        dispute_timestamp: BigInt(Math.floor(Date.now() / 1000)).toString(),
+      }).catch((err) => {
+        console.warn('[DisputePage.tsx] updateDisputeOnChain:', err)
       })
 
-      // 6a) Persist each uploaded file as a dispute_evidence row. Best-effort —
-      //     the dispute row + on-chain submitEvidence() are the source of truth;
-      //     these rows back the gallery on the detail page. B-4: pass the
-      //     filer role explicitly (sellers raising a dispute are not 'buyer').
-      //     Each row carries the per-file keccak + on-chain tx hash so the
-      //     detail-page "legacy evidence" list can deep-link to Etherscan.
-      const primaryKeccak = await cidToBytes32(uploads[0].cid)
+      // 5a) Persist each uploaded file as a dispute_evidence row. The
+      //     per-file keccakBytes32 here is `keccak256(fileBytes)` (the
+      //     file_hash, computed in uploadDisputeEvidenceFile) — NOT the
+      //     on-chain URI hash. They\'re intentionally distinct: the
+      //     on-chain value is in disputes.tx_hash_evidence + the
+      //     contract\'s Evidence event, this column is the
+      //     off-chain integrity check.
       const evidenceFiles: DisputeEvidenceFile[] = uploads.map((u, idx) => ({
         cid: u.cid,
         url: u.url,
         name: u.name,
         size: u.size,
-        // Only the first file was sent on-chain; remaining rows are
-        // Supabase-only and carry keccakBytes32=null so future indexer
-        // doesn't claim they're on-chain.
-        keccakBytes32: idx === 0 ? primaryKeccak : null,
+        keccakBytes32: u.keccakBytes32,
+        // txHash is the on-chain submitEvidence call, which only the
+        // primary file was sent through. Extras carry null so a
+        // future indexer doesn\'t claim they\'re on-chain.
         txHash: idx === 0 ? evidenceTxHash : null,
         evidenceGroupId: 0,
       }))
@@ -503,22 +535,15 @@ const effectiveEscrow =
         console.warn('[DisputePage] insertDisputeEvidence failed:', insertErr)
       })
 
-      // B-9 (belt-and-braces) — also bump via updateDisputeOnChain in case
-      // an older DB doesn't support the status-on-create path.
-      await updateDisputeOnChain(dispute.id, {
-        status: DisputeStatus.IN_REVIEW,
-        evidenceGroupId: 0,
-        appealCount: 0,
-      }).catch((err) => { console.warn('[DisputePage.tsx]', err); return undefined })
-
-      // 6b) Mirror the trade into `disputed` so the trades list stops showing
-      //     it as a funding/active trade. Non-fatal — the dispute row is the
-      //     source of truth for listing.
+      // 5b) Mirror the trade into `disputed` so the trades list stops
+      //     showing it as a funding/active trade. Non-fatal — the
+      //     dispute row is the source of truth for listing.
       await updateTradeStatus(linkedTrade.id, 'disputed', {
         escrowStatus: 'disputed',
         txHash,
         escrowEventType: TradeEventType.ESCROW_DISPUTED,
-      }).catch((err) => { console.warn('[DisputePage.tsx]', err); /* non-fatal — the dispute row already landed */
+      }).catch((err) => {
+        console.warn('[DisputePage.tsx]', err)
       })
 
       toast.success(t('disputePage.successFiled'))
