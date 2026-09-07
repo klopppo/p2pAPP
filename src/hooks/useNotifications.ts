@@ -22,26 +22,27 @@ import { uniqueRealtimeTopic } from '@/lib/realtimeTopic'
 export function useNotifications() {
   const { data: user } = useCurrentUser()
   const qc = useQueryClient()
+  const userId = user?.id
 
   const query = useQuery({
-    queryKey: ['notifications', user?.id],
+    queryKey: ['notifications', userId],
     queryFn: () => listNotifications(user!.id),
-    enabled: !!user,
+    enabled: !!userId,
   })
 
   useEffect(() => {
-    if (!user) return
+    if (!userId) return
     const channel = supabase
-      .channel(uniqueRealtimeTopic(`notifications:user:${user.id}`))
+      .channel(uniqueRealtimeTopic(`notifications:user:${userId}`))
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
+          filter: `user_id=eq.${userId}`,
         },
-        () => qc.invalidateQueries({ queryKey: ['notifications', user.id] })
+        () => qc.invalidateQueries({ queryKey: ['notifications', userId] })
       )
       .on(
         'postgres_changes',
@@ -49,15 +50,15 @@ export function useNotifications() {
           event: 'UPDATE',
           schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
+          filter: `user_id=eq.${userId}`,
         },
-        () => qc.invalidateQueries({ queryKey: ['notifications', user.id] })
+        () => qc.invalidateQueries({ queryKey: ['notifications', userId] })
       )
       .subscribe()
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user?.id, qc])
+  }, [userId, qc])
 
   return query
 }
@@ -69,33 +70,34 @@ export function useNotifications() {
 export function useUnreadCount() {
   const { data: user } = useCurrentUser()
   const qc = useQueryClient()
+  const userId = user?.id
 
   const query = useQuery({
-    queryKey: ['notifications:unread', user?.id],
+    queryKey: ['notifications:unread', userId],
     queryFn: () => getUnreadNotificationCount(user!.id),
-    enabled: !!user,
+    enabled: !!userId,
     refetchInterval: 60_000,
   })
 
   useEffect(() => {
-    if (!user) return
+    if (!userId) return
     const channel = supabase
-      .channel(uniqueRealtimeTopic(`notifications-unread:${user.id}`))
+      .channel(uniqueRealtimeTopic(`notifications-unread:${userId}`))
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
+          filter: `user_id=eq.${userId}`,
         },
-        () => qc.invalidateQueries({ queryKey: ['notifications:unread', user.id] })
+        () => qc.invalidateQueries({ queryKey: ['notifications:unread', userId] })
       )
       .subscribe()
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user?.id, qc])
+  }, [userId, qc])
 
   return query
 }

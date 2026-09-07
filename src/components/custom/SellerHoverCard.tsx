@@ -42,7 +42,7 @@ export function SellerHoverCard({ seller, children }: SellerHoverCardProps) {
   }
 
   const onOpen = (addr: string) => {
-    window.open(`${explorerBase.token}${addr}`, '_blank', 'noopener')
+    window.open(`${explorerBase.address}${addr}`, '_blank', 'noopener')
   }
 
   return (

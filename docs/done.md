@@ -9,6 +9,20 @@
 
 ---
 
+## Codebase-wide bug audit & lint/build hardening — 2026-09-07
+
+Resolved route mismatches, explorer base URL misconfigurations, form validation/i18n omissions, React hook dependency issues, and ESLint rule configurations. Full test suite, lint, and production build pass with 0 errors.
+
+- **Route alignment**: Fixed `ChatHeader` linking to `/app/trade/:trade_id` instead of `/app/trades/:id` (trade details); updated `NotificationsBell` and `email.ts` to route trade notifications to `/app/trades/${trade_id}` and dispute notifications to `/app/disputes/${dispute_id}`.
+- **Explorer links**: Fixed `AddressWithActions`, `ProfilePage`, `SellerHoverCard`, and `OpenOfferPage` using `explorerBase.token` for wallet addresses instead of `explorerBase.address`.
+- **CreateOfferPage**: Added missing `fiatCurrency` selector with full currency options (`CURRENCY_SYMBOLS`), bound `currSymbol` dynamically, updated i18n locales, and fixed currency placeholder in hint text.
+- **OffersPage**: Added missing token filters (`USDT`, `DAI`, `WBTC`) to align with creation capabilities and centralized currency formatting via `@/lib/utils`.
+- **Hook dependencies**: Corrected missing/stale closures and dependencies in `NotificationDispatcherHost`, `ChatLayout`, `useConversations`, `useNotifications`, and `TradeDetailPage`.
+- **Profile hydration**: Added wallet-address-change awareness in `EditProfilePage` to re-hydrate form state when switching accounts.
+- **Build & Lint**: Resolved all TypeScript build errors (TS6133) and fast-refresh ESLint warnings.
+
+---
+
 ## Web3/messaging audit fixes: races, N+1, cursor + id hardening — 2026-09-04
 
 Batch of fixes from the cross-audit, shipped together (typecheck + lint clean).

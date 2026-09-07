@@ -89,7 +89,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   const markRead = useMarkRead(isOurTeam ? null : activeId)
   const identity = useMemo(
     () => (user ? { userId: user.id, nickname: user.nickname } : null),
-    [user?.id, user?.nickname],
+    [user],
   )
   const typing = useTypingIndicator(isOurTeam ? null : activeId, identity)
   const online = useConversationPresence(isOurTeam ? null : activeId, identity)

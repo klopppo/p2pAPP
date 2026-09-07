@@ -26,9 +26,7 @@ import {
 } from '@/lib/contracts'
 import { parseUnits } from 'viem'
 import { errorMessage } from '@/lib/errorMessage'
-
-const CURRENCY_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
-const currencySymbol = (code: string) => CURRENCY_SYMBOLS[code] ?? ''
+import { currencySymbol } from '@/lib/utils'
 
 const REGION_NAMES: Record<string, string> = {
   IT: 'Italy', DE: 'Germany', FR: 'France', ES: 'Spain',

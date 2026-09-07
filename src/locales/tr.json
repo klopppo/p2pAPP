@@ -229,6 +229,7 @@
     "buy": "Al",
     "sell": "Sat",
     "tokenCurrency": "Jeton/Para Birimi",
+    "fiatCurrency": "İtibari Para",
     "pricePerUnit": "Birim Fiyatı",
     "minimumAmount": "Minimum Tutar",
     "maximumAmount": "Maksimum Tutar",

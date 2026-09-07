@@ -18,22 +18,21 @@ import {
 import { Label } from '@/components/ui/label'
 import { Check, ChevronDown, Loader2 } from 'lucide-react'
 import { createOffer, ensureUser } from '@/lib/supabase'
+import { currencySymbol, CURRENCY_SYMBOLS } from '@/lib/utils'
 
 // Standard unit-of-measure decimals per asset. offers.crypto_amount /
 // min/max_amount are NUMERIC(30,18) but stored in the asset's natural human
 // units (e.g. 0.5 ETH), so derived crypto quantities are rounded to the
 // token's standard precision before persisting / previewing.
 const TOKEN_DECIMALS: Record<string, number> = {
-  BTC: 8,
-  ETH: 18,
-  USDC: 6,
   USDT: 6,
+  USDC: 6,
   DAI: 18,
-  EUR: 2,
-  USD: 2,
-  GBP: 2,
+  ETH: 18,
+  WBTC: 8,
+  BTC: 8,
 }
-const tokenDecimals = (token: string) => TOKEN_DECIMALS[token] ?? 8
+const tokenDecimals = (token: string) => TOKEN_DECIMALS[token] ?? 18
 const roundTo = (value: number, decimals: number) => Number(value.toFixed(decimals))
 const roundFiat = (value: number) => roundTo(value, 2)
 const formatTokenAmount = (value: number, token: string) =>
@@ -44,6 +43,7 @@ const formatTokenAmount = (value: number, token: string) =>
 interface OfferForm {
   type: 'buy' | 'sell'
   token: string
+  fiatCurrency: string
   price: number
   minAmount: number
   maxAmount: number
@@ -61,12 +61,13 @@ export function CreateOfferPage() {
   const { address, isConnected } = useAccount()
   const [formData, setFormData] = useState<OfferForm>({
     type: 'buy',
-    token: 'BTC',
-    price: 52340,
-    minAmount: 5000,
-    maxAmount: 50000,
-    paymentMethod: 'SEPA Instant',
-    location: 'Italy',
+    token: 'USDT',
+    fiatCurrency: 'USD',
+    price: 1,
+    minAmount: 100,
+    maxAmount: 5000,
+    paymentMethod: 'Bank Transfer',
+    location: 'Global',
     gracePeriod: 24,
     description: '',
     isPrivate: false,
@@ -78,9 +79,6 @@ export function CreateOfferPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
-    // This app is wallet-based (no Supabase Auth session for wallet users),
-    // so we resolve the seller from the connected wallet: upsert (idempotent
-    // sync, also covers the connect-time sync) returns the user row with id.
     if (!isConnected || !address) {
       toast.error(t('createOffer.errorConnectWallet'))
       return
@@ -120,21 +118,11 @@ export function CreateOfferPage() {
     try {
       const me = await ensureUser(address)
       if (!me) {
-        // No SIWE session for this wallet yet — write flow can't proceed.
         toast.error(t('createOffer.errorConnectWallet'))
         setIsSubmitting(false)
         return
       }
 
-      // Prepare offer data
-      // NOTE: available_regions is CHAR(2)[] (ISO country codes), so map the
-      // human-readable location. grace_period_hours has no DB column, so it is
-      // intentionally not sent (the form field stays for future use).
-      //
-      // Units: min/max are entered in fiat (EUR). The crypto quantity is
-      // derived from the price per unit — same inverse relationship the trade
-      // flow uses (crypto_amount = fiat_amount / price_per_unit) — and rounded
-      // to the asset's standard decimals.
       const cryptoAmount = roundTo(
         formData.maxAmount / formData.price,
         tokenDecimals(formData.token),
@@ -144,7 +132,7 @@ export function CreateOfferPage() {
         type: formData.type,
         crypto_token: formData.token,
         crypto_amount: cryptoAmount,
-        fiat_currency: 'EUR',
+        fiat_currency: formData.fiatCurrency,
         fiat_amount: roundFiat(formData.maxAmount),
         price_per_unit: formData.price,
         min_amount: roundFiat(formData.minAmount),
@@ -156,12 +144,14 @@ export function CreateOfferPage() {
         payment_methods: [formData.paymentMethod],
         description: formData.description.trim() || null,
         available_regions:
-          formData.location === 'Global' ? [] : [REGION_CODES[formData.location] ?? formData.location.slice(0, 2).toUpperCase()],
+          formData.location === 'Global'
+            ? []
+            : [REGION_CODES[formData.location] ?? formData.location.slice(0, 2).toUpperCase()],
         platform_fee_bps: 50, // 0.5%
         network_fee: 0,
         tags: [formData.location],
         featured: false,
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // Expires in 7 days
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       }
 
       // Create offer in database
@@ -178,24 +168,76 @@ export function CreateOfferPage() {
     }
   }
 
-  const tokens = ['BTC', 'ETH', 'USDC', 'USDT', 'DAI', 'EUR', 'USD', 'GBP']
+  const tokens = ['USDT', 'USDC', 'DAI', 'ETH', 'WBTC', 'BTC']
+  const fiatCurrencies = Object.keys(CURRENCY_SYMBOLS)
   const paymentMethods = [
-    'SEPA Instant',
     'Bank Transfer',
-    'PayPal',
-    'PayPal Friends & Family',
-    'Wise Transfer',
+    'SEPA Instant',
+    'Pix',
+    'Revolut',
     'Wise',
-    'Cash'
+    'Zelle',
+    'Venmo',
+    'CashApp',
+    'PayPal',
+    'UPI / IMPS',
+    'Alipay',
+    'WeChat Pay',
+    'M-Pesa',
+    'Papara',
+    'Mercado Pago',
+    'Interac e-Transfer',
+    'Cash in Person',
   ]
-  const locations = ['Italy', 'Germany', 'France', 'Spain', 'Global']
-  // offers.available_regions is CHAR(2)[] (ISO 3166-1 alpha-2 country codes).
+  const locations = [
+    'Global',
+    'United States',
+    'European Union',
+    'United Kingdom',
+    'Brazil',
+    'Turkey',
+    'Argentina',
+    'India',
+    'Nigeria',
+    'Canada',
+    'Australia',
+    'Mexico',
+    'Colombia',
+    'Switzerland',
+    'Japan',
+    'Philippines',
+    'Vietnam',
+    'United Arab Emirates',
+    'Italy',
+    'Germany',
+    'France',
+    'Spain',
+  ]
   const REGION_CODES: Record<string, string> = {
-    Italy: 'IT',
-    Germany: 'DE',
-    France: 'FR',
-    Spain: 'ES',
+    'United States': 'US',
+    'European Union': 'EU',
+    'United Kingdom': 'GB',
+    'Brazil': 'BR',
+    'Turkey': 'TR',
+    'Argentina': 'AR',
+    'India': 'IN',
+    'Nigeria': 'NG',
+    'Canada': 'CA',
+    'Australia': 'AU',
+    'Mexico': 'MX',
+    'Colombia': 'CO',
+    'Switzerland': 'CH',
+    'Japan': 'JP',
+    'Philippines': 'PH',
+    'Vietnam': 'VN',
+    'United Arab Emirates': 'AE',
+    'Italy': 'IT',
+    'Germany': 'DE',
+    'France': 'FR',
+    'Spain': 'ES',
   }
+
+  const currSymbol = currencySymbol(formData.fiatCurrency)
 
   return (
       <div className="w-full max-w-xl mx-auto">
@@ -239,8 +281,8 @@ export function CreateOfferPage() {
                     </div>
                   </div>
 
-                  {/* Token and Price */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Token, Fiat Currency and Price */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <Label htmlFor="token" className="text-base font-semibold mb-2 block">
                         {t('createOffer.tokenCurrency')}
@@ -272,8 +314,38 @@ export function CreateOfferPage() {
                       </DropdownMenu>
                     </div>
                     <div>
+                      <Label htmlFor="fiatCurrency" className="text-base font-semibold mb-2 block">
+                        {t('createOffer.fiatCurrency')}
+                      </Label>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full justify-between rounded-full border border-border"
+                          >
+                            {formData.fiatCurrency} ({currSymbol.trim() || formData.fiatCurrency})
+                            <ChevronDown className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="max-h-60 overflow-y-auto">
+                          <DropdownMenuGroup>
+                            {fiatCurrencies.map((fiat) => (
+                              <DropdownMenuItem
+                                key={fiat}
+                                onSelect={() => setFormData({ ...formData, fiatCurrency: fiat })}
+                              >
+                                {fiat} ({currencySymbol(fiat).trim() || fiat})
+                                {formData.fiatCurrency === fiat && <Check className="w-4 h-4 ml-auto" />}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <div>
                       <Label htmlFor="price" className="text-base font-semibold mb-2 block">
-                        {t('createOffer.pricePerUnit')}
+                        {t('createOffer.pricePerUnit')} ({currSymbol.trim() || formData.fiatCurrency})
                       </Label>
                       <Input
                         id="price"
@@ -289,7 +361,7 @@ export function CreateOfferPage() {
                   {/* Amount Range */}
                   <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">
-                      {t('createOffer.amountInFiat', { currency: 'EUR' })}
+                      {t('createOffer.amountInFiat', { currency: formData.fiatCurrency })}
                     </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>

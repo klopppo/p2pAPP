@@ -229,6 +229,7 @@
     "buy": "买入",
     "sell": "卖出",
     "tokenCurrency": "代币/货币",
+    "fiatCurrency": "法定货币",
     "pricePerUnit": "单价",
     "minimumAmount": "最低金额",
     "maximumAmount": "最高金额",

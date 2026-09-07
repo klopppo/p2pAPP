@@ -34,6 +34,20 @@ export default defineConfig([
       // inside a lazy useState initializer so the same Set reference appears
       // in render output. The check is overly strict for that exact pattern.
       'react-hooks/purity': 'off',
+      'react-refresh/only-export-components': [
+        'warn',
+        { allowConstantExport: true },
+      ],
+    },
+  },
+  {
+    files: [
+      'src/components/ui/**',
+      'src/components/infinite-list.tsx',
+      'src/components/marquee.tsx',
+    ],
+    rules: {
+      'react-refresh/only-export-components': 'off',
     },
   },
 ])

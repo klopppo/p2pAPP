@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { currencySymbol } from '@/lib/utils'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -84,8 +85,6 @@ function getTxLabel(t: (key: string) => string, stage: TxStage): string {
   }
   return labels[stage]
 }
-
-const CURRENCY_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
 
 function formatTokenAmount(raw: bigint, decimals: number, symbol: string) {
   const human = formatUnits(raw, decimals)
@@ -573,7 +572,7 @@ export function TradeDetailPage() {
         }
       }
     },
-    [escrowAddress, tradeId, refetchEscrow],
+    [tradeId, refetchEscrow],
   )
   useEscrowEventWatcher(escrowAddress, handleEscrowEvent)
 
@@ -673,7 +672,7 @@ export function TradeDetailPage() {
       </Text>
       <Text variant="muted">
         {trade.crypto_amount} {trade.crypto_token} ·{' '}
-        {CURRENCY_SYMBOLS[trade.fiat_currency ?? ''] ?? ''}
+        {currencySymbol(trade.fiat_currency)}
         {trade.fiat_amount} {trade.fiat_currency}
       </Text>
 

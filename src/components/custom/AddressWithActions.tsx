@@ -4,6 +4,7 @@ import { Text } from '@/components/ui/text'
 import { Copy, ExternalLink, MessageCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { explorerBase as defaultExplorerBase } from '@/lib/explorer'
+import { shortAddress } from '@/lib/utils'
 
 type Props = {
   address: string
@@ -23,8 +24,6 @@ type Props = {
   messageDisabled?: boolean
 }
 
-export const formatAddress = (addr: string) => (addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : '')
-
 /**
  * Compact address pill with inline action buttons (Copy, Open in Explorer,
  * optional Message). Wraps text + icons in a single bordered pill so the
@@ -35,7 +34,7 @@ export const formatAddress = (addr: string) => (addr ? `${addr.slice(0, 6)}...${
 export function AddressWithActions({
   address,
   className = '',
-  explorerBase = defaultExplorerBase.token,
+  explorerBase = defaultExplorerBase.address,
   copyToastMessage,
   showText = true,
   textClassName = 'font-mono text-xs text-muted-foreground',
@@ -68,7 +67,7 @@ export function AddressWithActions({
     >
       {showText && (
         <Text variant="small" className={textClassName}>
-          {formatAddress(address)}
+          {shortAddress(address)}
         </Text>
       )}
       {showText && (

@@ -28,22 +28,24 @@ export function useConversations() {
     refetchInterval: 15_000,
   })
 
+  const userId = user?.id
+
   useEffect(() => {
-    if (!user) return
+    if (!userId) return
 
     const channel = supabase
-      .channel(uniqueRealtimeTopic(`conversations:user:${user.id}`))
+      .channel(uniqueRealtimeTopic(`conversations:user:${userId}`))
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'conversations' },
-        () => qc.invalidateQueries({ queryKey: ['conversations', user.id] })
+        () => qc.invalidateQueries({ queryKey: ['conversations', userId] })
       )
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user?.id, qc])
+  }, [userId, qc])
 
   return query
 }
@@ -158,7 +160,6 @@ export function useLocallyReadConversations() {
 // during render, including the canonical pattern below. We use
 // useSyncExternalStore to expose a ref-held Set to consumers without
 // re-rendering the whole list on every mark() call.
-// eslint-disable-next-line react-hooks/purity -- see comment above
 // Subscribe to a ref's current value, returning a plain render-time
 // snapshot. `useSyncExternalStore` is the canonical React 18+ API for
 // reading mutable state during render without tripping the

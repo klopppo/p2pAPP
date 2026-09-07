@@ -38,21 +38,23 @@ export function NotificationDispatcherHost() {
     prefsRef.current = prefs.data
   }, [prefs.data])
 
+  const userId = user?.id
+
   useEffect(() => {
     // Wait for prefs before subscribing — otherwise we'd dispatch to the
     // hard-coded fallback (`{inapp:true,email:false}`) and the user might
     // have inapp disabled.
-    if (!user || prefs.isLoading) return
+    if (!userId || prefs.isLoading) return
 
     const channel = supabase
-      .channel(`notif-dispatcher:${user.id}`)
+      .channel(`notif-dispatcher:${userId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
+          filter: `user_id=eq.${userId}`,
         },
         async (payload) => {
           const n = payload.new as Notification
@@ -82,8 +84,8 @@ export function NotificationDispatcherHost() {
             contacts,
           })
 
-          qc.invalidateQueries({ queryKey: ['notifications', user.id] })
-          qc.invalidateQueries({ queryKey: ['notifications:unread', user.id] })
+          qc.invalidateQueries({ queryKey: ['notifications', userId] })
+          qc.invalidateQueries({ queryKey: ['notifications:unread', userId] })
         }
       )
       .subscribe()
@@ -91,7 +93,7 @@ export function NotificationDispatcherHost() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user?.id, prefs.isLoading, qc])
+  }, [userId, prefs.isLoading, qc])
 
   return null
 }

@@ -17,10 +17,7 @@ import { useOffer } from '@/hooks/useOffers'
 import { useConversations } from '@/hooks/useConversations'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { getOrCreateDirectConversation } from '@/lib/supabase'
-
-
-const CURRENCY_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
-const currencySymbol = (code: string) => CURRENCY_SYMBOLS[code] ?? ''
+import { currencySymbol } from '@/lib/utils'
 
 const REGION_NAMES: Record<string, string> = {
   IT: 'Italy', DE: 'Germany', FR: 'France', ES: 'Spain',
@@ -140,7 +137,7 @@ export function OpenOfferPage() {
                         <Link to={`/app/profile/${sellerAddr}`}>
                           <Text variant="h4" className="truncate hover:underline">{middleTruncate(sellerAddr)}</Text>
                         </Link>
-                        <AddressWithActions address={sellerAddr} explorerBase={explorerBase.token} showText={false} />
+                        <AddressWithActions address={sellerAddr} explorerBase={explorerBase.address} showText={false} />
                       </div>
                     ) : (
                       <Link to={`/app/profile/${sellerAddr}`}>
@@ -164,7 +161,7 @@ export function OpenOfferPage() {
                     {sellerAddr && (
                       <AddressWithActions
                         address={sellerAddr}
-                        explorerBase={explorerBase.token}
+                        explorerBase={explorerBase.address}
                         {...(canMessage
                           ? {
                               onMessage: startChat,

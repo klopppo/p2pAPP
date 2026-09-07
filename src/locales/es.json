@@ -229,6 +229,7 @@
     "buy": "Compra",
     "sell": "Venta",
     "tokenCurrency": "Token/Moneda",
+    "fiatCurrency": "Moneda fiduciaria",
     "pricePerUnit": "Precio por unidad",
     "minimumAmount": "Cantidad mínima",
     "maximumAmount": "Cantidad máxima",

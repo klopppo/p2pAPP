@@ -408,8 +408,6 @@ export function DisputeDetailPage() {
       30_000,
     )
     return () => window.clearInterval(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- we read only
-    // these two scalars; the closure-captured `escrowState` object is fine.
   }, [escrowState?.disputeTimestamp, escrowState?.state])
 
   if (isLoading) {

@@ -229,6 +229,7 @@
     "buy": "Buy",
     "sell": "Sell",
     "tokenCurrency": "Token/Currency",
+    "fiatCurrency": "Fiat Currency",
     "pricePerUnit": "Price Per Unit",
     "minimumAmount": "Minimum Amount",
     "maximumAmount": "Maximum Amount",

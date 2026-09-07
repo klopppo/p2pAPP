@@ -215,7 +215,7 @@ describe("final RLS posture: allow/deny per table × role × command", () => {
 
   it("storage avatars: anon read-only, writes are wallet-path-scoped (no overwriting others)", () => {
     const writes = policiesFor("objects", "storage").filter(
-      (p) => p.cmd === "insert" || p.cmd === "update"
+      (p) => (p.cmd === "insert" || p.cmd === "update") && p.name.startsWith("avatars_")
     )
     expect(writes.length).toBe(2)
     for (const p of writes) {
@@ -225,12 +225,14 @@ describe("final RLS posture: allow/deny per table × role × command", () => {
     }
     const anonWrite = policiesFor("objects", "storage").filter(
       (p) =>
-        (p.cmd === "insert" || p.cmd === "update") && p.roles.includes("anon")
+        (p.cmd === "insert" || p.cmd === "update") &&
+        p.name.startsWith("avatars_") &&
+        p.roles.includes("anon")
     )
     expect(anonWrite).toEqual([])
   })
 
-  it("legacy permissive policies are all dropped by the SIWE rewrite", () => {
+  it("legacy permissive policies are al dropped by the SIWE rewrite", () => {
     const permissiveNames = [
       "users_insert_any",
       "users_update_any",

@@ -42,8 +42,11 @@ export function NotificationsBell() {
     setOpen(false)
     if (!n.read_at) await markOne.mutateAsync(n.id)
     if (n.conversation_id) navigate(`/app/messages/${n.conversation_id}`)
-    else if (n.trade_id) navigate(`/app/trade/${n.trade_id}`)
-    else if (n.kind === 'dispute_update') navigate('/app/disputes')
+    else if (n.trade_id) navigate(`/app/trades/${n.trade_id}`)
+    else if (n.kind === 'dispute_update') {
+      if (n.payload?.dispute_id) navigate(`/app/disputes/${n.payload.dispute_id}`)
+      else navigate('/app/disputes')
+    }
     else if (n.payload?.offer_id)
       navigate(`/app/offer/${String(n.payload.offer_id)}`)
   }

@@ -45,6 +45,6 @@ export async function sendEmail(notification: Notification, to: string | null) {
 function appUrl(n: Notification): string {
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
   if (n.conversation_id) return `${origin}/app/messages/${n.conversation_id}`
-  if (n.trade_id) return `${origin}/app/trade/${n.trade_id}`
+  if (n.trade_id) return `${origin}/app/trades/${n.trade_id}`
   return `${origin}/app/messages`
 }

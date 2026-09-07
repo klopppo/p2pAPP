@@ -62,7 +62,7 @@ export function ChatHeader({ conversation, currentUserId, online, onBack }: Prop
 
       {conversation.trade && (
         <Link
-          to={`/app/trade/${conversation.trade.trade_id}`}
+          to={`/app/trades/${conversation.trade.id}`}
           className="hidden sm:inline-flex"
         >
           <TradeSummaryPill trade={conversation.trade} />

@@ -29,6 +29,7 @@ import { useTranslation } from 'react-i18next'
 import { ReviewList } from '@/components/custom/ReviewList'
 import { RatingBreakdown } from '@/components/custom/RatingBreakdown'
 import { useUserReviews, useUserReputation } from '@/hooks/useReviews'
+import { currencySymbol } from '@/lib/utils'
 
 // Local UI shape for the offers table. Mirrors what OffersTableWrapper expects;
 // kept here because the data comes from useOffersBySeller (which returns the DB
@@ -61,9 +62,6 @@ interface Offer {
 
 type SortKey = 'price' | 'minAmount' | 'maxAmount'
 type SortDir = 'asc' | 'desc'
-
-const CURRENCY_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
-const currencySymbol = (code: string) => CURRENCY_SYMBOLS[code] ?? `${code} `
 
 function formatNumber(n: number | string | null | undefined): string {
   const num = Number(n) || 0
@@ -108,7 +106,7 @@ export function ProfilePage() {
 
   // Target = URL param if present, else connected wallet
   const targetAddress = urlWalletAddress ?? connectedAddress
-  const isOwnProfile = !urlWalletAddress || (targetAddress === connectedAddress)
+  const isOwnProfile = !urlWalletAddress || (targetAddress?.toLowerCase() === connectedAddress?.toLowerCase())
 
   const { data: profile, isLoading: profileLoading, isError: profileError } = useUserProfile(targetAddress)
   const { data: user } = useCurrentUser()
@@ -310,7 +308,7 @@ export function ProfilePage() {
           <div className="mt-1">
             <AddressWithActions
               address={walletAddr}
-              explorerBase={explorerBase.token}
+              explorerBase={explorerBase.address}
               textClassName="font-mono text-xs text-muted-foreground"
               {...(canMessage
                 ? {

@@ -50,14 +50,14 @@ export function EditProfilePage() {
   const [form, setForm] = useState<ProfileForm>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
-  const hydrated = useRef(false)
+  const hydratedAddressRef = useRef<string | null>(null)
   const wasOnboarding = useRef(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!profile || hydrated.current) return
-    hydrated.current = true
+    if (!profile || !address || hydratedAddressRef.current === address.toLowerCase()) return
+    hydratedAddressRef.current = address.toLowerCase()
     if (!profile.nickname) wasOnboarding.current = true
     setForm({
       nickname: profile.nickname ?? '',
@@ -69,7 +69,7 @@ export function EditProfilePage() {
       telegramHandle: profile.telegram_handle ?? '',
       githubHandle: profile.github_handle ?? '',
     })
-  }, [profile])
+  }, [profile, address])
 
   useEffect(() => {
     return () => {

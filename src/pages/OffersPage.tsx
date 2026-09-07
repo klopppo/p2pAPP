@@ -20,6 +20,7 @@ import { SellerHoverCard, type SellerPreview } from '@/components/custom/SellerH
 import { FullDropdown } from '@/components/custom/FullDropdown'
 import { MaskedList, useInfiniteList } from '@/components/infinite-list'
 import { ArrowUpDown, Loader2 } from 'lucide-react'
+import { currencySymbol } from '@/lib/utils'
 
 interface Offer {
   id: string
@@ -41,9 +42,6 @@ interface Offer {
 
 type SortKey = 'price' | 'minAmount' | 'maxAmount'
 type SortDir = 'asc' | 'desc'
-
-const CURRENCY_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
-const currencySymbol = (code: string) => CURRENCY_SYMBOLS[code] ?? `${code} `
 
 // Shape returned by getActiveOffers() (select * + joined seller). NUMERIC
 // columns arrive as strings from PostgREST, so they are coerced with Number().
@@ -218,9 +216,12 @@ export function OffersPage() {
                   onSelect={setTokenFilter}
                   options={[
                     { label: t('offers.filterAll'), value: 'all' },
-                    { label: 'ETH', value: 'ETH' },
-                    { label: 'BTC', value: 'BTC' },
+                    { label: 'USDT', value: 'USDT' },
                     { label: 'USDC', value: 'USDC' },
+                    { label: 'DAI', value: 'DAI' },
+                    { label: 'ETH', value: 'ETH' },
+                    { label: 'WBTC', value: 'WBTC' },
+                    { label: 'BTC', value: 'BTC' },
                   ]}
                 />
                 <FullDropdown
