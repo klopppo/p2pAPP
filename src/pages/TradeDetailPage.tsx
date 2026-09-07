@@ -456,7 +456,6 @@ export function TradeDetailPage() {
   // Reuse the single `nowSecsBig` from the funding-timelock effect above
   // (hoisting a second interval here would tick the same wall clock twice
   // per second for the same component).
-  const nowSecsBig2 = nowSecsBig
 
   const { showCancel } = useMemo(() => {
     const buyerOk =
@@ -465,20 +464,20 @@ export function TradeDetailPage() {
       (escrowState?.buyerSecurityDeposited ?? false) &&
       !(escrowState?.fundsLocked ?? false) &&
       (escrowState?.buyerDepositTime ?? 0n) > 0n &&
-      nowSecsBig2 >= (escrowState?.buyerDepositTime ?? 0n) + CANCEL_TIMELOCK_SECONDS
+      nowSecsBig >= (escrowState?.buyerDepositTime ?? 0n) + CANCEL_TIMELOCK_SECONDS
     const sellerOk =
       !!isSeller &&
       liveState === KlerosEscState.AWAITING_FUNDING &&
       (escrowState?.sellerSecurityDeposited ?? false) &&
       !(escrowState?.buyerSecurityDeposited ?? false) &&
       (escrowState?.sellerDepositTime ?? 0n) > 0n &&
-      nowSecsBig2 >= (escrowState?.sellerDepositTime ?? 0n) + CANCEL_TIMELOCK_SECONDS
+      nowSecsBig >= (escrowState?.sellerDepositTime ?? 0n) + CANCEL_TIMELOCK_SECONDS
     return { showCancel: buyerOk || sellerOk }
   }, [
     isBuyer,
     isSeller,
     liveState,
-    nowSecsBig2,
+    nowSecsBig,
     escrowState?.buyerSecurityDeposited,
     escrowState?.fundsLocked,
     escrowState?.buyerDepositTime,
@@ -520,8 +519,13 @@ export function TradeDetailPage() {
   // shared watcher here so counterparty `cancelTrade` / `release` / `lockFunds`
   // / deposit events show up without a manual page refresh. Only relevant
   // financing-phase + dispute-lifecycle events are dispatched by name.
+  // Depend on the primitive `tradeId` (not the full `trade` object): react-query
+  // hands back a fresh reference on every refetch, which would otherwise tear
+  // down + resubscribe the watcher each poll and miss on-chain events in the gap.
+  const tradeId = trade?.id
   const handleEscrowEvent = useCallback(
     (name: string) => {
+      if (!tradeId) return
       if (
         name === 'Released' ||
         name === 'TradeCancelled' ||
@@ -536,16 +540,16 @@ export function TradeDetailPage() {
         // Mirror the financing-phase transition into Supabase so the trades
         // list + dispute page see the new state immediately.
         if (name === 'TradeFullyFunded') {
-          setTradeEscrowStatus(trade!.id, EscrowStatus.FUNDED, {
+          setTradeEscrowStatus(tradeId, EscrowStatus.FUNDED, {
             escrowEventType: TradeEventType.ESCROW_FUNDED,
           }).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); return undefined })
         } else if (name === 'Confirmed') {
-          setTradeEscrowStatus(trade!.id, EscrowStatus.CONFIRMED, {
+          setTradeEscrowStatus(tradeId, EscrowStatus.CONFIRMED, {
             escrowEventType: TradeEventType.ESCROW_CONFIRMED,
           }).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); return undefined })
         } else if (name === 'BuyerSecurityDeposited') {
           upsertTradeEscrowStatus(
-            trade!.id,
+            tradeId,
             EscrowStatus.BUYER_DEPOSITED,
           ).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); return undefined })
         } else if (
@@ -553,23 +557,23 @@ export function TradeDetailPage() {
           name === 'SellerFundsLocked'
         ) {
           upsertTradeEscrowStatus(
-            trade!.id,
+            tradeId,
             EscrowStatus.SELLER_DEPOSITED,
           ).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); return undefined })
         } else if (name === 'TradeCancelled') {
-          updateTradeStatus(trade!.id, 'cancelled', {
+          updateTradeStatus(tradeId, 'cancelled', {
             escrowStatus: EscrowStatus.CANCELLED,
             escrowEventType: TradeEventType.ESCROW_CANCELLED,
           }).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); return undefined })
         } else if (name === 'Released') {
-          updateTradeStatus(trade!.id, 'completed', {
+          updateTradeStatus(tradeId, 'completed', {
             escrowStatus: EscrowStatus.RELEASED,
             escrowEventType: TradeEventType.ESCROW_RELEASED,
           }).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); return undefined })
         }
       }
     },
-    [escrowAddress, trade, refetchEscrow],
+    [escrowAddress, tradeId, refetchEscrow],
   )
   useEscrowEventWatcher(escrowAddress, handleEscrowEvent)
 

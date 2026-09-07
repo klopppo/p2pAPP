@@ -49,8 +49,10 @@
 
 - [ ] **Storage path-owner policy** for `avatars` bucket (`${auth.uid()}/...`);
       `updateUserProfile` ownership check; `avatar_url` scheme allowlist.
-- [ ] **`crypto.randomUUID()`** for offer/trade/dispute ids (replaces
-      `Math.random()`).
+- [x] **`crypto.randomUUID()`** for offer/trade/dispute ids (replaces
+      `Math.random()`). _(2026-09-04 — shipped as `crypto.getRandomValues`
+      base36 suffix to preserve the `OFF-`/`TRD-`/`DSP-` varchar format;
+      see `done.md`)_
 - [ ] **Typing/presence payload trimming** — drop `nickname` from typing
       broadcasts; server-authorized channels after JWT.
 - [x] **Trigger hygiene (part 1)** — `set search_path` pinned on the three

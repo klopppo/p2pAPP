@@ -573,6 +573,21 @@ export async function getOffersBySeller(sellerId: string, status?: OfferStatus) 
 }
 
 /**
+ * Crypto-safe base36 suffix for client-minted unique ids.
+ *
+ * Math.random()-based suffixes are predictable enough to collide or be
+ * enumerated by other parties; the Web Crypto RNG is the right tool here.
+ * Returns ~13 chars of base36 entropy (≈ 6 bytes).
+ */
+function randomIdSuffix(): string {
+  const buf = new Uint8Array(6)
+  crypto.getRandomValues(buf)
+  let n = 0n
+  for (const b of buf) n = (n << 8n) | BigInt(b)
+  return n.toString(36).toUpperCase()
+}
+
+/**
  * Generate a client-side unique `offer_id`.
  *
  * offers.offer_id is VARCHAR(40) NOT NULL UNIQUE with no DB default, and the
@@ -580,7 +595,7 @@ export async function getOffersBySeller(sellerId: string, status?: OfferStatus) 
  * Format: OFF-<base36 timestamp><random> (~18 chars, well within 40).
  */
 export function generateOfferId(): string {
-  return `OFF-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`.toUpperCase()
+  return `OFF-${Date.now().toString(36)}${randomIdSuffix()}`.toUpperCase()
 }
 
 /**
@@ -643,7 +658,7 @@ export async function createOffer(offerData: Partial<Offer>) {
  * Format: TRD-<base36 timestamp><random> (~18 chars, well within 40).
  */
 export function generateTradeId(): string {
-  return `TRD-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`.toUpperCase()
+  return `TRD-${Date.now().toString(36)}${randomIdSuffix()}`.toUpperCase()
 }
 
 /**
@@ -653,7 +668,7 @@ export function generateTradeId(): string {
  * 40-char varchar).
  */
 export function generateDisputeId(): string {
-  return `DSP-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`.toUpperCase()
+  return `DSP-${Date.now().toString(36)}${randomIdSuffix()}`.toUpperCase()
 }
 
 /**
@@ -1135,7 +1150,10 @@ export async function updateDisputeOnChain(
     dbUpdate.on_chain_ruling = update.onChainRuling
   }
   if (update.status) dbUpdate.status = update.status
-  if (update.resolvedAt) dbUpdate.resolved_at = update.resolvedAt
+  // resolvedAt is explicitly nullable — callers pass null to clear it (e.g.
+  // when a reopened dispute has no resolution). `!== undefined` preserves that
+  // intent, while `if (update.resolvedAt)` would silently drop null resets.
+  if (update.resolvedAt !== undefined) dbUpdate.resolved_at = update.resolvedAt
   if (update.evidenceGroupId !== undefined) {
     dbUpdate.evidence_group_id = update.evidenceGroupId
   }
@@ -1614,7 +1632,27 @@ export async function listConversations(userId: string) {
     throw error
   }
 
-  // Flatten the nested shape into ConversationView[] and compute unread counts.
+  // Compute unread counts for the user's conversations in ONE round-trip via a
+  // DB function (see <timestamp>_unread_conversation_counts.sql). The prior
+  // implementation issued a `count` query per conversation — N+1 waterfall
+  // that grew linearly with open threads and showed up as slow chat loads.
+  const unreadMap = new Map<string, number>()
+  try {
+    const { data: counts } = await supabase.rpc(
+      'get_unread_conversation_counts',
+      { p_user_id: userId },
+    )
+    for (const c of (counts ?? []) as Array<{
+      conversation_id: string
+      unread_count: number
+    }>) {
+      unreadMap.set(c.conversation_id, c.unread_count)
+    }
+  } catch (err) {
+    console.warn('[listConversations] unread count RPC failed, defaulting to 0:', err)
+  }
+
+  // Flatten the nested shape into ConversationView[] and apply unread counts.
   const out: ConversationView[] = []
   for (const row of (rows ?? []) as unknown as Array<{
     conversation: ConversationView | null
@@ -1624,30 +1662,13 @@ export async function listConversations(userId: string) {
 
     const participants = (conv.participants ?? []) as ConversationWithParticipant[]
     const me = participants.find((p) => p.user_id === userId)
-    const lastReadId = me?.last_read_message_id ?? null
-
-    // Count messages strictly newer than the user's last_read_message_id
-    // (and not authored by the user). One cheap query per conversation.
-    let q = supabase
-      .from('messages')
-      .select('id', { count: 'exact', head: true })
-      .eq('conversation_id', conv.id)
-      .neq('sender_id', userId)
-    if (lastReadId) {
-      const cursor = await getMessageSortKey(lastReadId)
-      q = q.or(
-        `and(created_at.gt.${cursor.created_at},id.gt.${cursor.id}),created_at.gt.${cursor.created_at}`
-      )
-    }
-    const { count } = await q
-    const unread = count ?? 0
 
     out.push({
       ...conv,
       participants,
       trade: conv.trade ?? null,
-      unread_count: unread,
-      last_read_message_id: lastReadId,
+      unread_count: unreadMap.get(conv.id) ?? 0,
+      last_read_message_id: me?.last_read_message_id ?? null,
     })
   }
 
@@ -1678,12 +1699,39 @@ export async function getOrCreateDirectConversation(
 ): Promise<string | null> {
   if (currentUserId === otherUserId) return null
 
-  // Server-side race-safe create via SECURITY DEFINER RPC (see migration
-  // 20260824000006_rls_column_restrict.sql). The RPC grabs a transaction-
-  // scoped advisory lock keyed on the sorted participant pair before
-  // reading, so two tabs racing to open the same direct chat serialize on
-  // it and the second one re-checks + returns the first one's row instead
-  // of inserting a duplicate.
+  // Fast pre-check before the RPC for the common case (existing direct
+  // conversation between the two users): query the current user's
+  // participant rows first and intersect with the other user's. That
+  // avoids paying the RPC round-trip + advisory-lock cost for the 99%
+  // case where the conversation already exists. Falls back to the RPC if
+  // no shared row exists.
+  const { data: myParts, error: partsErr } = await supabase
+    .from('conversation_participants')
+    .select('conversation_id')
+    .eq('user_id', currentUserId)
+  if (partsErr) {
+    console.error('[getOrCreateDirectConversation] participant lookup failed:', partsErr)
+    return null
+  }
+  const myConvIds = (myParts ?? []).map(
+    (p: { conversation_id: string }) => p.conversation_id,
+  )
+  if (myConvIds.length > 0) {
+    const { data: shared, error: sharedErr } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id')
+      .eq('user_id', otherUserId)
+      .in('conversation_id', myConvIds)
+    if (sharedErr) {
+      console.error('[getOrCreateDirectConversation] shared lookup failed:', sharedErr)
+      return null
+    }
+    if (shared && shared.length > 0) {
+      return shared[0].conversation_id as string
+    }
+  }
+
+  // No existing conversation — fall back to the race-safe RPC.
   const { data, error } = await supabase.rpc('get_or_create_direct_conversation', {
     p_current_user_id: currentUserId,
     p_other_user_id: otherUserId,
@@ -1778,9 +1826,12 @@ export async function listMessages(
   if (options.before) {
     const cursor = await getMessageSortKey(options.before)
     // Composite cursor: strictly older than (created_at, id), i.e.
-    //   created_at < ts  OR  (created_at = ts AND id < boundary).
+    //   (created_at < ts)  OR  (created_at = ts AND id < boundary).
+    // The previous `and(a,b),a` shape collapsed to `a`, which dropped the
+    // `id` term entirely and let same-millisecond messages cross page
+    // boundaries un/lost. `eq` on the timestamp pins ties to the id.
     query = query.or(
-      `and(created_at.lt.${cursor.created_at},id.lt.${cursor.id}),created_at.lt.${cursor.created_at}`
+      `and(created_at.lt.${cursor.created_at}),and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`
     )
   }
 
@@ -2021,11 +2072,6 @@ export async function signInWithWallet(
   walletAddress: string,
   options: {
     signMessage: (args: { message: string }) => Promise<`0x${string}`>
-    verifyMessage?: (args: {
-      message: string
-      signature: `0x${string}`
-      address: `0x${string}`
-    }) => Promise<boolean>
     chainId?: number
     appName?: string
   },
@@ -2033,103 +2079,50 @@ export async function signInWithWallet(
   const { signMessage, chainId, appName } = options
   const addr = walletAddress.toLowerCase() as `0x${string}`
 
-  try {
-    // 1. One-shot nonce from the server.
-    const { data: nonceRes, error: nonceErr } = await supabase.functions.invoke(
-      'siwe-auth',
-      { body: { action: 'nonce', address: addr } },
-    )
-    if (nonceErr || !nonceRes?.nonce) throw nonceErr ?? new Error('no nonce')
-    const nonce = String(nonceRes.nonce)
-    if (!/^[a-zA-Z0-9_-]{8,64}$/.test(nonce)) throw new Error('bad nonce')
+  // 1. One-shot nonce from the server.
+  const { data: nonceRes, error: nonceErr } = await supabase.functions.invoke(
+    'siwe-auth',
+    { body: { action: 'nonce', address: addr } },
+  )
+  if (nonceErr || !nonceRes?.nonce) throw nonceErr ?? new Error('no nonce')
+  const nonce = String(nonceRes.nonce)
+  if (!/^[a-zA-Z0-9_-]{8,64}$/.test(nonce)) throw new Error('bad nonce')
 
-    // 2. Build + sign the challenge.
-    const { message, issuedAt } = buildSiweChallengeLocal(addr, {
-      nonce,
-      chainId,
-      appName,
-    })
-    const signature = await signMessage({ message })
-
-    // 3. Server verifies the signature and mints a real Supabase JWT.
-    const { data, error } = await supabase.functions.invoke('siwe-auth', {
-      body: { action: 'verify', message, signature },
-    })
-    if (error || !data?.access_token) {
-      throw error ?? new Error('siwe-auth did not return a token')
-    }
-
-    // Install the session. `refresh_token` is a placeholder: our JWT is the
-    // source of truth and re-signing (not refresh) is how a session renews,
-    // so this value is never used for anything meaningful.
-    const { error: sessionErr } = await supabase.auth.setSession({
-      access_token: data.access_token as string,
-      refresh_token: 'siwe-wallet-session',
-    })
-    if (sessionErr) throw sessionErr
-
-    setSiweMarker({ address: addr, issuedAt }) // never persist the signature
-
-    // The edge function upserted the row keyed by wallet; read it back.
-    return await ensureUser(addr)
-  } catch (err) {
-    // Dev-only fallback BEFORE the edge function / RLS migration are deployed:
-    // verify the signature in-browser and proceed without a JWT session.
-    if (isLocalDev() && isEdgeUnavailable(err)) {
-      return legacyClientSignIn(addr, options)
-    }
-    throw err
-  }
-}
-
-/**
- * Pre-edge-function dev fallback: client-side verify + marker only, no JWT.
- * Mirrors the old pre-SIWE behavior so local dev keeps working until the
- * migration is pushed.
- */
-async function legacyClientSignIn(
-  addr: `0x${string}`,
-  options: {
-    signMessage: (args: { message: string }) => Promise<`0x${string}`>
-    verifyMessage?: (args: {
-      message: string
-      signature: `0x${string}`
-      address: `0x${string}`
-    }) => Promise<boolean>
-    chainId?: number
-    appName?: string
-  },
-): Promise<User | null> {
-  const verifyMessageFn =
-    options.verifyMessage ??
-    (async (a) => (await import('viem')).verifyMessage(a))
+  // 2. Build + sign the challenge.
   const { message, issuedAt } = buildSiweChallengeLocal(addr, {
-    chainId: options.chainId,
-    appName: options.appName,
+    nonce,
+    chainId,
+    appName,
   })
-  const signature = await options.signMessage({ message })
-  const valid = await verifyMessageFn({ message, signature, address: addr })
-  if (!valid) {
-    throw new SiweRejectedError('SIWE signature did not verify — refusing to sign in.')
+  const signature = await signMessage({ message })
+
+  // 3. Server verifies the signature and mints a real Supabase JWT.
+  const { data, error } = await supabase.functions.invoke('siwe-auth', {
+    body: { action: 'verify', message, signature },
+  })
+  if (error || !data?.access_token) {
+    throw error ?? new Error('siwe-auth did not return a token')
   }
-  setSiweMarker({ address: addr, issuedAt })
-  return ensureUser(addr)
+
+  // Install the session. `refresh_token` is a placeholder: our JWT is the
+  // source of truth and re-signing (not refresh) is how a session renews,
+  // so this value is never used for anything meaningful.
+  const { error: sessionErr } = await supabase.auth.setSession({
+    access_token: data.access_token as string,
+    refresh_token: 'siwe-wallet-session',
+  })
+  if (sessionErr) throw sessionErr
+
+  setSiweMarker({ address: addr, issuedAt }) // never persist the signature
+
+  // The edge function upserted the row keyed by wallet; read it back.
+  return await ensureUser(addr)
 }
 
 function setSiweMarker(marker: { address: string; issuedAt: string }): void {
   if (typeof window !== 'undefined') {
     window.localStorage.setItem('coffernode:siwe:last', JSON.stringify(marker))
   }
-}
-
-function isLocalDev(): boolean {
-  if (typeof window === 'undefined') return false
-  return ['localhost', '127.0.0.1'].includes(window.location.hostname)
-}
-
-function isEdgeUnavailable(err: unknown): boolean {
-  const e = err as { type?: string; status?: number }
-  return e?.type === 'FunctionsFetchError' || e?.status === 404
 }
 
 class SiweRejectedError extends Error {

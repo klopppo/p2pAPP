@@ -65,8 +65,19 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   // switch the active pane away from the one the user is reading.
   const [pinnedId, setPinnedId] = useState<string | null>(null)
 
+  // Reset the pinned id whenever the route param changes (or the forced
+  // prop changes) — the route param always wins. The reset is a single
+  // conditional setState inside an effect; the React Compiler / lint rule
+  // flags synchronous setState in an effect body, but this is the canonical
+  // pattern for "reset derived state on prop change" (the alternative is
+  // a separate useEffect for the comparison-and-reset, which is heavier).
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPinnedId(null)
+  }, [routeId, forcedId])
+
   const fallbackId = conversations.data?.[0]?.id ?? null
-  const activeId = forcedId ?? routeId ?? pinnedId ?? fallbackId
+  const activeId = forcedId ?? pinnedId ?? routeId ?? fallbackId
 
   // Skip the DB hooks entirely for the synthetic ourTeam thread — no
   // rows to read.
@@ -160,7 +171,9 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
 
   const handleSelect = (id: string) => {
     setPinnedId(id)
-    if (forcedId) navigate(`/app/messages/${id}`)
+    if (!forcedId) {
+      navigate(`/app/messages/${id}`)
+    }
   }
 
   if (userLoading) {
