@@ -12,6 +12,7 @@ import { ProfilePage } from './pages/ProfilePage'
 import { EditProfilePage } from './pages/EditProfilePage'
 import { ChatLayout } from './components/custom/chat/ChatLayout'
 import { CreateOfferPage } from './pages/CreateOfferPage'
+import { EditOfferPage } from './pages/EditOfferPage'
 import { OpenOfferPage } from './pages/OpenOfferPage'
 import { TradePage } from './pages/TradePage'
 import { TradesPage } from './pages/TradesPage'
@@ -124,6 +125,7 @@ function App() {
                 <Route path="messages/:conversationId" element={<ChatLayout />} />
                 <Route path="create-offer" element={<CreateOfferPage />} />
                 <Route path="offer/:id" element={<OpenOfferPage />} />
+                <Route path="offer/:id/edit" element={<EditOfferPage />} />
                 <Route path="trade/:id" element={<TradePage />} />
                 <Route path="trades" element={<TradesPage />} />
                 <Route path="trades/:id" element={<TradeDetailPage />} />

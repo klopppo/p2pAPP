@@ -646,6 +646,37 @@ export async function createOffer(offerData: Partial<Offer>) {
   return data
 }
 
+/**
+ * Update an existing offer. Caller is responsible for authorization — RLS
+ * lets any anon update any row, so `EditOfferPage` must verify the connected
+ * wallet owns the row before calling. We don't change `seller_id`,
+ * `offer_id`, `published_at`, or `status` here; those are immutable for an
+ * ACTIVE offer. Pausing/cancelling/expiring is a separate concern.
+ */
+export async function updateOffer(id: string, patch: Partial<Offer>) {
+  const sanitized: Record<string, unknown> = { ...patch }
+  // Defensive: strip fields the seller must never change via this endpoint.
+  delete sanitized.id
+  delete sanitized.offer_id
+  delete sanitized.seller_id
+  delete sanitized.status
+  delete sanitized.published_at
+
+  const { data, error } = await supabase
+    .from('offers')
+    .update({ ...sanitized, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error updating offer:', error)
+    throw error
+  }
+
+  return data
+}
+
 // =================================================================
 // TRADE QUERIES
 // =================================================================

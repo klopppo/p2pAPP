@@ -269,13 +269,32 @@ export function OpenOfferPage() {
                     {t('openOffer.readyToTradeSubtitle')}
                   </Text>
                 </div>
-                <Button
-                  className="w-full rounded-full"
-                  size="lg"
-                  onClick={() => navigate(`/app/trade/${offer.id}`)}
-                >
-                  {t('openOffer.continueToTrade')}
-                </Button>
+                {user && seller && user.id === seller.id ? (
+                  // Seller viewing their own offer: skip "Continue to trade"
+                  // (trading with yourself makes no sense) and surface Edit
+                  // instead. The ownership check uses the same join shape as
+                  // `useCurrentUser` (`user.id`) and the embedded seller row.
+                  <>
+                    <Button
+                      className="w-full rounded-full"
+                      size="lg"
+                      onClick={() => navigate(`/app/offer/${offer.id}/edit`)}
+                    >
+                      {t('openOffer.editOffer')}
+                    </Button>
+                    <p className="text-xs text-muted-foreground text-center">
+                      {t('openOffer.editOfferHint')}
+                    </p>
+                  </>
+                ) : (
+                  <Button
+                    className="w-full rounded-full"
+                    size="lg"
+                    onClick={() => navigate(`/app/trade/${offer.id}`)}
+                  >
+                    {t('openOffer.continueToTrade')}
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
