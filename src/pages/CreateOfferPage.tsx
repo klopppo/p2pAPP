@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAccount } from 'wagmi'
+import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -59,6 +60,7 @@ export function CreateOfferPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { address, isConnected } = useAccount()
+  const qc = useQueryClient()
   const [formData, setFormData] = useState<OfferForm>({
     type: 'buy',
     token: 'USDT',
@@ -156,6 +158,10 @@ export function CreateOfferPage() {
 
       // Create offer in database
       await createOffer(offerData)
+      // Force the offers list to refetch on the next mount (cached data
+      // is fresh for `staleTime` default of 5s — the user would otherwise
+      // wait up to that long when they navigate back).
+      qc.invalidateQueries({ queryKey: ['offers'] })
 
       toast.success(t('createOffer.successCreated'))
       navigate('/app/offers')
