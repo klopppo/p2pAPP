@@ -216,6 +216,7 @@ export function OffersPage() {
                   onSelect={setTokenFilter}
                   options={[
                     { label: t('offers.filterAll'), value: 'all' },
+                    { label: 'fUSD', value: 'fUSD' },
                     { label: 'USDT', value: 'USDT' },
                     { label: 'USDC', value: 'USDC' },
                     { label: 'DAI', value: 'DAI' },

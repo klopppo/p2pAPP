@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useAccount } from 'wagmi'
+import { useAccount, useSignMessage } from 'wagmi'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Wallet as WalletIcon } from 'lucide-react'
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import {
   DropdownMenu,
@@ -18,7 +20,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
 import { Check, ChevronDown, Loader2 } from 'lucide-react'
-import { createOffer, ensureUser } from '@/lib/supabase'
+import { createOffer, ensureUser, ensureWalletSession } from '@/lib/supabase'
 import { currencySymbol, CURRENCY_SYMBOLS } from '@/lib/utils'
 
 // Standard unit-of-measure decimals per asset. offers.crypto_amount /
@@ -26,6 +28,10 @@ import { currencySymbol, CURRENCY_SYMBOLS } from '@/lib/utils'
 // units (e.g. 0.5 ETH), so derived crypto quantities are rounded to the
 // token's standard precision before persisting / previewing.
 const TOKEN_DECIMALS: Record<string, number> = {
+  // fUSD is the factory-deployed test token on Sepolia (see contracts/script/DeploySepolia.s.sol).
+  // 18 decimals, ERC-20 with a public mint() — testnet only. Replace this entry with
+  // mainnet tokens (USDC/USDT/DAI = 6, ETH/WBTC = 18/8) once a real factory is live.
+  fUSD: 18,
   USDT: 6,
   USDC: 6,
   DAI: 18,
@@ -59,11 +65,12 @@ interface OfferForm {
 export function CreateOfferPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { address, isConnected } = useAccount()
+  const { address, isConnected, status } = useAccount()
+  const { signMessageAsync } = useSignMessage()
   const qc = useQueryClient()
   const [formData, setFormData] = useState<OfferForm>({
     type: 'buy',
-    token: 'USDT',
+    token: 'fUSD',
     fiatCurrency: 'USD',
     price: 1,
     minAmount: 100,
@@ -118,7 +125,29 @@ export function CreateOfferPage() {
     setIsSubmitting(true)
 
     try {
-      const me = await ensureUser(address)
+      // 1) `ensureUser` requires a Supabase session (SIWE). If the wallet is
+      //    connected but the user declined / missed the SIWE popup on connect,
+      //    `useSyncUser` never wrote the session, so `ensureUser` returns
+      //    null. Run SIWE inline + retry before bailing. The earlier toast
+      //    (`errorConnectWallet`) was misleading: the wallet IS connected,
+      //    the user just hasn't signed the SIWE challenge yet.
+      let me = await ensureUser(address)
+      if (!me && isConnected && address && signMessageAsync) {
+        toast.loading(t('createOffer.signingIn', { defaultValue: 'Sign in with your wallet…' }), {
+          id: 'siwe-inline',
+        })
+        const session = await ensureWalletSession(address, { signMessage: signMessageAsync })
+        toast.dismiss('siwe-inline')
+        if (session.user) {
+          me = session.user
+        } else {
+          toast.error(t('createOffer.errorSiweRequired', {
+            defaultValue: 'Sign-in with your wallet is required to create an offer.',
+          }))
+          setIsSubmitting(false)
+          return
+        }
+      }
       if (!me) {
         toast.error(t('createOffer.errorConnectWallet'))
         setIsSubmitting(false)
@@ -174,7 +203,7 @@ export function CreateOfferPage() {
     }
   }
 
-  const tokens = ['USDT', 'USDC', 'DAI', 'ETH', 'WBTC', 'BTC']
+  const tokens = ['fUSD', 'USDT', 'USDC', 'DAI', 'ETH', 'WBTC', 'BTC']
   const fiatCurrencies = Object.keys(CURRENCY_SYMBOLS)
   const paymentMethods = [
     'Bank Transfer',
@@ -257,6 +286,21 @@ export function CreateOfferPage() {
 
         {/* Centered Card */}
         <Card className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl">
+          {/* wagmi v2: `status` is the source of truth — `isConnected` lags a
+              render during rehydration after a refresh / wallet switch and
+              can flash `false` even though the ConnectButton shows the
+              account. The banner mirrors the actual `status` so the user
+              isn't blindsided by the toast when they click submit. */}
+          {status !== 'connected' && (
+            <Alert className="mb-4 rounded-2xl border-primary/30 bg-primary/5">
+              <WalletIcon className="w-4 h-4" />
+              <AlertDescription>
+                {t('createOffer.connectWalletBanner', {
+                  defaultValue: 'Connect a wallet from the navbar to create an offer.',
+                })}
+              </AlertDescription>
+            </Alert>
+          )}
                 <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Type Selection */}
                   <div>
@@ -542,7 +586,7 @@ export function CreateOfferPage() {
                   <div className="flex justify-end pt-4">
                     <Button
                       type="submit"
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || status !== 'connected'}
                       className="rounded-full px-8 py-3 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSubmitting ? (
@@ -550,6 +594,10 @@ export function CreateOfferPage() {
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                           {t('createOffer.creating')}
                         </>
+                      ) : status !== 'connected' ? (
+                        t('createOffer.connectToSubmit', {
+                          defaultValue: 'Connect wallet to create',
+                        })
                       ) : (
                         t('createOffer.createOffer')
                       )}

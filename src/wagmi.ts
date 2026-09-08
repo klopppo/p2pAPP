@@ -52,6 +52,22 @@ if (!projectId) {
   )
 }
 
+/**
+ * Custom RPC endpoints per chain. Defaults below are CORS-friendly public
+ * endpoints (Cloudflare-ETH + PublicNode). The browser-safe `http()`
+ * fallback that viem ships with (`eth.merkle.io`) returns no
+ * `Access-Control-Allow-Origin` header and the browser preflight blocks
+ * the request, so we MUST pass explicit URLs when running in the browser.
+ *
+ * Override per-env via:
+ *   VITE_MAINNET_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/<key>
+ *   VITE_SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/<key>
+ */
+const mainnetRpc = import.meta.env.VITE_MAINNET_RPC_URL?.trim() ||
+  'https://cloudflare-eth.com'
+const sepoliaRpc = import.meta.env.VITE_SEPOLIA_RPC_URL?.trim() ||
+  'https://ethereum-sepolia.publicnode.com'
+
 export const config = getDefaultConfig({
   appName: 'CofferNode',
   // Non-empty placeholder keeps getDefaultConfig from throwing when the env var
@@ -61,8 +77,8 @@ export const config = getDefaultConfig({
   appUrl: import.meta.env.VITE_APP_URL ?? 'http://localhost:5173',
   chains: SUPPORTED_CHAINS as unknown as readonly [Chain, ...Chain[]],
   transports: {
-    [mainnet.id]: http(),
-    [sepolia.id]: http(),
+    [mainnet.id]: http(mainnetRpc),
+    [sepolia.id]: http(sepoliaRpc),
   },
 })
 
