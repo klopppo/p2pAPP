@@ -5,6 +5,7 @@ import type { ConversationView, ConversationWithParticipant } from '@/types/data
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Text } from '@/components/ui/text'
 import { TradeSummaryPill } from './TradeSummaryPill'
+import { shortAddress } from '@/lib/utils'
 
 interface Props {
   conversation: ConversationView
@@ -70,9 +71,4 @@ export function ChatHeader({ conversation, currentUserId, online, onBack }: Prop
       )}
     </div>
   )
-}
-
-function shortAddress(addr: string): string {
-  if (!addr) return ''
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`
 }
