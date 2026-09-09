@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Loader2, Inbox, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -62,7 +62,6 @@ interface TradeRow {
 
 export function TradesPage() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
   const { data: user } = useCurrentUser()
   const { data: trades = [], isLoading, isError } = useTrades()
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('all')
@@ -124,7 +123,6 @@ export function TradesPage() {
         title={t('trades.title')}
         subtitle={t('trades.subtitle')}
         variant="centered"
-        onBack={() => navigate('/app/offers')}
       />
 
       {/* Filter strip */}

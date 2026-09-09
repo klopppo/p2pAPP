@@ -2165,6 +2165,16 @@ class SiweRejectedError extends Error {
  * or null when there is no session (or the claim is missing).
  */
 export async function getSessionWallet(): Promise<string | null> {
+  // Marker short-circuit: the SIWE backend mints the session via
+  // supabase.auth.setSession() with a JWT that doesn't surface
+  // wallet_address at the top level or under user_metadata (GoTrue
+  // doesn't expose arbitrary custom claims). Without this fallback every
+  // call site that checks the JWT — isSignedInAs, ensureUser's insert
+  // gate, getOrCreateDirectConversation, etc. — returns null and the
+  // inline-SIWE retry path pops another MetaMask prompt.
+  const marker = getSiweMarker()
+  if (marker?.address) return marker.address.toLowerCase()
+
   const session = await getSession()
   if (!session?.access_token) return null
   const payload = decodeJwtPayload(session.access_token)
