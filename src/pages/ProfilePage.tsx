@@ -279,20 +279,6 @@ export function ProfilePage() {
 
   return (
     <section className="space-y-8">
-      {isOwnProfile && (
-        <div className="flex">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => navigate('/app/profile/edit')}
-            className="rounded-full shadow-none"
-          >
-            <Pencil className="w-3.5 h-3.5 mr-1" />
-            {t('profile.editProfile')}
-          </Button>
-        </div>
-      )}
-
       <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
         <Avatar className="h-24 w-24">
           <AvatarImage src={avatarUrl} />
@@ -302,6 +288,8 @@ export function ProfilePage() {
           <div className="flex items-center gap-3 flex-wrap">
             <Text variant="h2">{nickname}</Text>
             <Badge className="bg-success text-success-foreground hover:bg-success/90 text-sm">
+
+
               {lastActive === '—' ? t('profile.offline') : t('profile.online')}
             </Badge>
           </div>
@@ -326,6 +314,20 @@ export function ProfilePage() {
             <Text variant="muted" className="mt-2 max-w-2xl">{profile.bio}</Text>
           )}
         </div>
+        {/* Edit profile button — anchored to the right of the avatar+identity
+            row on the owner's profile so it visually belongs to the same
+            horizontal group as the avatar / nickname / address. */}
+        {isOwnProfile && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => navigate('/app/profile/edit')}
+            className="rounded-full shadow-none shrink-0"
+          >
+            <Pencil className="w-3.5 h-3.5 mr-1" />
+            {t('profile.editProfile')}
+          </Button>
+        )}
       </div>
 
       {/* Stats Grid (bento boxes) */}

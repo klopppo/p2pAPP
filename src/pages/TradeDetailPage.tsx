@@ -35,7 +35,6 @@ import {
   ERC20_ABI,
   KLEROS_ESC_ABI,
   KlerosEscState,
-  KlerosEscStateLabel,
   Ruling,
   type KlerosEscStateValue,
 } from '@/lib/contracts'
@@ -162,8 +161,6 @@ export function TradeDetailPage() {
   // the hook). Guard the lookup so TS doesn't try to index with `undefined`.
   const liveState: KlerosEscStateValue | null =
     onChainState != null ? (onChainState as KlerosEscStateValue) : null
-  const stateLabel =
-    liveState != null ? KlerosEscStateLabel[liveState] : t('tradeDetail.loadingTrade')
 
   // ── Action: approve + deposit (buyer OR seller path) ─────────────────────
   const fundEscrow = async (
@@ -645,9 +642,10 @@ export function TradeDetailPage() {
   return (
     <div className="w-full max-w-xl mx-auto">
       {/* Same AppPageHeader centered shape as CreateOfferPage / TradesPage:
-          title + subtitle, no back arrow on the left, no action on the
-          right, no horizontal divider. The status badge rides below the
-          subtitle so it doesn't break the centered layout. */}
+          back button left, title + subtitle centered, no horizontal
+          divider. The escrow status badge used to live under the
+          subtitle; it was removed per UX feedback (the state is
+          repeated inside the Funding card below). */}
       <AppPageHeader
         title={`${t('tradeDetail.trade')} ${trade.crypto_token}`}
         subtitle={
@@ -658,14 +656,8 @@ export function TradeDetailPage() {
           </>
         }
         variant="centered"
+        onBack={() => navigate(-1)}
       />
-      {liveState != null && (
-        <div className="flex justify-center -mt-6 mb-6">
-          <span className="inline-flex items-center px-2.5 h-6 rounded-full bg-muted text-xs font-medium">
-            {stateLabel}
-          </span>
-        </div>
-      )}
 
       {/* Wallet-not-connected */}
       {!isConnected && (
