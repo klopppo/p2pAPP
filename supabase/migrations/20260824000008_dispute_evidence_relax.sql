@@ -24,10 +24,23 @@
 -- 1) Backfill: copy any remaining NULL ipfs_cid / ipfs_url from the legacy
 --    columns. Mirrors the safety step in 20260824000003.
 -- ---------------------------------------------------------------------------
-update public.dispute_evidence
-  set ipfs_cid = coalesce(ipfs_cid, file_hash),
-      ipfs_url = coalesce(ipfs_url, file_encrypted)
-  where ipfs_cid is null or ipfs_url is null;
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'dispute_evidence'
+      and column_name = 'file_encrypted'
+  ) then
+    update public.dispute_evidence
+      set ipfs_cid = coalesce(ipfs_cid, file_hash::text),
+          ipfs_url = coalesce(ipfs_url, file_encrypted::text)
+      where ipfs_cid is null or ipfs_url is null;
+  else
+    update public.dispute_evidence
+      set ipfs_cid = coalesce(ipfs_cid, file_hash::text)
+      where ipfs_cid is null;
+  end if;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- 2) Enforce NOT NULL on the canonical columns. Wrap in DO blocks so the

@@ -91,6 +91,61 @@ $$;
 --    page). Writes are self-scoped to the signed-in wallet.
 -- =====================================================================
 
+-- Idempotent apply on drifted remotes: every policy this file creates (or
+-- relies on the absence of) is dropped first. Tables that may not exist
+-- (e.g. message_attachments on older deployments) are guarded.
+do $$
+begin
+  execute 'drop policy if exists "users_select_public"          on public.users';
+  execute 'drop policy if exists "users_insert_self"            on public.users';
+  execute 'drop policy if exists "offers_select_public"         on public.offers';
+  execute 'drop policy if exists "offers_insert_owner"          on public.offers';
+  execute 'drop policy if exists "offers_update_owner"          on public.offers';
+  execute 'drop policy if exists "trades_select_parties"        on public.trades';
+  execute 'drop policy if exists "trades_insert_parties"        on public.trades';
+  execute 'drop policy if exists "trades_update_parties"        on public.trades';
+  execute 'drop policy if exists "trade_events_select_parties"  on public.trade_events';
+  execute 'drop policy if exists "trade_events_insert_parties"  on public.trade_events';
+  execute 'drop policy if exists "conversations_read_participant"       on public.conversations';
+  execute 'drop policy if exists "conversations_update_participant"    on public.conversations';
+  execute 'drop policy if exists "conv_participants_read_participant"  on public.conversation_participants';
+  execute 'drop policy if exists "conv_participants_insert_self"       on public.conversation_participants';
+  execute 'drop policy if exists "conv_participants_update_self"       on public.conversation_participants';
+  execute 'drop policy if exists "conv_participants_delete_self"       on public.conversation_participants';
+  execute 'drop policy if exists "messages_read_participant"    on public.messages';
+  execute 'drop policy if exists "messages_insert_participant"  on public.messages';
+  execute 'drop policy if exists "messages_update_own"          on public.messages';
+  execute 'drop policy if exists "messages_delete_own"          on public.messages';
+  execute 'drop policy if exists "notifications_read_own"       on public.notifications';
+  execute 'drop policy if exists "notifications_insert_own"     on public.notifications';
+  execute 'drop policy if exists "notifications_update_own"     on public.notifications';
+  execute 'drop policy if exists "notifications_delete_own"     on public.notifications';
+  execute 'drop policy if exists "notif_prefs_read_own"         on public.notification_preferences';
+  execute 'drop policy if exists "notif_prefs_insert_own"       on public.notification_preferences';
+  execute 'drop policy if exists "notif_prefs_update_own"       on public.notification_preferences';
+  execute 'drop policy if exists "notif_prefs_delete_own"       on public.notification_preferences';
+  execute 'drop policy if exists "disputes_select_parties"      on public.disputes';
+  execute 'drop policy if exists "disputes_insert_parties"      on public.disputes';
+  execute 'drop policy if exists "disputes_update_parties"      on public.disputes';
+  execute 'drop policy if exists "dispute_evidence_read_parties"    on public.dispute_evidence';
+  execute 'drop policy if exists "dispute_evidence_insert_parties"  on public.dispute_evidence';
+  execute 'drop policy if exists "dispute_evidence_update_parties"  on public.dispute_evidence';
+  execute 'drop policy if exists "trade_ratings_select_public"  on public.trade_ratings';
+  execute 'drop policy if exists "trade_ratings_insert_owner"   on public.trade_ratings';
+  execute 'drop policy if exists "reputation_scores_select_public"    on public.reputation_scores';
+  execute 'drop policy if exists "reputation_points_select_public"    on public.reputation_points';
+  execute 'drop policy if exists "reputation_badges_select_public"    on public.reputation_badges';
+  execute 'drop policy if exists "reputation_recent_stats_select_public" on public.reputation_recent_stats';
+  execute 'drop policy if exists "avatars_anon_write"           on storage.objects';
+  execute 'drop policy if exists "avatars_anon_update"          on storage.objects';
+  execute 'drop policy if exists "avatars_self_write"           on storage.objects';
+  execute 'drop policy if exists "avatars_self_update"          on storage.objects';
+  if to_regclass('public.message_attachments') is not null then
+    execute 'drop policy if exists "message_attachments_read_participant" on public.message_attachments';
+    execute 'drop policy if exists "message_attachments_insert_own"       on public.message_attachments';
+  end if;
+end $$;
+
 drop policy if exists "users_insert_any" on public.users;
 drop policy if exists "users_update_any" on public.users;
 drop policy if exists "users_select_any" on public.users;
@@ -104,6 +159,8 @@ create policy "users_insert_self"
   on public.users for insert
   to authenticated
   with check (wallet_address = lower(auth.jwt() ->> 'wallet_address'));
+
+drop policy if exists "users_update_self" on public.users;
 
 create policy "users_update_self"
   on public.users for update
@@ -166,7 +223,7 @@ create policy "trade_events_select_parties"
   to authenticated
   using (exists (
     select 1 from public.trades t
-    where t.id = trade_id
+    where t.id = trade_id::uuid
       and (t.buyer_id = public.current_user_id() or t.seller_id = public.current_user_id())
   ));
 
@@ -175,7 +232,7 @@ create policy "trade_events_insert_parties"
   to authenticated
   with check (exists (
     select 1 from public.trades t
-    where t.id = trade_id
+    where t.id = trade_id::uuid
       and (t.buyer_id = public.current_user_id() or t.seller_id = public.current_user_id())
   ));
 
@@ -243,19 +300,25 @@ create policy "messages_delete_own"
   to authenticated
   using (sender_id = public.current_user_id());
 
-drop policy if exists "message_attachments_all" on public.message_attachments;
-create policy "message_attachments_read_participant"
-  on public.message_attachments for select
-  to authenticated
-  using (public.is_conversation_participant(
-    (select conversation_id from public.messages where id = message_attachments.id),
-    public.current_user_id()
-  ));
+do $$
+begin
+  if to_regclass('public.message_attachments') is not null then
+    execute 'drop policy if exists "message_attachments_all" on public.message_attachments';
+    
+    create policy "message_attachments_read_participant"
+      on public.message_attachments for select
+      to authenticated
+      using (public.is_conversation_participant(
+        (select conversation_id from public.messages where id = message_attachments.id),
+        public.current_user_id()
+      ));
 
-create policy "message_attachments_insert_own"
-  on public.message_attachments for insert
-  to authenticated
-  with check (uploaded_by = public.current_user_id());
+    create policy "message_attachments_insert_own"
+      on public.message_attachments for insert
+      to authenticated
+      with check (uploaded_by = public.current_user_id());
+  end if;
+end $$;
 
 -- =====================================================================
 -- 7. NOTIFICATIONS + PREFS — own rows only.
@@ -330,7 +393,7 @@ create policy "dispute_evidence_read_parties"
   to authenticated
   using (exists (
     select 1 from public.disputes d
-    where d.id = dispute_id
+    where d.id = dispute_id::uuid
       and (d.buyer_id = public.current_user_id() or d.seller_id = public.current_user_id())
   ));
 
@@ -339,7 +402,7 @@ create policy "dispute_evidence_insert_parties"
   to authenticated
   with check (exists (
     select 1 from public.disputes d
-    where d.id = dispute_id
+    where d.id = dispute_id::uuid
       and (d.buyer_id = public.current_user_id() or d.seller_id = public.current_user_id())
   ));
 
@@ -348,12 +411,12 @@ create policy "dispute_evidence_update_parties"
   to authenticated
   using (exists (
     select 1 from public.disputes d
-    where d.id = dispute_id
+    where d.id = dispute_id::uuid
       and (d.buyer_id = public.current_user_id() or d.seller_id = public.current_user_id())
   ))
   with check (exists (
     select 1 from public.disputes d
-    where d.id = dispute_id
+    where d.id = dispute_id::uuid
       and (d.buyer_id = public.current_user_id() or d.seller_id = public.current_user_id())
   ));
 
@@ -373,7 +436,7 @@ create policy "trade_ratings_insert_owner"
     rater_id = public.current_user_id()
     and exists (
       select 1 from public.trades t
-      where t.id = trade_id
+      where t.id = trade_id::uuid
         and (t.buyer_id = public.current_user_id() or t.seller_id = public.current_user_id())
     )
   );

@@ -172,6 +172,11 @@ export function TradePage() {
         setStage('idle')
         return
       }
+      if (buyerWallet.toLowerCase() === sellerWallet.toLowerCase()) {
+        toast.error(t('trade.errorSameCounterparty'))
+        setStage('idle')
+        return
+      }
 
       
 
@@ -237,6 +242,48 @@ export function TradePage() {
         cryptoAmount.toFixed(safeDecimals),
         safeDecimals,
       )
+      if (cryptoBaseUnits === 0n) {
+        toast.error(t('trade.errorAmountTooSmall'))
+        setStage('idle')
+        return
+      }
+
+      // Pre-flight gas estimation: catch a REVERT before broadcasting. RPC
+      // providers cap raw-tx gas (Infura: 16,777,216); when estimateGas
+      // reverts, some wallets sign with a padded ~21M gas limit that the cap
+      // then rejects with the misleading "gas limit too high" error — masking
+      // the real cause. Estimating now surfaces the true reason and bounds
+      // the submitted gas so it can never trip the cap. Known trap: the
+      // factory refuses its treasury/owner wallet as a trade party.
+      let gas: bigint | undefined
+      try {
+        gas = await publicClient.estimateContractGas({
+          address: factoryAddress,
+          abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
+          functionName: 'createEscrow',
+          args: [
+            buyerWallet as `0x${string}`,
+            sellerWallet as `0x${string}`,
+            DEFAULT_GRACE_PERIOD_SECONDS,
+            cryptoBaseUnits,
+            depositBps,
+          ],
+          account: address as `0x${string}`,
+        })
+      } catch (estErr) {
+        const reason =
+          estErr instanceof Error
+            ? estErr.message.split('\n')[0].slice(0, 240)
+            : String(estErr)
+        console.error('[TradePage] createEscrow estimate reverted:', estErr)
+        toast.error(t('trade.errorCreateEscrowEstimate'), {
+          description: reason,
+        })
+        setStage('idle')
+        return
+      }
+      // 30% headroom above the true estimate, far below the 16.7M RPC cap.
+      const gasLimit = (gas * 130n) / 100n
 
       // Deploy a KlerosEsc clone via the factory. Default grace period is
       // 7 days, default security deposit is 10% (within KlerosEsc's MIN/MAX).
@@ -252,6 +299,7 @@ export function TradePage() {
           cryptoBaseUnits,
           depositBps,
         ],
+        gas: gasLimit,
       })
       // Bound the wait so a Sepolia RPC stall doesn't leave the form
       // spinning at stage='mining' forever. Without this, a stalled RPC

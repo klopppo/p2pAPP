@@ -4,6 +4,14 @@
 -- See docs/dispute-status.md §P0 gaps (evidence_group_id, appeal_count,
 -- raiser, fee_paid_wei, winner, dispute_timestamp, ruling_received_time).
 
+-- Reconciliation: the remote `disputes` table was created from an older
+-- revision of 20260814000001 and lacks the on-chain mirror base columns the
+-- indexes below reference. Idempotent so fresh schemas are unaffected.
+alter table public.disputes
+  add column if not exists escrow_address    varchar(42);
+alter table public.disputes
+  add column if not exists kleros_dispute_id text;
+
 alter table public.disputes
   add column if not exists evidence_group_id     integer not null default 0;
 alter table public.disputes

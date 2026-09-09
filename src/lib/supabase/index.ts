@@ -2168,7 +2168,14 @@ export async function getSessionWallet(): Promise<string | null> {
   const session = await getSession()
   if (!session?.access_token) return null
   const payload = decodeJwtPayload(session.access_token)
-  const wallet = payload?.wallet_address
+  const metadata = payload?.user_metadata as Record<string, unknown> | undefined
+  const raw =
+    typeof payload?.wallet_address === 'string'
+      ? payload.wallet_address
+      : typeof metadata?.wallet_address === 'string'
+        ? metadata.wallet_address
+        : null
+  const wallet = raw
   return typeof wallet === 'string' && wallet ? wallet.toLowerCase() : null
 }
 

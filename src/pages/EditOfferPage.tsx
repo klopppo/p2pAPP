@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useAccount, useSignMessage } from 'wagmi'
+import { useAccount } from 'wagmi'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -22,6 +22,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { Check, ChevronDown, Loader2 } from 'lucide-react'
 import { updateOffer, ensureUser, ensureWalletSession } from '@/lib/supabase'
+import { signWalletMessage } from '@/lib/walletSigner'
 import { useOffer } from '@/hooks/useOffers'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { currencySymbol, CURRENCY_SYMBOLS } from '@/lib/utils'
@@ -70,7 +71,6 @@ export function EditOfferPage() {
   const navigate = useNavigate()
   const { id } = useParams()
   const { status } = useAccount()
-  const { signMessageAsync } = useSignMessage()
   const { data: user } = useCurrentUser()
   const qc = useQueryClient()
   const { data: offer, isLoading: offerLoading, isError: offerError } = useOffer(id)
@@ -218,10 +218,10 @@ export function EditOfferPage() {
       // an upsert via the public Supabase client; RLS is permissive in dev
       // but we still gate on the connected wallet.
       let me = await ensureUser(user.wallet_address)
-      if (!me && user.wallet_address && signMessageAsync) {
+      if (!me && user.wallet_address) {
         toast.loading(t('editOffer.signingIn'), { id: 'siwe-inline' })
         const session = await ensureWalletSession(user.wallet_address, {
-          signMessage: signMessageAsync,
+          signMessage: signWalletMessage,
         })
         toast.dismiss('siwe-inline')
         me = session.user

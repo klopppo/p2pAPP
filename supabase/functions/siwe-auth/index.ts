@@ -10,8 +10,16 @@
 //   The nonce is stored server-side in `siwe_nonces` (one-shot, 5 min TTL),
 //   issued/bound to the requesting address. /verify re-verifies the EIP-4361
 //   signature with viem, consumes the nonce atomically, provisions a GoTrue
-//   auth user (needed for `supabase.auth.setSession` on the client) and returns
-//   a minted JWT.
+//   auth user (needed for `supabase.auth.setSession` on the client).
+//
+// Session issuance: the platform GoTrue validates ONLY tokens signed with its
+// own ES256 private key (the injected SUPABASE_JWKS is public-only and legacy
+// HS256 secrets are not accepted). A self-minted JWT can therefore never pass
+// the platform's signature check, so this function lets GoTrue itself mint the
+// session: it issues a server-side magiclink for the wallet email and exchanges
+// it at the client-facing /verify endpoint with the injected anon key. RLS
+// authorizes via the `wallet_address` claim inside `user_metadata`
+// (see migrations/20260908000001 siwe_go_true_claim_fix).
 //
 // Identity model (wallet-primary):
 //   • RLS does NOT use auth.uid(). Every policy authorizes through the JWT
@@ -23,10 +31,10 @@
 //   • public.users rows keep their own ids (pre-existing rows are untouched)
 //     and are created/updated keyed by the unique wallet_address.
 //
-// Env (auto-injected in prod; pass via --env-file when serving locally):
-//   SUPABASE_URL
-//   SUPABASE_SERVICE_ROLE_KEY
-//   SUPABASE_JWT_SECRET
+// Env (URL + service role + anon key are auto-injected):
+//   SUPABASE_URL                (auto-injected)
+//   SUPABASE_SERVICE_ROLE_KEY   (auto-injected)
+//   SUPABASE_ANON_KEY           (auto-injected)
 //
 // Deploy:
 //   supabase functions deploy siwe-auth --no-verify-jwt
@@ -36,7 +44,6 @@
 // authorization logic (parser, allowlist, TTLs) lives in ../_shared/siwe-core.ts
 // so the penetration test suite can exercise it without a Deno runtime.
 import { createClient } from "npm:@supabase/supabase-js@2.108.2"
-import { SignJWT } from "npm:jose@5"
 import { verifyMessage } from "npm:viem@2"
 import {
   ALLOWED_URI_HOSTS,
@@ -44,7 +51,6 @@ import {
   NONCE_TTL_MINUTES,
   normalizeAddress,
   parseSiweMessage,
-  SESSION_TTL_SECONDS,
   WALLET_EMAIL_DOMAIN,
   type ParsedSiweMessage,
 } from "../_shared/siwe-core.ts"
@@ -72,10 +78,9 @@ Deno.serve(async (req: Request) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
-  const jwtSecret = Deno.env.get("SUPABASE_JWT_SECRET")
-  if (!supabaseUrl || !serviceRoleKey || !jwtSecret) {
+  if (!supabaseUrl || !serviceRoleKey) {
     return json(
-      { error: "Missing SUPABASE_URL / SERVICE_ROLE_KEY / JWT_SECRET" },
+      { error: "Missing SUPABASE_URL / SERVICE_ROLE_KEY" },
       500
     )
   }
@@ -91,7 +96,7 @@ Deno.serve(async (req: Request) => {
     return issueNonce(body.address, supabaseUrl, serviceRoleKey)
   }
   if (body.action === "verify") {
-    return verifyAndMint(body, supabaseUrl, serviceRoleKey, jwtSecret)
+    return handleVerify(body, supabaseUrl, serviceRoleKey)
   }
   return json({ error: "Unknown action" }, 400)
 })
@@ -153,11 +158,10 @@ async function issueNonce(
 
 
 
-async function verifyAndMint(
+async function handleVerify(
   body: SignInRequest,
   supabaseUrl: string,
-  serviceRoleKey: string,
-  jwtSecret: string
+  serviceRoleKey: string
 ): Promise<Response> {
   const { message, signature } = body
   if (!message || !signature) {
@@ -221,10 +225,18 @@ async function verifyAndMint(
     return json({ error: "Signature did not verify" }, 401)
   }
 
-  // 3-5. Provision identity + users row + mint JWT (fail → clean 500 JSON).
+  // 3-5. Provision identity + session (fail → clean 500 JSON).
   try {
-    // 3. Provision the GoTrue auth user (session mechanics) linked to the wallet.
+    // 3. Provision the GoTrue auth user (session mechanics) linked to the
+    //    wallet, then 5. hand the session minting to GoTrue itself (see below).
+    // 5. Session: the platform GoTrue validates ONLY tokens minted with its
+    //    own ES256 private key (the injected SUPABASE_JWKS is public-only and
+    //    no legacy HS256 secret is accepted). A self-minted JWT can therefore
+    //    never pass the platform's signature check — so we let GoTrue itself
+    //    mint the session by exchanging a server-side magiclink for the
+    //    wallet-scoped auth user created in step 3.
     const authUid = await getOrCreateAuthUser(admin, parsed.address)
+    void authUid
 
     // 4. Ensure the public.users row exists keyed by the unique wallet_address.
     const { data: existing } = await admin
@@ -255,24 +267,13 @@ async function verifyAndMint(
         .eq("wallet_address", parsed.address)
     }
 
-    // 5. Mint a minimal Supabase JWT. RLS authorizes via the `wallet_address`
-    //    claim (NOT sub); sub is the GoTrue auth user id for session plumbing.
-    const projectRef = new URL(supabaseUrl).hostname.split(".")[0]
-    const token = await new SignJWT({
-      role: "authenticated",
-      wallet_address: parsed.address,
-      ref: projectRef,
-    })
-      .setProtectedHeader({ alg: "HS256", typ: "JWT" })
-      .setSubject(authUid)
-      .setIssuedAt()
-      .setExpirationTime(SESSION_TTL_SECONDS + "s")
-      .setIssuer("supabase")
-      .setAudience("authenticated")
-      .setJti(crypto.randomUUID())
-      .sign(new TextEncoder().encode(jwtSecret))
+    const session = await exchangeMagiclinkSession(
+      supabaseUrl,
+      serviceRoleKey,
+      parsed.address
+    )
 
-    return json({ access_token: token, user })
+    return json({ access_token: session.access_token, user })
   } catch (err) {
     console.error("siwe-auth: verifyAndMint provisioning failed", err)
     return json({ error: "Internal error" }, 500)
@@ -343,6 +344,79 @@ async function getOrCreateAuthUser(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Let GoTrue mint the session. Server-side: issue a magiclink for the wallet
+ * email via the admin API, then exchange the token_hash at the client-facing
+ * /verify endpoint (with the injected anon key). The resulting access_token
+ * is signed with the platform's ES256 private key and passes every GoTrue /
+ * PostgREST signature check — something a self-minted JWT can never do on
+ * projects whose signing key never leaves the platform.
+ */
+async function exchangeMagiclinkSession(
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  addr: string
+): Promise<{ access_token: string; refresh_token: string; user: unknown }> {
+  const email = `${addr.replace(/^0x/, "")}@${WALLET_EMAIL_DOMAIN}`
+
+  const linkRes = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, {
+    method: "POST",
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ type: "magiclink", email }),
+  })
+  if (!linkRes.ok) {
+    console.error(
+      "siwe-auth: generate_link failed",
+      linkRes.status,
+      (await linkRes.text()).slice(0, 300)
+    )
+    throw new Error("Magic link issuance failed")
+  }
+  const linkData = await linkRes.json()
+  const tokenHash =
+    linkData?.hashed_token ??
+    linkData?.token_hash ??
+    linkData?.properties?.token_hash
+  if (typeof tokenHash !== "string" || !tokenHash) {
+    throw new Error("Magic link exchange produced no token_hash")
+  }
+
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+  const verifyRes = await fetch(`${supabaseUrl}/auth/v1/verify`, {
+    method: "POST",
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${anonKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ type: "magiclink", token_hash: tokenHash }),
+  })
+  if (!verifyRes.ok) {
+    console.error(
+      "siwe-auth: verify exchange failed",
+      verifyRes.status,
+      (await verifyRes.text()).slice(0, 300)
+    )
+    throw new Error("Session exchange failed")
+  }
+  const session = await verifyRes.json()
+  if (typeof session?.access_token !== "string") {
+    throw new Error("Session exchange returned no access_token")
+  }
+  return {
+    access_token: session.access_token,
+    refresh_token:
+      typeof session.refresh_token === "string"
+        ? session.refresh_token
+        : "siwe-wallet-session",
+    user: session.user ?? null,
+  }
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

@@ -135,13 +135,13 @@ create table if not exists reputation_badges (
 
 create table if not exists reputation_recent_stats (
   user_id         uuid not null references users(id) on delete cascade,
-  window          varchar(10) not null check (window in ('7d','30d')),
+  "window"        varchar(10) not null check ("window" in ('7d','30d')),
   trades          integer not null default 0,
   rating          numeric(3,2) default 0,
   disputes        integer not null default 0,
   response_hours  numeric(6,2),
   computed_at     timestamptz not null default now(),
-  primary key (user_id, window)
+  primary key (user_id, "window")
 );
 
 -- ---------------------------------------------------------------------------

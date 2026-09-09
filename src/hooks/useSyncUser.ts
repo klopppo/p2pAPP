@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react'
 import type { FC } from 'react'
-import { useAccount, useSignMessage } from 'wagmi'
+import { useAccount } from 'wagmi'
 import { useNavigate } from 'react-router-dom'
 import { clearPersistedQueryCache } from '@/lib/queryPersister'
 import { ensureWalletSession, signOut } from '@/lib/supabase'
+import { signWalletMessage } from '@/lib/walletSigner'
 
 /**
  * Keeps the Supabase `users` row in sync with the connected wallet.
@@ -25,7 +26,6 @@ import { ensureWalletSession, signOut } from '@/lib/supabase'
  */
 export function useSyncUser() {
   const { address, isConnected } = useAccount()
-  const { signMessageAsync } = useSignMessage()
   const syncedAddress = useRef<string | null>(null)
   const redirectedAddress = useRef<string | null>(null)
   const navigate = useNavigate()
@@ -36,7 +36,7 @@ export function useSyncUser() {
   useEffect(() => {
     const myToken = ++tokenRef.current
 
-    if (!isConnected || !address || !signMessageAsync) {
+    if (!isConnected || !address) {
       // Wallet gone: tear down the Supabase session + caches so the stale
       // session can't keep authorizing reads/writes as the old wallet.
       // Bump the token first so any in-flight ensureWalletSession from the
@@ -56,7 +56,7 @@ export function useSyncUser() {
     if (syncedAddress.current === address) return
     syncedAddress.current = address
 
-    ensureWalletSession(address, { signMessage: signMessageAsync })
+    ensureWalletSession(address, { signMessage: signWalletMessage })
       .then(({ user }) => {
         // Drop the result if a newer connect/disconnect has superseded us.
         if (tokenRef.current !== myToken) return
@@ -75,7 +75,7 @@ export function useSyncUser() {
         // Reset so a later re-render can retry.
         syncedAddress.current = null
       })
-  }, [address, isConnected, signMessageAsync, navigate])
+  }, [address, isConnected, navigate])
 }
 
 /**

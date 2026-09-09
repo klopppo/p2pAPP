@@ -9,6 +9,62 @@
 
 ---
 
+## TradePage escrow create preflight — bounded gas + real revert surfacing — 2026-09-09
+
+`createEscrow` on TradePage now estimates the contract call BEFORE broadcasting and
+submits with a bounded gas limit, so a reverting estimate can no longer degrade into the
+misleading Infura rejection ("transaction gas limit too high (cap: 16777216, tx: 21000000)")
+that masks the true cause with a wallet-padded ~21M gas fallback.
+
+- **Root cause found on-chain** (Sepolia factory `0x19003a…71`): `createEscrow` rejects
+  any party that is the factory's `treasury`/`owner`. In this deployment both are
+  `0xcaDF076f…ssda1d` (the deployer), so every offer created from that wallet reverts
+  with custom error `0x14bcf5c8` — for BOTH roles, at any amount/bps/grace (verified
+  via `eth_estimateGas` probes across all 16 live offers; only that maker's offers fail).
+  `0xd7c43e0f` = `InvalidGracePeriod()`, `0xbab7ca35` = `InvalidSeller()` (4byte registry).
+- **Fix** (`src/pages/TradePage.tsx`): preflight `estimateContractGas` → on revert, show
+  the REAL reason (selector/message) in the toast and abort (no tx sent); on success,
+  submit with `gas = estimate * 1.3`, far below the 16.7M RPC cap. Added guards for
+  buyer==seller and `cryptoBaseUnits == 0`. New i18n keys in all 5 locales
+  (`errorSameCounterparty`, `errorAmountTooSmall`, `errorCreateEscrowEstimate`).
+- **Ops note**: the treasury/owner wallet (`0xcaDF…`) can never be a trade party — create
+  offers from a different wallet on this deployment.
+
+## SIWE sign-in production cutover — GoTrue-issued sessions — 2026-09-08
+
+First-time wallet connect now lands a real, platform-signed GoTrue session end-to-end on
+the deployed project (nonce → SIWE verify → `access_token` → RLS-authorized reads).
+
+- **Why it changed**: the hosted runtime no longer injects a signing secret and the
+  injected `SUPABASE_JWKS` is public-only (EC ES256, `hasD: false`); legacy HS256 secrets
+  are rejected by GoTrue (`bad_jwt`) and PostgREST (`PGRST301`). A self-minted JWT can
+  never pass the platform's signature check.
+- **Final architecture** (`supabase/functions/siwe-auth/index.ts`): removed `mintToken`
+  (jose/JWT signing); `handleVerify` now provisions the GoTrue auth user then
+  `exchangeMagiclinkSession()` issues a server-side magiclink for the wallet email
+  (`/auth/v1/admin/generate_link`, admin key on `apikey` + `Authorization`) and exchanges
+  `hashed_token` (top-level, not `properties.token_hash`) at `/auth/v1/verify` with the
+  injected anon key. GoTrue mints an ES256 token its own RPC layer trusts.
+- **RLS claim-path fix** — migration `20260908000001_siwe_go_true_claim_fix.sql`:
+  GoTrue JWTs carry `wallet_address` nested under `user_metadata`, so `current_user_id()`
+  and `users_insert_self`/`users_update_self` now read the nested path (top-level
+  fallback) instead of `auth.jwt() ->> 'wallet_address'` (always NULL → all wallet-scoped
+  policies silently denied). `getSessionWallet` in `src/lib/supabase/index.ts` mirrors the
+  fallback for client-side display.
+- **Verified live** on `tauyciaavhnopeseecmz`: verify returns 200 + GoTrue token,
+  `/auth/v1/user` 200, `/rest/v1/users` self-row 200, `/rest/v1/conversations` 200,
+  `get_unread_conversation_counts` RPC 200.
+- **Ops**: migration drift was reconciled idempotently along the way (
+  `20260814000001` `"window"` keyword, `20260824000002/3/6/8` defensive reconciliation,
+  `20260829000002` pre-drop policies + `to_regclass` guard); `message_attachments` does not
+  exist on the remote (pre-existing gap, unrelated). Temp probe `envprobe` removed (deployed
+  + local). `send-email` is deployed but still untested.
+- **⚠ SECURITY**: several project credentials were exposed during debugging — rotate the
+  PAT (`sbp_…`), service-role (`sb_secret_…`), publishable key, and the shared JWT secret
+  value `faa6ba9b-…` at the next session.
+
+---
+
 ## Codebase-wide bug audit & lint/build hardening — 2026-09-07
 
 Resolved route mismatches, explorer base URL misconfigurations, form validation/i18n omissions, React hook dependency issues, and ESLint rule configurations. Full test suite, lint, and production build pass with 0 errors.

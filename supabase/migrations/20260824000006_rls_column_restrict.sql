@@ -40,6 +40,59 @@
 -- RLS state), so it remains effective even if a later SIWE re-apply drops
 -- our named policies.
 
+-- ---------------------------------------------------------------------------
+-- 0. Prerequisites (kept here so this file also applies on fresh DBs where
+--    the SIWE rewrite has not run yet, and on drifted remotes that predate
+--    both). Idempotent.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.current_user_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select u.id
+  from public.users u
+  where u.wallet_address = lower(coalesce(auth.jwt() ->> 'wallet_address', ''))
+  limit 1;
+$$;
+
+create or replace function public.is_conversation_participant(
+  p_conversation_id uuid,
+  p_user_id uuid
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.conversation_participants
+    where conversation_id = p_conversation_id
+      and user_id = p_user_id
+  );
+$$;
+
+-- The on-chain mirror columns (and the legacy proof columns) may be absent on
+-- remotes that were created from an older revision of 20260814000001.
+alter table public.disputes
+  add column if not exists escrow_address        varchar(42);
+alter table public.disputes
+  add column if not exists kleros_dispute_id     text;
+alter table public.disputes
+  add column if not exists tx_hash               text;
+alter table public.disputes
+  add column if not exists tx_hash_evidence      text;
+alter table public.disputes
+  add column if not exists kleros_dispute_status smallint;
+alter table public.disputes
+  add column if not exists escrow_state          smallint;
+alter table public.disputes
+  add column if not exists evidence_cid          text;
+
 -- =====================================================================
 -- 1. RPC: race-safe direct conversation creation (Critical #2)
 -- =====================================================================

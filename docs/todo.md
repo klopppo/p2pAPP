@@ -26,11 +26,24 @@
       siwe-auth --no-verify-jwt` → `supabase db push` (20260829000002 + 20260830000000)
       → client ship, done **live 2026-08-30**. Sign-in + a full trade flow were
       exercised on the deployed build. _(code+SQL landed 2026-08-29)_
+- [x] **💚 GoTrue session claim-path fix (deploy 2026-09-08)** — GoTrue mints
+      JWTs with `wallet_address` NESTED under `user_metadata` (not top-level),
+      so the SIWE RLS layer (`auth.jwt() ->> 'wallet_address'`) was reading
+      NULL and would deny every wallet-scoped policy on a real session.
+      Shipped migration `20260908000001_siwe_go_true_claim_fix.sql`
+      (`current_user_id()` + `users_insert_self`/`users_update_self` read the
+      nested path with a top-level fallback) + client `getSessionWallet`
+      fallback. E2E verified on the deployed project: nonce → verify → GoTrue
+      access_token → `/auth/v1/user` 200 → `conversations` / unread RPC 200.
 - [ ] **Resend key rotation** — key present in `.env.local` (gitignored);
       move to `supabase secrets set`, placeholder in tracked env files, rotate. _(ops)_
-- [x] **SIWE edge function + JWT mint** — `supabase/functions/siwe-auth`
-      (nonce issue/verify, viem signature check, GoTrue auth user provisioning,
-      HS256 JWT with `wallet_address` claim). _(2026-08-29, deploy above)_
+- [x] **SIWE edge function + session issuance** — `supabase/functions/siwe-auth`
+      (nonce issue/verify, viem signature check, GoTrue auth user provisioning).
+      Self-minted JWT is impossible on this platform (injected JWKS is
+      public-only, no HS256 secret reachable), so the function now lets GoTrue
+      itself mint the session via a server-side magiclink exchange
+      (`generate_link` admin → `/auth/v1/verify` with anon key). _
+      (deploy 2026-09-08, see 💚 below)_
 - [x] **Rewrite the 26 permissive RLS policies** — users → offers → trades →
       chat → notifications → disputes/ratings/reputation, all scoped via
       `public.current_user_id()` (JWT `wallet_address` claim); default-deny

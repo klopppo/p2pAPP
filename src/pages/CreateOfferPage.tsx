@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useAccount, useSignMessage } from 'wagmi'
+import { useAccount } from 'wagmi'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -21,6 +21,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { Check, ChevronDown, Loader2 } from 'lucide-react'
 import { createOffer, ensureUser, ensureWalletSession } from '@/lib/supabase'
+import { signWalletMessage } from '@/lib/walletSigner'
 import { currencySymbol, CURRENCY_SYMBOLS } from '@/lib/utils'
 
 // Standard unit-of-measure decimals per asset. offers.crypto_amount /
@@ -66,7 +67,6 @@ export function CreateOfferPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { address, isConnected, status } = useAccount()
-  const { signMessageAsync } = useSignMessage()
   const qc = useQueryClient()
   const [formData, setFormData] = useState<OfferForm>({
     type: 'buy',
@@ -132,11 +132,11 @@ export function CreateOfferPage() {
       //    (`errorConnectWallet`) was misleading: the wallet IS connected,
       //    the user just hasn't signed the SIWE challenge yet.
       let me = await ensureUser(address)
-      if (!me && isConnected && address && signMessageAsync) {
+      if (!me && isConnected && address) {
         toast.loading(t('createOffer.signingIn', { defaultValue: 'Sign in with your wallet…' }), {
           id: 'siwe-inline',
         })
-        const session = await ensureWalletSession(address, { signMessage: signMessageAsync })
+        const session = await ensureWalletSession(address, { signMessage: signWalletMessage })
         toast.dismiss('siwe-inline')
         if (session.user) {
           me = session.user
