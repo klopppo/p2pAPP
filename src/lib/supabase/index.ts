@@ -1466,7 +1466,7 @@ export async function getDisputeById(id: string) {
         buyer:users!trades_buyer_id_fkey (wallet_address, nickname, avatar_url),
         seller:users!trades_seller_id_fkey (wallet_address, nickname, avatar_url)
       ),
-      buyer:user!disputes_buyer_id_fkey (wallet_address, nickname, avatar_url, verification_level),
+      buyer:users!disputes_buyer_id_fkey (wallet_address, nickname, avatar_url, verification_level),
       seller:users!disputes_seller_id_fkey (wallet_address, nickname, avatar_url, verification_level),
       evidence:dispute_evidence(*)
     `)
@@ -1515,8 +1515,8 @@ export async function getRatingsForTrade(tradeId: string) {
     .from('trade_ratings')
     .select(`
       *,
-      rater:user!trade_ratings_rater_id_fkey (nickname, avatar_url),
-      rated:user!trade_ratings_rated_id_fkey (nickname, avatar_url)
+      rater:users!trade_ratings_rater_id_fkey (nickname, avatar_url),
+      rated:users!trade_ratings_rated_id_fkey (nickname, avatar_url)
     `)
     .eq('trade_id', tradeId)
     .order('submitted_at', { ascending: false })
@@ -1537,7 +1537,7 @@ export async function getRatingsByUser(userId: string) {
     .from('trade_ratings')
     .select(`
       *,
-      rater:user!trade_ratings_rater_id_fkey (nickname, avatar_url),
+      rater:users!trade_ratings_rater_id_fkey (nickname, avatar_url),
       trade:trades (trade_id, crypto_token, fiat_amount, fiat_currency)
     `)
     .eq('rated_id', userId)
