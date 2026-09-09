@@ -12,7 +12,6 @@ import {
 import { toast } from 'sonner'
 import { formatUnits, maxUint256, type Abi } from 'viem'
 import {
-  ArrowLeft,
   Wallet,
   Loader2,
   ShieldCheck,
@@ -30,6 +29,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Text } from '@/components/ui/text'
 import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import {
   CANCEL_TIMELOCK_SECONDS,
   ERC20_ABI,
@@ -644,38 +644,28 @@ export function TradeDetailPage() {
 
   return (
     <div className="w-full max-w-xl mx-auto">
-      {/* Header: back button on the left, centered title block, status badge
-          on the right. The trade-id label (TRD-…) was removed per UX
-          feedback — the deterministic ID is still in the receipt / Etherscan
-          link but doesn't need to be visible at the top. */}
-      <div className="flex items-center justify-between gap-2 mb-6">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate(-1)}
-          aria-label={t('tradeDetail.back')}
-          className="rounded-full shrink-0"
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <div className="flex-1 text-center">
-          <Text as="h2" variant="h2" className="mb-1 leading-tight">
-            {t('tradeDetail.trade')} {trade.crypto_token}
-          </Text>
-          <Text variant="muted">
+      {/* Same AppPageHeader centered shape as CreateOfferPage / TradesPage:
+          title + subtitle, no back arrow on the left, no action on the
+          right, no horizontal divider. The status badge rides below the
+          subtitle so it doesn't break the centered layout. */}
+      <AppPageHeader
+        title={`${t('tradeDetail.trade')} ${trade.crypto_token}`}
+        subtitle={
+          <>
             {trade.crypto_amount} {trade.crypto_token} ·{' '}
             {currencySymbol(trade.fiat_currency)}
             {trade.fiat_amount} {trade.fiat_currency}
-          </Text>
-        </div>
-        {liveState != null ? (
-          <span className="inline-flex items-center px-2 h-5 rounded-full bg-muted text-xs font-medium shrink-0">
+          </>
+        }
+        variant="centered"
+      />
+      {liveState != null && (
+        <div className="flex justify-center -mt-6 mb-6">
+          <span className="inline-flex items-center px-2.5 h-6 rounded-full bg-muted text-xs font-medium">
             {stateLabel}
           </span>
-        ) : (
-          <span className="shrink-0 w-9 h-9" aria-hidden="true" />
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Wallet-not-connected */}
       {!isConnected && (

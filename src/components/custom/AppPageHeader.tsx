@@ -1,13 +1,14 @@
+import type { ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
 
 interface AppPageHeaderProps {
   title: string
-  subtitle?: string
+  subtitle?: ReactNode
   variant?: 'split' | 'centered'
   /** Action node rendered on the right (split variant only) */
-  action?: React.ReactNode
+  action?: ReactNode
   /** Back handler (centered variant) */
   onBack?: () => void
   className?: string
