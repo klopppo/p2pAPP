@@ -287,6 +287,13 @@ export function TradePage() {
 
       // Deploy a KlerosEsc clone via the factory. Default grace period is
       // 7 days, default security deposit is 10% (within KlerosEsc's MIN/MAX).
+      //
+      // `gas` is capped explicitly: viem's auto-estimate falls back to the
+      // block gas limit (21M on most chains). Some RPCs (Infura, in
+      // particular) cap `eth_sendRawTransaction` at 16.7M, so an unbounded
+      // estimate reverts with "transaction gas limit too high". `createEscrow`
+      // deploys an EIP-1167 clone + initializes ~10 storage slots; 5M
+      // leaves generous headroom over the measured cost (~1.5M on Sepolia).
       setStage('mining')
       const txHash = await writeContractAsync({
         address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
@@ -299,7 +306,7 @@ export function TradePage() {
           cryptoBaseUnits,
           depositBps,
         ],
-        gas: gasLimit,
+        gas: 5_000_000n,
       })
       // Bound the wait so a Sepolia RPC stall doesn't leave the form
       // spinning at stage='mining' forever. Without this, a stalled RPC
