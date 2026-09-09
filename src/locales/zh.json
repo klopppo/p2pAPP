@@ -268,6 +268,7 @@
   "createOffer": {
     "title": "创建新报价",
     "subtitle": "浏览和创建交易报价",
+    "browseOffers": "浏览报价",
     "offerType": "报价类型",
     "buy": "买入",
     "sell": "卖出",
