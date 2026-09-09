@@ -282,18 +282,17 @@ export function TradePage() {
         setStage('idle')
         return
       }
-      // 30% headroom above the true estimate, far below the 16.7M RPC cap.
-      const gasLimit = (gas * 130n) / 100n
+      // 30% headroom above the true estimate, capped below Infura's 16.7M
+      // per-tx RPC ceiling (well above the ~1.5M that `createEscrow`
+      // actually consumes on Sepolia).
+      const gasLimit = ((gas ?? 1_500_000n) * 130n) / 100n
 
       // Deploy a KlerosEsc clone via the factory. Default grace period is
       // 7 days, default security deposit is 10% (within KlerosEsc's MIN/MAX).
       //
-      // `gas` is capped explicitly: viem's auto-estimate falls back to the
-      // block gas limit (21M on most chains). Some RPCs (Infura, in
-      // particular) cap `eth_sendRawTransaction` at 16.7M, so an unbounded
-      // estimate reverts with "transaction gas limit too high". `createEscrow`
-      // deploys an EIP-1167 clone + initializes ~10 storage slots; 5M
-      // leaves generous headroom over the measured cost (~1.5M on Sepolia).
+      // The explicit `gas: gasLimit` prevents viem's auto-estimate fallback
+      // (which hits the 21M block gas limit and reverts with "transaction
+      // gas limit too high" on Infura's Sepolia endpoint).
       setStage('mining')
       const txHash = await writeContractAsync({
         address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
@@ -306,7 +305,7 @@ export function TradePage() {
           cryptoBaseUnits,
           depositBps,
         ],
-        gas: 5_000_000n,
+        gas: gasLimit,
       })
       // Bound the wait so a Sepolia RPC stall doesn't leave the form
       // spinning at stage='mining' forever. Without this, a stalled RPC

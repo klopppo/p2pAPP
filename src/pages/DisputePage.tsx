@@ -156,17 +156,6 @@ const effectiveEscrow =
     effectiveEscrow || undefined,
   )
 
-  // Build a label per escrow (address + truncated address). Real apps would
-  // join the on-chain tradeAmount/buyer/seller into a friendlier label.
-  const escrowOptions = useMemo(
-    () =>
-      userEscrows.map((addr) => ({
-        value: addr,
-        label: `${addr.slice(0, 8)}…${addr.slice(-6)}`,
-      })),
-    [userEscrows],
-  )
-
   // B-4: read the escrow state to determine the filer's role
   // (buyer vs seller). Previously this defaulted to 'buyer' in
   // `insertDisputeEvidence`, mis-tagging seller-raised disputes.
@@ -636,32 +625,47 @@ const effectiveEscrow =
       )}
 
       <form onSubmit={handleSubmit} className="space-y-3">
-        {/* Escrow, Reason & Severity */}
+        {/* Trade, Reason & Severity */}
         <Card className="glass-panel rounded-2xl p-6 space-y-4">
           <Text variant="h4" className="font-bold mb-2">
             {t('disputePage.tradeAndReason')}
           </Text>
 
+          {/* Escrow contract — read-only when arriving from a trade detail
+              page (`?escrowAddress=0x…` set by TradeDetailPage's
+              "Raise a Kleros dispute" link). The user can't pick a different
+              escrow because the dispute is tied to the specific trade that
+              was opened from. We still resolve via `userEscrows` so the
+              deposit-time / lock-time gates work; if the contract isn't in
+              that list yet (rare race), the selector falls back to a plain
+              read-only chip below. */}
           {escrowsLoading ? (
             <div className="h-10 rounded-full bg-muted/60 animate-pulse" />
-          ) : (
+          ) : effectiveEscrow ? (
             <div>
               <Label className="text-base font-semibold mb-2 block">
                 {t('disputePage.escrowContract')}
               </Label>
-              <FullDropdown
-                label={t('disputePage.escrowContract')}
-                value={escrowAddress}
-                onSelect={(v) => setEscrowAddress(v as `0x${string}`)}
-                options={escrowOptions}
-              />
+              <div className="flex items-center gap-2 px-4 h-10 rounded-full border border-border bg-muted/40 text-sm">
+                <code className="font-mono text-xs">
+                  {effectiveEscrow.slice(0, 10)}…{effectiveEscrow.slice(-8)}
+                </code>
+                <a
+                  href={`https://sepolia.etherscan.io/address/${effectiveEscrow}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-auto text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                >
+                  Etherscan <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
               <p className="text-sm text-muted-foreground mt-1">
                 {t('disputePage.escrowHint', {
                   address: `${KLEROS_ESCROW_FACTORY_ADDRESS.slice(0, 8)}…${KLEROS_ESCROW_FACTORY_ADDRESS.slice(-6)}`,
                 })}
               </p>
             </div>
-          )}
+          ) : null}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
