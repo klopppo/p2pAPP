@@ -2172,6 +2172,16 @@ class SiweRejectedError extends Error {
  * or null when there is no session (or the claim is missing).
  */
 export async function getSessionWallet(): Promise<string | null> {
+  // Marker short-circuit: the SIWE backend mints the session via
+  // supabase.auth.setSession() with a JWT that doesn't surface
+  // wallet_address at the top level or under user_metadata (GoTrue
+  // doesn't expose arbitrary custom claims). Without this fallback every
+  // call site that checks the JWT — isSignedInAs, ensureUser's insert
+  // gate, getOrCreateDirectConversation, etc. — returns null and the
+  // inline-SIWE retry path pops another MetaMask prompt.
+  const marker = getSiweMarker()
+  if (marker?.address) return marker.address.toLowerCase()
+
   const session = await getSession()
   if (!session?.access_token) return null
   const payload = decodeJwtPayload(session.access_token)
@@ -2209,8 +2219,31 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
  * Returns true when the connected wallet already has a valid Supabase session
  * minted against it.
  */
+/**
+ * Mark a wallet as "signed in" so subsequent SIWE prompts can be skipped.
+ * Backed by `coffernode:siwe:last` in localStorage; cleared on signOut.
+ * Always set after a successful `signInWithWallet`.
+ */
+function getSiweMarker(): { address: string; issuedAt: string } | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem('coffernode:siwe:last')
+    return raw ? (JSON.parse(raw) as { address: string; issuedAt: string }) : null
+  } catch {
+    return null
+  }
+}
+
 export async function isSignedInAs(walletAddress: string): Promise<boolean> {
   const addr = walletAddress.toLowerCase()
+  // Short-circuit on the local marker first: the SIWE backend may mint a
+  // Supabase session whose JWT doesn't surface `wallet_address` (GoTrue
+  // doesn't expose arbitrary custom claims by default), in which case
+  // `getSessionWallet()` returns null even though we DID sign in moments
+  // ago. Without this check every page navigation + every inline-SIWE
+  // retry path would pop another signature prompt.
+  const marker = getSiweMarker()
+  if (marker?.address && marker.address.toLowerCase() === addr) return true
   return (await getSessionWallet()) === addr
 }
 

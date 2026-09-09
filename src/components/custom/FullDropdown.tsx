@@ -61,7 +61,7 @@ export function FullDropdown({
           />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align={align} sideOffset={sideOffset}>
+      <DropdownMenuContent align={align} sideOffset={sideOffset} className="min-w-56 w-[var(--radix-dropdown-menu-trigger-width)]">
         <DropdownMenuGroup>
           {options.map((o) => {
             const isActive = o.value === value
@@ -70,11 +70,11 @@ export function FullDropdown({
               <DropdownMenuItem
                 key={o.value}
                 onSelect={() => onSelect(o.value)}
-                className="capitalize cursor-pointer"
+                className="capitalize cursor-pointer whitespace-normal py-2.5"
               >
                 {Icon && <Icon className="w-4 h-4" />}
-                {o.label}
-                {isActive && <Check className="w-4 h-4 ml-auto" />}
+                <span className="flex-1">{o.label}</span>
+                {isActive && <Check className="w-4 h-4 ml-2 shrink-0" />}
               </DropdownMenuItem>
             )
           })}

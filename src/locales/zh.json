@@ -268,6 +268,7 @@
   "createOffer": {
     "title": "创建新报价",
     "subtitle": "浏览和创建交易报价",
+    "browseOffers": "浏览报价",
     "offerType": "报价类型",
     "buy": "买入",
     "sell": "卖出",
@@ -493,8 +494,8 @@
     "fee": "手续费",
     "gracePeriod": "宽限期",
     "funding": "资金注入",
-    "buyerDeposit": "买家保证金（{{amount}}）",
-    "sellerLock": "卖家锁定（{{amount}}）",
+    "buyerDeposit": "买家保证金 {{amount}}",
+    "sellerLock": "卖家锁定 {{amount}}",
     "depositPosted": "保证金已提交 · 等待 lockFunds()",
     "done": "完成",
     "waitingForBuyer": "等待买家",

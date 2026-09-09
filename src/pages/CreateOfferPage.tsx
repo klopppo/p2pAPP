@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAccount } from 'wagmi'
 import { useQueryClient } from '@tanstack/react-query'
@@ -8,8 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Wallet as WalletIcon } from 'lucide-react'
+import { ArrowLeftRight } from 'lucide-react'
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import {
   DropdownMenu,
@@ -276,31 +275,29 @@ export function CreateOfferPage() {
 
   return (
       <div className="w-full max-w-xl mx-auto">
-        {/* Centered Header Block */}
+        {/* Split header — same shape as /trades: title block on the left,
+            action button on the right. The back button (centered variant)
+            was removed; users get back via the navbar / browser history. */}
         <AppPageHeader
           title={t('createOffer.title')}
           subtitle={t('createOffer.subtitle')}
-          variant="centered"
-          onBack={() => navigate(-1)}
+          variant="split"
+          action={
+            <Button asChild variant="outline" className="rounded-full shadow-none">
+              <Link to="/app/offers">
+                <ArrowLeftRight className="w-4 h-4 mr-1" />
+                {t('createOffer.browseOffers')}
+              </Link>
+            </Button>
+          }
         />
 
-        {/* Centered Card */}
         <Card className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl">
           {/* wagmi v2: `status` is the source of truth — `isConnected` lags a
               render during rehydration after a refresh / wallet switch and
               can flash `false` even though the ConnectButton shows the
-              account. The banner mirrors the actual `status` so the user
-              isn't blindsided by the toast when they click submit. */}
-          {status !== 'connected' && (
-            <Alert className="mb-4 rounded-2xl border-primary/30 bg-primary/5">
-              <WalletIcon className="w-4 h-4" />
-              <AlertDescription>
-                {t('createOffer.connectWalletBanner', {
-                  defaultValue: 'Connect a wallet from the navbar to create an offer.',
-                })}
-              </AlertDescription>
-            </Alert>
-          )}
+              account. The button label switches to 'Connect wallet to
+              create' in that window, so we don't need the banner anymore. */}
                 <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Type Selection */}
                   <div>

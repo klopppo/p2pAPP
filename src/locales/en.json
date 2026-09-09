@@ -268,6 +268,7 @@
   "createOffer": {
     "title": "Create New Offer",
     "subtitle": "Browse and create trade offers",
+    "browseOffers": "Browse offers",
     "offerType": "Offer Type",
     "buy": "Buy",
     "sell": "Sell",
@@ -493,8 +494,8 @@
     "fee": "Fee",
     "gracePeriod": "Grace period",
     "funding": "Funding",
-    "buyerDeposit": "Buyer deposit ({{amount}})",
-    "sellerLock": "Seller lock ({{amount}})",
+    "buyerDeposit": "Buyer deposit {{amount}}",
+    "sellerLock": "Seller lock {{amount}}",
     "depositPosted": "Deposit posted · awaiting lockFunds()",
     "done": "Done",
     "waitingForBuyer": "Waiting for buyer",

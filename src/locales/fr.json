@@ -268,6 +268,7 @@
   "createOffer": {
     "title": "Créer une nouvelle offre",
     "subtitle": "Parcourez et créez des offres d'échange",
+    "browseOffers": "Voir les offres",
     "offerType": "Type d'offre",
     "buy": "Achat",
     "sell": "Vente",
@@ -493,8 +494,8 @@
     "fee": "Frais",
     "gracePeriod": "Délai de grâce",
     "funding": "Financement",
-    "buyerDeposit": "Dépôt de l'acheteur ({{amount}})",
-    "sellerLock": "Verrouillage du vendeur ({{amount}})",
+    "buyerDeposit": "Dépôt de l'acheteur {{amount}}",
+    "sellerLock": "Verrouillage du vendeur {{amount}}",
     "depositPosted": "Dépôt soumis · en attente de lockFunds()",
     "done": "Terminé",
     "waitingForBuyer": "En attente de l'acheteur",

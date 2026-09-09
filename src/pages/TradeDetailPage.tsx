@@ -644,37 +644,38 @@ export function TradeDetailPage() {
 
   return (
     <div className="w-full max-w-xl mx-auto">
-      <div className="flex items-center gap-2 mb-4">
+      {/* Header: back button on the left, centered title block, status badge
+          on the right. The trade-id label (TRD-…) was removed per UX
+          feedback — the deterministic ID is still in the receipt / Etherscan
+          link but doesn't need to be visible at the top. */}
+      <div className="flex items-center justify-between gap-2 mb-6">
         <Button
           variant="ghost"
           size="icon"
           onClick={() => navigate(-1)}
           aria-label={t('tradeDetail.back')}
-          className="rounded-full"
+          className="rounded-full shrink-0"
         >
           <ArrowLeft className="w-4 h-4" />
         </Button>
-        <Text
-          variant="small"
-          className="uppercase tracking-wider text-muted-foreground"
-        >
-          {trade.trade_id}
-        </Text>
-        {liveState != null && (
-          <span className="inline-flex items-center px-2 h-5 rounded-full bg-muted text-xs font-medium">
+        <div className="flex-1 text-center">
+          <Text as="h2" variant="h2" className="mb-1 leading-tight">
+            {t('tradeDetail.trade')} {trade.crypto_token}
+          </Text>
+          <Text variant="muted">
+            {trade.crypto_amount} {trade.crypto_token} ·{' '}
+            {currencySymbol(trade.fiat_currency)}
+            {trade.fiat_amount} {trade.fiat_currency}
+          </Text>
+        </div>
+        {liveState != null ? (
+          <span className="inline-flex items-center px-2 h-5 rounded-full bg-muted text-xs font-medium shrink-0">
             {stateLabel}
           </span>
+        ) : (
+          <span className="shrink-0 w-9 h-9" aria-hidden="true" />
         )}
       </div>
-
-      <Text as="h2" variant="h2" className="mb-1">
-        {t('tradeDetail.trade')} {trade.crypto_token}
-      </Text>
-      <Text variant="muted">
-        {trade.crypto_amount} {trade.crypto_token} ·{' '}
-        {currencySymbol(trade.fiat_currency)}
-        {trade.fiat_amount} {trade.fiat_currency}
-      </Text>
 
       {/* Wallet-not-connected */}
       {!isConnected && (
