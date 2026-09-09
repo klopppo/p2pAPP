@@ -2234,6 +2234,31 @@ function getSiweMarker(): { address: string; issuedAt: string } | null {
   }
 }
 
+/**
+ * Mark a wallet as "user declined the SIWE signature". Once set for a
+ * wallet, `ensureWalletSession` short-circuits with `session: false` and
+ * the caller can keep the app in read-only mode instead of re-prompting
+ * MetaMask on every page mount. Cleared on `signOut` (same lifetime as
+ * the success marker, so manual retry is still possible after logout).
+ *
+ * Stored under `coffernode:siwe:declined:{address}` so per-wallet
+ * rejections don't poison other wallets on the same browser.
+ */
+function getSiweRejectedMarker(address: string): boolean {
+  if (typeof window === 'undefined') return false
+  return window.localStorage.getItem(`coffernode:siwe:declined:${address}`) === '1'
+}
+
+function setSiweRejectedMarker(address: string): void {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(`coffernode:siwe:declined:${address}`, '1')
+}
+
+function clearSiweRejectedMarker(address: string): void {
+  if (typeof window === 'undefined') return
+  window.localStorage.removeItem(`coffernode:siwe:declined:${address}`)
+}
+
 export async function isSignedInAs(walletAddress: string): Promise<boolean> {
   const addr = walletAddress.toLowerCase()
   // Short-circuit on the local marker first: the SIWE backend may mint a
@@ -2269,11 +2294,23 @@ export async function ensureWalletSession(
     return { session: true, user: await ensureUser(addr) }
   }
 
+  // Honor a previous rejection: if the user already declined the SIWE
+  // signature for this wallet, do not pop MetaMask again. The app stays
+  // read-only (the caller branches on `session: false` and the inline
+  // retry paths surface a "sign-in required" toast instead of a popup).
+  if (getSiweRejectedMarker(addr)) {
+    return { session: false, user: await ensureUser(addr) }
+  }
+
   try {
     await signInWithWallet(addr, options)
+    // Successful sign-in clears any prior rejection so disconnect + reconnect
+    // starts the user with a fresh prompt if they want it again.
+    clearSiweRejectedMarker(addr)
     return { session: true, user: await ensureUser(addr) }
   } catch (err) {
     if (err instanceof SiweRejectedError) {
+      setSiweRejectedMarker(addr)
       console.warn('[ensureWalletSession] sign-in rejected:', err.message)
     } else {
       console.error('[ensureWalletSession] sign-in failed:', err)
@@ -2329,17 +2366,52 @@ function localNonce(bytes = 16): string {
  * Drop the SIWE session marker (if any). Kept for the profile menu; a real
  * sign-out should use `signOut` which also clears the Supabase session.
  */
+/**
+ * Legacy entry point — clears only the success marker. Use `signOut`
+ * (which calls this AND the per-wallet rejection marker) for the full
+ * cleanup path.
+ */
 export async function signOutSiweMarker(): Promise<void> {
   if (typeof window !== 'undefined') {
     window.localStorage.removeItem('coffernode:siwe:last')
   }
 }
 
+function clearSiweMarkersFor(address: string): void {
+  if (typeof window === 'undefined') return
+  window.localStorage.removeItem('coffernode:siwe:last')
+  clearSiweRejectedMarker(address)
+}
+
 /**
- * Sign out — clears the Supabase session and all caches.
+ * Sign out — clears the Supabase session + all caches + both SIWE
+ * markers (success + rejection) for the currently connected wallet.
  */
 export async function signOut() {
   clearAllUserCache()
+  // Best-effort: if we have an address hint cached, clear its rejection
+  // marker too. signOut itself doesn't take an address, so we read the
+  // marker to figure out the wallet (or fall back to just clearing the
+  // success marker if no rejection was ever recorded).
+  if (typeof window !== 'undefined') {
+    const last = window.localStorage.getItem('coffernode:siwe:last')
+    if (last) {
+      try {
+        const parsed = JSON.parse(last) as { address?: string }
+        if (parsed.address) clearSiweMarkersFor(parsed.address.toLowerCase())
+        else window.localStorage.removeItem('coffernode:siwe:last')
+      } catch {
+        window.localStorage.removeItem('coffernode:siwe:last')
+      }
+    }
+    // Also clear any rejection markers in case the user never signed in.
+    for (let i = window.localStorage.length - 1; i >= 0; i--) {
+      const k = window.localStorage.key(i)
+      if (k && k.startsWith('coffernode:siwe:declined:')) {
+        window.localStorage.removeItem(k)
+      }
+    }
+  }
   const { error } = await supabase.auth.signOut()
   if (error) {
     console.error('Error signing out:', error)
