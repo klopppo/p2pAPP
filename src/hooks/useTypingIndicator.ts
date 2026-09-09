@@ -208,18 +208,12 @@ export function useConversationPresence(
 
     channel
       .on('presence', { event: 'sync' }, syncFromState)
-      .on('presence', { event: 'leave' }, ({ leftPresences }) => {
-        // The connection-closed peer is in `leftPresences`. Remove them
-        // by id without waiting for the server's next `sync` (which
-        // doesn't always fire for the last leaver). supabase-js typing
-        // widens the payload to `{[key: string]: any}` so we cast through
-        // unknown — same shape we used to track the user via `track()`.
-        const leftIds = new Set(
-          (leftPresences as unknown as PresenceUser[]).map((p) => p.user_id)
-        )
-        if (leftIds.size === 0) return
-        setOnline((prev) => prev.filter((p) => !leftIds.has(p.user_id)))
-      })
+      // Re-baseline on leave instead of subtracting: a wallet open in two
+      // tabs tracks two entries under the same key, so closing one tab
+      // must NOT flip the user offline while the other tab is still here.
+      // The server doesn't always re-broadcast `sync` for the last leaver,
+      // so drive the refresh from the local event.
+      .on('presence', { event: 'leave' }, syncFromState)
       .subscribe(async (status: string) => {
         if (status === 'SUBSCRIBED') {
           await channel.track({

@@ -28,6 +28,10 @@ export function useNotifications() {
     queryKey: ['notifications', userId],
     queryFn: () => listNotifications(user!.id),
     enabled: !!userId,
+    // Poll fallback for environments without Realtime publication on
+    // `notifications` (same mechanism as useConversations). Realtime
+    // invalidations keep this fresh when the publication is enabled.
+    refetchInterval: 30_000,
   })
 
   useEffect(() => {

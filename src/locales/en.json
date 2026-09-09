@@ -220,7 +220,10 @@
     "connecting": "Connecting…",
     "loading": "Loading…",
     "loadingConversation": "Loading conversation…",
-    "conversationNotFound": "Conversation not found."
+    "conversationNotFound": "Conversation not found.",
+    "sendFailed": "Couldn't send the message. Please try again.",
+    "signInRequired": "Sign-in required — approve the wallet signature to send messages.",
+    "reconnectRequired": "Session expired — disconnect and reconnect your wallet to send messages."
   },
   "editOffer": {
     "title": "Edit offer",

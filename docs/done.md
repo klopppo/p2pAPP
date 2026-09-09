@@ -9,6 +9,38 @@
 
 ---
 
+## Session hardening + wallet-claim backfill + live presence — 2026-09-09
+
+"Messages can't be sent", "Conversation not found" on first DM, and "notifications don't
+work" all traced to one root cause: RLS resolves the wallet from the session JWT's
+`user_metadata.wallet_address`, but (a) the client treated the localStorage marker
+`coffernode:siwe:last` as proof of session and (b) GoTrue auth users created **before**
+the metadata convention mint JWTs WITHOUT the claim, so `current_user_id()` resolves to
+NULL and every wallet-scoped policy silently denies (sends, conversation/notification
+reads) — while `isSignedInAs` kept returning true, so the app never re-signed-in.
+
+- **Client** (`src/lib/supabase/index.ts`): `getSessionWallet` now returns the wallet
+  ONLY when a live token carries the claim — a token **without** the claim returns null
+  so `isSignedInAs` flips false and the next wallet round forces a fresh SIWE sign-in.
+  Dropped the marker-based claim fallback (`getSiweMarker` removed; marker is now just a
+  remember-me hint). `isSignedInAs` additionally hard-requires `access_token` + non-expired
+  `exp`.
+- **Server** (`supabase/functions/siwe-auth/index.ts`): new `ensureWalletMetadata` runs on
+  every verify — `admin.auth.admin.updateUserById` backfills
+  `user_metadata.wallet_address` on EXISTING auth users (both the link fast-path and the
+  `email_exists` retry), so the very next magiclink token carries the claim and post-deploy
+  sign-ins self-heal the broken sessions.
+- **Send-failure toasts** (`src/hooks/useMessages.ts`): optimistic send errors now branch
+  `42501` → `chat.signInRequired`, `401`/`PGRST301` → `chat.reconnectRequired`, else
+  `chat.sendFailed` (new keys in all 5 locales).
+- **Live online/offline** (`src/hooks/useGlobalPresence.tsx` + callers): app-wide
+  `presence:coffernode:global` channel drives the chat partner dot (`ChatLayout.tsx`) and
+  the ProfilePage badge via `onlineUsers.has(id)`; multi-tab-safe (re-baseline on
+  sync/join/leave, provider remounts on identity change).
+- **Notifications resilience** (`src/hooks/useNotifications.ts`): 30s `refetchInterval`
+  fallback so the bell feed isn't permanently stale when Realtime publication doesn't
+  deliver.
+
 ## TradePage escrow create preflight — bounded gas + real revert surfacing — 2026-09-09
 
 `createEscrow` on TradePage now estimates the contract call BEFORE broadcasting and

@@ -35,6 +35,16 @@
       nested path with a top-level fallback) + client `getSessionWallet`
       fallback. E2E verified on the deployed project: nonce → verify → GoTrue
       access_token → `/auth/v1/user` 200 → `conversations` / unread RPC 200.
+- [x] **Session self-heal for pre-claim auth users (deploy 2026-09-09)** —
+      auth users created BEFORE the `user_metadata.wallet_address` convention
+      minted claim-less JWTs → `current_user_id()` NULL → every wallet-scoped
+      RLS policy silently denied (message sends, "Conversation not found" on
+      first DM, empty notifications). Fixed via (a) `ensureWalletMetadata`
+      backfill in `siwe-auth` on every verify AND (b) client `getSessionWallet`
+      no longer treating a claim-less token / `siwe:last` marker as proof of
+      session, forcing a fresh sign-in that regenerates a claim-bearing token.
+      Requires `supabase functions deploy siwe-auth` after this ships. See
+      `done.md` 2026-09-09.
 - [ ] **Resend key rotation** — key present in `.env.local` (gitignored);
       move to `supabase secrets set`, placeholder in tracked env files, rotate. _(ops)_
 - [x] **SIWE edge function + session issuance** — `supabase/functions/siwe-auth`

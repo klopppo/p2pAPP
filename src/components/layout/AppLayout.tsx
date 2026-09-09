@@ -4,6 +4,7 @@ import { Navbar } from './Navbar'
 import { Footer } from './Footer'
 import { PageContainer } from './PageContainer'
 import { ChainGuard } from '@/components/custom/ChainGuard'
+import { GlobalPresenceProvider } from '@/hooks/useGlobalPresence'
 import { warmUpIpns } from '@/lib/ipfs'
 
 interface AppLayoutProps {
@@ -45,9 +46,11 @@ export function AppLayout({ children }: AppLayoutProps) {
       <Navbar showTabs />
       <ChainGuard />
       <main className="flex-1 flex flex-col min-h-0">
-        <PageContainer type="app">
-          {children || <Outlet />}
-        </PageContainer>
+        <GlobalPresenceProvider>
+          <PageContainer type="app">
+            {children || <Outlet />}
+          </PageContainer>
+        </GlobalPresenceProvider>
       </main>
       <Footer />
     </div>

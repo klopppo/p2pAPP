@@ -290,7 +290,6 @@ async function getOrCreateAuthUser(
   addr: string
 ): Promise<string> {
   const email = `${addr.replace(/^0x/, "")}@${WALLET_EMAIL_DOMAIN}`
-  
 
   // Fast path: known link.
   const { data: link } = await admin
@@ -301,7 +300,17 @@ async function getOrCreateAuthUser(
 
   if (link?.auth_user_id) {
     const { data } = await admin.auth.admin.getUserById(link.auth_user_id)
-    if (data?.user) return data.user.id
+    if (data?.user) {
+      // Backfill the wallet claim on the GoTrue user. RLS resolves the
+      // active wallet via `auth.jwt() -> 'user_metadata' ->> 'wallet_address'`,
+      // and GoTrue only embeds the metadata that exists AT token-mint time —
+      // auth users created before the metadata convention, or migrated from
+      // an earlier sign-in flow, would otherwise mint JWTs WITHOUT the claim
+      // and `current_user_id()` would resolve to NULL, silently denying every
+      // RLS read/write (messages, notifications, conversation lookups…).
+      await ensureWalletMetadata(admin, data.user.id, addr)
+      return data.user.id
+    }
     // Dangling link — clear it and re-provision below.
     await admin.from("siwe_auth_links").delete().eq("wallet_address", addr)
   }
@@ -323,7 +332,10 @@ async function getOrCreateAuthUser(
         .select("auth_user_id")
         .eq("wallet_address", addr)
         .maybeSingle()
-      if (retry?.auth_user_id) return retry.auth_user_id
+      if (retry?.auth_user_id) {
+        await ensureWalletMetadata(admin, retry.auth_user_id, addr)
+        return retry.auth_user_id
+      }
     }
     console.error("siwe-auth: createUser failed", error)
     throw new Error("Identity provisioning failed")
@@ -339,6 +351,26 @@ async function getOrCreateAuthUser(
       { onConflict: "wallet_address" }
     )
   return data.user.id
+}
+
+/**
+ * Make sure the GoTrue auth user's `user_metadata.wallet_address` matches
+ * `addr`. GoTrue signs it into every subsequent session JWT, and the SIWE RLS
+ * layer (see migrations/20260908000001) reads it from there — so an auth user
+ * without the claim would mint "valid" sessions that every wallet-scoped RLS
+ * policy silently denies. Idempotent: no-op when the claim already matches.
+ */
+async function ensureWalletMetadata(
+  admin: ReturnType<typeof createClient>,
+  authUid: string,
+  addr: string
+): Promise<void> {
+  const { data: u } = await admin.auth.admin.getUserById(authUid)
+  const meta = (u?.user?.user_metadata ?? {}) as Record<string, unknown>
+  if (meta.wallet_address === addr) return
+  await admin.auth.admin.updateUserById(authUid, {
+    user_metadata: { ...meta, wallet_address: addr },
+  })
 }
 
 // ---------------------------------------------------------------------------

@@ -12,6 +12,7 @@ import {
 } from '@/hooks/useConversations'
 import { useMessages, useSendMessage } from '@/hooks/useMessages'
 import { useTypingIndicator, useConversationPresence } from '@/hooks/useTypingIndicator'
+import { useGlobalPresence } from '@/hooks/useGlobalPresence'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { ConversationList } from './ConversationList'
 import { ChatHeader } from './ChatHeader'
@@ -93,6 +94,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   )
   const typing = useTypingIndicator(isOurTeam ? null : activeId, identity)
   const online = useConversationPresence(isOurTeam ? null : activeId, identity)
+  const onlineUsers = useGlobalPresence()
 
   const partner = useMemo(() => {
     if (!user) return null
@@ -102,7 +104,9 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
     return conv.participants.find((p) => p.user_id !== user.id) ?? null
   }, [convQuery.data, user, isOurTeam])
 
-  const partnerOnline = !!partner && online.some((o) => o.user_id === partner.user_id)
+  const partnerOnline =
+    !!partner &&
+    (onlineUsers.has(partner.user_id) || online.some((o) => o.user_id === partner.user_id))
 
   // Synthetic conversation (for ChatHeader) + synthetic messages for the
   // ourTeam thread. Computed every render but cheap — no DB read.

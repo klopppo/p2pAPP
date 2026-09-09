@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 import { supabase, listMessages, sendMessage, markConversationRead } from '@/lib/supabase'
 import type { MessageKind, MessageWithSender } from '@/types/database'
 import { useCurrentUser } from './useCurrentUser'
@@ -114,6 +116,7 @@ export function useMessages(conversationId: string | null | undefined) {
 export function useSendMessage(conversationId: string | null | undefined) {
   const { data: user } = useCurrentUser()
   const qc = useQueryClient()
+  const { t } = useTranslation()
   const tempIdRef = useRef(0)
 
   return useMutation({
@@ -150,9 +153,21 @@ export function useSendMessage(conversationId: string | null | undefined) {
       qc.setQueryData<MessageWithSender[]>(key, [...previous, optimistic])
       return { previous, tempId }
     },
-    onError: (_err, _vars, ctx) => {
+    onError: (err, _vars, ctx) => {
       if (!conversationId || !ctx) return
       qc.setQueryData(['messages', conversationId], ctx.previous)
+      // Surface the failure instead of silently rolling back — under the
+      // SIWE RLS the two loudest causes are a missing/invalid session
+      // (42501 — RLS denied the insert) and a genuinely dead session
+      // (expired JWT, 401). Give the user an actionable prompt for both.
+      const code = (err as { code?: string })?.code
+      if (code === '42501' && user) {
+        toast.error(t('chat.signInRequired'))
+      } else if (code === '401' || code === 'PGRST301') {
+        toast.error(t('chat.reconnectRequired'))
+      } else {
+        toast.error(t('chat.sendFailed'))
+      }
     },
     onSuccess: (saved, _vars, ctx) => {
       if (!conversationId || !ctx) return

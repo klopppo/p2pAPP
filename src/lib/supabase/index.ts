@@ -2172,28 +2172,30 @@ class SiweRejectedError extends Error {
  * or null when there is no session (or the claim is missing).
  */
 export async function getSessionWallet(): Promise<string | null> {
-  // Marker short-circuit: the SIWE backend mints the session via
-  // supabase.auth.setSession() with a JWT that doesn't surface
-  // wallet_address at the top level or under user_metadata (GoTrue
-  // doesn't expose arbitrary custom claims). Without this fallback every
-  // call site that checks the JWT — isSignedInAs, ensureUser's insert
-  // gate, getOrCreateDirectConversation, etc. — returns null and the
-  // inline-SIWE retry path pops another MetaMask prompt.
-  const marker = getSiweMarker()
-  if (marker?.address) return marker.address.toLowerCase()
-
+  // The real source of truth is the active Supabase session. Prefer the
+  // actual JWT claim (top-level or GoTrue's nested `user_metadata` bag).
   const session = await getSession()
-  if (!session?.access_token) return null
-  const payload = decodeJwtPayload(session.access_token)
-  const metadata = payload?.user_metadata as Record<string, unknown> | undefined
-  const raw =
-    typeof payload?.wallet_address === 'string'
-      ? payload.wallet_address
-      : typeof metadata?.wallet_address === 'string'
-        ? metadata.wallet_address
-        : null
-  const wallet = raw
-  return typeof wallet === 'string' && wallet ? wallet.toLowerCase() : null
+  if (session?.access_token) {
+    const payload = decodeJwtPayload(session.access_token)
+    const metadata = payload?.user_metadata as Record<string, unknown> | undefined
+    const raw =
+      typeof payload?.wallet_address === 'string'
+        ? payload.wallet_address
+        : typeof metadata?.wallet_address === 'string'
+          ? metadata.wallet_address
+          : null
+    if (typeof raw === 'string' && raw) return raw.toLowerCase()
+    // A present token WITHOUT the claim mints a "valid" session the RLS
+    // layer still denies (current_user_id() resolves to NULL). Treat it as
+    // not signed-in so callers re-run SIWE — the edge function backfills
+    // user_metadata.wallet_address on every verify, so the retry fixes the
+    // claim instead of looping on silent denials.
+    return null
+  }
+
+  // No token at all -> definitely not signed in. The `coffernode:siwe:last`
+  // marker is a remember-me hint only; it is NOT proof of a live session.
+  return null
 }
 
 /**
@@ -2210,25 +2212,6 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
       '=',
     )
     return JSON.parse(atob(padded)) as Record<string, unknown>
-  } catch {
-    return null
-  }
-}
-
-/**
- * Returns true when the connected wallet already has a valid Supabase session
- * minted against it.
- */
-/**
- * Mark a wallet as "signed in" so subsequent SIWE prompts can be skipped.
- * Backed by `coffernode:siwe:last` in localStorage; cleared on signOut.
- * Always set after a successful `signInWithWallet`.
- */
-function getSiweMarker(): { address: string; issuedAt: string } | null {
-  if (typeof window === 'undefined') return null
-  try {
-    const raw = window.localStorage.getItem('coffernode:siwe:last')
-    return raw ? (JSON.parse(raw) as { address: string; issuedAt: string }) : null
   } catch {
     return null
   }
@@ -2261,14 +2244,24 @@ function clearSiweRejectedMarker(address: string): void {
 
 export async function isSignedInAs(walletAddress: string): Promise<boolean> {
   const addr = walletAddress.toLowerCase()
-  // Short-circuit on the local marker first: the SIWE backend may mint a
-  // Supabase session whose JWT doesn't surface `wallet_address` (GoTrue
-  // doesn't expose arbitrary custom claims by default), in which case
-  // `getSessionWallet()` returns null even though we DID sign in moments
-  // ago. Without this check every page navigation + every inline-SIWE
-  // retry path would pop another signature prompt.
-  const marker = getSiweMarker()
-  if (marker?.address && marker.address.toLowerCase() === addr) return true
+
+  // Hard requirement: an actual Supabase session token must exist. The
+  // `coffernode:siwe:last` marker is a remember-me hint (and a claim-path
+  // fallback for GoTrue JWTs we can't decode client-side) — but a marker
+  // with no live token is a false positive that makes every RLS write
+  // fail silently (messages, last_active_at, mark-read…).
+  const session = await getSession()
+  if (!session?.access_token) return false
+
+  // Belt-and-suspenders: if the token is already past exp, supabase-js's
+  // background refresh may not have run yet — treat it as not signed in so
+  // we re-sign instead of authorizing with a dead JWT.
+  const payload = decodeJwtPayload(session.access_token)
+  if (typeof payload?.exp === 'number' && payload.exp * 1000 < Date.now()) return false
+
+  // getSessionWallet() falls back to the marker (when a token is present)
+  // so a claim we can't parse on the client still counts as signed-in —
+  // RLS re-authorizes the server side anyway.
   return (await getSessionWallet()) === addr
 }
 

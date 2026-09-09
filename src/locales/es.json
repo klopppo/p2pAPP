@@ -220,7 +220,10 @@
     "connecting": "Conectando…",
     "loading": "Cargando…",
     "loadingConversation": "Cargando conversación…",
-    "conversationNotFound": "Conversación no encontrada."
+    "conversationNotFound": "Conversación no encontrada.",
+    "sendFailed": "No se pudo enviar el mensaje. Inténtalo de nuevo.",
+    "signInRequired": "Requiere iniciar sesión: aprueba la firma de tu cartera para enviar mensajes.",
+    "reconnectRequired": "Sesión caducada: desconecta y vuelve a conectar tu cartera para enviar mensajes."
   },
   "editOffer": {
     "title": "Editar oferta",

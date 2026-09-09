@@ -220,7 +220,10 @@
     "connecting": "Connexion…",
     "loading": "Chargement…",
     "loadingConversation": "Chargement de la conversation…",
-    "conversationNotFound": "Conversation introuvable."
+    "conversationNotFound": "Conversation introuvable.",
+    "sendFailed": "Impossible d'envoyer le message. Réessayez.",
+    "signInRequired": "Connexion requise — approuvez la signature de votre portefeuille pour envoyer des messages.",
+    "reconnectRequired": "Session expirée — déconnectez puis reconnectez votre portefeuille pour envoyer des messages."
   },
   "editOffer": {
     "title": "Modifier l'offre",

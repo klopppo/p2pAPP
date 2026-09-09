@@ -220,7 +220,10 @@
     "connecting": "连接中…",
     "loading": "加载中…",
     "loadingConversation": "加载对话中…",
-    "conversationNotFound": "未找到对话。"
+    "conversationNotFound": "未找到对话。",
+    "sendFailed": "无法发送消息，请重试。",
+    "signInRequired": "需要登录——请批准钱包签名以发送消息。",
+    "reconnectRequired": "会话已过期——请断开并重新连接钱包以发送消息。"
   },
   "editOffer": {
     "title": "编辑报价",

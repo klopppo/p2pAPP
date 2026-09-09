@@ -23,6 +23,7 @@ import { ArrowUpDown } from 'lucide-react'
 import { useUserProfile, useOffersBySeller } from '@/hooks/useOffers'
 import { useConversations } from '@/hooks/useConversations'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useGlobalPresence } from '@/hooks/useGlobalPresence'
 import { getOrCreateDirectConversation } from '@/lib/supabase'
 import { AddressWithActions } from '@/components/custom/AddressWithActions'
 import { useTranslation } from 'react-i18next'
@@ -110,6 +111,9 @@ export function ProfilePage() {
 
   const { data: profile, isLoading: profileLoading, isError: profileError } = useUserProfile(targetAddress)
   const { data: user } = useCurrentUser()
+  // Live app-wide presence — a user is "online" when they're connected to
+  // the app with a wallet RIGHT NOW (not "last_active_at" was ever set).
+  const onlineUsers = useGlobalPresence()
   const { data: offers, isLoading: offersLoading } = useOffersBySeller(profile?.id)
   // Conversation list — used to find a pre-existing thread with the viewed
   // user. Placed before the early returns below so rules-of-hooks is happy.
@@ -235,7 +239,6 @@ export function ProfilePage() {
   const cancelledTrades = profile.cancelled_trades ?? 0
   const disputeCount = profile.dispute_count ?? 0
   const completionRate = totalTrades > 0 ? `${Math.round((completedTrades / totalTrades) * 100)}%` : '—'
-  const lastActive = profile.last_active_at ? new Date(profile.last_active_at).toLocaleDateString() : '—'
   const memberSince = profile.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
   // "Message" button — find any conversation with this user via the
@@ -288,9 +291,7 @@ export function ProfilePage() {
           <div className="flex items-center gap-3 flex-wrap">
             <Text variant="h2">{nickname}</Text>
             <Badge className="bg-success text-success-foreground hover:bg-success/90 text-sm">
-
-
-              {lastActive === '—' ? t('profile.offline') : t('profile.online')}
+              {onlineUsers.has(profile.id) ? t('profile.online') : t('profile.offline')}
             </Badge>
           </div>
           <div className="mt-1">

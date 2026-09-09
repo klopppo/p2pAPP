@@ -220,7 +220,10 @@
     "connecting": "Bağlanıyor…",
     "loading": "Yükleniyor…",
     "loadingConversation": "Sohbet yükleniyor…",
-    "conversationNotFound": "Sohbet bulunamadı."
+    "conversationNotFound": "Sohbet bulunamadı.",
+    "sendFailed": "Mesaj gönderilemedi. Lütfen tekrar deneyin.",
+    "signInRequired": "Giriş gerekli — mesaj göndermek için cüzdan imzasını onaylayın.",
+    "reconnectRequired": "Oturum süresi doldu — mesaj göndermek için cüzdanınızı bağlayıp yeniden bağlayın."
   },
   "editOffer": {
     "title": "Teklifi düzenle",
