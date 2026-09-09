@@ -530,7 +530,7 @@ export async function getActiveOffers(limit = 50, offset = 0) {
     .from('offers')
     .select(`
       *,
-      seller:users!offers_seller_id_fkey (wallet_address, nickname, avatar_url, verification_level, total_trades, avg_rating)
+      seller:users!offers_seller_id_fkey (id, wallet_address, nickname, avatar_url, verification_level, total_trades, avg_rating)
     `)
     .eq('status', OfferStatus.ACTIVE)
     .gte('expires_at', new Date().toISOString())
@@ -553,7 +553,7 @@ export async function getOffersBySeller(sellerId: string, status?: OfferStatus) 
     .from('offers')
     .select(`
       *,
-      seller:users!offers_seller_id_fkey (nickname, avatar_url, verification_level)
+      seller:users!offers_seller_id_fkey (id, nickname, avatar_url, verification_level)
     `)
     .eq('seller_id', sellerId)
     .order('created_at', { ascending: false })
@@ -607,7 +607,7 @@ export async function getOfferById(id: string) {
     .from('offers')
     .select(`
       *,
-      seller:users!offers_seller_id_fkey (wallet_address, nickname, avatar_url, verification_level, total_trades, avg_rating)
+      seller:users!offers_seller_id_fkey (id, wallet_address, nickname, avatar_url, verification_level, total_trades, avg_rating)
     `)
     .eq('id', id)
     .single()
@@ -1729,6 +1729,13 @@ export async function getOrCreateDirectConversation(
   otherUserId: string,
 ): Promise<string | null> {
   if (currentUserId === otherUserId) return null
+  // Reject non-uuid args before they hit PostgREST, which would otherwise
+  // cast a `undefined`/garbage value and throw `invalid input syntax for
+  // type uuid` deep in the query. Callers that only fetch joined rows
+  // without selecting `id` are the usual source.
+  const isUuid = (v: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v)
+  if (!isUuid(currentUserId) || !isUuid(otherUserId)) return null
 
   // Fast pre-check before the RPC for the common case (existing direct
   // conversation between the two users): query the current user's

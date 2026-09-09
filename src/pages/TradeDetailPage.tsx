@@ -777,14 +777,14 @@ export function TradeDetailPage() {
 
           <div className="space-y-3 text-sm">
             <FundingRow
-              label={`${t('tradeDetail.buyerDeposit')} (${formatTokenAmount(escrowState.securityDepositAmount, decimals, symbol)})`}
+              label={t('tradeDetail.buyerDeposit', { amount: formatTokenAmount(escrowState.securityDepositAmount, decimals, symbol) })}
               done={escrowState.buyerSecurityDeposited}
               who="buyer"
               isMe={isBuyer}
               t={t}
             />
             <FundingRow
-              label={`${t('tradeDetail.sellerLock')} (${formatTokenAmount(escrowState.tradeAmount + escrowState.securityDepositAmount, decimals, symbol)})`}
+              label={t('tradeDetail.sellerLock', { amount: formatTokenAmount(escrowState.tradeAmount + escrowState.securityDepositAmount, decimals, symbol) })}
               done={escrowState.sellerSecurityDeposited && escrowState.fundsLocked}
               who="seller"
               isMe={isSeller}
