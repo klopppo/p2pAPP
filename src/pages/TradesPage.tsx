@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Loader2, Inbox, ArrowLeftRight } from 'lucide-react'
+import { Loader2, Inbox, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -62,6 +62,7 @@ interface TradeRow {
 
 export function TradesPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { data: user } = useCurrentUser()
   const { data: trades = [], isLoading, isError } = useTrades()
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('all')
@@ -114,18 +115,16 @@ export function TradesPage() {
 
   return (
     <section className="space-y-8">
+      {/* Centered header matching /create-offer: back button left, title +
+          subtitle dead-center. The 'Browse offers' action that lived on
+          the right in the old split variant is gone — the empty-state CTA
+          covers it when there are no trades, and a discoverable offer
+          board is one navbar click away. */}
       <AppPageHeader
         title={t('trades.title')}
         subtitle={t('trades.subtitle')}
-        variant="split"
-        action={
-          <Button asChild className="rounded-full shadow-none">
-            <Link to="/app/offers">
-              <ArrowLeftRight className="w-4 h-4 mr-1" />
-              {t('trades.browseOffers')}
-            </Link>
-          </Button>
-        }
+        variant="centered"
+        onBack={() => navigate('/app/offers')}
       />
 
       {/* Filter strip */}
@@ -177,7 +176,7 @@ export function TradesPage() {
             </div>
             <Button asChild className="rounded-full shadow-none mt-2">
               <Link to="/app/offers">
-                <ArrowLeftRight className="w-4 h-4 mr-1" />
+                <Search className="w-4 h-4 mr-1" />
                 {t('trades.findAnOffer')}
               </Link>
             </Button>
