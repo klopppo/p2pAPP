@@ -2266,6 +2266,43 @@ export async function isSignedInAs(walletAddress: string): Promise<boolean> {
 }
 
 /**
+ * Self-heal for sessions minted BEFORE the wallet-claim backfill shipped.
+ * GoTrue issues fresh tokens with the CURRENT user_metadata, so exchanging
+ * the stored refresh_token silently rewrites a claim-less JWT into one that
+ * carries `user_metadata.wallet_address` — no wallet signature needed.
+ * Returns true when the active token already does (or now does) carry the
+ * claim for `address`. Callers fall through to the normal SIWE re-sign path.
+ */
+async function refreshToWalletClaim(address: string): Promise<boolean> {
+  const addr = address.toLowerCase()
+  const session = await getSession()
+  if (!session?.access_token || !session.refresh_token) return false
+
+  const readMemoizedClaim = (accessToken: string): string | null => {
+    const payload = decodeJwtPayload(accessToken)
+    if (!payload) return null
+    const metadata = payload?.user_metadata as Record<string, unknown> | undefined
+    const raw =
+      typeof payload?.wallet_address === 'string'
+        ? payload.wallet_address
+        : typeof metadata?.wallet_address === 'string'
+          ? metadata.wallet_address
+          : null
+    return typeof raw === 'string' && raw ? raw.toLowerCase() : null
+  }
+
+  // Claim already present and matching — nothing to do.
+  if (readMemoizedClaim(session.access_token) === addr) return true
+
+  // Claim-less (valid) token: refresh once to pick up the backfilled metadata.
+  const { data, error } = await supabase.auth.refreshSession()
+  if (error) return false
+  const accessToken = data?.session?.access_token
+  if (!accessToken) return false
+  return readMemoizedClaim(accessToken) === addr
+}
+
+/**
  * Ensure a session exists for the connected wallet: sign in (SIWE) if needed,
  * then resolve the user row. This is the entry point called on wallet connect.
  *
@@ -2281,6 +2318,13 @@ export async function ensureWalletSession(
   },
 ): Promise<{ session: boolean; user: User | null }> {
   const addr = walletAddress.toLowerCase()
+
+  // Pre-claim sessions (minted before the wallet metadata backfill) can be
+  // repaired silently by exchanging the refresh token — avoids re-prompting
+  // the wallet on app reload for users whose token predates the fix.
+  if (await refreshToWalletClaim(addr)) {
+    return { session: true, user: await ensureUser(addr) }
+  }
 
   if (await isSignedInAs(addr)) {
     // Already signed in for this wallet — just resolve the row.

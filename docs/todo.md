@@ -43,8 +43,11 @@
       backfill in `siwe-auth` on every verify AND (b) client `getSessionWallet`
       no longer treating a claim-less token / `siwe:last` marker as proof of
       session, forcing a fresh sign-in that regenerates a claim-bearing token.
-      Requires `supabase functions deploy siwe-auth` after this ships. See
-      `done.md` 2026-09-09.
+      (c) `refreshToWalletClaim` boot self-heal exchanges the refresh token for
+      pre-backfill sessions (verified live end-to-end with a temp `diag`
+      function: minted token carries the claim, `current_user_id` 200,
+      prefs/conversations reads 200). `siwe-auth` deployed; client side needs
+      an app reload. See `done.md` 2026-09-09.
 - [ ] **Resend key rotation** — key present in `.env.local` (gitignored);
       move to `supabase secrets set`, placeholder in tracked env files, rotate. _(ops)_
 - [x] **SIWE edge function + session issuance** — `supabase/functions/siwe-auth`

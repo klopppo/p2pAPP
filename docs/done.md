@@ -25,6 +25,15 @@ reads) — while `isSignedInAs` kept returning true, so the app never re-signed-
   Dropped the marker-based claim fallback (`getSiweMarker` removed; marker is now just a
   remember-me hint). `isSignedInAs` additionally hard-requires `access_token` + non-expired
   `exp`.
+- **Claims self-heal at boot** (`src/lib/supabase/index.ts::refreshToWalletClaim`): when a
+  stored session token is valid but claim-less (minted pre-backfill), `ensureWalletSession`
+  exchanges the refresh token ONCE — GoTrue re-reads the now-backfilled user_metadata when
+  minting a fresh token, so the claim-less JWT is silently rewritten into a claim-bearing
+  one without re-prompting the wallet. Verified live via a temp `diag` function (deployed,
+  exercised, removed): minted a real server-side magiclink token, decoded
+  `user_metadata.wallet_address` present, `rpc/current_user_id` → 200
+  `3ca94e15-…`, `notification_preferences` read → 200, `conversations` read → 200
+  (previously 42501/406 with a stale token).
 - **Server** (`supabase/functions/siwe-auth/index.ts`): new `ensureWalletMetadata` runs on
   every verify — `admin.auth.admin.updateUserById` backfills
   `user_metadata.wallet_address` on EXISTING auth users (both the link fast-path and the
