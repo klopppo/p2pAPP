@@ -105,8 +105,12 @@ export function SignInPrompt() {
       clearRejected(address)
       qc.invalidateQueries({ queryKey: ['current-user'] })
       qc.invalidateQueries({ queryKey: ['user-profile'] })
-      // The visibility effect will re-evaluate once the success marker
-      // + user row are both present, and hide the prompt.
+      // The success marker is now in localStorage. Hide the prompt
+      // explicitly rather than waiting for the visibility effect to
+      // re-run — the effect only depends on [address, isConnected], and
+      // those don't change on a successful sign-in. The marker check
+      // is the source of truth either way.
+      setVisible(false)
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : String(err))
     } finally {
