@@ -691,3 +691,7 @@ export interface MockOffer {
   maxAmount: number
   isPositive: boolean
 }
+
+// Re-export RBAC and Audit types
+export * from './rbac'
+

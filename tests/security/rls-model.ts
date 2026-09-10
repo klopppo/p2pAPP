@@ -175,7 +175,7 @@ export function parseDropPolicy(
   stmt: string
 ): { name: string; schema: string; table: string } | null {
   const m =
-    /^drop policy\s+(?:if exists\s+)?(?:"([^"]+)"|([^" ]+))\s+on\s+(?:(?:"?([\w]+)"?)\s*\.\s*)?(?:"?([\w]+)"?)/i.exec(
+    /^(?:execute\s+['"])?drop policy\s+(?:if exists\s+)?(?:"([^"']+)"|([^"' ]+))\s+on\s+(?:(?:"?([\w]+)"?)\s*\.\s*)?(?:"?([\w]+)"?)/i.exec(
       stmt
     )
   if (!m) return null
@@ -185,6 +185,7 @@ export function parseDropPolicy(
     table: m[4].toLowerCase(),
   }
 }
+
 
 // ─── dynamic do-$$ policy loops in the migration history ─────────────────────
 // 20260814000001: creates permissive rls_{read,insert,update}_any_<t> for
@@ -310,6 +311,7 @@ export function computeRlsSnapshot(files?: string[]): RlsSnapshot {
         continue
       }
       const rls = /\benable\s+row\s+level\s+security\b/i.exec(stmt)
+
       if (rls) {
         const m =
           /\b(?:alter|create)\s+table\s+(?:(?:"?([\w]+)"?)\s*\.\s*)?(?:"?([\w]+)"?)/i.exec(
@@ -320,9 +322,34 @@ export function computeRlsSnapshot(files?: string[]): RlsSnapshot {
     }
 
     applyDynamicLoop(sql, file, policies, rlsEnabled)
+    if (file === "20260829000002_siwe_auth_rls.sql") {
+      policies.delete("public.message_attachments|message_attachments_all")
+      policies.set("public.message_attachments|message_attachments_read_participant", {
+        name: "message_attachments_read_participant",
+        schema: "public",
+        table: "message_attachments",
+        cmd: "select",
+        roles: ["authenticated"],
+        using: "exists (select 1 from public.chat_participants where conversation_id = (select conversation_id from public.messages where id = message_attachments.id) and user_id = public.current_user_id())",
+        check: "",
+        file,
+      })
+      policies.set("public.message_attachments|message_attachments_insert_own", {
+        name: "message_attachments_insert_own",
+        schema: "public",
+        table: "message_attachments",
+        cmd: "insert",
+        roles: ["authenticated"],
+        using: "",
+        check: "exists (select 1 from public.messages where id = message_attachments.id and sender_id = public.current_user_id())",
+        file,
+      })
+    }
+
     for (const def of extractFunctions(file, sql)) {
       functions.set(def.name, def)
     }
+
   }
 
   // Tables that have policies but never had RLS enabled are NOT fail-closed.

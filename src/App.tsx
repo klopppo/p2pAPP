@@ -20,7 +20,9 @@ import { TradeDetailPage } from './pages/TradeDetailPage'
 import { DisputePage } from './pages/DisputePage'
 import { DisputesListPage } from './pages/DisputesListPage'
 import { DisputeDetailPage } from './pages/DisputeDetailPage'
+import { OperatorDashboardPage } from './pages/OperatorDashboardPage'
 import { AppLayout } from './components/layout/AppLayout'
+
 import { DocsLayout } from './pages/docs/DocsLayout'
 import DocsIndex from './pages/docs/index'
 import DocsGettingStarted from './pages/docs/GettingStarted'
@@ -132,7 +134,9 @@ function App() {
                 <Route path="dispute" element={<DisputePage />} />
                 <Route path="disputes" element={<DisputesListPage />} />
                 <Route path="disputes/:id" element={<DisputeDetailPage />} />
+                <Route path="operator" element={<OperatorDashboardPage />} />
               </Route>
+
               <Route path="/docs" element={<DocsLayout />}>
                 <Route index element={<DocsIndex />} />
                 <Route path="getting-started" element={<DocsGettingStarted />} />

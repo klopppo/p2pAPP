@@ -9,6 +9,33 @@
 
 ---
 
+## RBAC, Audit Logger Movimenti & Operator Dashboard — 2026-09-10
+
+Implemented a complete Role-Based Access Control (RBAC) architecture, an immutable user/operator activity audit logger, user reporting mechanism, and an Operator Portal dashboard:
+
+- **Database & Migrations** (`docs/migrations/002-rbac-audit-logger-operator-dashboard.sql`):
+  - `sys_programs` (system modules & controllers: `OPERATOR_PORTAL`, `AUDIT_LOGGER`, `USER_REPORTS`, `MESSAGES_INSPECTOR`, `TRADES_MONITOR`, `DISPUTES_CONSOLE`, `RBAC_MANAGEMENT`).
+  - `sys_roles` (`SUPER_ADMIN`, `COMPLIANCE_LEAD`, `SUPPORT_OPERATOR`, `ARBITRATOR`, `AUDITOR_READONLY`).
+  - `sys_permissions` (`VIEW`, `CREATE`, `EDIT`, `DELETE`, `EXECUTE`, `VIEW_PRIVATE_MESSAGES`, `RESOLVE_REPORT`, `MANAGE_OPERATORS`, `AUDIT_READ`).
+  - `sys_program_role_permissions` (atomic matrix linking Program × Role × Permission).
+  - `sys_operators` & `sys_operator_roles` (backoffice staff identity & role assignments).
+  - `user_activity_logs` (immutable event log recording actor, program, action, resource, old/new states, metadata, and telemetry).
+  - `user_reports` (user reports for scam, fraudulent payment receipts, abusive chat, or off-platform trading).
+- **Core Services & Types** (`src/types/rbac.ts`, `src/lib/auditLogger.ts`, `src/lib/operatorService.ts`, `src/lib/reportsService.ts`):
+  - In-memory & Supabase logging engine (`logUserActivity`, `listUserActivityLogs`).
+  - Permission checker & matrix modifier (`hasPermission`, `isPermissionEnabled`, `toggleRolePermission`).
+  - Chat inspection service with automatic audit logging upon transcript access.
+  - User reports creation and resolution workflows with operator notes.
+- **UI & Operator Portal** (`src/pages/OperatorDashboardPage.tsx`, `src/components/custom/ReportUserModal.tsx`, `src/components/layout/Navbar.tsx`):
+  - Operator Dashboard with 4 interactive tabs: User Reports, Movement Audit Logger, Messages Inspector, and Dynamic RBAC Matrix.
+  - User reporting modal integrated on Chat Header and Profile page.
+  - Navigation route `/app/operator` registered in `App.tsx` and Navbar resources.
+- **Testing** (`tests/security/rbac-audit-logger.spec.ts`):
+  - Unit & security test suite covering RBAC permissions, audit logger persistence, reports lifecycle, and message inspection permission checks (100% passing).
+
+---
+
+
 ## Session hardening + wallet-claim backfill + live presence — 2026-09-09
 
 "Messages can't be sent", "Conversation not found" on first DM, and "notifications don't

@@ -3,9 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { Button } from '@/components/ui/button'
 import { explorerBase } from '@/lib/explorer'
-import { Loader2, Pencil } from 'lucide-react'
+import { Loader2, Pencil, ShieldAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { ReportUserModal } from '@/components/custom/ReportUserModal'
+
 import {
   Table,
   TableBody,
@@ -120,6 +122,7 @@ export function ProfilePage() {
   const { data: conversations = [] } = useConversations()
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [startingChat, setStartingChat] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -315,10 +318,8 @@ export function ProfilePage() {
             <Text variant="muted" className="mt-2 max-w-2xl">{profile.bio}</Text>
           )}
         </div>
-        {/* Edit profile button — anchored to the right of the avatar+identity
-            row on the owner's profile so it visually belongs to the same
-            horizontal group as the avatar / nickname / address. */}
-        {isOwnProfile && (
+        {/* Edit profile button or Report User button */}
+        {isOwnProfile ? (
           <Button
             size="sm"
             variant="outline"
@@ -328,8 +329,25 @@ export function ProfilePage() {
             <Pencil className="w-3.5 h-3.5 mr-1" />
             {t('profile.editProfile')}
           </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setReportOpen(true)}
+            className="rounded-full shadow-none shrink-0 text-destructive border-destructive/30 hover:bg-destructive/10"
+          >
+            <ShieldAlert className="w-3.5 h-3.5 mr-1" />
+            Segnala Utente
+          </Button>
         )}
       </div>
+
+      <ReportUserModal
+        isOpen={reportOpen}
+        onClose={() => setReportOpen(false)}
+        reportedWallet={walletAddr}
+      />
+
 
       {/* Stats Grid (bento boxes) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

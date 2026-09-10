@@ -17,7 +17,10 @@
       escrow allow/deny × ABI surface × client gates; RLS policy simulator +
       posture assertions; siwe-auth/send-email deny/allow) + `docs/penetration-test-matrix.md`. _(2026-08-30)_
 
+- [x] **RBAC, Audit Logger Movimenti & Operator Dashboard** — Migration `002-rbac-audit-logger-operator-dashboard.sql`, `user_activity_logs`, `sys_programs`, `sys_roles`, `sys_permissions`, `sys_operators`, `user_reports`, Operator Dashboard page (`/app/operator`), and modal segnalazioni. _(2026-09-10)_
+
 - [x] **Live test runbook** — `docs/live-test-checklist.md` (automated gates +
+
       manual 2-browser pass: auth, RLS cross-user, chat/notify, trade,
       dispute, retention). Automated gates P; manual pass pending user
       execution. _(2026-08-30)_

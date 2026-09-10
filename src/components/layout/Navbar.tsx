@@ -16,8 +16,10 @@ import {
   MoreHorizontal,
   User,
   ShieldAlert,
+  ShieldCheck,
   ArrowLeftRight,
 } from 'lucide-react'
+
 import { WalletConnectButton } from '@/components/custom/WalletConnectButton'
 import { NotificationsBell } from '@/components/custom/NotificationsBell'
 import { NotificationDispatcherHost } from '@/components/custom/NotificationDispatcherHost'
@@ -107,13 +109,15 @@ const NAV_LINKS: ReadonlyArray<{
 ]
 
 const RESOURCE_LINKS: ReadonlyArray<
-  | { labelKey: string; to: string; icon: typeof ShieldAlert; requiresAuth?: boolean }
+  | { labelKey: string; to: string; icon: typeof ShieldAlert | typeof ShieldCheck; requiresAuth?: boolean }
   | { labelKey: string; href: string; icon: typeof ShieldAlert; requiresAuth?: boolean }
 > = [
   { labelKey: 'nav.disputes', to: '/app/disputes', icon: ShieldAlert, requiresAuth: true },
+  { labelKey: 'nav.operator', to: '/app/operator', icon: ShieldCheck, requiresAuth: true },
   { labelKey: 'nav.docs', to: '/docs', icon: BookOpen },
   { labelKey: 'nav.discord', href: 'https://discord.gg/example', icon: MessageCircle },
 ] as const
+
 
 const LANGUAGES: { label: string; code: string }[] = [
   { label: 'English', code: 'en' },
