@@ -2346,8 +2346,18 @@ export async function ensureWalletSession(
     clearSiweRejectedMarker(addr)
     return { session: true, user: await ensureUser(addr) }
   } catch (err) {
+    // ANY failure path marks the wallet as "declined for now" so we don't
+    // pester the user with a fresh MetaMask popup on every page mount.
+    // The previous code only set the marker when `err instanceof
+    // SiweRejectedError`, but `SiweRejectedError` was never actually thrown
+    // — every failure (user dismissed the popup, RPC timeout, backend
+    // rejection) fell through to the generic branch and the marker never
+    // got written, so the user got re-prompted indefinitely. Treating every
+    // sign-in failure as a soft decline matches the intended UX: "if they
+    // didn't sign once, don't keep asking". The SiweGate modal shows a
+    // 'Try again' CTA so the user can opt back in explicitly.
+    setSiweRejectedMarker(addr)
     if (err instanceof SiweRejectedError) {
-      setSiweRejectedMarker(addr)
       console.warn('[ensureWalletSession] sign-in rejected:', err.message)
     } else {
       console.error('[ensureWalletSession] sign-in failed:', err)
