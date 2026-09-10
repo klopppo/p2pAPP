@@ -1,10 +1,23 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Loader2, Inbox, Search } from 'lucide-react'
+import {
+  Loader2,
+  Inbox,
+  Search,
+  Clock,
+  ArrowDownLeft,
+  ArrowUpRight,
+  ShieldCheck,
+  Hourglass,
+  Gavel,
+  CheckCircle2,
+  RotateCcw,
+  XCircle,
+  type LucideIcon,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Text } from '@/components/ui/text'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
@@ -83,18 +96,41 @@ export function TradesPage() {
     { value: 'refunded', label: t('trades.statusRefunded') },
   ]
 
-  const ESCROW_LABELS: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
-    awaiting_deposit: { label: t('trades.escrowAwaitingDeposit'), variant: 'outline' },
-    buyer_deposited: { label: t('trades.escrowBuyerDeposited'), variant: 'secondary' },
-    seller_deposited: { label: t('trades.escrowSellerDeposited'), variant: 'secondary' },
-    funded: { label: t('trades.escrowFunded') ?? 'Funded', variant: 'secondary' },
-    confirmed: { label: t('trades.escrowGracePeriod'), variant: 'default' },
-    deposited: { label: t('trades.escrowDeposited'), variant: 'secondary' },
-    pending_release: { label: t('trades.escrowPendingRelease'), variant: 'default' },
-    disputed: { label: t('trades.escrowDisputed'), variant: 'destructive' },
-    released: { label: t('trades.escrowReleased'), variant: 'secondary' },
-    refunded: { label: t('trades.escrowRefunded'), variant: 'outline' },
-    cancelled: { label: t('trades.escrowCancelled') ?? 'Cancelled', variant: 'outline' },
+  const ESCROW_LABELS: Record<
+    string,
+    { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive'; icon: LucideIcon }
+  > = {
+    awaiting_deposit: {
+      label: t('trades.escrowAwaitingDeposit'),
+      variant: 'outline',
+      icon: Clock,
+    },
+    buyer_deposited: {
+      label: t('trades.escrowBuyerDeposited'),
+      variant: 'secondary',
+      icon: ArrowDownLeft,
+    },
+    seller_deposited: {
+      label: t('trades.escrowSellerDeposited'),
+      variant: 'secondary',
+      icon: ArrowUpRight,
+    },
+    funded: { label: t('trades.escrowFunded') ?? 'Funded', variant: 'secondary', icon: ShieldCheck },
+    confirmed: {
+      label: t('trades.escrowGracePeriod'),
+      variant: 'default',
+      icon: Hourglass,
+    },
+    deposited: { label: t('trades.escrowDeposited'), variant: 'secondary', icon: ShieldCheck },
+    pending_release: {
+      label: t('trades.escrowPendingRelease'),
+      variant: 'default',
+      icon: Hourglass,
+    },
+    disputed: { label: t('trades.escrowDisputed'), variant: 'destructive', icon: Gavel },
+    released: { label: t('trades.escrowReleased'), variant: 'secondary', icon: CheckCircle2 },
+    refunded: { label: t('trades.escrowRefunded'), variant: 'outline', icon: RotateCcw },
+    cancelled: { label: t('trades.escrowCancelled') ?? 'Cancelled', variant: 'outline', icon: XCircle },
   }
 
   const myId = user?.id
@@ -114,37 +150,39 @@ export function TradesPage() {
 
   return (
     <section className="space-y-8">
-      {/* Centered header matching /create-offer: back button left, title +
-          subtitle dead-center. The 'Browse offers' action that lived on
-          the right in the old split variant is gone — the empty-state CTA
-          covers it when there are no trades, and a discoverable offer
-          board is one navbar click away. */}
+      {/* Split header (left-aligned title block, right-aligned filter
+          cluster). Replaces the centered variant that used to sit here
+          — the dead-center title ate the horizontal space and forced the
+          'N trades' counter below into its own row. The status filter
+          dropdown lives on the right so the eye lands on it without
+          scanning. */}
       <AppPageHeader
         title={t('trades.title')}
-        subtitle={t('trades.subtitle')}
-        variant="centered"
+        subtitle={
+          <>
+            {t('trades.subtitle')}
+            {' · '}
+            {t('trades.tradeCount', { count: filtered.length })}
+          </>
+        }
+        variant="split"
+        action={
+          <div className="flex items-center gap-3">
+            <FullDropdown
+              label={t('trades.roleLabel')}
+              value={roleFilter}
+              onSelect={(v) => setRoleFilter(v as RoleFilter)}
+              options={ROLE_FILTERS}
+            />
+            <FullDropdown
+              label={t('trades.statusLabel')}
+              value={statusFilter}
+              onSelect={(v) => setStatusFilter(v as StatusFilter)}
+              options={STATUS_FILTERS}
+            />
+          </div>
+        }
       />
-
-      {/* Filter strip */}
-      <div className="flex items-end justify-between gap-4 flex-wrap">
-        <Text variant="muted">
-          {t('trades.tradeCount', { count: filtered.length })}
-        </Text>
-        <div className="flex items-center gap-3">
-          <FullDropdown
-            label={t('trades.roleLabel')}
-            value={roleFilter}
-            onSelect={(v) => setRoleFilter(v as RoleFilter)}
-            options={ROLE_FILTERS}
-          />
-          <FullDropdown
-            label={t('trades.statusLabel')}
-            value={statusFilter}
-            onSelect={(v) => setStatusFilter(v as StatusFilter)}
-            options={STATUS_FILTERS}
-          />
-        </div>
-      </div>
 
       {/* Body */}
       {isLoading ? (
@@ -186,7 +224,9 @@ export function TradesPage() {
             const escrowMeta = ESCROW_LABELS[trade.escrow_status] ?? {
               label: trade.escrow_status,
               variant: 'outline' as const,
+              icon: Clock as typeof Clock,
             }
+            const StatusIcon = escrowMeta.icon
             const counterparty =
               myId === trade.buyer_id ? trade.seller : trade.buyer
             const role = myId === trade.buyer_id ? 'buyer' : 'seller'
@@ -201,6 +241,25 @@ export function TradesPage() {
                   className="block group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl"
                 >
                   <Card className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl transition-colors group-hover:border-primary/50 group-hover:bg-background/70">
+                    {/* Top-of-card status strip — full-width so the eye
+                        lands on the state of the trade first, before the
+                        trade-id label below. Icon + label gives the state
+                        enough weight that it doesn't get lost between the
+                        ID and the amount. */}
+                    <div
+                      className={`mb-4 -mx-2 -mt-2 px-2 pt-2 pb-3 rounded-xl flex items-center gap-2 ${
+                        escrowMeta.variant === 'destructive'
+                          ? 'bg-destructive/10 text-destructive'
+                          : escrowMeta.variant === 'default'
+                            ? 'bg-primary/15 text-primary'
+                            : 'bg-muted text-foreground'
+                      }`}
+                    >
+                      <StatusIcon className="w-4 h-4 shrink-0" />
+                      <span className="text-sm font-semibold tracking-wide uppercase">
+                        {escrowMeta.label}
+                      </span>
+                    </div>
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0 flex-1 space-y-2">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -210,12 +269,6 @@ export function TradesPage() {
                           >
                             {trade.trade_id}
                           </Text>
-                          <Badge
-                            variant={escrowMeta.variant}
-                            className="rounded-full text-[10px] py-0"
-                          >
-                            {escrowMeta.label}
-                          </Badge>
                         </div>
 
                         <Text variant="h4" className="truncate">
