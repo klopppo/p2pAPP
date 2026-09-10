@@ -4,7 +4,7 @@ import { Navbar } from './Navbar'
 import { Footer } from './Footer'
 import { PageContainer } from './PageContainer'
 import { ChainGuard } from '@/components/custom/ChainGuard'
-import { SiweGate } from '@/components/auth/SiweGate'
+import { SignInPrompt } from '@/components/auth/SignInPrompt'
 import { GlobalPresenceProvider } from '@/hooks/useGlobalPresence'
 import { warmUpIpns } from '@/lib/ipfs'
 
@@ -43,19 +43,24 @@ export function AppLayout({ children }: AppLayoutProps) {
   }, [])
 
   return (
-    <SiweGate>
-      <div className="relative z-10 min-h-screen flex flex-col">
-        <Navbar showTabs />
-        <ChainGuard />
-        <main className="flex-1 flex flex-col min-h-0">
-          <GlobalPresenceProvider>
-            <PageContainer type="app">
-              {children || <Outlet />}
-            </PageContainer>
-          </GlobalPresenceProvider>
-        </main>
-        <Footer />
-      </div>
-    </SiweGate>
+    <div className="relative z-10 min-h-screen flex flex-col">
+      <Navbar showTabs />
+      <ChainGuard />
+      <main className="flex-1 flex flex-col min-h-0">
+        <GlobalPresenceProvider>
+          <PageContainer type="app">
+            {children || <Outlet />}
+          </PageContainer>
+        </GlobalPresenceProvider>
+      </main>
+      <Footer />
+      {/* Non-blocking SIWE nudge. Only visible when the user has a
+          connected wallet but no signature; clicking the backdrop (or
+          the X / 'Later' button) dismisses for this browser session. The
+          page is fully interactive underneath — Supabase / chain queries
+          still require a session, so action buttons that need it surface
+          their own inline 'sign-in required' toast. */}
+      <SignInPrompt />
+    </div>
   )
 }

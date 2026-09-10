@@ -752,4 +752,13 @@
     "errorTitle": "Oturum açma başarısız",
     "errorBody": "Tekrar deneyin."
   }
+,
+  "signInPrompt": {
+    "title": "Devam etmek için oturum açın",
+    "body": "Cüzdanınız bağlı ancak oturum açma mesajı hâlâ bekliyor. İşlemlerinizi ve sohbetlerinizi yüklemek için oturum açın.",
+    "signCta": "Mesajı imzala",
+    "signing": "İmzalıyor…",
+    "dismiss": "Kapat",
+    "later": "Daha sonra"
+  }
 }

@@ -751,5 +751,13 @@
     "retryCta": "Try again",
     "errorTitle": "Sign-in failed",
     "errorBody": "Try again."
+  },
+  "signInPrompt": {
+    "title": "Sign in to continue",
+    "body": "Your wallet is connected but the sign-in message is still pending. Sign in to load your trades and chats.",
+    "signCta": "Sign message",
+    "signing": "Signing…",
+    "dismiss": "Dismiss",
+    "later": "Later"
   }
 }

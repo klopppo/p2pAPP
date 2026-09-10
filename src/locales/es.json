@@ -752,4 +752,13 @@
     "errorTitle": "Falló el inicio de sesión",
     "errorBody": "Inténtalo de nuevo."
   }
+,
+  "signInPrompt": {
+    "title": "Inicia sesión para continuar",
+    "body": "Tu billetera está conectada pero el mensaje de inicio de sesión sigue pendiente. Inicia sesión para cargar tus intercambios y chats.",
+    "signCta": "Firmar mensaje",
+    "signing": "Firmando…",
+    "dismiss": "Cerrar",
+    "later": "Más tarde"
+  }
 }

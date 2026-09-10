@@ -752,4 +752,13 @@
     "errorTitle": "Échec de la connexion",
     "errorBody": "Réessayez."
   }
+,
+  "signInPrompt": {
+    "title": "Connectez-vous pour continuer",
+    "body": "Votre portefeuille est connecté mais le message de connexion est toujours en attente. Connectez-vous pour charger vos échanges et discussions.",
+    "signCta": "Signer le message",
+    "signing": "Signature…",
+    "dismiss": "Ignorer",
+    "later": "Plus tard"
+  }
 }

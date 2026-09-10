@@ -752,4 +752,13 @@
     "errorTitle": "登录失败",
     "errorBody": "请重试。"
   }
+,
+  "signInPrompt": {
+    "title": "请登录后继续",
+    "body": "钱包已连接,但登录消息仍未签名。请登录以加载您的交易和聊天记录。",
+    "signCta": "签名",
+    "signing": "签名中…",
+    "dismiss": "关闭",
+    "later": "稍后"
+  }
 }
