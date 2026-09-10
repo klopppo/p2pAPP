@@ -662,6 +662,7 @@
   },
   "wallet": {
     "connectWallet": "Connect Wallet",
+    "signIn": "Sign in",
     "connecting": "Connecting...",
     "copyAddress": "Copy Address",
     "viewExplorer": "View Explorer",

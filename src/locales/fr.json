@@ -549,7 +549,7 @@
   "editProfile": {
     "title": "Modifier le profil",
     "subtitle": "Mettez à jour vos informations publiques",
-    "connectWallet": "Connectez votre portefeuille",
+    "connectWallet": "Connectez votre portefeuille",    "signIn": "Se connecter",
     "connectWalletDescription": "Connectez un portefeuille pour modifier votre profil.",
     "loadingProfile": "Chargement du profil…",
     "nickname": "Pseudonyme",

@@ -1,4 +1,4 @@
-import { useAccount, useDisconnect } from 'wagmi'
+import { useDisconnect } from 'wagmi'
 import { useConnectModal } from '@rainbow-me/rainbowkit'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -11,10 +11,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Loader2, User, Copy, ExternalLink } from 'lucide-react'
+import { useSignedInStatus } from '@/hooks/useSignedInStatus'
 
 export function WalletConnectButton() {
   const { openConnectModal, connectModalOpen } = useConnectModal()
-  const { address, isConnected } = useAccount()
+  // The navbar only flips to the "connected" affordance when BOTH the
+  // wallet is connected AND the SIWE signature was captured. Until
+  // then, we show the "Connect wallet" CTA so the top header is
+  // consistent with the rest of the app (and with the SiweGate).
+  const { address, isConnected, isFullySignedIn } = useSignedInStatus()
   const { disconnect } = useDisconnect()
   const navigate = useNavigate()
   const { t } = useTranslation()
@@ -46,7 +51,11 @@ export function WalletConnectButton() {
     }
   }
 
-  if (!isConnected) {
+  if (!isFullySignedIn) {
+    // Either the wallet isn't connected, the signature wasn't captured,
+    // or the Supabase user row isn't visible yet. In every case the
+    // CTA is the same: open the RainbowKit picker, which will hand off
+    // to the SiweGate for the sign-in step.
     return connectModalOpen ? (
       <div className="flex items-center gap-2 h-10 px-4 bg-background text-foreground border border-border rounded-full">
         <Loader2 className="h-4 w-4 animate-spin" />
@@ -54,7 +63,11 @@ export function WalletConnectButton() {
       </div>
     ) : (
       <MotionButton
-        label={t('wallet.connectWallet')}
+        label={
+          isConnected && !isFullySignedIn
+            ? t('wallet.signIn', { defaultValue: 'Sign in' })
+            : t('wallet.connectWallet')
+        }
         classes="bg-background text-foreground border border-border"
         onClick={openConnectModal}
       />

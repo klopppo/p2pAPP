@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useAccount } from 'wagmi'
+import { useSignedInStatus } from '@/hooks/useSignedInStatus'
 import {
   Tag,
   BookOpen,
@@ -130,7 +130,10 @@ interface NavbarProps {
 
 export function Navbar({ showTabs = false }: NavbarProps) {
   const { t, i18n } = useTranslation()
-  const { isConnected } = useAccount()
+  // Navbar's "signed in" state requires both wallet + signature, not just
+  // the wagmi connection. The SiweGate handles the actual sign-in flow;
+  // this hook is the source of truth for the top-header affordances.
+  const { isFullySignedIn } = useSignedInStatus()
   const [resourcesOpen, setResourcesOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [showLang, setShowLang] = useState(false)
@@ -143,13 +146,15 @@ export function Navbar({ showTabs = false }: NavbarProps) {
   const navigate = useNavigate()
   const currentPath = location.pathname
 
-  // Items with `requiresAuth` are filtered out when no wallet is connected.
-  // Public items (offers, profile, docs, discord) stay visible so visitors
-  // can still discover the marketplace from the navbar.
-  const visibleNavLinks = isConnected
+  // Items with `requiresAuth` are filtered out when the user hasn't
+  // completed the SIWE sign-in (wallet alone isn't enough — see
+  // useSignedInStatus). Public items (offers, profile, docs, discord)
+  // stay visible so visitors can still discover the marketplace from
+  // the navbar.
+  const visibleNavLinks = isFullySignedIn
     ? NAV_LINKS
     : NAV_LINKS.filter((l) => !l.requiresAuth)
-  const visibleResourceLinks = isConnected
+  const visibleResourceLinks = isFullySignedIn
     ? RESOURCE_LINKS
     : RESOURCE_LINKS.filter((r) => !r.requiresAuth)
 

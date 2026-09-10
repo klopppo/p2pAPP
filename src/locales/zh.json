@@ -549,7 +549,7 @@
   "editProfile": {
     "title": "编辑资料",
     "subtitle": "更新您的公开信息",
-    "connectWallet": "连接您的钱包",
+    "connectWallet": "连接您的钱包",    "signIn": "登录",
     "connectWalletDescription": "连接钱包以编辑您的资料。",
     "loadingProfile": "正在加载资料…",
     "nickname": "昵称",

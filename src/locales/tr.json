@@ -549,7 +549,7 @@
   "editProfile": {
     "title": "Profili Düzenle",
     "subtitle": "Herkese açık bilgilerinizi güncelleyin",
-    "connectWallet": "Cüzdanınızı bağlayın",
+    "connectWallet": "Cüzdanınızı bağlayın",    "signIn": "Oturum aç",
     "connectWalletDescription": "Profilinizi düzenlemek için bir cüzdan bağlayın.",
     "loadingProfile": "Profil yükleniyor…",
     "nickname": "Takma ad",

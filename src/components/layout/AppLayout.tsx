@@ -4,7 +4,7 @@ import { Navbar } from './Navbar'
 import { Footer } from './Footer'
 import { PageContainer } from './PageContainer'
 import { ChainGuard } from '@/components/custom/ChainGuard'
-// import { SiweGate } from '@/components/auth/SiweGate'
+import { SiweGate } from '@/components/auth/SiweGate'
 import { GlobalPresenceProvider } from '@/hooks/useGlobalPresence'
 import { warmUpIpns } from '@/lib/ipfs'
 
@@ -43,27 +43,19 @@ export function AppLayout({ children }: AppLayoutProps) {
   }, [])
 
   return (
-    // <SiweGate>
-    //   Temporarily disabled per UX request — the gate is fully implemented
-    //   in @/components/auth/SiweGate.tsx (state machine, marker persistence,
-    //   RainbowKit picker, button-driven sign-in). Re-enable by removing the
-    //   block-comment and restoring the wrapping <SiweGate> below. When
-    //   re-enabled, the gate will block all /app/* routes until the user
-    //   signs the SIWE challenge; the success + rejection localStorage
-    //   markers persist across reloads so the user is never re-prompted on
-    //   the same device.
-    // </SiweGate>
-    <div className="relative z-10 min-h-screen flex flex-col">
-      <Navbar showTabs />
-      <ChainGuard />
-      <main className="flex-1 flex flex-col min-h-0">
-        <GlobalPresenceProvider>
-          <PageContainer type="app">
-            {children || <Outlet />}
-          </PageContainer>
-        </GlobalPresenceProvider>
-      </main>
-      <Footer />
-    </div>
+    <SiweGate>
+      <div className="relative z-10 min-h-screen flex flex-col">
+        <Navbar showTabs />
+        <ChainGuard />
+        <main className="flex-1 flex flex-col min-h-0">
+          <GlobalPresenceProvider>
+            <PageContainer type="app">
+              {children || <Outlet />}
+            </PageContainer>
+          </GlobalPresenceProvider>
+        </main>
+        <Footer />
+      </div>
+    </SiweGate>
   )
 }

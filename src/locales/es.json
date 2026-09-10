@@ -549,7 +549,7 @@
   "editProfile": {
     "title": "Editar perfil",
     "subtitle": "Actualice su información pública",
-    "connectWallet": "Conecte su billetera",
+    "connectWallet": "Conecte su billetera",    "signIn": "Iniciar sesión",
     "connectWalletDescription": "Conecte una billetera para editar su perfil.",
     "loadingProfile": "Cargando perfil…",
     "nickname": "Apodo",
