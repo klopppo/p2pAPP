@@ -814,22 +814,30 @@ export async function upsertTradeEscrowStatus(
   escrowStatus: string,
   txHash?: string,
 ) {
-  const updates: Record<string, unknown> = {
-    escrow_status: escrowStatus,
-    updated_at: new Date().toISOString(),
-  }
-  if (txHash) updates.escrow_tx_hash = txHash
-  const { data, error } = await supabase
-    .from('trades')
-    .update(updates)
-    .eq('id', tradeId)
-    .select()
-    .single()
-
+  // Route through the SECURITY DEFINER RPC `set_trade_escrow_status`
+  // (migration 20260911000000). The row-level RLS policy
+  // `trades_update_parties` (20260824000006) intentionally freezes
+  // `escrow_status` for direct UPDATEs — the RPC bypasses RLS with the
+  // same internal authorization (caller must be buyer or seller) so we
+  // don't open the door to arbitrary writes.
+  const { error } = await supabase.rpc('set_trade_escrow_status', {
+    p_trade_id: tradeId,
+    p_new_status: escrowStatus,
+    p_tx_hash: txHash ?? null,
+    p_event_type: 'escrow_status_updated',
+  })
   if (error) {
     console.error('Error updating trade escrow status:', error)
     throw error
   }
+
+  const { data } = await supabase
+    .from('trades')
+    .select()
+    .eq('id', tradeId)
+    .single()
+
+  if (!data) return null
 
   await logTradeEvent(
     data.id,
@@ -917,23 +925,30 @@ export async function setTradeEscrowStatus(
   escrowStatus: EscrowStatus,
   options?: { txHash?: string; escrowEventType?: TradeEventType },
 ) {
-  const updates: Record<string, unknown> = {
-    escrow_status: escrowStatus,
-    updated_at: new Date().toISOString(),
-  }
-  if (options?.txHash) updates.escrow_tx_hash = options.txHash
-
-  const { data, error } = await supabase
-    .from('trades')
-    .update(updates)
-    .eq('id', tradeId)
-    .select()
-    .single()
-
+  // Route through the SECURITY DEFINER RPC `set_trade_escrow_status`
+  // (migration 20260911000000). The row-level RLS policy
+  // `trades_update_parties` (20260824000006) intentionally freezes
+  // `escrow_status` for direct UPDATEs — the RPC bypasses RLS with the
+  // same internal authorization (caller must be buyer or seller) so we
+  // don't open the door to arbitrary writes.
+  const { error } = await supabase.rpc('set_trade_escrow_status', {
+    p_trade_id: tradeId,
+    p_new_status: escrowStatus,
+    p_tx_hash: options?.txHash ?? null,
+    p_event_type: options?.escrowEventType ?? TradeEventType.ESCROW_STATUS_UPDATED,
+  })
   if (error) {
     console.error('Error setting trade escrow status:', error)
     throw error
   }
+
+  const { data } = await supabase
+    .from('trades')
+    .select()
+    .eq('id', tradeId)
+    .single()
+
+  if (!data) return null
 
   await logTradeEvent(
     data.id,
