@@ -26,7 +26,6 @@ import { useTranslation } from 'react-i18next'
 import { ShieldCheck, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
-import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { ensureWalletSession } from '@/lib/supabase'
 
 const REJECTED_KEY_PREFIX = 'coffernode:siwe:declined:'
@@ -69,17 +68,19 @@ export function SignInPrompt() {
   const { t } = useTranslation()
   const { address, isConnected } = useAccount()
   const { signMessageAsync } = useSignMessage()
-  const { data: currentUser } = useCurrentUser()
   const qc = useQueryClient()
 
   const [visible, setVisible] = useState(false)
   const [signing, setSigning] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  // Recompute visibility whenever the address / signature / user state
-  // changes. Key insight: visibility = (wallet connected) AND
-  // (no success marker OR rejection marker present) AND (user hasn't
-  // dismissed for this address this session).
+  // The prompt hides as soon as the success marker is written + no
+  // rejection is set for the connected wallet. We deliberately do NOT
+  // gate on `useCurrentUser` here — that query can lag a beat behind
+  // the marker write (refetch in flight, RLS hiccup, etc.) and we'd
+  // briefly stay visible even though the user just signed. The
+  // marker is the durable "signed in on this device" signal; the
+  // Supabase user row is for the rest of the app.
   useEffect(() => {
     if (!isConnected || !address) {
       setVisible(false)
@@ -88,16 +89,12 @@ export function SignInPrompt() {
     const lower = address.toLowerCase()
     const success = hasSuccessMarker(lower)
     const rejected = hasRejectionMarker(lower)
-    const userOk =
-      !!currentUser?.wallet_address &&
-      currentUser.wallet_address.toLowerCase() === lower
-    // Fully signed in → hide (forever, until they disconnect).
-    if (success && userOk && !rejected) {
+    if (success && !rejected) {
       setVisible(false)
       return
     }
     setVisible(!isDismissedFor(lower))
-  }, [address, isConnected, currentUser])
+  }, [address, isConnected])
 
   const runSignIn = useCallback(async () => {
     if (!address || !signMessageAsync) return
