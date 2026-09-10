@@ -32,7 +32,7 @@ const REJECTED_KEY_PREFIX = 'coffernode:siwe:declined:'
 const SUCCESS_KEY = 'coffernode:siwe:last'
 const DISMISS_KEY_PREFIX = 'coffernode:siwe:promptDismissed:'
 
-function hasSuccessMarker(addr: string): boolean {
+function readSuccess(addr: string): boolean {
   if (typeof window === 'undefined') return false
   try {
     const raw = window.localStorage.getItem(SUCCESS_KEY)
@@ -44,17 +44,17 @@ function hasSuccessMarker(addr: string): boolean {
   }
 }
 
-function hasRejectionMarker(addr: string): boolean {
+function hasRejection(addr: string): boolean {
   if (typeof window === 'undefined') return false
   return window.localStorage.getItem(`${REJECTED_KEY_PREFIX}${addr.toLowerCase()}`) === '1'
 }
 
-function isDismissedFor(addr: string): boolean {
+function isDismissed(addr: string): boolean {
   if (typeof window === 'undefined') return false
   return window.sessionStorage.getItem(`${DISMISS_KEY_PREFIX}${addr.toLowerCase()}`) === '1'
 }
 
-function markDismissedFor(addr: string): void {
+function markDismissed(addr: string): void {
   if (typeof window === 'undefined') return
   window.sessionStorage.setItem(`${DISMISS_KEY_PREFIX}${addr.toLowerCase()}`, '1')
 }
@@ -73,28 +73,30 @@ export function SignInPrompt() {
   const [visible, setVisible] = useState(false)
   const [signing, setSigning] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  // Bumped after every sign-in attempt (success or failure). Forces the
+  // visibility effect below to re-run after the marker write so the
+  // prompt disappears the instant sign-in completes — deps [address,
+  // isConnected] alone don't change on success, so without this the
+  // effect would only fire on the next wallet/route change.
+  const [signAttempts, setSignAttempts] = useState(0)
 
-  // The prompt hides as soon as the success marker is written + no
-  // rejection is set for the connected wallet. We deliberately do NOT
-  // gate on `useCurrentUser` here — that query can lag a beat behind
-  // the marker write (refetch in flight, RLS hiccup, etc.) and we'd
-  // briefly stay visible even though the user just signed. The
-  // marker is the durable "signed in on this device" signal; the
-  // Supabase user row is for the rest of the app.
+  // Single source of truth for visibility. Re-runs on:
+  //   - address / isConnected change (wallet connect/disconnect)
+  //   - signAttempts change (every sign-in attempt)
+  // The marker + dismissed + rejection flags are read from localStorage
+  // every run, so the marker write is picked up within one render.
   useEffect(() => {
     if (!isConnected || !address) {
       setVisible(false)
       return
     }
     const lower = address.toLowerCase()
-    const success = hasSuccessMarker(lower)
-    const rejected = hasRejectionMarker(lower)
-    if (success && !rejected) {
+    if (readSuccess(lower) && !hasRejection(lower)) {
       setVisible(false)
       return
     }
-    setVisible(!isDismissedFor(lower))
-  }, [address, isConnected])
+    setVisible(!isDismissed(lower))
+  }, [address, isConnected, signAttempts])
 
   const runSignIn = useCallback(async () => {
     if (!address || !signMessageAsync) return
@@ -105,40 +107,24 @@ export function SignInPrompt() {
       clearRejected(address)
       qc.invalidateQueries({ queryKey: ['current-user'] })
       qc.invalidateQueries({ queryKey: ['user-profile'] })
-      // The success marker is now in localStorage. Hide the prompt
-      // explicitly rather than waiting for the visibility effect to
-      // re-run — the effect only depends on [address, isConnected], and
-      // those don't change on a successful sign-in. The marker check
-      // is the source of truth either way.
-      setVisible(false)
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : String(err))
     } finally {
       setSigning(false)
+      // Always bump the attempt counter so the visibility effect re-runs
+      // and picks up the freshly-written success / rejection markers.
+      setSignAttempts((n) => n + 1)
     }
   }, [address, signMessageAsync, qc])
 
   const handleDismiss = useCallback(() => {
     if (!address) return
-    markDismissedFor(address)
+    markDismissed(address)
     setVisible(false)
-  }, [address])
-
-  // If the user disconnects, the dismissal for that address is moot —
-  // clear it so a future re-connect with the same wallet doesn't inherit
-  // a stale "I dismissed this" flag from before they disconnected.
-  useEffect(() => {
-    if (!address) {
-      // No connected wallet: nothing to clear. The sessionStorage entries
-      // for any other address (if they exist) are inert.
-    }
   }, [address])
 
   if (!visible || !isConnected || !address) return null
 
-  // Note: the prompt body is intentionally lightweight — no huge copy,
-  // no full-page takeover. The user can click outside the card to
-  // dismiss; everything else on the page remains interactive.
   return (
     <div
       role="presentation"
