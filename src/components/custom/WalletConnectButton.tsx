@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Loader2, User, Copy, ExternalLink } from 'lucide-react'
 import { useSignedInStatus } from '@/hooks/useSignedInStatus'
+import { signOut } from '@/lib/supabase'
 
 export function WalletConnectButton() {
   const { openConnectModal, connectModalOpen } = useConnectModal()
@@ -103,7 +104,26 @@ export function WalletConnectButton() {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          onClick={() => disconnect()}
+          onClick={async () => {
+            // Clear the SIWE markers (success + rejection for this
+            // wallet) synchronously, before disconnecting. signOut's own
+            // marker cleanup also runs from useSyncUser's effect, but
+            // doing it here means there's no race window where the
+            // prompt could re-trigger on the next connect.
+            try {
+              await signOut()
+            } catch {
+              // signOut's Supabase call may fail (no active session) —
+              // ignore; the localStorage marker cleanup below still runs.
+            }
+            if (address) {
+              localStorage.removeItem('coffernode:siwe:last')
+              localStorage.removeItem(
+                `coffernode:siwe:declined:${address.toLowerCase()}`,
+              )
+            }
+            disconnect()
+          }}
           className="text-red-500 rounded-xl"
         >
           {t('wallet.disconnect')}
