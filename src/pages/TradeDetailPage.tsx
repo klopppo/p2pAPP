@@ -751,6 +751,41 @@ export function TradeDetailPage() {
         </Card>
       )}
 
+      {/* Grace period info — visible whenever the trade is in the
+          CONFIRMED_PENDING state on-chain (buyer has called confirm()).
+          Explains what the grace period is, who can act during it, and
+          a countdown if the window hasn't elapsed yet. */}
+      {escrowState && liveState === KlerosEscState.CONFIRMED_PENDING && (
+        <Card className="glass-panel rounded-2xl p-6 mt-3">
+          <Text variant="h4" className="font-bold mb-2">
+            {t('tradeDetail.gracePeriod')}
+          </Text>
+          <Text variant="small" className="text-muted-foreground">
+            {t('tradeDetail.gracePeriodBody', {
+              defaultValue:
+                "The buyer has confirmed the off-chain payment. Either side can settle the escrow by releasing the crypto — no third party involved. If the grace window closes without action, the seller can release and the buyer can no longer dispute this stage.",
+            })}
+          </Text>
+          {graceEndSeconds != null && (
+            <div className="mt-3 flex items-center gap-2 text-sm">
+              <Timer className="w-4 h-4 text-muted-foreground" />
+              <span>
+                {gracePeriodElapsed
+                  ? t('tradeDetail.gracePeriodEnded', {
+                      defaultValue: 'Grace period ended — release is now available.',
+                    })
+                  : t('tradeDetail.gracePeriodRemaining', {
+                      seconds:
+                        graceEndSeconds > nowSecsBig
+                          ? (graceEndSeconds - nowSecsBig).toString()
+                          : '0',
+                    })}
+              </span>
+            </div>
+          )}
+        </Card>
+      )}
+
       {/* Funding progress */}
       {escrowState && (
         <Card className="glass-panel rounded-2xl p-6 mt-3">
