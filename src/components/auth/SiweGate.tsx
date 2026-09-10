@@ -19,9 +19,9 @@
  * disconnect from their wallet (or sign out) to clear all markers and
  * start fresh.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useAccount, useConnectors, useSignMessage } from 'wagmi'
-import type { Connector } from '@wagmi/core'
+import { useCallback, useEffect, useState } from 'react'
+import { useAccount, useSignMessage } from 'wagmi'
+import { useConnectModal } from '@rainbow-me/rainbowkit'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Loader2, ShieldCheck, Wallet, X } from 'lucide-react'
@@ -74,12 +74,11 @@ export function SiweGate({ children }: SiweGateProps) {
   const { signMessageAsync } = useSignMessage()
   const { data: currentUser } = useCurrentUser()
   const qc = useQueryClient()
-
-  const connectors = useConnectors()
-  const injectedConnector = useMemo<Connector | undefined>(
-    () => connectors.find((c) => c.type === 'injected') ?? connectors[0],
-    [connectors],
-  )
+  // `useConnectModal` opens RainbowKit's standard picker (MetaMask,
+  // WalletConnect, Coinbase, injected, etc.) instead of hard-wiring the
+  // first injected connector. This is the same modal the navbar's
+  // ConnectButton shows, so the user gets the familiar list.
+  const { openConnectModal } = useConnectModal()
 
   const [phase, setPhase] = useState<Phase>('restoring')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -155,16 +154,10 @@ export function SiweGate({ children }: SiweGateProps) {
     }
   }, [address, signMessageAsync, inFlight, qc])
 
-  const handleConnect = useCallback(async () => {
-    if (!injectedConnector) return
+  const handleConnect = useCallback(() => {
     setErrorMessage(null)
-    try {
-      await injectedConnector.connect()
-    } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : String(err))
-      setPhase('error')
-    }
-  }, [injectedConnector])
+    openConnectModal?.()
+  }, [openConnectModal])
 
   // "Try again" clears the rejected marker and re-enters the sign flow.
   const handleRetry = useCallback(() => {
@@ -205,7 +198,6 @@ export function SiweGate({ children }: SiweGateProps) {
       <Button
         size="lg"
         onClick={handleConnect}
-        disabled={!injectedConnector}
         className="rounded-full px-8 shadow-none"
       >
         <Wallet className="w-4 h-4 mr-2" />
