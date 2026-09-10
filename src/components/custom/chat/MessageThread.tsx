@@ -39,11 +39,19 @@ export function MessageThread({
     // Only auto-scroll when something new arrived.
     if (messages.length === prevCountRef.current) return
     prevCountRef.current = messages.length
-    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    // Scroll the container (not the page). `scrollTop = scrollHeight`
+    // pins to the bottom without involving `scrollIntoView`, which
+    // would walk up the ancestor chain and could end up scrolling
+    // <html> when the parent chain doesn't strictly clip us.
+    const el = containerRef.current
+    if (el) el.scrollTop = el.scrollHeight
   }, [messages.length])
 
   return (
-    <div ref={containerRef} className="flex-1 overflow-y-auto space-y-4 min-h-0 no-scrollbar">
+    <div
+      ref={containerRef}
+      className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-4 no-scrollbar"
+    >
       {hasMore && (
         <div className="flex justify-center">
           <button

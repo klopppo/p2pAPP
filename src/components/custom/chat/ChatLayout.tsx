@@ -213,7 +213,17 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   }
 
   return (
-    <section className="flex-1 flex flex-col min-h-0 -mb-8">
+    // Constrain the chat to the viewport so the message thread scrolls
+    // inside its own `overflow-y-auto` div instead of pushing the whole
+    // page down when a new message lands. The previous `flex-1 + min-h-0`
+    // chain inherited its height from `AppLayout`'s `min-h-screen` parent
+    // — content taller than the viewport simply expanded the page, and
+    // `scrollIntoView({ block: 'end' })` then walked the page instead
+    // of the message thread. The `overflow-hidden` here clips the chat to
+    // the available viewport so the thread becomes the scrollable
+    // ancestor. `h-[calc(100dvh-...)]` reserves room for the navbar;
+    // adjust the var / value if the navbar height changes.
+    <section className="flex-1 flex flex-col min-h-0 -mb-8 overflow-hidden h-[calc(100dvh-4rem)]">
       <div className="flex flex-1 min-h-0">
         {showSidebar && (
           <div className={activeId ? 'hidden md:block' : 'w-full md:w-auto'}>
@@ -235,7 +245,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
               {t('chat.conversationNotFound')}
             </div>
           ) : (
-    <div className="flex-1 bg-background/20 px-6 pt-6 pb-3 flex flex-col min-h-0">
+    <div className="flex-1 bg-background/20 px-6 pt-6 pb-3 flex flex-col min-h-0 overflow-hidden">
               <ChatHeader
                 conversation={convQuery.data}
                 currentUserId={user.id}
@@ -306,7 +316,7 @@ function OurTeamPane({
     </button>
   )
   return (
-    <div className="flex-1 bg-background/20 px-6 pt-6 pb-3 flex flex-col min-h-0">
+    <div className="flex-1 bg-background/20 px-6 pt-6 pb-3 flex flex-col min-h-0 overflow-hidden">
       {/* Inline minimal header so the welcome thread reads correctly. */}
       <div className="flex items-center gap-3 pb-3 border-b border-border/40">
         {headerBack}
