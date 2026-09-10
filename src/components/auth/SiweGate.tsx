@@ -1,26 +1,23 @@
 /**
- * Sign-in gate — full-screen modal that blocks the rest of the `/app/*`
- * routes until the user has signed a SIWE message with their connected
- * wallet. Once accepted, the result is persisted by `signInWithWallet` to
- * the `coffernode:siwe:last` localStorage marker; on next visit the gate
- * sees the marker and opens the app immediately. If the user declines,
- * `ensureWalletSession` writes `coffernode:siwe:declined:<addr>` and
- * subsequent visits skip the prompt — the gate stays in "declined"
- * state until the user clicks "Try again".
+ * SIWE sign-in gate — full-screen modal that blocks the rest of the
+ * `/app/*` routes until the user has signed a SIWE message with their
+ * connected wallet. The modal NEVER disappears mid-flow: it stays
+ * mounted through "connect wallet" → "click to sign" → MetaMask popup
+ * → "admitted", then collapses once. The two state machines (modal
+ * state + admitted boolean) are decoupled so the underlying React
+ * subtree (children) only mounts after BOTH wallet + signature are
+ * present — Supabase queries (via useCurrentUser, gated on `isConnected`)
+ * don't run before that.
  *
- * Behaviour summary:
- *   1. Wallet not connected → "Connect wallet to continue" with the
- *      RainbowKit trigger button.
- *   2. Wallet connected, marker exists → gate unmounts, children render.
- *   3. Wallet connected, no marker, no rejection → auto-prompt on mount
- *      so the user sees the SIWE popup exactly once per browser+wallet.
- *   4. Wallet connected, previously declined → show a "Try again" CTA.
+ * Persistence (lives forever, until explicit signOut):
+ *   - `coffernode:siwe:last`            = { address, issuedAt } on success
+ *   - `coffernode:siwe:declined:<addr>`  = '1' on user dismissal
  *
- * The gate does NOT manage the Supabase auth session itself — it relies on
- * the existing `useSyncUser` hook + `ensureWalletSession` plumbing. The
- * only thing the gate contributes is the visual lockout + the explicit
- * "Connect wallet" affordance (RainbowKit's ConnectButton only renders in
- * the navbar, which this gate covers).
+ * Re-admission on same browser requires a successful sign-in once. No
+ * auto-prompt if the marker is present. "Try again" is the only way
+ * back to a prompt if the user previously declined. The user can also
+ * disconnect from their wallet (or sign out) to clear all markers and
+ * start fresh.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAccount, useConnectors, useSignMessage } from 'wagmi'
@@ -62,109 +59,136 @@ interface SiweGateProps {
   children: React.ReactNode
 }
 
+/**
+ * Phases the gate can be in. `connect` is a sub-state of "no wallet yet";
+ * `sign` means "wallet connected, signature requested"; `declined` means
+ * the user previously dismissed the prompt and is sitting on the
+ * Try-again screen; `error` is a hard failure. The modal stays mounted
+ * across all of these — only `admitted=true` hides it.
+ */
+type Phase = 'connect' | 'sign' | 'declined' | 'error' | 'restoring'
+
 export function SiweGate({ children }: SiweGateProps) {
   const { t } = useTranslation()
   const { address, isConnected, status: wagmiStatus } = useAccount()
   const { signMessageAsync } = useSignMessage()
-  const { data: currentUser, isLoading: userLoading } = useCurrentUser()
+  const { data: currentUser } = useCurrentUser()
   const qc = useQueryClient()
 
-  // Pick the first injected connector to trigger RainbowKit programmatically
-  // — UI for "Connect wallet" is the rainbowkit modal that fires when we
-  // call connector.connect(). If you want the full RainbowKit picker UI
-  // (WalletConnect, Coinbase, etc.), use the ConnectButton in the navbar
-  // — this CTA only triggers whichever injected wallet the user has.
   const connectors = useConnectors()
   const injectedConnector = useMemo<Connector | undefined>(
     () => connectors.find((c) => c.type === 'injected') ?? connectors[0],
     [connectors],
   )
 
-  const [state, setState] = useState<
-    'idle' | 'signing' | 'declined' | 'connecting' | 'error'
-  >('idle')
+  const [phase, setPhase] = useState<Phase>('restoring')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [inFlight, setInFlight] = useState(false)
 
-  // Whether the user has been signed in for the currently connected wallet
-  // in this browser. Two sources of truth:
-  //   - the `coffernode:siwe:last` marker (set after every successful SIWE)
-  //   - the `users` row Supabase resolves after the session is established
-  // Both must agree before we let the rest of the app render.
-  const markerOk = address ? hadSuccessFor(address) : false
+  // Resolve admission. Read both markers BEFORE evaluating currentUser so
+  // a stale cached user doesn't admit a wallet that no longer matches the
+  // marker.
+  const lowerAddr = address?.toLowerCase()
+  const markerOk = lowerAddr ? hadSuccessFor(lowerAddr) : false
+  const rejected = lowerAddr ? hadRejected(lowerAddr) : false
   const userOk = !!currentUser?.wallet_address
   const userMatchesAddr =
     !!currentUser?.wallet_address &&
-    !!address &&
-    currentUser.wallet_address.toLowerCase() === address.toLowerCase()
-  const rejected = !!address && hadRejected(address)
+    !!lowerAddr &&
+    currentUser.wallet_address.toLowerCase() === lowerAddr
   const admitted = markerOk && userOk && userMatchesAddr && !rejected
 
-  // Fire the SIWE pop on first connect (the marker exists only AFTER the
-  // first successful sign — without this auto-prompt the user would see an
-  // empty gate forever). The previous-rejection case is *not* auto-prompted
-  // because that's the literal anti-pattern the rejection marker exists to
-  // prevent.
+  // Re-derive the visual phase from current state. We do NOT mutate phase
+  // from the signature promise resolution — instead we wait for the
+  // `markerOk` / `userOk` flags to flip after the Supabase write, which
+  // collapses the modal and re-renders children. This is what keeps the
+  // modal from "disappearing while the signature is being asked" — it
+  // stays mounted through the entire transaction, with its body
+  // reflecting what the user is expected to do (or wait for).
   useEffect(() => {
-    if (!isConnected || !address || admitted) return
-    if (rejected) return
-    if (!signMessageAsync) return
-    if (state !== 'idle') return
-    void runSignIn()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConnected, address, admitted, rejected])
+    if (admitted) return // happy path — modal collapses, nothing to do
+    if (!isConnected || !lowerAddr) {
+      if (phase !== 'restoring') setPhase('restoring')
+      return
+    }
+    if (rejected) {
+      if (phase !== 'declined') setPhase('declined')
+      return
+    }
+    if (inFlight) {
+      if (phase !== 'sign') setPhase('sign')
+      return
+    }
+    // Connected, no marker, not rejected, not in flight — sit on the
+    // 'sign' phase, which renders a button the user has to click. The
+    // explicit-click flow avoids the MetaMask popup appearing
+    // uninvited the moment the page mounts.
+    if (phase !== 'sign') setPhase('sign')
+  }, [admitted, isConnected, lowerAddr, rejected, inFlight, phase])
 
   const runSignIn = useCallback(async () => {
     if (!address || !signMessageAsync) return
-    setState('signing')
+    if (inFlight) return
+    setInFlight(true)
     setErrorMessage(null)
     try {
       await ensureWalletSession(address, { signMessage: signMessageAsync })
       clearRejected(address)
       // The Supabase `users` row is now guaranteed to exist; trigger a
-      // refetch so the rest of the app sees the logged-in user immediately.
-      qc.invalidateQueries({ queryKey: ['user'] })
+      // refetch so the rest of the app sees the logged-in user
+      // immediately (the gate's `admitted` flag is reactive on this
+      // query's data).
+      qc.invalidateQueries({ queryKey: ['current-user'] })
       qc.invalidateQueries({ queryKey: ['user-profile'] })
-      setState('idle')
+      setInFlight(false)
+      // Phase will flip off 'sign' automatically because markerOk /
+      // userOk become true → admitted=true → children render → modal
+      // unmounts via the {admitted ? children : null} branch.
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       setErrorMessage(msg)
-      setState('declined')
+      setInFlight(false)
+      // Any failure (rejection, throttle, backend error, etc.) is
+      // recorded by ensureWalletSession → reads back via the
+      // `rejected` flag → flips phase to 'declined' on the next render.
+      setPhase('declined')
     }
-  }, [address, signMessageAsync, qc])
+  }, [address, signMessageAsync, inFlight, qc])
 
-  const handleConnect = async () => {
+  const handleConnect = useCallback(async () => {
     if (!injectedConnector) return
-    setState('connecting')
     setErrorMessage(null)
     try {
       await injectedConnector.connect()
-      // After connect, the wagmiStatus flips to 'connected' and the
-      // effect above auto-fires runSignIn — we don't need to call it here.
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : String(err))
-      setState('error')
+      setPhase('error')
     }
-  }
+  }, [injectedConnector])
 
-  const handleRetry = () => {
-    clearRejected(address ?? '')
+  // "Try again" clears the rejected marker and re-enters the sign flow.
+  const handleRetry = useCallback(() => {
+    if (!address) return
+    clearRejected(address)
+    setPhase('sign')
+    setErrorMessage(null)
     void runSignIn()
-  }
+  }, [address, runSignIn])
 
-  // Decisive: once admitted, render the children and stop here. The gate
-  // is intentionally all-or-nothing — a partly-rendered tree behind a
-  // modal would still leak page-level fetches.
+  // Once admitted, render the children and STOP — the modal must never
+  // flicker behind a partially-rendered tree.
   if (admitted) return <>{children}</>
 
-  // State machine for the modal copy.
-  let icon: React.ReactNode = <Loader2 className="w-10 h-10 animate-spin text-muted-foreground" />
-  let title = t('signInGate.signingTitle', {
-    defaultValue: 'Signing you in…',
-  })
+  // ── Modal contents per phase ─────────────────────────────────────────
+  // The body of the modal is intentionally minimal: one icon, one title,
+  // one short body, at most one button. We avoid swapping in different
+  // copy mid-flow to keep the transition stable.
+  let icon: React.ReactNode
+  let title: string
   let body: React.ReactNode = null
-  let action: React.ReactNode = null
+  let button: React.ReactNode = null
 
-  if (!isConnected) {
+  if (!isConnected || !lowerAddr || phase === 'restoring') {
     icon = <Wallet className="w-10 h-10 text-primary" />
     title = t('signInGate.connectTitle', {
       defaultValue: 'Connect your wallet to continue',
@@ -177,20 +201,18 @@ export function SiweGate({ children }: SiweGateProps) {
         })}
       </Text>
     )
-    action = (
+    button = (
       <Button
         size="lg"
         onClick={handleConnect}
-        disabled={!injectedConnector || state === 'connecting'}
+        disabled={!injectedConnector}
         className="rounded-full px-8 shadow-none"
       >
         <Wallet className="w-4 h-4 mr-2" />
-        {state === 'connecting'
-          ? t('signInGate.connecting', { defaultValue: 'Connecting…' })
-          : t('signInGate.connectCta', { defaultValue: 'Connect wallet' })}
+        {t('signInGate.connectCta', { defaultValue: 'Connect wallet' })}
       </Button>
     )
-  } else if (rejected || state === 'declined') {
+  } else if (phase === 'declined' || rejected) {
     icon = <X className="w-10 h-10 text-destructive" />
     title = t('signInGate.declinedTitle', {
       defaultValue: 'Sign-in required',
@@ -210,19 +232,16 @@ export function SiweGate({ children }: SiweGateProps) {
         )}
       </>
     )
-    action = (
+    button = (
       <Button
         size="lg"
         onClick={handleRetry}
-        disabled={state === 'signing'}
         className="rounded-full px-8 shadow-none"
       >
-        {state === 'signing'
-          ? t('signInGate.signing', { defaultValue: 'Signing…' })
-          : t('signInGate.retryCta', { defaultValue: 'Try again' })}
+        {t('signInGate.retryCta', { defaultValue: 'Try again' })}
       </Button>
     )
-  } else if (state === 'error') {
+  } else if (phase === 'error') {
     icon = <X className="w-10 h-10 text-destructive" />
     title = t('signInGate.errorTitle', { defaultValue: 'Sign-in failed' })
     body = (
@@ -230,45 +249,66 @@ export function SiweGate({ children }: SiweGateProps) {
         {errorMessage ?? t('signInGate.errorBody', { defaultValue: 'Try again.' })}
       </Text>
     )
-    action = (
-      <Button size="lg" onClick={() => void runSignIn()} className="rounded-full px-8 shadow-none">
+    button = (
+      <Button size="lg" onClick={handleRetry} className="rounded-full px-8 shadow-none">
         {t('signInGate.retryCta', { defaultValue: 'Try again' })}
       </Button>
     )
-  } else if (state === 'connecting') {
-    icon = <Loader2 className="w-10 h-10 animate-spin text-muted-foreground" />
-    title = t('signInGate.connecting', { defaultValue: 'Connecting…' })
-  } else if (wagmiStatus === 'reconnecting' || userLoading) {
-    icon = <Loader2 className="w-10 h-10 animate-spin text-muted-foreground" />
-    title = t('signInGate.reconnecting', { defaultValue: 'Restoring session…' })
-  } else if (state === 'signing') {
-    icon = <ShieldCheck className="w-10 h-10 text-primary" />
-    title = t('signInGate.siweTitle', {
-      defaultValue: 'Approve the signature in your wallet',
-    })
-    body = (
-      <Text variant="muted">
-        {t('signInGate.siweBody', {
-          defaultValue:
-            'A small one-time signature. We never send transactions from this prompt and never touch your funds.',
-        })}
-      </Text>
-    )
   } else {
-    // Connected, no marker yet, no rejection — the auto-prompt effect
-    // above will fire momentarily; show a generic loading state until
-    // the pop appears.
-    icon = <Loader2 className="w-10 h-10 animate-spin text-muted-foreground" />
-    title = t('signInGate.preparingTitle', {
-      defaultValue: 'Preparing sign-in…',
-    })
+    // Phase === 'sign' or transient while we wait for the success
+    // marker + user row to arrive.
+    if (wagmiStatus === 'reconnecting') {
+      icon = <Loader2 className="w-10 h-10 animate-spin text-muted-foreground" />
+      title = t('signInGate.reconnecting', { defaultValue: 'Restoring session…' })
+    } else if (inFlight) {
+      icon = <ShieldCheck className="w-10 h-10 text-primary" />
+      title = t('signInGate.siweTitle', {
+        defaultValue: 'Approve the signature in your wallet',
+      })
+      body = (
+        <Text variant="muted">
+          {t('signInGate.siweBody', {
+            defaultValue:
+              'A small one-time signature. We never send transactions from this prompt and never touch your funds.',
+          })}
+        </Text>
+      )
+    } else {
+      icon = <ShieldCheck className="w-10 h-10 text-primary" />
+      title = t('signInGate.signingTitle', {
+        defaultValue: 'Sign in to continue',
+      })
+      body = (
+        <Text variant="muted">
+          {t('signInGate.siweBody', {
+            defaultValue:
+              'A small one-time signature. We never send transactions from this prompt and never touch your funds.',
+          })}
+        </Text>
+      )
+      button = (
+        <Button
+          size="lg"
+          onClick={() => void runSignIn()}
+          className="rounded-full px-8 shadow-none"
+        >
+          <ShieldCheck className="w-4 h-4 mr-2" />
+          {t('signInGate.signCta', { defaultValue: 'Sign message' })}
+        </Button>
+      )
+    }
   }
 
   return (
     <>
-      {/* The rest of the app underneath the gate would still receive
-          effects + queries if rendered. Don't render it until admitted. */}
-      {admitted ? children : null}
+      {/* Don't render children at all when not admitted. This is what
+          blocks Supabase queries on the rest of the tree: every page
+          below this gate does its own useCurrentUser, but those queries
+          are short-circuited by `enabled: isConnected && !!address` —
+          however the page-level data fetching (offers, trades, chats)
+          ALSO has its own useEffect/useQuery and we don't want them
+          mounting behind a modal. So we don't even render the
+          children subtree until both wallet + signature are present. */}
       {!admitted && (
         <div
           role="dialog"
@@ -282,7 +322,7 @@ export function SiweGate({ children }: SiweGateProps) {
               {title}
             </Text>
             {body}
-            {action}
+            {button}
           </div>
         </div>
       )}

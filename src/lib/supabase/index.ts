@@ -2106,6 +2106,14 @@ export async function isAuthenticated(): Promise<boolean> {
  * with viem and skip the session — the permissive pre-migration RLS makes the
  * app still work during development.
  */
+// Throttle code intentionally removed. The previous version had a
+// per-wallet 1-hour prompt cooldown (coffernode:siwe:lastPromptAt:<addr>)
+// but the user wants the success marker to be the durable "no re-prompt
+// on this device" signal and the rejected marker to be the durable
+// "no auto-re-prompt" signal. Only an explicit signOut / wallet switch
+// clears those and re-prompts. The hour cap added noise without solving
+// a real problem since the rejection marker already blocks the loop.
+
 export async function signInWithWallet(
   walletAddress: string,
   options: {
