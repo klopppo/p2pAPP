@@ -247,7 +247,7 @@ export function TradesPage() {
                         enough weight that it doesn't get lost between the
                         ID and the amount. */}
                     <div
-                      className={`mb-4 -mx-2 -mt-2 px-2 pt-2 pb-3 rounded-xl flex items-center gap-2 ${
+                      className={`mb-2 -mx-2 -mt-2 px-2 pt-2 pb-2 rounded-xl flex items-center gap-2 ${
                         escrowMeta.variant === 'destructive'
                           ? 'bg-destructive/10 text-destructive'
                           : escrowMeta.variant === 'default'
@@ -262,20 +262,19 @@ export function TradesPage() {
                     </div>
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0 flex-1 space-y-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Text
-                            variant="small"
-                            className="uppercase tracking-wider text-muted-foreground"
-                          >
-                            {trade.trade_id}
-                          </Text>
-                        </div>
-
                         <Text variant="h4" className="truncate">
                           {Number(trade.crypto_amount).toLocaleString('en-US', {
                             maximumFractionDigits: 6,
                           })}{' '}
                           {trade.crypto_token}
+                          <Text
+                            as="span"
+                            variant="small"
+                            className="font-mono uppercase tracking-wider text-muted-foreground"
+                          >
+                            {' '}
+                            {trade.trade_id}
+                          </Text>
                           <span className="text-muted-foreground font-normal">
                             {' '}
                             ·{' '}
