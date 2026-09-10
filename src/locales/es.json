@@ -733,4 +733,22 @@
     "switchCta": "Cambiar a {{chain}}",
     "switchError": "No se pudo cambiar automáticamente: {{message}}"
   }
+,
+  "signInGate": {
+    "connectTitle": "Conecta tu billetera para continuar",
+    "connectBody": "CofferNode usa Sign-In With Ethereum. Conecta una billetera para iniciar sesión — tu dirección sigue bajo tu control.",
+    "connectCta": "Conectar billetera",
+    "connecting": "Conectando…",
+    "reconnecting": "Restaurando sesión…",
+    "preparingTitle": "Preparando inicio de sesión…",
+    "siweTitle": "Aprueba la firma en tu billetera",
+    "siweBody": "Una firma única. Nunca enviamos transacciones desde este mensaje ni tocamos tus fondos.",
+    "signingTitle": "Iniciando sesión…",
+    "signing": "Firmando…",
+    "declinedTitle": "Inicio de sesión requerido",
+    "declinedBody": "Has rechazado el mensaje de inicio de sesión. CofferNode necesita tu firma para cargar tus intercambios y chats — inténtalo de nuevo cuando estés listo.",
+    "retryCta": "Reintentar",
+    "errorTitle": "Falló el inicio de sesión",
+    "errorBody": "Inténtalo de nuevo."
+  }
 }

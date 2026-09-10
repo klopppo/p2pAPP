@@ -733,4 +733,22 @@
     "switchCta": "Basculer vers {{chain}}",
     "switchError": "Bascule impossible : {{message}}"
   }
+,
+  "signInGate": {
+    "connectTitle": "Connectez votre portefeuille pour continuer",
+    "connectBody": "CofferNode utilise Sign-In With Ethereum. Connectez un portefeuille pour vous connecter — votre adresse reste sous votre contrôle.",
+    "connectCta": "Connecter le portefeuille",
+    "connecting": "Connexion…",
+    "reconnecting": "Restauration de la session…",
+    "preparingTitle": "Préparation de la connexion…",
+    "siweTitle": "Approuvez la signature dans votre portefeuille",
+    "siweBody": "Une petite signature unique. Nous n'envoyons jamais de transactions depuis cette invite et ne touchons jamais vos fonds.",
+    "signingTitle": "Connexion en cours…",
+    "signing": "Signature…",
+    "declinedTitle": "Connexion requise",
+    "declinedBody": "Vous avez refusé le message de connexion. CofferNode a besoin de votre signature pour charger vos échanges et discussions — réessayez quand vous êtes prêt.",
+    "retryCta": "Réessayer",
+    "errorTitle": "Échec de la connexion",
+    "errorBody": "Réessayez."
+  }
 }

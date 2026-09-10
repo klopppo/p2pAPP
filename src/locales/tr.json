@@ -733,4 +733,22 @@
     "switchCta": "{{chain}} ağına geç",
     "switchError": "Otomatik geçiş yapılamadı: {{message}}"
   }
+,
+  "signInGate": {
+    "connectTitle": "Devam etmek için cüzdanınızı bağlayın",
+    "connectBody": "CofferNode Sign-In With Ethereum kullanır. Oturum açmak için bir cüzdan bağlayın — adresiniz sizin kontrolünüzde kalır.",
+    "connectCta": "Cüzdanı bağla",
+    "connecting": "Bağlanıyor…",
+    "reconnecting": "Oturum geri yükleniyor…",
+    "preparingTitle": "Oturum açma hazırlanıyor…",
+    "siweTitle": "Cüzdanınızda imzayı onaylayın",
+    "siweBody": "Küçük tek seferlik bir imza. Bu istemden asla işlem göndermiyoruz ve fonlarınıza dokunmuyoruz.",
+    "signingTitle": "Oturum açılıyor…",
+    "signing": "İmzalıyor…",
+    "declinedTitle": "Oturum açma gerekli",
+    "declinedBody": "Oturum açma mesajını reddettiniz. CofferNode'un işlemlerinizi ve sohbetlerinizi yüklemesi için imzanız gerekiyor — hazır olduğunuzda tekrar deneyin.",
+    "retryCta": "Tekrar dene",
+    "errorTitle": "Oturum açma başarısız",
+    "errorBody": "Tekrar deneyin."
+  }
 }

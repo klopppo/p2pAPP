@@ -732,5 +732,22 @@
     "description": "Your wallet is on the wrong EVM chain. Switch to {{chain}} to continue.",
     "switchCta": "Switch to {{chain}}",
     "switchError": "Couldn't switch automatically: {{message}}"
+  },
+  "signInGate": {
+    "connectTitle": "Connect your wallet to continue",
+    "connectBody": "CofferNode uses Sign-In With Ethereum. Connect a wallet to sign in — your address stays in your control.",
+    "connectCta": "Connect wallet",
+    "connecting": "Connecting…",
+    "reconnecting": "Restoring session…",
+    "preparingTitle": "Preparing sign-in…",
+    "siweTitle": "Approve the signature in your wallet",
+    "siweBody": "A small one-time signature. We never send transactions from this prompt and never touch your funds.",
+    "signingTitle": "Signing you in…",
+    "signing": "Signing…",
+    "declinedTitle": "Sign-in required",
+    "declinedBody": "You declined the sign-in message. CofferNode needs your signature to load your trades and chats — try again when you're ready.",
+    "retryCta": "Try again",
+    "errorTitle": "Sign-in failed",
+    "errorBody": "Try again."
   }
 }

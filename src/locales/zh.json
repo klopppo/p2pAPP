@@ -733,4 +733,22 @@
     "switchCta": "切换到 {{chain}}",
     "switchError": "无法自动切换：{{message}}"
   }
+,
+  "signInGate": {
+    "connectTitle": "请连接钱包后继续",
+    "connectBody": "CofferNode 使用 Sign-In With Ethereum 登录。请连接钱包以完成签名 —— 您的地址始终由您控制。",
+    "connectCta": "连接钱包",
+    "connecting": "连接中…",
+    "reconnecting": "正在恢复会话…",
+    "preparingTitle": "正在准备登录…",
+    "siweTitle": "请在钱包中确认签名",
+    "siweBody": "一次性的签名提示。我们不会通过此提示发送任何交易,也不会触碰您的资金。",
+    "signingTitle": "正在登录…",
+    "signing": "签名中…",
+    "declinedTitle": "需要登录",
+    "declinedBody": "您拒绝了签名消息。CofferNode 需要您的签名才能加载您的交易和聊天记录 —— 准备好后请重试。",
+    "retryCta": "重试",
+    "errorTitle": "登录失败",
+    "errorBody": "请重试。"
+  }
 }
