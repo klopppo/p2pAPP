@@ -34,7 +34,7 @@ function readStored(): {
     if (raw) {
       const parsed = JSON.parse(raw) as { address?: string }
       if (typeof parsed.address === 'string') {
-        return parsed.address.toLowerCase()
+        signedAddress = parsed.address.toLowerCase()
       }
     }
   } catch {
