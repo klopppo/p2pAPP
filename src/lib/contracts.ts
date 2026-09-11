@@ -67,15 +67,17 @@ export const MIN_SECURITY_DEPOSIT_BPS = 100n
 export const MAX_SECURITY_DEPOSIT_BPS = 1500n
 
 // ─── App-level trade defaults ─────────────────────────────────────────────────
-// These aren't on-chain yet — offer/trade schemas don't carry them. Hardcode
-// reasonable defaults; the actual values should eventually come from the
-// offer row (`security_deposit_pct`, `grace_period`) once those columns exist.
+// `offers.grace_period` (hours) now lives on the offer row and is converted to
+// seconds when the escrow is deployed (see TradePage). `DEFAULT_GRACE_PERIOD_SECONDS`
+// is kept as the fallback for legacy rows without a value. The security deposit
+// fraction is still chosen by the taker at trade creation (TradePage UI, bps).
 
 /** Buyer/seller each post this fraction of `tradeAmount` as a slashable
  *  security deposit. 10% = 1000 bps (within MIN..MAX bound). */
 export const DEFAULT_SECURITY_DEPOSIT_BPS = 1000n
-/** Buyer confirms off-chain fiat; this is how long after `confirm()` anyone
- *  may call `release()` without a dispute. 7 days. */
+/** Legacy fallback grace window — how long after `confirm()` anyone may call
+ *  `release()` without a dispute. 7 days (168h). Overridden per-offer by
+ *  `offers.grace_period` when the offer carries one. */
 export const DEFAULT_GRACE_PERIOD_SECONDS = 7n * 24n * 60n * 60n
 /** KlerosDisputeStatus enum (matches IKlerosCourt / KlerosCourt). */
 export const KLEROS_DISPUTE_STATUS = {

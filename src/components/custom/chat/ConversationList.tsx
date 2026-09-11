@@ -1,10 +1,11 @@
 import { useTranslation } from 'react-i18next'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { MessageCircle } from 'lucide-react'
 import type { useConversations } from '@/hooks/useConversations'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { ConversationItem } from './ConversationItem'
 import { createOurTeamConversation, OUR_TEAM_ID } from './ourTeam'
+import { subscribeSupportChat } from '@/lib/supportChatService'
 import { Text } from '@/components/ui/text'
 import { Skeleton } from './Skeleton'
 
@@ -33,6 +34,13 @@ export function ConversationList({ activeId, locallyReadIds, onSelect, conversat
   const { t } = useTranslation()
   const { data: user } = useCurrentUser()
   const { data, isLoading, isError } = conversations
+  const [supportTick, setSupportTick] = useState(0)
+
+  useEffect(() => {
+    return subscribeSupportChat(() => {
+      setSupportTick((t) => t + 1)
+    })
+  }, [])
 
   const items = useMemo(() => {
     const real = data ?? []
@@ -41,7 +49,7 @@ export function ConversationList({ activeId, locallyReadIds, onSelect, conversat
     // De-dupe if a real conversation ever happens to share the ourTeam id.
     if (real.some((c) => c.id === OUR_TEAM_ID)) return real
     return [ourTeam, ...real]
-  }, [data, user])
+  }, [data, user, supportTick])
 
   return (
     <div className="w-full md:w-[380px] h-full flex-shrink-0 bg-muted/60 backdrop-blur-sm flex flex-col min-h-0">

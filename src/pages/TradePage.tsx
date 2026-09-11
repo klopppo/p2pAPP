@@ -22,6 +22,7 @@ import {
   ERC20_ABI,
   DEFAULT_GRACE_PERIOD_SECONDS,
   DEFAULT_SECURITY_DEPOSIT_BPS,
+  MAX_GRACE_PERIOD_SECONDS,
   isFactoryConfigured,
 } from '@/lib/contracts'
 import { parseUnits } from 'viem'
@@ -108,6 +109,19 @@ export function TradePage() {
     (depositRateNum === 0 || depositRateNum >= 1)
   const depositBps =
     depositRateNum === 0 ? 0n : BigInt(Math.round(depositRateNum * 100))
+
+  // Grace window is set by the seller at offer creation (hours, offers.grace_period).
+  // Convert to seconds for the factory's `createEscrow` gracePeriod param, clamped
+  // to KlerosEsc's 0..365d bounds. Falls back to the legacy 7-day default when the
+  // offer row carries no value (shouldn't happen post-migration).
+  const offerGraceSeconds = (() => {
+    const hours = Number(offer.grace_period)
+    if (!Number.isFinite(hours) || hours <= 0) return DEFAULT_GRACE_PERIOD_SECONDS
+    const seconds = BigInt(Math.round(hours * 3600))
+    return seconds > MAX_GRACE_PERIOD_SECONDS
+      ? MAX_GRACE_PERIOD_SECONDS
+      : seconds
+  })()
 
   const expiresAt = offer.expires_at ? new Date(offer.expires_at) : null
 
@@ -295,14 +309,14 @@ export function TradePage() {
           address: factoryAddress,
           abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
           functionName: 'createEscrow',
-          args: [
-            buyerWallet as `0x${string}`,
-            sellerWallet as `0x${string}`,
-            DEFAULT_GRACE_PERIOD_SECONDS,
-            cryptoBaseUnits,
-            depositBps,
-          ],
-          account: address as `0x${string}`,
+args: [
+          buyerWallet as `0x${string}`,
+          sellerWallet as `0x${string}`,
+          offerGraceSeconds,
+          cryptoBaseUnits,
+          depositBps,
+        ],
+        account: address as `0x${string}`,
         })
       } catch (estErr) {
         const reason =
@@ -321,8 +335,9 @@ export function TradePage() {
       // actually consumes on Sepolia).
       const gasLimit = ((gas ?? 1_500_000n) * 130n) / 100n
 
-      // Deploy a KlerosEsc clone via the factory. Default grace period is
-      // 7 days, default security deposit is 10% (within KlerosEsc's MIN/MAX).
+      // Deploy a KlerosEsc clone via the factory, honoring the seller's
+      // grace window from the offer (hours → seconds). Security deposit
+      // defaults to 10% (within KlerosEsc's MIN/MAX).
       //
       // The explicit `gas: gasLimit` prevents viem's auto-estimate fallback
       // (which hits the 21M block gas limit and reverts with "transaction
@@ -335,7 +350,7 @@ export function TradePage() {
         args: [
           buyerWallet as `0x${string}`,
           sellerWallet as `0x${string}`,
-          DEFAULT_GRACE_PERIOD_SECONDS,
+          offerGraceSeconds,
           cryptoBaseUnits,
           depositBps,
         ],

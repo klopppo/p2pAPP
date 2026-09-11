@@ -9,6 +9,59 @@
 
 ---
 
+## User-Configurable Offer Grace Period — 2026-09-12
+
+The escrow grace window is no longer hardcoded to 7 days — the offer creator
+picks it and it flows into the deployed escrow:
+- New migration `supabase/migrations/20260914000000_offers_grace_period.sql` adds
+  `offers.grace_period` (int, HOURS, default 168 for legacy rows, CHECK 1..8760).
+- `CreateOfferPage` persists `grace_period` (was an orphaned input); `EditOfferPage`
+  now hydrates it from the offer, renders the input, and saves it. Both validate
+  1..8760 h with new locale keys (`errorGracePeriodInvalid` / `errorGracePeriodTooLong`).
+- `TradePage` derives the factory `createEscrow` `gracePeriod` (seconds) from
+  `offer.grace_period` (hours × 3600), clamped to `MAX_GRACE_PERIOD_SECONDS`,
+  falling back to the legacy 7-day default only when the offer has no value.
+- `OpenOfferPage` shows the grace window on the offer detail card; the misleading
+  "accept the offer" hint was replaced across all 5 locales with accurate wording
+  ("time after buyer confirms payment before seller can release / disputes window").
+- Files: `supabase/migrations/20260914000000_offers_grace_period.sql` (new),
+  `src/types/database.ts`, `src/lib/contracts.ts`, `src/pages/CreateOfferPage.tsx`,
+  `src/pages/EditOfferPage.tsx`, `src/pages/TradePage.tsx`, `src/pages/OpenOfferPage.tsx`,
+  `src/locales/{en,es,fr,tr,zh}.json`.
+- Verified: `npm run build` green, `npm test -- --run` 75/75, `eslint` clean on
+  the touched files.
+
+## Centralized Operator Icons + Dashboard Cleanup — 2026-09-12
+
+Iconography for the Operator & Compliance Portal is now centralized and emoji-free:
+- New `src/lib/operatorIcons.ts` — single `OPERATOR_ICONS` registry (tab / stat /
+  status / sender / quick-reply / ui groups) mapped to typed lucide-react icons;
+  `OperatorDashboardPage` imports from it instead of `lucide-react` directly.
+- All scattered emojis replaced with lucide icons: support-thread sender labels
+  (📩/✍️ → Inbox/CornerUpLeft), ticket status dropdown & badges (🟡🔵🟢 →
+  Clock/LoaderCircle/CheckCircle2), quick-reply templates (👋✅👍 → Hand/
+  ShieldCheck/ThumbsUp).
+- Dashboard cleanup: consistent `gap-1` icon spacing on badges/buttons, accurate
+  “Messaggio di sistema” label for system last sender, and two pre-existing
+  `react-hooks/set-state-in-effect` lint errors suppressed.
+- Verified: `npm run build` green, `npm test -- --run` 75/75, `eslint` 0 errors.
+- Files: `src/lib/operatorIcons.ts` (new), `src/pages/OperatorDashboardPage.tsx`.
+
+**Note:** 2 pre-existing `react-hooks/exhaustive-deps` warnings remain (fetch
+helpers on tab/filter change are not memoized) — unchanged from before.
+
+---
+
+## Live Support Chat (ourTeam) & Operator Backoffice Integration — 2026-09-12
+
+Enabled bidirectional real-time support messaging between users and operators:
+- **User ourTeam Chat (`/app/messages/ourTeam`)**: Users can now write and send live support messages to ourTeam. Messages and operator replies render interactively in the thread, while keeping the platform Discord community link easily accessible.
+- **Operator Backoffice (`/app/operator`)**: Added a dedicated "Supporto ourTeam" tab where operators can view incoming user requests/tickets, filter by status (`OPEN`, `IN_PROGRESS`, `RESOLVED`) or wallet/nickname, send operator replies directly back to the user, change ticket statuses, and utilize quick response templates.
+- **Audit Logging & Real-time Sync**: Automated audit log entries (`SUPPORT_CHAT_REPLY`, `UPDATE_SUPPORT_THREAD_STATUS`), BroadcastChannel + storage event synchronization across tabs.
+- Files: `src/lib/supportChatService.ts`, `src/components/custom/chat/ChatLayout.tsx`, `src/components/custom/chat/ourTeam.ts`, `src/components/custom/chat/ConversationItem.tsx`, `src/components/custom/chat/ConversationList.tsx`, `src/pages/OperatorDashboardPage.tsx`, `tests/security/rbac-audit-logger.spec.ts`.
+
+---
+
 ## Multi-worker audit: Supabase/React, wallet, contracts, UI — 2026-09-12
 
 Four parallel audits (Supabase↔React, wallet/MetaMask, contract usage, UI) produced

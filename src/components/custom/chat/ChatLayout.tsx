@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { MessageCircle } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
+import { toast } from 'sonner'
 
 
 import {
@@ -20,6 +21,13 @@ import {
   markConversationNotificationsRead,
   setConversationViewing,
 } from '@/lib/supabase'
+import {
+  getOurTeamMessagesForUser,
+  sendUserOurTeamMessage,
+  markThreadReadByUser,
+  subscribeSupportChat,
+  type SupportMessage,
+} from '@/lib/supportChatService'
 import { ConversationList } from './ConversationList'
 import { ChatHeader } from './ChatHeader'
 import { MessageThread } from './MessageThread'
@@ -30,7 +38,6 @@ import { ChatLoading } from './ChatLoading'
 import {
   createOurTeamConversation,
   OUR_TEAM_ID,
-  OUR_TEAM_WELCOME,
   OUR_TEAM_DISCORD,
 } from './ourTeam'
 import type { ConversationView, MessageWithSender } from '@/types/database'
@@ -116,31 +123,8 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
     !!partner &&
     (onlineUsers.has(partner.user_id) || online.some((o) => o.user_id === partner.user_id))
 
-  // Synthetic conversation (for ChatHeader) + synthetic messages for the
-  // ourTeam thread. Computed every render but cheap — no DB read.
+  // Synthetic conversation for the ourTeam thread.
   const ourTeamConv: ConversationView | null = user ? createOurTeamConversation(user) : null
-  const ourTeamMessages = useMemo<MessageWithSender[]>(() => {
-    if (!isOurTeam || !user) return []
-    const now = new Date().toISOString()
-    const senderId = '00000000-0000-0000-0000-000000000000' // sentinel id
-    return [
-      {
-        id: 'ourTeam-welcome',
-        conversation_id: OUR_TEAM_ID,
-        sender_id: senderId,
-        body: OUR_TEAM_WELCOME,
-        kind: 'system',
-        created_at: now,
-        sender: {
-          id: senderId,
-          wallet_address: '',
-          nickname: 'ourTeam',
-          avatar_url: null,
-          verification_level: 'trusted',
-        },
-      },
-    ]
-  }, [isOurTeam, user])
 
   // Once messages render, mark the conversation read so the badge clears.
   // Skip the synthetic ourTeam thread — there's no DB row to mark.
@@ -301,7 +285,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
 
         {activeId ? (
           isOurTeam && ourTeamConv ? (
-            <OurTeamPane messages={ourTeamMessages} onBack={handleBack} />
+            <OurTeamPane onBack={handleBack} />
           ) : convQuery.isLoading ? (
             <ChatLoading size="lg" label={t('chat.loadingConversation')} />
           ) : !convQuery.data ? (
@@ -359,43 +343,133 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
 }
 
 /**
- * Right pane for the synthetic ourTeam thread. Renders the welcome
- * message + a Discord link, hides the composer (no DB row to send to),
- * and disables the typing indicator.
+ * Right pane for the ourTeam thread.
+ * Renders support messages, live operator responses, and allows the user
+ * to send messages to the operator team while keeping the Discord community link accessible.
  */
 function OurTeamPane({
-  messages,
   onBack,
 }: {
-  messages: MessageWithSender[]
   onBack: () => void
 }) {
   const { data: user } = useCurrentUser()
+  const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([])
+  const [draft, setDraft] = useState('')
+  const [isSending, setIsSending] = useState(false)
+
+  const refreshMessages = useCallback(() => {
+    if (!user) return
+    const msgs = getOurTeamMessagesForUser(user)
+    setSupportMessages(msgs)
+    markThreadReadByUser(user.id)
+  }, [user])
+
+  useEffect(() => {
+    refreshMessages()
+    const unsubscribe = subscribeSupportChat(refreshMessages)
+    return () => unsubscribe()
+  }, [refreshMessages])
+
+  const mappedMessages = useMemo<MessageWithSender[]>(() => {
+    if (!user) return []
+    return supportMessages.map((m) => {
+      const isMe = m.sender_type === 'user'
+      const senderId = isMe ? user.id : '00000000-0000-0000-0000-000000000000'
+      return {
+        id: m.id,
+        conversation_id: OUR_TEAM_ID,
+        sender_id: senderId,
+        body: m.body,
+        kind: m.sender_type === 'system' ? 'system' : 'text',
+        created_at: m.created_at,
+        sender: {
+          id: senderId,
+          wallet_address: isMe ? user.wallet_address || '' : '',
+          nickname: isMe ? user.nickname || 'You' : m.sender_name,
+          avatar_url: isMe ? user.avatar_url || null : null,
+          verification_level: isMe ? user.verification_level || 'unverified' : 'trusted',
+        },
+      }
+    })
+  }, [supportMessages, user])
+
+  const handleSend = async () => {
+    const text = draft.trim()
+    if (!text || !user || isSending) return
+    setIsSending(true)
+    try {
+      await sendUserOurTeamMessage(user, text)
+      setDraft('')
+      refreshMessages()
+    } catch (err) {
+      console.warn('[OurTeamPane] send message failed:', err)
+      toast.error('Impossibile inviare il messaggio di supporto.')
+    } finally {
+      setIsSending(false)
+    }
+  }
+
   const headerBack = (
     <button
       type="button"
       onClick={onBack}
-      className="md:hidden text-muted-foreground hover:text-foreground text-sm"
+      className="md:hidden text-muted-foreground hover:text-foreground text-sm cursor-pointer"
     >
       ← Back
     </button>
   )
+
   return (
     <div className="flex-1 bg-background/20 px-6 pt-6 pb-3 flex flex-col min-h-0 overflow-hidden">
-      {/* Inline minimal header so the welcome thread reads correctly. */}
-      <div className="flex items-center gap-3 pb-3 border-b border-border/40">
-        {headerBack}
-        <div className="h-10 w-10 rounded-full bg-primary/15 text-primary flex items-center justify-center shrink-0">
-          <MessageCircle className="w-5 h-5" />
+      {/* Header */}
+      <div className="flex items-center justify-between pb-3 border-b border-border/40 shrink-0">
+        <div className="flex items-center gap-3">
+          {headerBack}
+          <div className="relative">
+            <div className="h-10 w-10 rounded-full bg-primary/15 text-primary flex items-center justify-center shrink-0 font-bold text-xs">
+              OT
+            </div>
+            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full ring-2 ring-card" />
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-semibold">ourTeam</p>
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-primary/20 text-primary">
+                Operatori Attivi
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">Supporto Diretto CofferNode</p>
+          </div>
         </div>
-        <div>
-          <p className="text-sm font-semibold">ourTeam</p>
-          <p className="text-xs text-muted-foreground">CofferNode support</p>
-        </div>
+
+        <a
+          href={OUR_TEAM_DISCORD}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
+        >
+          <span>Discord Live</span>
+          <ExternalLink className="w-3.5 h-3.5" />
+        </a>
+      </div>
+
+      {/* Community notice banner */}
+      <div className="my-2 p-2.5 rounded-xl bg-card/60 border border-border/40 flex items-center justify-between gap-2 text-xs text-muted-foreground shrink-0">
+        <span>
+          💬 Scrivi qui sotto: un nostro operatore ti risponderà in questa chat.
+        </span>
+        <a
+          href={OUR_TEAM_DISCORD}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary hover:underline font-medium shrink-0"
+        >
+          Community Discord →
+        </a>
       </div>
 
       <MessageThread
-        messages={messages}
+        messages={mappedMessages}
         currentUserId={user?.id ?? ''}
         partnerAvatarUrl={null}
         partnerInitial="OT"
@@ -403,19 +477,15 @@ function OurTeamPane({
         onLoadOlder={() => undefined}
       />
 
-      <div className="pt-4 border-t border-border/50 flex flex-wrap gap-2">
-        <a
-          href={OUR_TEAM_DISCORD}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
-        >
-          Open Discord
-        </a>
-        <span className="text-xs text-muted-foreground self-center">
-          Live community support — Discord is the fastest channel.
-        </span>
-      </div>
+      <MessageComposer
+        value={draft}
+        onChange={setDraft}
+        onSend={handleSend}
+        onTyping={() => undefined}
+        onStopTyping={() => undefined}
+        disabled={isSending}
+        placeholder="Scrivi un messaggio a ourTeam..."
+      />
     </div>
   )
 }

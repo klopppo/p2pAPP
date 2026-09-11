@@ -107,6 +107,7 @@ export function OpenOfferPage() {
     .join(', ') || 'Global'
 
   const expiresAt = offer.expires_at ? new Date(offer.expires_at) : null
+  const gracePeriodHours = Number(offer.grace_period) || 0
 
   return (
     <section>
@@ -219,6 +220,14 @@ export function OpenOfferPage() {
                 <div className="space-y-1.5">
                    <Text variant="small" className="text-muted-foreground">{t('openOffer.location')}</Text>
                   <Text variant="body">{regions}</Text>
+                </div>
+                <div className="space-y-1.5">
+                   <Text variant="small" className="text-muted-foreground">{t('openOffer.gracePeriod')}</Text>
+                  <Text variant="body">
+                    {gracePeriodHours > 0
+                      ? t('openOffer.gracePeriodValue', { count: gracePeriodHours })
+                      : '—'}
+                  </Text>
                 </div>
               </div>
 

@@ -10,12 +10,20 @@ import {
   DEFAULT_PERMISSIONS,
   createOperator,
   listOperators,
+  getCurrentOperator,
 } from '@/lib/operatorService'
 import {
   createUserReport,
   listUserReports,
   resolveUserReport,
 } from '@/lib/reportsService'
+import {
+  sendUserOurTeamMessage,
+  sendOperatorOurTeamReply,
+  getOurTeamMessagesForUser,
+  listSupportThreads,
+  updateSupportThreadStatus,
+} from '@/lib/supportChatService'
 import { ReportCategory } from '@/types/rbac'
 
 describe('RBAC & Program-Role-Permission Matrix', () => {
@@ -139,5 +147,68 @@ describe('User Reports (Segnalazioni) & Message Inspector', () => {
     // Verify audit log has the inspection logged
     const logs = await listUserActivityLogs({ action: 'INSPECT_USER_CHAT' })
     expect(logs.length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('Support Chat (ourTeam) & Operator Replies', () => {
+  it('should allow a user to send support messages to ourTeam and retrieve history', async () => {
+    const user = {
+      id: '30000000-0000-0000-0000-000000000001',
+      wallet_address: '0xUserSupportTest123',
+      nickname: 'User_Tester',
+    }
+
+    const msg = await sendUserOurTeamMessage(user, 'Ho bisogno di assistenza per il mio trade')
+    expect(msg.id).toBeDefined()
+    expect(msg.body).toBe('Ho bisogno di assistenza per il mio trade')
+    expect(msg.sender_type).toBe('user')
+
+    const history = getOurTeamMessagesForUser(user)
+    expect(history.length).toBeGreaterThanOrEqual(2) // welcome + sent user message
+    expect(history.some((m) => m.body.includes('Ho bisogno di assistenza'))).toBe(true)
+  })
+
+  it('should allow an operator to reply to user support thread and log to audit', async () => {
+    const user = {
+      id: '30000000-0000-0000-0000-000000000002',
+      wallet_address: '0xUserSupportTest456',
+      nickname: 'Trader_Alex',
+    }
+
+    const userMsg = await sendUserOurTeamMessage(user, 'Quando viene rilasciato l’escrow?')
+    const threads = listSupportThreads()
+    const userThread = threads.find((t) => t.id === userMsg.thread_id || t.user_id === user.id)
+    expect(userThread).toBeDefined()
+
+    const operator = getCurrentOperator()
+    const opReply = await sendOperatorOurTeamReply(
+      userThread!.id,
+      operator,
+      'Ciao Alex! L’escrow viene rilasciato non appena il compratore conferma la ricezione.'
+    )
+
+    expect(opReply.id).toBeDefined()
+    expect(opReply.sender_type).toBe('operator')
+    expect(opReply.sender_name).toContain('ourTeam')
+
+    // Verify thread is updated
+    const updatedThreads = listSupportThreads()
+    const found = updatedThreads.find((t) => t.id === userThread!.id)
+    expect(found?.status).toBe('IN_PROGRESS')
+    expect(found?.last_message).toContain('Ciao Alex')
+
+    // Verify audit log has SUPPORT_CHAT_REPLY
+    const logs = await listUserActivityLogs({ action: 'SUPPORT_CHAT_REPLY' })
+    expect(logs.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('should allow updating support thread status', async () => {
+    const threads = listSupportThreads()
+    expect(threads.length).toBeGreaterThan(0)
+    const targetThread = threads[0]
+
+    await updateSupportThreadStatus(targetThread.id, 'RESOLVED', getCurrentOperator())
+    const updated = listSupportThreads().find((t) => t.id === targetThread.id)
+    expect(updated?.status).toBe('RESOLVED')
   })
 })

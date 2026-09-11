@@ -1,22 +1,5 @@
-import { useState, useEffect, useMemo } from 'react'
-import {
-  ShieldAlert,
-  Activity,
-  MessageSquare,
-  Users,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Eye,
-  Search,
-  RefreshCw,
-  Lock,
-  FileText,
-  AlertTriangle,
-  UserCheck,
-  Building2,
-  Filter,
-} from 'lucide-react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { OPERATOR_ICONS } from '@/lib/operatorIcons'
 import { toast } from 'sonner'
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import { Card, CardContent } from '@/components/ui/card'
@@ -56,6 +39,17 @@ import {
   resolveUserReport,
   type ListReportsFilters,
 } from '@/lib/reportsService'
+import {
+  listSupportThreads,
+  getThreadMessages,
+  sendOperatorOurTeamReply,
+  updateSupportThreadStatus,
+  markThreadReadByOperator,
+  subscribeSupportChat,
+  type SupportThread,
+  type SupportMessage,
+  type SupportThreadStatus,
+} from '@/lib/supportChatService'
 import { shortTradeId } from '@/lib/utils'
 import type {
   UserActivityLog,
@@ -65,11 +59,30 @@ import type {
 } from '@/types/rbac'
 
 export function OperatorDashboardPage() {
+  const {
+    tab: tabIcons,
+    stat: statIcons,
+    status: statusIcons,
+    sender: senderIcons,
+    quickReply: quickReplyIcons,
+    ui: uiIcons,
+  } = OPERATOR_ICONS
+
   const [activeTab, setActiveTab] = useState<
-    'reports' | 'logs' | 'messages' | 'rbac'
-  >('reports')
+    'support' | 'reports' | 'logs' | 'messages' | 'rbac'
+  >('support')
   const [operators, setOperators] = useState<SysOperator[]>([])
   const [currentOp, setCurOp] = useState<SysOperator>(getCurrentOperator())
+
+  // Support chat state
+  const [supportThreads, setSupportThreads] = useState<SupportThread[]>([])
+  const [activeSupportThreadId, setActiveSupportThreadId] = useState<string | null>(null)
+  const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([])
+  const [supportFilterStatus, setSupportFilterStatus] = useState('all')
+  const [supportFilterSearch, setSupportFilterSearch] = useState('')
+  const [operatorReply, setOperatorReply] = useState('')
+  const [sendingReply, setSendingReply] = useState(false)
+  const supportScrollRef = useRef<HTMLDivElement>(null)
 
   // Reports state
   const [reports, setReports] = useState<UserReport[]>([])
@@ -99,6 +112,50 @@ export function OperatorDashboardPage() {
   // RBAC matrix role selector
   const [matrixRole, setMatrixRole] = useState('COMPLIANCE_LEAD')
   const [, setRbacUpdateTick] = useState(0)
+
+  // Fetch Support Threads
+  const fetchSupport = () => {
+    const list = listSupportThreads()
+    setSupportThreads(list)
+    if (!activeSupportThreadId && list.length > 0) {
+      setActiveSupportThreadId(list[0].id)
+      setSupportMessages(getThreadMessages(list[0].id))
+      markThreadReadByOperator(list[0].id)
+    } else if (activeSupportThreadId) {
+      setSupportMessages(getThreadMessages(activeSupportThreadId))
+    }
+  }
+
+  const handleSelectSupportThread = (threadId: string) => {
+    setActiveSupportThreadId(threadId)
+    setSupportMessages(getThreadMessages(threadId))
+    markThreadReadByOperator(threadId)
+  }
+
+  const handleSendOperatorReply = async () => {
+    if (!activeSupportThreadId || !operatorReply.trim() || sendingReply) return
+    setSendingReply(true)
+    try {
+      await sendOperatorOurTeamReply(activeSupportThreadId, currentOp, operatorReply)
+      setOperatorReply('')
+      setSupportMessages(getThreadMessages(activeSupportThreadId))
+      fetchSupport()
+      fetchLogs()
+      toast.success('Risposta inviata all’utente con successo!')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Errore nell’invio della risposta'
+      toast.error(msg)
+    } finally {
+      setSendingReply(false)
+    }
+  }
+
+  const handleUpdateStatus = async (threadId: string, status: SupportThreadStatus) => {
+    await updateSupportThreadStatus(threadId, status, currentOp)
+    fetchSupport()
+    fetchLogs()
+    toast.success(`Stato ticket aggiornato a: ${status}`)
+  }
 
   // Fetch Reports
   const fetchReports = async () => {
@@ -145,30 +202,39 @@ export function OperatorDashboardPage() {
     }
   }
 
-  // Load initial data (declared after the fetchers it calls so there is no
-  // use-before-declaration).
+  // Load initial data
   const loadInitial = async () => {
     const ops = await listOperators()
     setOperators(ops)
     setCurOp(getCurrentOperator())
+    fetchSupport()
     fetchReports()
     fetchLogs()
   }
 
-  // Both effects below kick off async loaders that set state; the React
-  // Compiler lint flags the synchronous-within-effect call, but this is the
-  // canonical "load on mount / tab change" pattern.
-  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadInitial()
+    const unsubSupport = subscribeSupportChat(() => {
+      fetchSupport()
+    })
+    return () => unsubSupport()
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (activeTab === 'support') fetchSupport()
     if (activeTab === 'reports') fetchReports()
     if (activeTab === 'logs') fetchLogs()
     if (activeTab === 'messages') fetchConversations()
   }, [activeTab, reportFilterStatus, logFilterProgram])
-  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Auto-scroll support thread
+  useEffect(() => {
+    if (supportScrollRef.current) {
+      supportScrollRef.current.scrollTop = supportScrollRef.current.scrollHeight
+    }
+  }, [supportMessages])
 
   // Handle Operator Switcher
   const handleOperatorSwitch = (opId: string) => {
@@ -260,6 +326,35 @@ export function OperatorDashboardPage() {
     () => reports.filter((r) => r.status === 'IN_REVIEW').length,
     [reports]
   )
+  const openSupportThreadsCount = useMemo(
+    () => supportThreads.filter((t) => t.status === 'OPEN').length,
+    [supportThreads]
+  )
+  const inProgressSupportThreadsCount = useMemo(
+    () => supportThreads.filter((t) => t.status === 'IN_PROGRESS').length,
+    [supportThreads]
+  )
+
+  const filteredSupportThreads = useMemo(() => {
+    return supportThreads.filter((t) => {
+      if (supportFilterStatus !== 'all' && t.status !== supportFilterStatus) {
+        return false
+      }
+      if (supportFilterSearch.trim()) {
+        const query = supportFilterSearch.toLowerCase().trim()
+        const matchWallet = t.user_wallet.toLowerCase().includes(query)
+        const matchNick = (t.user_nickname || '').toLowerCase().includes(query)
+        const matchMsg = (t.last_message || '').toLowerCase().includes(query)
+        if (!matchWallet && !matchNick && !matchMsg) return false
+      }
+      return true
+    })
+  }, [supportThreads, supportFilterStatus, supportFilterSearch])
+
+  const selectedSupportThread = useMemo(
+    () => supportThreads.find((t) => t.id === activeSupportThreadId) || null,
+    [supportThreads, activeSupportThreadId]
+  )
 
   const canViewMessages = hasPermission(
     currentOp.roles,
@@ -308,7 +403,7 @@ export function OperatorDashboardPage() {
       <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-card/60 backdrop-blur-xl border border-border/50">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-            <UserCheck className="w-5 h-5" />
+            <uiIcons.userCheck className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -369,7 +464,7 @@ export function OperatorDashboardPage() {
               <span className="text-xs font-semibold uppercase tracking-wider">
                 Segnalazioni Aperte
               </span>
-              <ShieldAlert className="w-4 h-4 text-destructive" />
+              <statIcons.reports className="w-4 h-4 text-destructive" />
             </div>
             <div className="text-3xl font-extrabold text-foreground">
               {pendingReportsCount}
@@ -386,7 +481,7 @@ export function OperatorDashboardPage() {
               <span className="text-xs font-semibold uppercase tracking-wider">
                 Movimenti Registrati
               </span>
-              <Activity className="w-4 h-4 text-primary" />
+              <statIcons.logs className="w-4 h-4 text-primary" />
             </div>
             <div className="text-3xl font-extrabold text-foreground">
               {logs.length}
@@ -403,7 +498,7 @@ export function OperatorDashboardPage() {
               <span className="text-xs font-semibold uppercase tracking-wider">
                 Operatori nel Sistema
               </span>
-              <Users className="w-4 h-4 text-muted-foreground" />
+              <statIcons.operators className="w-4 h-4 text-muted-foreground" />
             </div>
             <div className="text-3xl font-extrabold text-foreground">
               {operators.length}
@@ -418,15 +513,15 @@ export function OperatorDashboardPage() {
           <CardContent className="space-y-1">
             <div className="flex justify-between items-center text-muted-foreground">
               <span className="text-xs font-semibold uppercase tracking-wider">
-                Programmi di Controllo
+                Supporto ourTeam
               </span>
-              <Building2 className="w-4 h-4 text-muted-foreground" />
+              <statIcons.support className="w-4 h-4 text-primary" />
             </div>
             <div className="text-3xl font-extrabold text-foreground">
-              {DEFAULT_PROGRAMS.length}
+              {openSupportThreadsCount}
             </div>
             <p className="text-xs text-muted-foreground">
-              Moduli operativi protetti
+              {inProgressSupportThreadsCount} in corso ({supportThreads.length} totali)
             </p>
           </CardContent>
         </Card>
@@ -435,11 +530,19 @@ export function OperatorDashboardPage() {
       {/* Tabs Navigation */}
       <div className="flex items-center gap-2 border-b border-border/50 pb-3 overflow-x-auto">
         <Button
+          variant={activeTab === 'support' ? 'default' : 'ghost'}
+          onClick={() => setActiveTab('support')}
+          className="rounded-full gap-2 text-sm cursor-pointer"
+        >
+          <tabIcons.support className="w-4 h-4" />
+          Supporto ourTeam ({openSupportThreadsCount > 0 ? `${openSupportThreadsCount} aperti` : supportThreads.length})
+        </Button>
+        <Button
           variant={activeTab === 'reports' ? 'default' : 'ghost'}
           onClick={() => setActiveTab('reports')}
           className="rounded-full gap-2 text-sm cursor-pointer"
         >
-          <ShieldAlert className="w-4 h-4" />
+          <tabIcons.reports className="w-4 h-4" />
           Segnalazioni Utenti ({reports.length})
         </Button>
         <Button
@@ -447,7 +550,7 @@ export function OperatorDashboardPage() {
           onClick={() => setActiveTab('logs')}
           className="rounded-full gap-2 text-sm cursor-pointer"
         >
-          <Activity className="w-4 h-4" />
+          <tabIcons.logs className="w-4 h-4" />
           Audit Logger Movimenti ({logs.length})
         </Button>
         <Button
@@ -455,7 +558,7 @@ export function OperatorDashboardPage() {
           onClick={() => setActiveTab('messages')}
           className="rounded-full gap-2 text-sm cursor-pointer"
         >
-          <MessageSquare className="w-4 h-4" />
+          <tabIcons.messages className="w-4 h-4" />
           Ispezione Messaggi Utenti
         </Button>
         <Button
@@ -463,10 +566,315 @@ export function OperatorDashboardPage() {
           onClick={() => setActiveTab('rbac')}
           className="rounded-full gap-2 text-sm cursor-pointer"
         >
-          <Lock className="w-4 h-4" />
+          <tabIcons.rbac className="w-4 h-4" />
           Programmi, Ruoli e Permessi
         </Button>
       </div>
+
+      {/* TAB 0: SUPPORTO LIVE OURTEAM */}
+      {activeTab === 'support' && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative">
+                <uiIcons.search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Cerca per wallet o messaggio..."
+                  value={supportFilterSearch}
+                  onChange={(e) => setSupportFilterSearch(e.target.value)}
+                  className="pl-9 rounded-full max-w-xs h-9 text-xs"
+                />
+              </div>
+
+              <FullDropdown
+                label="Stato Ticket"
+                value={supportFilterStatus}
+                options={[
+                  { label: 'Tutti gli stati', value: 'all' },
+                  { label: 'Aperti (OPEN)', value: 'OPEN' },
+                  { label: 'In Corso (IN_PROGRESS)', value: 'IN_PROGRESS' },
+                  { label: 'Risolti (RESOLVED)', value: 'RESOLVED' },
+                ]}
+                onSelect={(val) => setSupportFilterStatus(val)}
+              />
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchSupport}
+              className="rounded-full gap-1.5"
+            >
+              <uiIcons.refresh className="w-3.5 h-3.5" />
+              Ricarica Chat
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column: Lista Conversazioni di Supporto */}
+            <div className="lg:col-span-1 space-y-3">
+              <div className="flex justify-between items-center px-1">
+                <Text variant="h4" className="text-sm font-semibold">
+                  Ticket e Richieste Utenti ({filteredSupportThreads.length})
+                </Text>
+                <span className="text-xs text-muted-foreground">
+                  {openSupportThreadsCount} da gestire
+                </span>
+              </div>
+
+              <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+                {filteredSupportThreads.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-muted-foreground bg-card/30 rounded-2xl border border-border/40">
+                    Nessuna richiesta di supporto trovata.
+                  </div>
+                ) : (
+                  filteredSupportThreads.map((thread) => {
+                    const isSelected = activeSupportThreadId === thread.id
+                    return (
+                      <div
+                        key={thread.id}
+                        onClick={() => handleSelectSupportThread(thread.id)}
+                        className={`p-3.5 rounded-2xl border transition-all cursor-pointer space-y-1.5 ${
+                          isSelected
+                            ? 'bg-card border-primary/50 shadow-md ring-1 ring-primary/20'
+                            : 'bg-card/40 border-border/40 hover:bg-card/70'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-semibold text-xs text-foreground truncate">
+                              {thread.user_nickname || 'Utente'}
+                            </span>
+                            <span className="text-[10px] font-mono text-muted-foreground truncate">
+                              {thread.user_wallet}
+                            </span>
+                          </div>
+                          {thread.status === 'OPEN' && (
+                            <Badge className="bg-amber-500/15 text-amber-500 hover:bg-amber-500/25 rounded-full text-[10px] px-2 py-0 border-amber-500/30 gap-1">
+                              <statusIcons.OPEN className="w-3 h-3" />
+                              Aperto
+                            </Badge>
+                          )}
+                          {thread.status === 'IN_PROGRESS' && (
+                            <Badge className="bg-primary/15 text-primary hover:bg-primary/25 rounded-full text-[10px] px-2 py-0 border-primary/30 gap-1">
+                              <statusIcons.IN_PROGRESS className="w-3 h-3" />
+                              In Corso
+                            </Badge>
+                          )}
+                          {thread.status === 'RESOLVED' && (
+                            <Badge className="bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25 rounded-full text-[10px] px-2 py-0 border-emerald-500/30 gap-1">
+                              <statusIcons.RESOLVED className="w-3 h-3" />
+                              Risolto
+                            </Badge>
+                          )}
+                        </div>
+
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {thread.last_message}
+                        </p>
+
+                        <div className="flex justify-between items-center text-[10px] text-muted-foreground/80 pt-1">
+                          <span className="inline-flex items-center gap-1">
+                            {thread.last_sender_type === 'operator' ? (
+                              <>
+                                <senderIcons.operator className="w-3 h-3" />
+                                Risposta inviata
+                              </>
+                            ) : thread.last_sender_type === 'user' ? (
+                              <>
+                                <senderIcons.user className="w-3 h-3" />
+                                Messaggio utente
+                              </>
+                            ) : (
+                              <>
+                                <senderIcons.system className="w-3 h-3" />
+                                Messaggio di sistema
+                              </>
+                            )}
+                          </span>
+                          <span>
+                            {new Date(thread.last_message_at).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Right Column: Chat Interattiva Operatore */}
+            <div className="lg:col-span-2">
+              <Card className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl flex flex-col h-[650px]">
+                <CardContent className="space-y-4 flex flex-col flex-1 min-h-0">
+                  {/* Chat Header */}
+                  <div className="flex flex-wrap justify-between items-center border-b border-border/50 pb-3 gap-2 shrink-0">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Text variant="h4" className="font-bold">
+                          {selectedSupportThread?.user_nickname || 'Support Ticket'}
+                        </Text>
+                        <span className="text-xs font-mono text-muted-foreground">
+                          {selectedSupportThread?.user_wallet}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        ID: {selectedSupportThread?.id || '—'}
+                      </p>
+                    </div>
+
+                    {selectedSupportThread && (
+                      <div className="flex items-center gap-2">
+                        <FullDropdown
+                          label="Stato"
+                          value={selectedSupportThread.status}
+                          options={[
+                            { label: 'Aperto (OPEN)', value: 'OPEN', icon: statusIcons.OPEN },
+                            { label: 'In Corso (IN_PROGRESS)', value: 'IN_PROGRESS', icon: statusIcons.IN_PROGRESS },
+                            { label: 'Risolto (RESOLVED)', value: 'RESOLVED', icon: statusIcons.RESOLVED },
+                          ]}
+                          onSelect={(val) => handleUpdateStatus(selectedSupportThread.id, val as SupportThreadStatus)}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Messages Scroll Area */}
+                  {!selectedSupportThread ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground space-y-2">
+                      <tabIcons.support className="w-10 h-10 opacity-40" />
+                      <p className="text-sm">Seleziona una richiesta di supporto dall&apos;elenco a sinistra per rispondere.</p>
+                    </div>
+                  ) : (
+                    <div
+                      ref={supportScrollRef}
+                      className="flex-1 overflow-y-auto space-y-3 pr-2 min-h-0"
+                    >
+                      {supportMessages.map((m) => {
+                        const isOperator = m.sender_type === 'operator'
+                        const isSystem = m.sender_type === 'system'
+
+                        if (isSystem) {
+                          return (
+                            <div key={m.id} className="flex justify-center my-2">
+                              <div className="px-3 py-1.5 rounded-full bg-muted/60 border border-border/40 text-[11px] text-muted-foreground text-center max-w-md">
+                                {m.body}
+                              </div>
+                            </div>
+                          )
+                        }
+
+                        return (
+                          <div
+                            key={m.id}
+                            className={`flex flex-col ${isOperator ? 'items-end' : 'items-start'}`}
+                          >
+                            <div className="flex items-center gap-1.5 mb-1 text-[11px] text-muted-foreground">
+                              {isOperator ? (
+                                <>
+                                  <Badge className="rounded-full text-[9px] px-1.5 py-0 bg-primary/20 text-primary border-none">
+                                    Operatore
+                                  </Badge>
+                                  <span className="font-semibold text-foreground">{m.sender_name}</span>
+                                  <span>• {new Date(m.created_at).toLocaleTimeString()}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="font-semibold text-foreground">{m.sender_name}</span>
+                                  <span className="font-mono text-[10px]">({m.user_wallet.slice(0, 6)}…)</span>
+                                  <span>• {new Date(m.created_at).toLocaleTimeString()}</span>
+                                </>
+                              )}
+                            </div>
+
+                            <div
+                              className={`p-3 rounded-2xl text-sm max-w-[80%] whitespace-pre-wrap break-words ${
+                                isOperator
+                                  ? 'bg-primary text-primary-foreground rounded-tr-none'
+                                  : 'bg-muted text-foreground rounded-tl-none border border-border/40'
+                              }`}
+                            >
+                              {m.body}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {/* Reply Composer & Quick Templates */}
+                  {selectedSupportThread && (
+                    <div className="space-y-2 pt-2 border-t border-border/50 shrink-0">
+                      {/* Quick Templates */}
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                        <span className="text-muted-foreground flex items-center gap-1 text-[11px]">
+                          <uiIcons.sparkles className="w-3 h-3 text-primary" /> Risposte rapide:
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="rounded-full h-6 text-[10px] px-2.5 py-0 gap-1"
+                          onClick={() => setOperatorReply((prev) => (prev ? `${prev} ` : '') + 'Ciao! Abbiamo preso in carico la tua richiesta. Un momento che verifichiamo la situazione...')}
+                        >
+                          <quickReplyIcons.greeting className="w-3 h-3" />
+                          Saluto
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="rounded-full h-6 text-[10px] px-2.5 py-0 gap-1"
+                          onClick={() => setOperatorReply((prev) => (prev ? `${prev} ` : '') + 'Abbiamo verificato: l’operazione escrow è stata confermata correttamente.')}
+                        >
+                          <quickReplyIcons.escrow className="w-3 h-3" />
+                          Conferma Escrow
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="rounded-full h-6 text-[10px] px-2.5 py-0 gap-1"
+                          onClick={() => setOperatorReply((prev) => (prev ? `${prev} ` : '') + 'Il tuo ticket è stato risolto. Restiamo a disposizione se hai altre domande!')}
+                        >
+                          <quickReplyIcons.resolved className="w-3 h-3" />
+                          Risolto
+                        </Button>
+                      </div>
+
+                      <div className="flex gap-2 items-end">
+                        <Textarea
+                          placeholder={`Scrivi una risposta come ${currentOp.full_name || currentOp.username} (ourTeam)...`}
+                          value={operatorReply}
+                          onChange={(e) => setOperatorReply(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault()
+                              handleSendOperatorReply()
+                            }
+                          }}
+                          className="min-h-[64px] max-h-[120px] text-xs resize-none rounded-xl"
+                        />
+                        <Button
+                          onClick={handleSendOperatorReply}
+                          disabled={!operatorReply.trim() || sendingReply}
+                          className="rounded-xl h-[64px] px-4 shrink-0 gap-1.5 font-medium text-xs"
+                        >
+                          <uiIcons.send className="w-4 h-4" />
+                          <span>Rispondi</span>
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* TAB 1: SEGNALAZIONI UTENTI */}
       {activeTab === 'reports' && (
@@ -493,7 +901,7 @@ export function OperatorDashboardPage() {
               disabled={reportsLoading}
               className="rounded-full gap-1.5"
             >
-              <RefreshCw
+              <uiIcons.refresh
                 className={`w-3.5 h-3.5 ${reportsLoading ? 'animate-spin' : ''}`}
               />
               Ricarica
@@ -586,7 +994,7 @@ export function OperatorDashboardPage() {
                               }}
                               className="rounded-full h-8 text-xs gap-1"
                             >
-                              <Eye className="w-3.5 h-3.5" /> Gestisci
+                              <uiIcons.eye className="w-3.5 h-3.5" /> Gestisci
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -702,7 +1110,7 @@ export function OperatorDashboardPage() {
                           onClick={() => handleResolveReport('DISMISSED')}
                           className="rounded-full gap-1 text-xs"
                         >
-                          <XCircle className="w-4 h-4 text-muted-foreground" />{' '}
+                          <uiIcons.xCircle className="w-4 h-4 text-muted-foreground" />{' '}
                           Respingi
                         </Button>
                         <Button
@@ -711,7 +1119,7 @@ export function OperatorDashboardPage() {
                           onClick={() => handleResolveReport('IN_REVIEW')}
                           className="rounded-full gap-1 text-xs"
                         >
-                          <Clock className="w-4 h-4" /> In Revisione
+                          <uiIcons.clock className="w-4 h-4" /> In Revisione
                         </Button>
                         <Button
                           variant="default"
@@ -719,7 +1127,7 @@ export function OperatorDashboardPage() {
                           onClick={() => handleResolveReport('RESOLVED')}
                           className="rounded-full gap-1 text-xs"
                         >
-                          <CheckCircle2 className="w-4 h-4" /> Risolvi & Chiudi
+                          <uiIcons.checkCircle className="w-4 h-4" /> Risolvi & Chiudi
                         </Button>
                       </div>
                     )}
@@ -737,7 +1145,7 @@ export function OperatorDashboardPage() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <uiIcons.search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Cerca per wallet..."
                   value={logFilterWallet}
@@ -747,7 +1155,7 @@ export function OperatorDashboardPage() {
               </div>
 
               <div className="relative">
-                <Filter className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <uiIcons.filter className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Filtra per azione (es. ESCROW)..."
                   value={logFilterAction}
@@ -777,7 +1185,7 @@ export function OperatorDashboardPage() {
               disabled={logsLoading}
               className="rounded-full gap-1.5"
             >
-              <RefreshCw
+              <uiIcons.refresh
                 className={`w-3.5 h-3.5 ${logsLoading ? 'animate-spin' : ''}`}
               />
               Ricarica Log
@@ -880,7 +1288,7 @@ export function OperatorDashboardPage() {
                               onClick={() => setSelectedLog(log)}
                               className="rounded-full h-7 text-xs font-sans gap-1"
                             >
-                              <FileText className="w-3.5 h-3.5" /> Dettagli
+                              <uiIcons.fileText className="w-3.5 h-3.5" /> Dettagli
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -983,7 +1391,7 @@ export function OperatorDashboardPage() {
           {!canViewMessages ? (
             <Card className="bg-background/50 border border-border/50 p-8 rounded-2xl text-center">
               <CardContent className="space-y-3">
-                <Lock className="w-8 h-8 text-destructive mx-auto" />
+                <uiIcons.lock className="w-8 h-8 text-destructive mx-auto" />
                 <Text variant="h4" className="font-bold">
                   Accesso Non Autorizzato
                 </Text>
@@ -1010,7 +1418,7 @@ export function OperatorDashboardPage() {
                     disabled={messagesLoading}
                     className="h-7 text-xs rounded-full"
                   >
-                    <RefreshCw className="w-3 h-3 mr-1" /> Aggiorna
+                    <uiIcons.refresh className="w-3 h-3 mr-1" /> Aggiorna
                   </Button>
                 </div>
 
@@ -1081,14 +1489,14 @@ export function OperatorDashboardPage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-1 text-xs text-primary bg-primary/10 px-2.5 py-1 rounded-full">
-                        <ShieldAlert className="w-3.5 h-3.5" />
+                        <uiIcons.shieldAlert className="w-3.5 h-3.5" />
                         <span>Audit Log Attivo</span>
                       </div>
                     </div>
 
                     {!activeConvId ? (
                       <div className="py-24 text-center text-muted-foreground space-y-2">
-                        <MessageSquare className="w-10 h-10 mx-auto opacity-40" />
+                        <uiIcons.message className="w-10 h-10 mx-auto opacity-40" />
                         <p className="text-sm">
                           Nessuna conversazione selezionata.
                         </p>
@@ -1121,7 +1529,7 @@ export function OperatorDashboardPage() {
                             </p>
                             {m.flagged && (
                               <div className="flex items-center gap-1 text-[10px] text-destructive pt-1">
-                                <AlertTriangle className="w-3 h-3" />
+                                <uiIcons.alertTriangle className="w-3 h-3" />
                                 <span>
                                   Messaggio segnalato per sospetta violazione
                                 </span>

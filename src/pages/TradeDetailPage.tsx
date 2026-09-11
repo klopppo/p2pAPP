@@ -442,8 +442,7 @@ export function TradeDetailPage() {
   // `depositBuyerSecurityDeposit()` / `depositSellerSecurityDeposit()` revert
   // with NoSecurityDepositRequired() at 0%, and `AlreadyDeposited()` once done.
   const showBuyerDeposit =
-    !!isBuyer &&
-    liveState === KlerosEscState.AWAITING_FUNDING &&
+    !!isBuyer && liveState === KlerosEscState.AWAITING_FUNDING &&
     depositPct > 0n &&
     !(escrowState?.buyerSecurityDeposited ?? false)
   // Seller: a deposit is only needed when pct > 0 and not yet deposited; the
@@ -459,6 +458,7 @@ export function TradeDetailPage() {
   const showSellerLock =
     !!isSeller &&
     liveState === KlerosEscState.AWAITING_FUNDING &&
+    ((escrowState?.buyerSecurityDeposited ?? false) || depositPct === 0n) &&
     !(escrowState?.fundsLocked ?? false) &&
     (depositPct === 0n || (escrowState?.sellerSecurityDeposited ?? false))
   const showBuyerConfirm =

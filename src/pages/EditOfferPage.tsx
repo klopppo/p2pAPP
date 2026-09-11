@@ -125,7 +125,7 @@ export function EditOfferPage() {
       maxAmount: Number(offer.max_amount) || 0,
       paymentMethod: offer.payment_methods?.[0] ?? 'Bank Transfer',
       location: locationLabel,
-      gracePeriod: 24,
+      gracePeriod: Number(offer.grace_period) || 24,
       description: offer.description ?? '',
       isPrivate: offer.is_private,
       targetUser: offer.target_user ?? '',
@@ -206,6 +206,14 @@ export function EditOfferPage() {
       toast.error(t('editOffer.errorMaxLessThanMin'))
       return
     }
+    if (!Number.isFinite(formData.gracePeriod) || formData.gracePeriod <= 0) {
+      toast.error(t('editOffer.errorGracePeriodInvalid'))
+      return
+    }
+    if (formData.gracePeriod > 8760) {
+      toast.error(t('editOffer.errorGracePeriodTooLong'))
+      return
+    }
     if (
       formData.isPrivate &&
       !/^0x[a-fA-F0-9]{40}$/.test(formData.targetUser.trim())
@@ -267,6 +275,7 @@ export function EditOfferPage() {
           : null,
         payment_methods: [formData.paymentMethod],
         description: formData.description.trim() || null,
+        grace_period: Math.round(formData.gracePeriod),
         available_regions:
           formData.location === 'Global'
             ? []
@@ -589,6 +598,24 @@ export function EditOfferPage() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+          </div>
+
+          {/* Grace Period */}
+          <div>
+            <Label htmlFor="gracePeriod" className="text-base font-semibold mb-2 block">
+              {t('editOffer.gracePeriod')}
+            </Label>
+            <Input
+              id="gracePeriod"
+              type="number"
+              value={formData.gracePeriod}
+              onChange={(e) => setFormData({ ...formData, gracePeriod: Number(e.target.value) })}
+              className="rounded-full border border-border"
+              placeholder="24"
+            />
+            <p className="text-sm text-muted-foreground mt-2">
+              {t('editOffer.gracePeriodHint')}
+            </p>
           </div>
 
           {/* Description */}

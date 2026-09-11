@@ -16,32 +16,28 @@
  * referenced anywhere outside this module.
  */
 import type { ConversationView } from '@/types/database'
+import { getOurTeamThreadPreview, OUR_TEAM_WELCOME_TEXT } from '@/lib/supportChatService'
 
 export const OUR_TEAM_ID = 'ourTeam'
 export const OUR_TEAM_DISCORD = 'https://discord.gg/coffernode'
 
-const WELCOME_BODY =
-  "👋 Welcome to CofferNode! You can contact us from here for any " +
-  "issues, questions, or support requests — replies usually land within a " +
-  "few hours during business days. We're here to help, and for live " +
-  "community support see Discord below."
+export const OUR_TEAM_WELCOME = OUR_TEAM_WELCOME_TEXT
 
-/** Build a synthetic `ConversationView` for the current user. The current
- *  user is the only participant; partners are an empty array so the
- *  ConversationItem / ChatHeader "other party" resolver falls back to a
- *  system contact identity. */
+/** Build a synthetic `ConversationView` for the current user. */
 export function createOurTeamConversation(
   currentUser: { id: string; wallet_address?: string | null; nickname?: string | null; avatar_url?: string | null },
 ): ConversationView {
+  const preview = getOurTeamThreadPreview(currentUser.id)
+
   return {
     id: OUR_TEAM_ID,
     trade_id: null,
     status: 'open',
-    last_message_at: new Date().toISOString(),
-    last_message_preview: WELCOME_BODY.slice(0, 200),
+    last_message_at: preview.last_message_at,
+    last_message_preview: preview.last_message_preview.slice(0, 200),
     created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    unread_count: 0,
+    updated_at: preview.last_message_at,
+    unread_count: preview.unread_count,
     last_read_message_id: null,
     participants: [
       {
@@ -64,6 +60,3 @@ export function createOurTeamConversation(
     trade: null,
   }
 }
-
-/** The synthetic welcome message rendered when the user opens ourTeam. */
-export const OUR_TEAM_WELCOME = WELCOME_BODY

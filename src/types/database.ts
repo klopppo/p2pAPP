@@ -256,6 +256,11 @@ export interface Offer {
   /** 20-byte ETH address of the single candidate who may accept this offer. */
   target_user: string | null
 
+  /** Escrow grace window in HOURS after the buyer confirms the off-chain
+   *  payment (migration 20260914000000). Converted to seconds when the escrow
+   *  is deployed (TradePage: `grace_period * 3600`). */
+  grace_period: number
+
   platform_fee_bps: number
   network_fee: number
 
