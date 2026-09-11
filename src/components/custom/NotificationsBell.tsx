@@ -40,7 +40,15 @@ export function NotificationsBell() {
 
   const handleSelect = async (n: Notification) => {
     setOpen(false)
-    if (!n.read_at) await markOne.mutateAsync(n.id)
+    // Marking read is best-effort — navigation must not be blocked by a
+    // failed mutation (and an unhandled rejection here would be noisy).
+    if (!n.read_at) {
+      try {
+        await markOne.mutateAsync(n.id)
+      } catch {
+        /* non-fatal */
+      }
+    }
     if (n.conversation_id) navigate(`/app/messages/${n.conversation_id}`)
     else if (n.trade_id) navigate(`/app/trades/${n.trade_id}`)
     else if (n.kind === 'dispute_update') {

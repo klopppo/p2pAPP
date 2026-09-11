@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ConnectButton } from '@rainbow-me/rainbowkit'
+import { shortTradeId } from '@/lib/utils'
 import { ShieldAlert, Loader2, Inbox, Plus, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -195,7 +195,7 @@ export function DisputesListPage() {
                           <div className="flex flex-col">
                             <span className="text-muted-foreground text-xs">{t('disputes.tradeLabel')}</span>
                             <span className="font-mono truncate">
-                              {trade?.trade_id ?? d.trade_id}
+                              {shortTradeId(trade?.trade_id ?? d.trade_id)}
                             </span>
                           </div>
                           {trade?.crypto_token && (
@@ -232,15 +232,6 @@ export function DisputesListPage() {
           })}
         </ul>
       )}
-
-      <noscript>
-        <Text variant="muted">
-          {t('disputes.connectWalletDescription')}
-        </Text>
-        <div className="mt-2">
-          <ConnectButton showBalance={false} />
-        </div>
-      </noscript>
     </section>
   )
 }

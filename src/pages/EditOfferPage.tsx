@@ -111,6 +111,11 @@ export function EditOfferPage() {
     const code = offer.available_regions?.[0]
     const locationLabel = code ? (REGION_LABELS[code] ?? 'Global') : 'Global'
 
+    // Hydrate the form once from the loaded offer. This is the canonical
+    // "seed editable state from async data" pattern; the React Compiler lint
+    // flags the synchronous setState, but deriving the form during render is
+    // not viable here (the user then owns the fields).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFormData({
       type: offer.type,
       token: offer.crypto_token,
@@ -136,7 +141,12 @@ export function EditOfferPage() {
     return user.id === offer.seller_id || user.id === offer.seller?.id
   }, [user, offer])
 
-  if (offerLoading || !hydrated) {
+  // Loading only while the offer fetch is in flight, or while a successfully
+  // fetched offer is being mapped into the form (one render). The old
+  // `|| !hydrated` guard never released when the query errored/returned null
+  // (the hydration effect bails at `!offer`), so a bad offer id spun forever
+  // and the not-found branch below was unreachable.
+  if (offerLoading || (!!offer && !hydrated)) {
     return (
       <section className="flex items-center justify-center py-20 text-muted-foreground">
         <Loader2 className="w-5 h-5 animate-spin mr-2" /> {t('editOffer.loading')}

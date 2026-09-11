@@ -1,5 +1,6 @@
 import type { ConversationView } from '@/types/database'
 import { Badge } from '@/components/ui/badge'
+import { shortTradeId } from '@/lib/utils'
 
 const ESCROW_LABELS: Record<
   string,
@@ -27,7 +28,7 @@ export function TradeSummaryPill({ trade }: { trade: NonNullable<ConversationVie
   }
   return (
     <div className="flex items-center gap-2 rounded-full bg-background/50 border border-border/50 px-3 py-1.5">
-      <span className="text-xs font-mono text-muted-foreground">{trade.trade_id}</span>
+      <span className="text-xs font-mono text-muted-foreground">{shortTradeId(trade.trade_id)}</span>
       <Badge variant={meta.variant} className="rounded-full text-[10px] py-0">
         {meta.label}
       </Badge>

@@ -12,7 +12,8 @@
     "language": "Dil",
     "currency": "Para birimi",
     "back": "Geri",
-    "toggleMenu": "Menüyü aç/kapat"
+    "toggleMenu": "Menüyü aç/kapat",
+    "operator": "Operatör Portalı"
   },
   "footer": {
     "copyright": "© 2026 CofferNode. Tüm hakları saklıdır.",
@@ -207,7 +208,8 @@
     "escrowReleased": "Serbest bırakıldı",
     "escrowRefunded": "İade edildi",
     "escrowFunded": "Fonlandı",
-    "escrowCancelled": "İptal edildi"
+    "escrowCancelled": "İptal edildi",
+    "escrowGracePeriod": "Ek süre"
   },
   "chat": {
     "messages": "Mesajlar",
@@ -221,6 +223,7 @@
     "loading": "Yükleniyor…",
     "loadingConversation": "Sohbet yükleniyor…",
     "conversationNotFound": "Sohbet bulunamadı.",
+    "signInToView": "Sohbetlerinizi yüklemek için giriş yapın.",
     "sendFailed": "Mesaj gönderilemedi. Lütfen tekrar deneyin.",
     "signInRequired": "Giriş gerekli — mesaj göndermek için cüzdan imzasını onaylayın.",
     "reconnectRequired": "Oturum süresi doldu — mesaj göndermek için cüzdanınızı bağlayıp yeniden bağlayın."
@@ -401,7 +404,9 @@
     "submittingEvidence": "Kanıt gönderiliyor…",
     "evidenceRound": "Tur {{n}}",
     "evidenceSubmittedSuccess": "Kanıt gönderildi",
-    "evidenceSubmittedError": "Kanıt gönderilemedi"
+    "evidenceSubmittedError": "Kanıt gönderilemedi",
+    "errorUploadTimeout": "Yükleme zaman aşımına uğradı — bağlantınızı kontrol edip tekrar deneyin.",
+    "unknownState": "Bilinmeyen durum"
   },
   "openOffer": {
     "viewOffer": "Teklifi Görüntüle",
@@ -480,7 +485,9 @@
     "errorFailedToDeploy": "Konuşlandırılan emanet adresi çözümlenemedi.",
     "successDeployed": "Emanet konuşlandırıldı — ticareti devam ettirmek için fonlayın.",
     "errorGeneric": "İşlem açılamadı. Lütfen tekrar deneyin.",
-    "noRating": "Henüz değerlendirme yok"
+    "noRating": "Henüz değerlendirme yok",
+    "errorInvalidWallet": "Bağlı cüzdan geçersiz. Yeniden bağlayıp tekrar deneyin.",
+    "errorTokenMismatch": "Bu teklif {{offered}} cinsinden, ancak emanet sözleşmesi yalnızca {{escrow}} destekliyor."
   },
   "tradeDetail": {
     "loadingTrade": "İşlem yükleniyor…",
@@ -547,12 +554,16 @@
     "releaseAvailableIn": "Serbest bırakma {{seconds}} içinde",
     "tradeRemovedOrNoAccess": "Bu işlem kaldırılmış olabilir veya erişim yetkiniz olmayabilir.",
     "messageCounterpart": "Karşı tarafa mesaj",
-    "messageCounterpartTitle": "Karşı tarafla sohbeti aç"
+    "messageCounterpartTitle": "Karşı tarafla sohbeti aç",
+    "gracePeriodBody": "Alıcı zincir dışı ödemeyi onayladı. Her iki taraf da kriptoyu serbest bırakarak emaneti sonuçlandırabilir; üçüncü taraf yoktur. Ek süre işlem yapılmadan dolarsa satıcı serbest bırakabilir ve alıcı bu aşamayı artık itiraz edemez.",
+    "gracePeriodEnded": "Ek süre doldu — serbest bırakma artık kullanılabilir.",
+    "gracePeriodRemaining": "Kalan: {{seconds}} sn"
   },
   "editProfile": {
     "title": "Profili Düzenle",
     "subtitle": "Herkese açık bilgilerinizi güncelleyin",
-    "connectWallet": "Cüzdanınızı bağlayın",    "signIn": "Oturum aç",
+    "connectWallet": "Cüzdanınızı bağlayın",
+    "signIn": "Oturum aç",
     "connectWalletDescription": "Profilinizi düzenlemek için bir cüzdan bağlayın.",
     "loadingProfile": "Profil yükleniyor…",
     "nickname": "Takma ad",
@@ -643,7 +654,8 @@
     "warningSomeUploadsFailed": "{{total}} dosya yüklendi ama {{failed}} başarısız; itiraz elimizdeki kanıtlarla açılacak.",
     "errorAllUploadsFailed": "Tüm kanıt yüklemeleri başarısız oldu. Bağlantınızı kontrol edip tekrar deneyin.",
     "errorUploadTimeout": "Yükleme zaman aşımına uğradı — bağlantınızı kontrol edip tekrar deneyin.",
-    "errorRaiseReverted": "On-chain gönderim geri alındı. Kanıt dosyaları silindi; tekrar deneyebilirsiniz."
+    "errorRaiseReverted": "On-chain gönderim geri alındı. Kanıt dosyaları silindi; tekrar deneyebilirsiniz.",
+    "errorInvalidState": "Bu emanet, itiraz açılabilecek bir durumda değil."
   },
   "cookieConsent": {
     "privacyTitle": "Gizliliğinize önem veriyoruz",
@@ -669,7 +681,8 @@
     "copyAddress": "Adresi Kopyala",
     "viewExplorer": "Gezgini Görüntüle",
     "editProfile": "Profili Düzenle",
-    "disconnect": "Bağlantıyı Kes"
+    "disconnect": "Bağlantıyı Kes",
+    "signIn": "Giriş yap"
   },
   "notifications": {
     "title": "Bildirimler",
@@ -735,8 +748,7 @@
     "description": "Cüzdanınız yanlış EVM ağında. Devam etmek için {{chain}} ağına geçin.",
     "switchCta": "{{chain}} ağına geç",
     "switchError": "Otomatik geçiş yapılamadı: {{message}}"
-  }
-,
+  },
   "signInGate": {
     "connectTitle": "Devam etmek için cüzdanınızı bağlayın",
     "connectBody": "CofferNode Sign-In With Ethereum kullanır. Oturum açmak için bir cüzdan bağlayın — adresiniz sizin kontrolünüzde kalır.",
@@ -754,14 +766,43 @@
     "retryCta": "Tekrar dene",
     "errorTitle": "Oturum açma başarısız",
     "errorBody": "Tekrar deneyin."
-  }
-,
+  },
   "signInPrompt": {
     "title": "Devam etmek için oturum açın",
     "body": "Cüzdanınız bağlı ancak oturum açma mesajı hâlâ bekliyor. İşlemlerinizi ve sohbetlerinizi yüklemek için oturum açın.",
     "signCta": "Mesajı imzala",
     "signing": "İmzalıyor…",
     "dismiss": "Kapat",
-    "later": "Daha sonra"
+    "later": "Daha sonra",
+    "failed": "Giriş tamamlanmadı. Lütfen tekrar deneyin."
+  },
+  "report": {
+    "reportUser": "Kullanıcıyı bildir",
+    "reportUserOrChat": "Kullanıcıyı veya sohbeti operatörlere bildir",
+    "report": "Bildir",
+    "success": "Bildirim operatörlere iletildi.",
+    "modalTitle": "Operatör bildirimi gönder",
+    "reportedUser": "Bildirilen kullanıcı",
+    "reason": "Bildirim nedeni",
+    "description": "Ayrıntılar ve ilgili mesajlar destek ve uyum ekibine gönderilecek.",
+    "categoryLabel": "Kategori",
+    "detailLabel": "Ayrıntılı açıklama",
+    "detailPlaceholder": "Ne olduğunu açıklayın (örn. sahte banka makbuzu, sohbette tehdit, platform dışı ödeme talebi...)",
+    "detailHint": "Operatörlerin doğrulamasına yardımcı olmak için mümkün olduğunca çok bilgi verin.",
+    "abuseWarning": "Yanlış bildirimler veya sistemin kötüye kullanımı itibar cezalarına yol açabilir.",
+    "cancel": "İptal",
+    "submitting": "Gönderiliyor…",
+    "submit": "Operatörlere gönder",
+    "tradeId": "İşlem kimliği",
+    "chatId": "Sohbet kimliği",
+    "requiredReason": "Sorunun ayrıntılı bir açıklamasını girin.",
+    "submitError": "Bildirim gönderilirken hata oluştu",
+    "catScam": "Dolandırıcılık girişimi",
+    "catPaymentFraud": "Ödeme dolandırıcılığı (sahte makbuz)",
+    "catAbusive": "Hakaret/tehdit içeren mesajlar",
+    "catOffPlatform": "Platform dışı ticaret",
+    "catImpersonation": "Kimlik taklidi",
+    "catTerms": "Kullanım koşulları ihlali",
+    "catOther": "Diğer"
   }
 }

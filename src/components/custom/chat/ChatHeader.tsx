@@ -82,10 +82,11 @@ export function ChatHeader({ conversation, currentUserId, online, onBack }: Prop
           size="sm"
           onClick={() => setReportOpen(true)}
           className="rounded-full text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 gap-1 px-2.5 h-8 cursor-pointer"
-          title="Segnala utente o chat agli operatori"
+          title={t('report.reportUserOrChat')}
+          aria-label={t('report.reportUserOrChat')}
         >
           <ShieldAlert className="w-4 h-4" />
-          <span className="hidden sm:inline">Segnala</span>
+          <span className="hidden sm:inline">{t('report.report')}</span>
         </Button>
       </div>
 

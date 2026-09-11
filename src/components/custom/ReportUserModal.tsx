@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ShieldAlert, X, AlertTriangle, Loader2, Send } from 'lucide-react'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Text } from '@/components/ui/text'
@@ -9,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { FullDropdown } from '@/components/custom/FullDropdown'
 import { createUserReport } from '@/lib/reportsService'
+import { shortTradeId } from '@/lib/utils'
 import { ReportCategory } from '@/types/rbac'
 import { useAccount } from 'wagmi'
 
@@ -21,16 +23,6 @@ interface ReportUserModalProps {
   messageId?: string | null
 }
 
-const CATEGORY_OPTIONS = [
-  { label: 'Tentativo di Truffa (Scam)', value: ReportCategory.SCAM_ATTEMPT },
-  { label: 'Frode nel Pagamento (Ricevuta Falsa)', value: ReportCategory.PAYMENT_FRAUD },
-  { label: 'Messaggi Ingiuriosi / Minacce', value: ReportCategory.ABUSIVE_MESSAGES },
-  { label: 'Scambio Fuori Piattaforma', value: ReportCategory.OFF_PLATFORM_TRADING },
-  { label: 'Furto Identità (Impersonation)', value: ReportCategory.IMPERSONATION },
-  { label: 'Violazione Termini di Servizio', value: ReportCategory.TERMS_VIOLATION },
-  { label: 'Altro Motivo', value: ReportCategory.OTHER },
-]
-
 export function ReportUserModal({
   isOpen,
   onClose,
@@ -39,17 +31,26 @@ export function ReportUserModal({
   conversationId,
   messageId,
 }: ReportUserModalProps) {
+  const { t } = useTranslation()
   const { address } = useAccount()
   const [category, setCategory] = useState<ReportCategory>(ReportCategory.SCAM_ATTEMPT)
   const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  if (!isOpen) return null
+  const categoryOptions = [
+    { label: t('report.catScam'), value: ReportCategory.SCAM_ATTEMPT },
+    { label: t('report.catPaymentFraud'), value: ReportCategory.PAYMENT_FRAUD },
+    { label: t('report.catAbusive'), value: ReportCategory.ABUSIVE_MESSAGES },
+    { label: t('report.catOffPlatform'), value: ReportCategory.OFF_PLATFORM_TRADING },
+    { label: t('report.catImpersonation'), value: ReportCategory.IMPERSONATION },
+    { label: t('report.catTerms'), value: ReportCategory.TERMS_VIOLATION },
+    { label: t('report.catOther'), value: ReportCategory.OTHER },
+  ]
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!reason.trim()) {
-      toast.error('Inserisci una descrizione dettagliata del problema riscontrato.')
+      toast.error(t('report.requiredReason'))
       return
     }
 
@@ -67,11 +68,11 @@ export function ReportUserModal({
         message_id: messageId,
       })
 
-      toast.success('Segnalazione inviata con successo agli operatori!')
+      toast.success(t('report.success'))
       setReason('')
       onClose()
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Errore durante l’invio della segnalazione'
+      const msg = err instanceof Error ? err.message : t('report.submitError')
       toast.error(msg)
     } finally {
       setSubmitting(false)
@@ -80,6 +81,7 @@ export function ReportUserModal({
 
   return (
     <AnimatePresence>
+      {isOpen && (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-md">
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -91,6 +93,7 @@ export function ReportUserModal({
             <button
               onClick={onClose}
               disabled={submitting}
+              aria-label={t('report.cancel')}
               className="absolute top-4 right-4 p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
@@ -102,27 +105,27 @@ export function ReportUserModal({
                   <ShieldAlert className="w-5 h-5" />
                 </div>
                 <div>
-                  <Text variant="h4" className="font-bold">Invia Segnalazione Operatori</Text>
+                  <Text variant="h4" className="font-bold">{t('report.modalTitle')}</Text>
                   <p className="text-xs text-muted-foreground">
-                    I dettagli e i messaggi correlati saranno inviati al team di supporto e compliance.
+                    {t('report.description')}
                   </p>
                 </div>
               </div>
 
               <div className="p-3 rounded-xl bg-muted/40 border border-border/50 text-xs space-y-1 font-mono">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Utente Segnalato:</span>
+                  <span className="text-muted-foreground">{t('report.reportedUser')}:</span>
                   <span className="text-foreground font-semibold">{reportedWallet}</span>
                 </div>
                 {tradeId && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">ID Transazione / Trade:</span>
-                    <span className="text-foreground">{tradeId}</span>
+                    <span className="text-muted-foreground">{t('report.tradeId')}:</span>
+                    <span className="text-foreground">{shortTradeId(tradeId)}</span>
                   </div>
                 )}
                 {conversationId && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">ID Chat:</span>
+                    <span className="text-muted-foreground">{t('report.chatId')}:</span>
                     <span className="text-foreground">{conversationId}</span>
                   </div>
                 )}
@@ -130,32 +133,32 @@ export function ReportUserModal({
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold">Motivo Segnalazione</Label>
+                  <Label className="text-sm font-semibold">{t('report.reason')}</Label>
                   <FullDropdown
-                    label="Categoria"
+                    label={t('report.categoryLabel')}
                     value={category}
-                    options={CATEGORY_OPTIONS}
+                    options={categoryOptions}
                     onSelect={(val) => setCategory(val as ReportCategory)}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold">Descrizione Dettagliata</Label>
+                  <Label className="text-sm font-semibold">{t('report.detailLabel')}</Label>
                   <Textarea
-                    placeholder="Descrivi cosa è accaduto (es. ricevuta bancaria contraffatta, minacce in chat, richiesta di pagamento esterno...)"
+                    placeholder={t('report.detailPlaceholder')}
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
                     rows={4}
                     className="border border-border resize-none rounded-xl"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Fornisci quante più informazioni possibili per facilitare la verifica degli operatori.
+                    {t('report.detailHint')}
                   </p>
                 </div>
 
                 <div className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 text-destructive text-xs">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
-                  <span>Le false segnalazioni o l’abuso del sistema possono comportare sanzioni sul punteggio reputazione.</span>
+                  <span>{t('report.abuseWarning')}</span>
                 </div>
 
                 <div className="flex items-center justify-end gap-3 pt-2">
@@ -166,7 +169,7 @@ export function ReportUserModal({
                     disabled={submitting}
                     className="rounded-full"
                   >
-                    Annulla
+                    {t('report.cancel')}
                   </Button>
                   <Button
                     type="submit"
@@ -176,11 +179,11 @@ export function ReportUserModal({
                   >
                     {submitting ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin" /> Invio in corso...
+                        <Loader2 className="w-4 h-4 animate-spin" /> {t('report.submitting')}
                       </>
                     ) : (
                       <>
-                        <Send className="w-4 h-4" /> Invia agli Operatori
+                        <Send className="w-4 h-4" /> {t('report.submit')}
                       </>
                     )}
                   </Button>
@@ -190,6 +193,7 @@ export function ReportUserModal({
           </Card>
         </motion.div>
       </div>
+      )}
     </AnimatePresence>
   )
 }

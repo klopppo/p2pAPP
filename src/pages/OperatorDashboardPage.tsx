@@ -56,6 +56,7 @@ import {
   resolveUserReport,
   type ListReportsFilters,
 } from '@/lib/reportsService'
+import { shortTradeId } from '@/lib/utils'
 import type {
   UserActivityLog,
   UserReport,
@@ -98,19 +99,6 @@ export function OperatorDashboardPage() {
   // RBAC matrix role selector
   const [matrixRole, setMatrixRole] = useState('COMPLIANCE_LEAD')
   const [, setRbacUpdateTick] = useState(0)
-
-  // Load initial data
-  const loadInitial = async () => {
-    const ops = await listOperators()
-    setOperators(ops)
-    setCurOp(getCurrentOperator())
-    fetchReports()
-    fetchLogs()
-  }
-
-  useEffect(() => {
-    loadInitial()
-  }, [])
 
   // Fetch Reports
   const fetchReports = async () => {
@@ -157,11 +145,30 @@ export function OperatorDashboardPage() {
     }
   }
 
+  // Load initial data (declared after the fetchers it calls so there is no
+  // use-before-declaration).
+  const loadInitial = async () => {
+    const ops = await listOperators()
+    setOperators(ops)
+    setCurOp(getCurrentOperator())
+    fetchReports()
+    fetchLogs()
+  }
+
+  // Both effects below kick off async loaders that set state; the React
+  // Compiler lint flags the synchronous-within-effect call, but this is the
+  // canonical "load on mount / tab change" pattern.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    loadInitial()
+  }, [])
+
   useEffect(() => {
     if (activeTab === 'reports') fetchReports()
     if (activeTab === 'logs') fetchLogs()
     if (activeTab === 'messages') fetchConversations()
   }, [activeTab, reportFilterStatus, logFilterProgram])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Handle Operator Switcher
   const handleOperatorSwitch = (opId: string) => {
@@ -641,7 +648,7 @@ export function OperatorDashboardPage() {
                         <span className="text-muted-foreground">
                           Trade Collegato:
                         </span>
-                        <span>{selectedReport.trade_id}</span>
+                        <span>{shortTradeId(selectedReport.trade_id)}</span>
                       </div>
                     )}
                     {selectedReport.conversation_id && (
@@ -1035,7 +1042,7 @@ export function OperatorDashboardPage() {
                         </div>
                         {conv.trade_id && (
                           <p className="text-[11px] text-muted-foreground font-mono">
-                            Trade: {conv.trade_id}
+                            Trade: {shortTradeId(conv.trade_id)}
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground truncate">

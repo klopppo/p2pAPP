@@ -553,7 +553,7 @@ export async function getOffersBySeller(sellerId: string, status?: OfferStatus) 
     .from('offers')
     .select(`
       *,
-      seller:users!offers_seller_id_fkey (id, nickname, avatar_url, verification_level)
+      seller:users!offers_seller_id_fkey (id, wallet_address, nickname, avatar_url, verification_level, avg_rating, total_trades)
     `)
     .eq('seller_id', sellerId)
     .order('created_at', { ascending: false })
@@ -839,16 +839,9 @@ export async function upsertTradeEscrowStatus(
 
   if (!data) return null
 
-  await logTradeEvent(
-    data.id,
-    'escrow_status_updated',
-    'system',
-    `Escrow status → ${escrowStatus}`,
-    { escrow_status: escrowStatus, tx_hash: txHash ?? null },
-  ).catch(() => {
-    /* non-fatal — the status mirror already landed */
-  })
-
+  // No explicit `logTradeEvent` here: `set_trade_escrow_status` already
+  // inserts a `trade_events` row (with the real caller as actor) when
+  // `p_event_type` is supplied. Logging again would double every transition.
   return data
 }
 
@@ -871,45 +864,54 @@ export async function updateTradeStatus(
     escrowEventType?: TradeEventType
   },
 ) {
-  const now = new Date().toISOString()
-  const updates: Record<string, unknown> = {
-    status,
-    updated_at: now,
-  }
-  if (options?.escrowStatus) updates.escrow_status = options.escrowStatus
-  if (options?.txHash) updates.escrow_tx_hash = options.txHash
-  if (status === 'completed') updates.completed_at = now
-  if (status === 'cancelled') updates.cancelled_at = now
-  if (status === 'disputed') {
-    updates.disputed_at = now
-    updates.has_dispute = true
-  }
-
-  const { data, error } = await supabase
-    .from('trades')
-    .update(updates)
-    .eq('id', tradeId)
-    .select()
-    .single()
-
+  // The `status` / `has_dispute` / `completed_at` columns are revoked from
+  // `authenticated` (20260824000006), so a direct UPDATE always fails with
+  // 42501 and every caller's `.catch()` silently swallowed it — the trade row
+  // never moved to completed/cancelled/disputed. Route through the SECURITY
+  // DEFINER `set_trade_status` RPC (extended in 20260912000000 to also stamp
+  // completed_at/cancelled_at/disputed_at/has_dispute) which re-checks that
+  // the caller is a party.
+  const { error } = await supabase.rpc('set_trade_status', {
+    p_trade_id: tradeId,
+    p_new_status: status,
+    p_tx_hash: options?.txHash ?? null,
+  })
   if (error) {
     console.error('Error updating trade status:', error)
     throw error
   }
 
-  await logTradeEvent(
-    data.id,
-    options?.escrowEventType ?? TradeEventType.TRADE_STATUS_UPDATED,
-    'system',
-    `Trade status → ${status}`,
-    {
-      status,
-      escrow_status: options?.escrowStatus ?? null,
-      tx_hash: options?.txHash ?? null,
-    },
-  ).catch(() => {
-    /* non-fatal — the status mirror already landed */
-  })
+  // Mirror the escrow column via its own RPC (also revoked for direct writes).
+  // Its optional `p_event_type` writes the audit row.
+  if (options?.escrowStatus) {
+    const { error: escrowErr } = await supabase.rpc('set_trade_escrow_status', {
+      p_trade_id: tradeId,
+      p_new_status: options.escrowStatus,
+      p_tx_hash: options?.txHash ?? null,
+      p_event_type: options.escrowEventType ?? TradeEventType.ESCROW_STATUS_UPDATED,
+    })
+    if (escrowErr) {
+      console.error('Error updating trade escrow status:', escrowErr)
+      throw escrowErr
+    }
+  } else if (options?.escrowEventType) {
+    // Lifecycle-only flip that still deserves a granular audit entry.
+    await logTradeEvent(
+      tradeId,
+      options.escrowEventType,
+      'system',
+      `Trade status → ${status}`,
+      { status, tx_hash: options.txHash ?? null },
+    ).catch(() => {
+      /* non-fatal — the status mirror already landed */
+    })
+  }
+
+  const { data } = await supabase
+    .from('trades')
+    .select()
+    .eq('id', tradeId)
+    .single()
 
   return data
 }
@@ -950,16 +952,9 @@ export async function setTradeEscrowStatus(
 
   if (!data) return null
 
-  await logTradeEvent(
-    data.id,
-    options?.escrowEventType ?? TradeEventType.ESCROW_STATUS_UPDATED,
-    'system',
-    `Escrow status → ${escrowStatus}`,
-    { escrow_status: escrowStatus, tx_hash: options?.txHash ?? null },
-  ).catch(() => {
-    /* non-fatal — the status mirror already landed */
-  })
-
+  // No explicit `logTradeEvent` here: `set_trade_escrow_status` already
+  // inserts a `trade_events` row when `p_event_type` is supplied. Logging
+  // again would double every escrow transition.
   return data
 }
 
@@ -1188,18 +1183,34 @@ export async function updateDisputeOnChain(
   const dbUpdate: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
   }
-  if (update.escrowState !== undefined) dbUpdate.escrow_state = update.escrowState
+  // `status`, `winner`, `on_chain_ruling`, `kleros_dispute_status`, and
+  // `resolved_at` are revoked from `authenticated` (20260824000006) — writing
+  // any of them in a direct UPDATE fails the whole statement with 42501, so
+  // the non-sensitive mirrors below would silently never persist either.
+  // Collect them for the SECURITY DEFINER RPC instead.
+  const sensitive: {
+    p_status?: DisputeStatus
+    p_winner?: 'buyer' | 'seller' | null
+    p_on_chain_ruling?: number | null
+    p_kleros_dispute_status?: number | null
+    p_resolved_at?: string | null
+    p_clear_resolved_at: boolean
+  } = { p_clear_resolved_at: false }
+  if (update.status !== undefined) sensitive.p_status = update.status
+  if (update.winner !== undefined) sensitive.p_winner = update.winner
+  if (update.onChainRuling !== undefined) sensitive.p_on_chain_ruling = update.onChainRuling
   if (update.klerosDisputeStatus !== undefined) {
-    dbUpdate.kleros_dispute_status = update.klerosDisputeStatus
+    sensitive.p_kleros_dispute_status = update.klerosDisputeStatus
   }
-  if (update.onChainRuling !== undefined) {
-    dbUpdate.on_chain_ruling = update.onChainRuling
-  }
-  if (update.status) dbUpdate.status = update.status
   // resolvedAt is explicitly nullable — callers pass null to clear it (e.g.
   // when a reopened dispute has no resolution). `!== undefined` preserves that
   // intent, while `if (update.resolvedAt)` would silently drop null resets.
-  if (update.resolvedAt !== undefined) dbUpdate.resolved_at = update.resolvedAt
+  if (update.resolvedAt !== undefined) {
+    sensitive.p_resolved_at = update.resolvedAt
+    sensitive.p_clear_resolved_at = update.resolvedAt === null
+  }
+
+  if (update.escrowState !== undefined) dbUpdate.escrow_state = update.escrowState
   if (update.evidenceGroupId !== undefined) {
     dbUpdate.evidence_group_id = update.evidenceGroupId
   }
@@ -1208,7 +1219,6 @@ export async function updateDisputeOnChain(
   }
   if (update.raiser !== undefined) dbUpdate.raiser = update.raiser
   if (update.feePaidWei !== undefined) dbUpdate.fee_paid_wei = update.feePaidWei
-  if (update.winner !== undefined) dbUpdate.winner = update.winner
   if (update.disputeTimestamp !== undefined) {
     dbUpdate.dispute_timestamp = update.disputeTimestamp
   }
@@ -1226,6 +1236,29 @@ export async function updateDisputeOnChain(
     dbUpdate.evidence_cid = update.evidenceCid
   }
   if (update.description !== undefined) dbUpdate.description = update.description
+
+  const hasSensitive =
+    sensitive.p_status !== undefined ||
+    sensitive.p_winner !== undefined ||
+    sensitive.p_on_chain_ruling !== undefined ||
+    sensitive.p_kleros_dispute_status !== undefined ||
+    sensitive.p_resolved_at !== undefined
+
+  if (hasSensitive) {
+    const { error: rpcErr } = await supabase.rpc('set_dispute_on_chain', {
+      p_dispute_id: id,
+      ...sensitive,
+    })
+    if (rpcErr) {
+      console.error('Error setting dispute on-chain fields:', rpcErr)
+      throw rpcErr
+    }
+  }
+
+  // Only the `updated_at` seed left → nothing else to persist directly.
+  if (Object.keys(dbUpdate).length <= 1 && !hasSensitive) {
+    return null
+  }
 
   const { data, error } = await supabase
     .from('disputes')
@@ -1684,10 +1717,15 @@ export async function listConversations(userId: string) {
   // that grew linearly with open threads and showed up as slow chat loads.
   const unreadMap = new Map<string, number>()
   try {
-    const { data: counts } = await supabase.rpc(
+    // supabase-js RESOLVES with `{ data: null, error }` on RPC failure — it
+    // does not throw. Destructuring only `data` (the old code) meant the
+    // catch below never fired and every conversation silently got
+    // `unread_count: 0`.
+    const { data: counts, error: countsErr } = await supabase.rpc(
       'get_unread_conversation_counts',
       { p_user_id: userId },
     )
+    if (countsErr) throw countsErr
     for (const c of (counts ?? []) as Array<{
       conversation_id: string
       unread_count: number
@@ -1811,13 +1849,16 @@ export async function getOrCreateDirectConversation(
  * so `created_at.lt./gt.` alone silently drops or double-counts the sibling.
  * Ties are broken by id (uuid has a total order in Postgres).
  */
-async function getMessageSortKey(messageId: string): Promise<{ created_at: string; id: string }> {
+async function getMessageSortKey(messageId: string): Promise<{ created_at: string; id: string } | null> {
   const { data, error } = await supabase
     .from('messages')
     .select('created_at')
     .eq('id', messageId)
     .single()
-  if (error || !data) return { created_at: '1970-01-01T00:00:00Z', id: messageId }
+  // A missing/unreadable cursor must NOT degrade to epoch: the composite
+  // `.or()` would then match nothing and page silently backward from 1970.
+  // Returning null lets the caller surface/bail instead.
+  if (error || !data) return null
   return { created_at: (data as { created_at: string }).created_at, id: messageId }
 }
 
@@ -1878,6 +1919,10 @@ export async function listMessages(
 
   if (options.before) {
     const cursor = await getMessageSortKey(options.before)
+    // Cursor row is gone/unreadable — returning the (empty) page as-is would
+    // mislead `loadOlder()` into thinking history ended awkwardly. Signal a
+    // clean empty result instead of paging from a bogus boundary.
+    if (!cursor) return []
     // Composite cursor: strictly older than (created_at, id), i.e.
     //   (created_at < ts)  OR  (created_at = ts AND id < boundary).
     // The previous `and(a,b),a` shape collapsed to `a`, which dropped the
@@ -2165,12 +2210,17 @@ export async function signInWithWallet(
     throw error ?? new Error('siwe-auth did not return a token')
   }
 
-  // Install the session. `refresh_token` is a placeholder: our JWT is the
-  // source of truth and re-signing (not refresh) is how a session renews,
-  // so this value is never used for anything meaningful.
+  // Install the session. Use GoTrue's real refresh token when the edge
+  // function returns one (it does — see siwe-auth `handleVerify`): with
+  // `autoRefreshToken: true`, a placeholder would make the automated refresh
+  // fail, GoTrue would emit SIGNED_OUT, and the app would silently lose its
+  // session while the localStorage marker kept the UI looking signed in.
   const { error: sessionErr } = await supabase.auth.setSession({
     access_token: data.access_token as string,
-    refresh_token: 'siwe-wallet-session',
+    refresh_token:
+      typeof data.refresh_token === 'string' && data.refresh_token
+        ? data.refresh_token
+        : 'siwe-wallet-session',
   })
   if (sessionErr) throw sessionErr
 
@@ -2314,8 +2364,14 @@ async function refreshToWalletClaim(address: string): Promise<boolean> {
     return typeof raw === 'string' && raw ? raw.toLowerCase() : null
   }
 
-  // Claim already present and matching — nothing to do.
-  if (readMemoizedClaim(session.access_token) === addr) return true
+  // Claim already present and matching — nothing to do, unless the token is
+  // already past `exp` (supabase's background refresh may not have run yet).
+  // In that case fall through so the caller re-signs instead of treating a
+  // dead JWT as a live session.
+  const payload = decodeJwtPayload(session.access_token)
+  const notExpired =
+    typeof payload?.exp !== 'number' || payload.exp * 1000 > Date.now()
+  if (readMemoizedClaim(session.access_token) === addr && notExpired) return true
 
   // Claim-less (valid) token: refresh once to pick up the backfilled metadata.
   const { data, error } = await supabase.auth.refreshSession()
@@ -2338,6 +2394,13 @@ export async function ensureWalletSession(
     signMessage: (args: { message: string }) => Promise<`0x${string}`>
     chainId?: number
     appName?: string
+    /**
+     * Explicit user intent (e.g. the navbar "Sign in" button). Skips the
+     * persisted-rejection short-circuit so a deliberate click always opens
+     * MetaMask instead of silently no-op'ing on a marker written by an
+     * earlier dismissed/failed attempt.
+     */
+    force?: boolean
   },
 ): Promise<{ session: boolean; user: User | null }> {
   const addr = walletAddress.toLowerCase()
@@ -2358,7 +2421,7 @@ export async function ensureWalletSession(
   // signature for this wallet, do not pop MetaMask again. The app stays
   // read-only (the caller branches on `session: false` and the inline
   // retry paths surface a "sign-in required" toast instead of a popup).
-  if (getSiweRejectedMarker(addr)) {
+  if (!options.force && getSiweRejectedMarker(addr)) {
     return { session: false, user: await ensureUser(addr) }
   }
 
@@ -2474,13 +2537,10 @@ export async function signOut() {
         window.localStorage.removeItem('coffernode:siwe:last')
       }
     }
-    // Also clear any rejection markers in case the user never signed in.
-    for (let i = window.localStorage.length - 1; i >= 0; i--) {
-      const k = window.localStorage.key(i)
-      if (k && k.startsWith('coffernode:siwe:declined:')) {
-        window.localStorage.removeItem(k)
-      }
-    }
+    // NOTE: do NOT sweep every `coffernode:siwe:declined:*` key here. Signing
+    // out wallet A must not clear wallet B's rejection — that would re-enable
+    // auto-prompting for an unrelated wallet on this device. The active
+    // wallet's marker is cleared above via `clearSiweMarkersFor`.
   }
   const { error } = await supabase.auth.signOut()
   if (error) {

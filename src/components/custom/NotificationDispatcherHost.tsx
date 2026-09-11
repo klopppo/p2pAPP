@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useNotificationPreferences } from '@/hooks/useNotifications'
 import { dispatchNotification } from '@/lib/notifications'
+import { uniqueRealtimeTopic } from '@/lib/realtimeTopic'
 import type { Notification } from '@/types/database'
 
 /**
@@ -47,7 +48,7 @@ export function NotificationDispatcherHost() {
     if (!userId || prefs.isLoading) return
 
     const channel = supabase
-      .channel(`notif-dispatcher:${userId}`)
+      .channel(uniqueRealtimeTopic(`notif-dispatcher:${userId}`))
       .on(
         'postgres_changes',
         {

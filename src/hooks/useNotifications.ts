@@ -12,6 +12,7 @@ import {
 } from '@/lib/supabase'
 import type { NotificationChannel } from '@/types/database'
 import { useCurrentUser } from './useCurrentUser'
+import { useWalletSession } from './useWalletSession'
 import { uniqueRealtimeTopic } from '@/lib/realtimeTopic'
 
 /**
@@ -21,13 +22,17 @@ import { uniqueRealtimeTopic } from '@/lib/realtimeTopic'
  */
 export function useNotifications() {
   const { data: user } = useCurrentUser()
+  const { sessionWallet, hasSession } = useWalletSession()
   const qc = useQueryClient()
   const userId = user?.id
 
   const query = useQuery({
-    queryKey: ['notifications', userId],
+    queryKey: ['notifications', userId, sessionWallet],
     queryFn: () => listNotifications(user!.id),
-    enabled: !!userId,
+    // A `users` row resolves for any connected wallet (the table is
+    // world-readable), so gating on `userId` alone runs this read
+    // unauthenticated and caches an empty feed. Gate on the live session.
+    enabled: !!userId && hasSession,
     // Poll fallback for environments without Realtime publication on
     // `notifications` (same mechanism as useConversations). Realtime
     // invalidations keep this fresh when the publication is enabled.
@@ -35,7 +40,7 @@ export function useNotifications() {
   })
 
   useEffect(() => {
-    if (!userId) return
+    if (!userId || !hasSession) return
     const channel = supabase
       .channel(uniqueRealtimeTopic(`notifications:user:${userId}`))
       .on(
@@ -62,7 +67,7 @@ export function useNotifications() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [userId, qc])
+  }, [userId, hasSession, qc])
 
   return query
 }
@@ -73,18 +78,19 @@ export function useNotifications() {
  */
 export function useUnreadCount() {
   const { data: user } = useCurrentUser()
+  const { sessionWallet, hasSession } = useWalletSession()
   const qc = useQueryClient()
   const userId = user?.id
 
   const query = useQuery({
-    queryKey: ['notifications:unread', userId],
+    queryKey: ['notifications:unread', userId, sessionWallet],
     queryFn: () => getUnreadNotificationCount(user!.id),
-    enabled: !!userId,
+    enabled: !!userId && hasSession,
     refetchInterval: 60_000,
   })
 
   useEffect(() => {
-    if (!userId) return
+    if (!userId || !hasSession) return
     const channel = supabase
       .channel(uniqueRealtimeTopic(`notifications-unread:${userId}`))
       .on(
@@ -101,7 +107,7 @@ export function useUnreadCount() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [userId, qc])
+  }, [userId, hasSession, qc])
 
   return query
 }
@@ -142,15 +148,16 @@ export function useMarkAllRead() {
  */
 export function useNotificationPreferences() {
   const { data: user } = useCurrentUser()
+  const { sessionWallet, hasSession } = useWalletSession()
 
   const query = useQuery({
-    queryKey: ['notification-prefs', user?.id],
+    queryKey: ['notification-prefs', user?.id, sessionWallet],
     queryFn: async () => {
       if (!user) return []
       await ensureDefaultNotificationPreferences(user.id)
       return getNotificationPreferences(user.id)
     },
-    enabled: !!user,
+    enabled: !!user && hasSession,
   })
 
   const setEnabled = useCallback(

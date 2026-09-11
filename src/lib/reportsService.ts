@@ -184,19 +184,72 @@ export async function resolveUserReport(
     throw new Error('Accesso negato: Permesso USER_REPORTS:RESOLVE_REPORT mancante')
   }
 
-  const report = IN_MEMORY_REPORTS.find(r => r.id === reportId)
-  if (!report) {
+  const now = new Date().toISOString()
+
+  // In-memory (seed/demo) report — mutate in place, then best-effort persist.
+  const inMemory = IN_MEMORY_REPORTS.find(r => r.id === reportId)
+  if (inMemory) {
+    const oldState = { ...inMemory }
+    inMemory.status = status
+    inMemory.resolution_notes = notes || inMemory.resolution_notes
+    inMemory.resolved_by_operator_id = operatorId
+    inMemory.resolved_at = now
+    inMemory.updated_at = now
+
+    await logUserActivity({
+      operator_id: operatorId,
+      wallet_address: currentOp.wallet_address,
+      program_id: 'USER_REPORTS',
+      action: status === 'RESOLVED' ? 'RESOLVE_USER_REPORT' : 'UPDATE_REPORT_STATUS',
+      resource_type: 'user_report',
+      resource_id: reportId,
+      old_state: { status: oldState.status, notes: oldState.resolution_notes },
+      new_state: { status: inMemory.status, notes: inMemory.resolution_notes },
+      metadata: { operator_username: currentOp.username },
+    })
+
+    try {
+      await supabase.from('user_reports').update({
+        status: inMemory.status,
+        resolution_notes: inMemory.resolution_notes,
+        resolved_by_operator_id: inMemory.resolved_by_operator_id,
+        resolved_at: inMemory.resolved_at,
+        updated_at: inMemory.updated_at,
+      }).eq('id', reportId)
+    } catch {
+      // offline fallback
+    }
+
+    return inMemory
+  }
+
+  // DB-backed report (the real path in a populated environment). The old code
+  // only searched IN_MEMORY_REPORTS and threw for every row loaded from
+  // Supabase, so resolving a real report from the dashboard always failed.
+  const { data: existingData } = await supabase
+    .from('user_reports')
+    .select('*')
+    .eq('id', reportId)
+    .maybeSingle()
+  const existing = (existingData ?? null) as UserReport | null
+  if (!existing) {
     throw new Error('Segnalazione non trovata')
   }
 
-  const oldState = { ...report }
-  report.status = status
-  report.resolution_notes = notes || report.resolution_notes
-  report.resolved_by_operator_id = operatorId
-  report.resolved_at = new Date().toISOString()
-  report.updated_at = new Date().toISOString()
+  const { data, error } = await supabase
+    .from('user_reports')
+    .update({
+      status,
+      resolution_notes: notes ?? existing.resolution_notes,
+      resolved_by_operator_id: operatorId,
+      resolved_at: now,
+      updated_at: now,
+    })
+    .eq('id', reportId)
+    .select()
+    .single()
+  if (error) throw error
 
-  // Logga l'azione dell'operatore nell'audit log
   await logUserActivity({
     operator_id: operatorId,
     wallet_address: currentOp.wallet_address,
@@ -204,23 +257,10 @@ export async function resolveUserReport(
     action: status === 'RESOLVED' ? 'RESOLVE_USER_REPORT' : 'UPDATE_REPORT_STATUS',
     resource_type: 'user_report',
     resource_id: reportId,
-    old_state: { status: oldState.status, notes: oldState.resolution_notes },
-    new_state: { status: report.status, notes: report.resolution_notes },
+    old_state: { status: existing.status, notes: existing.resolution_notes },
+    new_state: { status, notes: notes ?? existing.resolution_notes },
     metadata: { operator_username: currentOp.username },
   })
 
-  // Supabase update
-  try {
-    await supabase.from('user_reports').update({
-      status: report.status,
-      resolution_notes: report.resolution_notes,
-      resolved_by_operator_id: report.resolved_by_operator_id,
-      resolved_at: report.resolved_at,
-      updated_at: report.updated_at,
-    }).eq('id', reportId)
-  } catch {
-    // offline fallback
-  }
-
-  return report
+  return data as UserReport
 }

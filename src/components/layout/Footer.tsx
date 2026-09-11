@@ -12,12 +12,12 @@ export function Footer() {
           {t('footer.copyright')}
         </p>
         <div className="flex gap-4">
-          <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <Link to="/docs/terms-of-service" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             {t('footer.terms')}
-          </a>
-          <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          </Link>
+          <Link to="/docs/faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             {t('footer.privacy')}
-          </a>
+          </Link>
           <Link to="/docs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             {t('footer.docs')}
           </Link>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useSyncExternalStore, useState } from '
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, listConversations, getConversation, getConversationByTradeId, markConversationRead } from '@/lib/supabase'
 import { useCurrentUser } from './useCurrentUser'
+import { useWalletSession } from './useWalletSession'
 import { uniqueRealtimeTopic } from '@/lib/realtimeTopic'
 
 /**
@@ -16,12 +17,15 @@ import { uniqueRealtimeTopic } from '@/lib/realtimeTopic'
  */
 export function useConversations() {
   const { data: user } = useCurrentUser()
+  const { sessionWallet, hasSession } = useWalletSession()
   const qc = useQueryClient()
 
   const query = useQuery({
-    queryKey: ['conversations', user?.id],
+    queryKey: ['conversations', user?.id, sessionWallet],
     queryFn: () => listConversations(user!.id),
-    enabled: !!user,
+    // `!!user` alone is not enough — the world-readable `users` row resolves
+    // even without a JWT, and the RLS read policy would return [] silently.
+    enabled: !!user && hasSession,
     // Poll fallback for environments without Realtime publication on
     // `conversations` (see useMessages). Realtime invalidations keep this
     // fresh when the publication is enabled.
@@ -31,7 +35,7 @@ export function useConversations() {
   const userId = user?.id
 
   useEffect(() => {
-    if (!userId) return
+    if (!userId || !hasSession) return
 
     const channel = supabase
       .channel(uniqueRealtimeTopic(`conversations:user:${userId}`))
@@ -45,7 +49,7 @@ export function useConversations() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [userId, qc])
+  }, [userId, hasSession, qc])
 
   return query
 }
@@ -56,18 +60,19 @@ export function useConversations() {
  */
 export function useConversation(conversationId: string | null | undefined) {
   const { data: user } = useCurrentUser()
+  const { sessionWallet, hasSession } = useWalletSession()
   const qc = useQueryClient()
 
   const query = useQuery({
-    queryKey: ['conversation', conversationId, user?.id],
+    queryKey: ['conversation', conversationId, user?.id, sessionWallet],
     queryFn: () => getConversation(conversationId!, user!.id),
-    enabled: !!conversationId && !!user,
+    enabled: !!conversationId && !!user && hasSession,
     staleTime: 30_000,
     refetchInterval: 15_000,
   })
 
   useEffect(() => {
-    if (!conversationId) return
+    if (!conversationId || !hasSession) return
     const channel = supabase
       .channel(uniqueRealtimeTopic(`conversation:${conversationId}`))
       .on(
@@ -84,7 +89,7 @@ export function useConversation(conversationId: string | null | undefined) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [conversationId, qc])
+  }, [conversationId, hasSession, qc])
 
   return query
 }
@@ -94,10 +99,11 @@ export function useConversation(conversationId: string | null | undefined) {
  * `createTrade` to redirect the user into chat.
  */
 export function useConversationByTradeId(tradeId: string | null | undefined) {
+  const { sessionWallet, hasSession } = useWalletSession()
   return useQuery({
-    queryKey: ['conversation-by-trade', tradeId],
+    queryKey: ['conversation-by-trade', tradeId, sessionWallet],
     queryFn: () => getConversationByTradeId(tradeId!),
-    enabled: !!tradeId,
+    enabled: !!tradeId && hasSession,
   })
 }
 

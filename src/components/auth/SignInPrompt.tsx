@@ -19,7 +19,7 @@
  * The wallet itself is also key in the storage so a different wallet
  * doesn't inherit another wallet's dismiss.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useAccount, useSignMessage } from 'wagmi'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -27,22 +27,10 @@ import { ShieldCheck, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
 import { ensureWalletSession } from '@/lib/supabase'
+import { useWalletSession } from '@/hooks/useWalletSession'
 
 const REJECTED_KEY_PREFIX = 'coffernode:siwe:declined:'
-const SUCCESS_KEY = 'coffernode:siwe:last'
 const DISMISS_KEY_PREFIX = 'coffernode:siwe:promptDismissed:'
-
-function readSuccess(addr: string): boolean {
-  if (typeof window === 'undefined') return false
-  try {
-    const raw = window.localStorage.getItem(SUCCESS_KEY)
-    if (!raw) return false
-    const parsed = JSON.parse(raw) as { address?: string }
-    return parsed?.address?.toLowerCase() === addr.toLowerCase()
-  } catch {
-    return false
-  }
-}
 
 function hasRejection(addr: string): boolean {
   if (typeof window === 'undefined') return false
@@ -68,59 +56,71 @@ export function SignInPrompt() {
   const { t } = useTranslation()
   const { address, isConnected } = useAccount()
   const { signMessageAsync } = useSignMessage()
+  const { hasSession } = useWalletSession()
   const qc = useQueryClient()
 
-  const [visible, setVisible] = useState(false)
   const [signing, setSigning] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  // Bumped after every sign-in attempt (success or failure). Forces the
-  // visibility effect below to re-run after the marker write so the
-  // prompt disappears the instant sign-in completes — deps [address,
-  // isConnected] alone don't change on success, so without this the
-  // effect would only fire on the next wallet/route change.
-  const [signAttempts, setSignAttempts] = useState(0)
+  // Bumped after every sign-in attempt (success or failure) and after a
+  // dismissal. Forces a re-render so the derived `visible` below re-reads the
+  // freshly-written marker / dismissal flags — deps like [address,
+  // isConnected] alone don't change on success. The value itself is unused.
+  const [, setSignAttempts] = useState(0)
 
-  // Single source of truth for visibility. Re-runs on:
+  // Single source of truth for visibility, derived during render (no effect,
+  // so no cascading setState). Re-evaluated on:
   //   - address / isConnected change (wallet connect/disconnect)
-  //   - signAttempts change (every sign-in attempt)
-  // The marker + dismissed + rejection flags are read from localStorage
-  // every run, so the marker write is picked up within one render.
-  useEffect(() => {
-    if (!isConnected || !address) {
-      setVisible(false)
-      return
-    }
-    const lower = address.toLowerCase()
-    if (readSuccess(lower) && !hasRejection(lower)) {
-      setVisible(false)
-      return
-    }
-    setVisible(!isDismissed(lower))
-  }, [address, isConnected, signAttempts])
+  //   - hasSession change (a live JWT hides the prompt outright)
+  //   - signAttempts change (every attempt / dismissal)
+  // The rejection + dismissal flags are read from storage every render. The
+  // remember-me marker is intentionally NOT consulted: a stale marker with no
+  // live session used to hide this prompt entirely, leaving the user stuck
+  // signed-out with no recovery. `hasSession` is the real gate.
+  const lowerAddress = address?.toLowerCase() ?? null
+  const visible =
+    isConnected &&
+    !!lowerAddress &&
+    !hasSession &&
+    !hasRejection(lowerAddress) &&
+    !isDismissed(lowerAddress)
 
   const runSignIn = useCallback(async () => {
     if (!address || !signMessageAsync) return
     setSigning(true)
     setErrorMessage(null)
     try {
-      await ensureWalletSession(address, { signMessage: signMessageAsync })
+      const { session } = await ensureWalletSession(address, {
+        signMessage: signMessageAsync,
+        force: true,
+      })
+      // `ensureWalletSession` never throws — it returns `session: false` on
+      // any failure. Only clear the durable rejection marker on an actual
+      // success, otherwise a failed attempt would wipe the marker that the
+      // service just wrote (and the caller couldn't tell it failed).
+      if (!session) {
+        setErrorMessage(t('signInPrompt.failed', {
+          defaultValue: 'Sign-in was not completed. Please try again.',
+        }))
+        return
+      }
       clearRejected(address)
+      qc.invalidateQueries({ queryKey: ['wallet-session'] })
       qc.invalidateQueries({ queryKey: ['current-user'] })
       qc.invalidateQueries({ queryKey: ['user-profile'] })
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : String(err))
     } finally {
       setSigning(false)
-      // Always bump the attempt counter so the visibility effect re-runs
-      // and picks up the freshly-written success / rejection markers.
+      // Always bump the attempt counter so the next render picks up the
+      // freshly-written success / rejection markers.
       setSignAttempts((n) => n + 1)
     }
-  }, [address, signMessageAsync, qc])
+  }, [address, signMessageAsync, qc, t])
 
   const handleDismiss = useCallback(() => {
     if (!address) return
     markDismissed(address)
-    setVisible(false)
+    setSignAttempts((n) => n + 1)
   }, [address])
 
   if (!visible || !isConnected || !address) return null

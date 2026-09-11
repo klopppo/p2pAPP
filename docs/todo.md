@@ -143,6 +143,38 @@
 - [ ] **Schema (P1)** — Decide on `dispute_category` enum vs free-text `reason_category`; either migrate or pare the doc.
 - [ ] **Contract decision** — `KlerosEsc` has no `unlockAfterTimeout()` (legacy variant had it). Seller recovery for "buyer paid but never confirms" requires raising a dispute (costs ETH). Decide: add the function for parity, or document the ETH-cost workaround.
 
+## 🧹 2026-09-12 multi-worker audit — remaining follow-ups
+
+> High-signal fixes shipped same day (see `done.md`). These are the audit items
+> intentionally deferred.
+
+- [ ] **SIWE in-flight cancellation** — `signInWithWallet` installs the session
+      itself; a slow MetaMask approval after an account switch can overwrite the
+      newer wallet's session. Thread an `isCurrent()`/`AbortSignal` into the sign
+      path and re-check the connected address before `setSession`.
+- [ ] **Origin-bound SIWE** — the challenge URI is hardcoded to
+      `https://coffernode.app` regardless of `window.location`, and the nonce is
+      not origin-bound server-side (EIP-4361 violation; replayable from a
+      phishing origin). Bind nonce→origin and verify `Origin`/domain on `/verify`.
+- [ ] **De-dupe SIWE prompts** — `useSyncUser`, `SignInPrompt`, and the navbar
+      button can each start a sign-in; add a module-level single-flight promise
+      keyed by address.
+- [ ] **Dispute `?escrowAddress=` trust** — the dispute page pays
+      `arbitrationCost` to an arbitrary escrow from the query string; validate it
+      against the factory's `escrowBy*` / the loaded `useUserEscrows()` list.
+- [ ] **Dispute escrow selector** — `DisputePage` silently defaults to
+      `userEscrows[0]`; add a real `FullDropdown` selector.
+- [ ] **Marketplace pagination** — `useOffers` fetches only the first 50 rows;
+      convert to `useInfiniteQuery` so "Load More" pages past 50.
+- [ ] **Operator dashboard i18n + shadcn dialogs** — the operator surface is
+      hardcoded Italian and uses raw `<div>` overlays instead of Radix Dialog.
+- [ ] **Mock court auto-rule** — the Sepolia `MockKlerosCourt` never calls
+      `KlerosEsc.rule()`, so `executeRuling()` is unreachable for 30 days; add a
+      dev action or a court that calls back.
+- [ ] **Raw `<div>`/a11y sweep** — remaining clickable divs, unlabeled
+      icon-only buttons, and `htmlFor` labels pointing at non-existent ids
+      (`CreateOfferPage`/`EditOfferPage` dropdown triggers).
+
 ## ⚪ P3 — Stretch
 
 - [ ] **Server-side indexer** — Supabase edge function watching `KlerosEsc` events to mirror state, so disputes update even when no one is viewing them.

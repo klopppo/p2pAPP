@@ -1,11 +1,27 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { supabase, listMessages, sendMessage, markConversationRead } from '@/lib/supabase'
 import type { MessageKind, MessageWithSender } from '@/types/database'
 import { useCurrentUser } from './useCurrentUser'
+import { useWalletSession } from './useWalletSession'
 import { uniqueRealtimeTopic } from '@/lib/realtimeTopic'
+
+/** Page size for the initial load and each `loadOlder()` page. */
+const MESSAGE_PAGE_SIZE = 50
+
+/**
+ * Query key for a conversation's message page. Includes the session wallet so
+ * switching wallets (or completing SIWE after the first fetch) lands on a
+ * distinct cache entry instead of reusing the previous wallet's/anon result.
+ */
+function messagesKey(
+  conversationId: string | null | undefined,
+  sessionWallet: string | null,
+) {
+  return ['messages', conversationId, sessionWallet] as const
+}
 
 /** Ascending (oldest→newest) comparator; ties broken by id (matches
  *  the deterministic `created_at ASC, id ASC` order from `listMessages`). */
@@ -28,11 +44,34 @@ function byTimeAsc(a: Pick<MessageWithSender, 'created_at' | 'id'>, b: Pick<Mess
 export function useMessages(conversationId: string | null | undefined) {
   const qc = useQueryClient()
   const { data: user } = useCurrentUser()
+  const { sessionWallet, hasSession } = useWalletSession()
+  const key = messagesKey(conversationId, sessionWallet)
+
+  // Whether older history exists. Derived from the page size, NOT from the
+  // merged list length: `loadOlder()` prepends into the same cache entry, so
+  // `data.length >= 50` stays true forever once the list grows and the "Load
+  // older" button would never disappear. The state is keyed by
+  // conversation+session so a switch naturally resets it (no reset effect).
+  const conversationKey = `${conversationId ?? ''}|${sessionWallet ?? ''}`
+  const [pagination, setPagination] = useState<{
+    key: string
+    hasMore: boolean
+    loading: boolean
+  }>({ key: '', hasMore: false, loading: false })
+  const hasMoreOlder =
+    pagination.key === conversationKey ? pagination.hasMore : false
+  const isLoadingOlder =
+    pagination.key === conversationKey ? pagination.loading : false
+  const initializedRef = useRef<string | null>(null)
+  const loadingOlderRef = useRef(false)
 
   const query = useQuery({
-    queryKey: ['messages', conversationId],
-    queryFn: () => listMessages(conversationId!, { limit: 50 }),
-    enabled: !!conversationId,
+    queryKey: key,
+    queryFn: () => listMessages(conversationId!, { limit: MESSAGE_PAGE_SIZE }),
+    // Gate on a live session, not just the conversation id: without the JWT
+    // claim the RLS read policy filters every row and PostgREST returns an
+    // empty array (no error) — the "signed in but empty chat" failure mode.
+    enabled: !!conversationId && hasSession,
     staleTime: 30_000,
     // Poll fallback: if the project has no Supabase Realtime publication on
     // `messages` (or RLS blocks the INSERT broadcast), live chat still works —
@@ -41,9 +80,24 @@ export function useMessages(conversationId: string | null | undefined) {
     refetchInterval: 5_000,
   })
 
+  // Seed `hasMoreOlder` once per conversation/session from the first page: a
+  // full page means there may be older history, a short page means we're at
+  // the start.
   useEffect(() => {
-    if (!conversationId) return
+    if (!query.data || !conversationId) return
+    if (initializedRef.current === conversationKey) return
+    initializedRef.current = conversationKey
+    setPagination({
+      key: conversationKey,
+      hasMore: query.data.length >= MESSAGE_PAGE_SIZE,
+      loading: false,
+    })
+  }, [query.data, conversationId, conversationKey])
+
+  useEffect(() => {
+    if (!conversationId || !hasSession) return
     const meId = user?.id
+    const liveKey = messagesKey(conversationId, sessionWallet)
     const channel = supabase
       .channel(uniqueRealtimeTopic(`messages:${conversationId}`))
       .on(
@@ -73,7 +127,7 @@ export function useMessages(conversationId: string | null | undefined) {
           // shape from current cache if needed (we'll refresh on next mutation).
           // Insert in (created_at, id) order, not arrival order — realtime
           // events can be delivered out of sequence under load.
-          qc.setQueryData<MessageWithSender[]>(['messages', conversationId], (prev) => {
+          qc.setQueryData<MessageWithSender[]>(liveKey, (prev) => {
             const list = prev ?? []
             if (list.some((m) => m.id === incoming.id)) return list
             const next = [...list, { ...incoming, sender: null } as unknown as MessageWithSender]
@@ -87,26 +141,44 @@ export function useMessages(conversationId: string | null | undefined) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [conversationId, qc, user?.id])
+  }, [conversationId, sessionWallet, hasSession, qc, user?.id])
 
-  const loadOlder = async () => {
-    if (!conversationId) return
-    const list = qc.getQueryData<MessageWithSender[]>(['messages', conversationId])
+  const loadOlder = useCallback(async () => {
+    if (!conversationId || !hasMoreOlder || loadingOlderRef.current) return
+    const key = messagesKey(conversationId, sessionWallet)
+    const list = qc.getQueryData<MessageWithSender[]>(key)
     if (!list || list.length === 0) return
-    const oldest = list[0]
-    const older = await listMessages(conversationId, { limit: 50, before: oldest.id })
-    qc.setQueryData<MessageWithSender[]>(['messages', conversationId], (prev) => {
-      const current = prev ?? []
-      const existing = new Set(current.map((m) => m.id))
-      const fresh = older.filter((m) => !existing.has(m.id))
-      if (fresh.length === 0) return prev
-      return [...fresh, ...current]
-    })
-  }
+    loadingOlderRef.current = true
+    setPagination((p) => ({
+      key: conversationKey,
+      hasMore: p.key === conversationKey ? p.hasMore : false,
+      loading: true,
+    }))
+    try {
+      const oldest = list[0]
+      const older = await listMessages(conversationId, {
+        limit: MESSAGE_PAGE_SIZE,
+        before: oldest.id,
+      })
+      qc.setQueryData<MessageWithSender[]>(key, (prev) => {
+        const current = prev ?? []
+        const existing = new Set(current.map((m) => m.id))
+        const fresh = older.filter((m) => !existing.has(m.id))
+        if (fresh.length === 0) return prev
+        return [...fresh, ...current]
+      })
+      // A short page means the start of history has been reached.
+      setPagination({
+        key: conversationKey,
+        hasMore: older.length >= MESSAGE_PAGE_SIZE,
+        loading: false,
+      })
+    } finally {
+      loadingOlderRef.current = false
+    }
+  }, [conversationId, sessionWallet, conversationKey, hasMoreOlder, qc])
 
-  const hasMore = (query.data?.length ?? 0) >= 50
-
-  return { ...query, loadOlder, hasMore }
+  return { ...query, loadOlder, hasMore: hasMoreOlder, isLoadingOlder }
 }
 
 /**
@@ -115,6 +187,7 @@ export function useMessages(conversationId: string | null | undefined) {
  */
 export function useSendMessage(conversationId: string | null | undefined) {
   const { data: user } = useCurrentUser()
+  const { sessionWallet, hasSession } = useWalletSession()
   const qc = useQueryClient()
   const { t } = useTranslation()
   const tempIdRef = useRef(0)
@@ -122,6 +195,7 @@ export function useSendMessage(conversationId: string | null | undefined) {
   return useMutation({
     mutationFn: async (input: { body: string; kind?: MessageKind }) => {
       if (!user || !conversationId) throw new Error('No active conversation')
+      if (!hasSession) throw new Error('No signed-in session')
       return sendMessage({
         conversationId,
         senderId: user.id,
@@ -130,8 +204,8 @@ export function useSendMessage(conversationId: string | null | undefined) {
       })
     },
     onMutate: async (input) => {
-      if (!conversationId || !user) return
-      const key = ['messages', conversationId]
+      if (!conversationId || !user || !hasSession) return
+      const key = messagesKey(conversationId, sessionWallet)
       await qc.cancelQueries({ queryKey: key })
       const previous = qc.getQueryData<MessageWithSender[]>(key) ?? []
       const tempId = `temp-${Date.now()}-${++tempIdRef.current}`
@@ -155,13 +229,13 @@ export function useSendMessage(conversationId: string | null | undefined) {
     },
     onError: (err, _vars, ctx) => {
       if (!conversationId || !ctx) return
-      qc.setQueryData(['messages', conversationId], ctx.previous)
+      qc.setQueryData(messagesKey(conversationId, sessionWallet), ctx.previous)
       // Surface the failure instead of silently rolling back — under the
       // SIWE RLS the two loudest causes are a missing/invalid session
       // (42501 — RLS denied the insert) and a genuinely dead session
       // (expired JWT, 401). Give the user an actionable prompt for both.
       const code = (err as { code?: string })?.code
-      if (code === '42501' && user) {
+      if ((code === '42501' || (err instanceof Error && err.message === 'No signed-in session')) && user) {
         toast.error(t('chat.signInRequired'))
       } else if (code === '401' || code === 'PGRST301') {
         toast.error(t('chat.reconnectRequired'))
@@ -171,7 +245,7 @@ export function useSendMessage(conversationId: string | null | undefined) {
     },
     onSuccess: (saved, _vars, ctx) => {
       if (!conversationId || !ctx) return
-      const key = ['messages', conversationId]
+      const key = messagesKey(conversationId, sessionWallet)
       // Swap the optimistic temp-* id for the real one. Filter out the
       // temp row first (not just by id) so a realtime INSERT that slipped
       // through the meId-skip path can't leave two copies behind.

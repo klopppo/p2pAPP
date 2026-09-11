@@ -273,7 +273,11 @@ async function handleVerify(
       parsed.address
     )
 
-    return json({ access_token: session.access_token, user })
+    return json({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+      user,
+    })
   } catch (err) {
     console.error("siwe-auth: verifyAndMint provisioning failed", err)
     return json({ error: "Internal error" }, 500)
