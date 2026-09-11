@@ -56,6 +56,7 @@ import {
   resolveUserReport,
   type ListReportsFilters,
 } from '@/lib/reportsService'
+import { shortTradeId } from '@/lib/utils'
 import type {
   UserActivityLog,
   UserReport,
@@ -647,7 +648,7 @@ export function OperatorDashboardPage() {
                         <span className="text-muted-foreground">
                           Trade Collegato:
                         </span>
-                        <span>{selectedReport.trade_id}</span>
+                        <span>{shortTradeId(selectedReport.trade_id)}</span>
                       </div>
                     )}
                     {selectedReport.conversation_id && (
@@ -1041,7 +1042,7 @@ export function OperatorDashboardPage() {
                         </div>
                         {conv.trade_id && (
                           <p className="text-[11px] text-muted-foreground font-mono">
-                            Trade: {conv.trade_id}
+                            Trade: {shortTradeId(conv.trade_id)}
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground truncate">

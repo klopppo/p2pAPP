@@ -301,7 +301,7 @@ export function CreateOfferPage() {
                 <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Type Selection */}
                   <div>
-                    <Label className="text-base font-semibold mb-2 block">{t('createOffer.offerType')}</Label>
+                    <Label className="text-base font-semibold mb-2 block text-center">{t('createOffer.offerType')}</Label>
                     <div className="flex justify-center gap-4">
                       <Button
                         type="button"

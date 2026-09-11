@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { shortTradeId } from '@/lib/utils'
 import {
   Loader2,
   Inbox,
@@ -54,6 +55,8 @@ interface TradeRow {
   trade_id: string
   status: string
   escrow_status: string
+  /** Live phase read from the escrow contract (overrides the DB mirror). */
+  live_escrow_status?: string
   crypto_token: string
   crypto_amount: number | string
   fiat_currency: string
@@ -221,8 +224,12 @@ export function TradesPage() {
       ) : (
         <ul className="space-y-3">
           {filtered.map((trade) => {
-            const escrowMeta = ESCROW_LABELS[trade.escrow_status] ?? {
-              label: trade.escrow_status,
+            // Prefer the live on-chain phase; the DB mirror can lag behind
+            // (e.g. show "Awaiting deposit" while the escrow is already in the
+            // buyer-confirmed grace window).
+            const escrowStatus = trade.live_escrow_status ?? trade.escrow_status
+            const escrowMeta = ESCROW_LABELS[escrowStatus] ?? {
+              label: escrowStatus,
               variant: 'outline' as const,
               icon: Clock as typeof Clock,
             }
@@ -273,7 +280,7 @@ export function TradesPage() {
                             className="font-mono uppercase tracking-wider text-muted-foreground"
                           >
                             {' '}
-                            {trade.trade_id}
+                            {shortTradeId(trade.trade_id)}
                           </Text>
                           <span className="text-muted-foreground font-normal">
                             {' '}

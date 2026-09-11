@@ -42,6 +42,7 @@ import {
 import { uploadToIpfs, cidToBytes32 } from '@/lib/ipfs'
 import { errorMessage } from '@/lib/errorMessage'
 import { explorerBase } from '@/lib/explorer'
+import { shortTradeId } from '@/lib/utils'
 import { DisputeStatus, TradeStatus } from '@/types/database'
 
 type DisputeStatusValue =
@@ -978,7 +979,7 @@ export function DisputeDetailPage() {
             <div className="flex items-center gap-3 rounded-xl border border-border bg-background/60 px-3 py-2">
               <div className="min-w-0 flex-1">
                 <Text variant="small" className="font-mono truncate">
-                  {trade.trade_id}
+                  {shortTradeId(trade.trade_id)}
                 </Text>
                 <Text variant="muted" className="text-xs">
                   {trade.status ?? '—'} · escrow {trade.escrow_status ?? '—'}

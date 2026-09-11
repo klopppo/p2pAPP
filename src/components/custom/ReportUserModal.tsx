@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { FullDropdown } from '@/components/custom/FullDropdown'
 import { createUserReport } from '@/lib/reportsService'
+import { shortTradeId } from '@/lib/utils'
 import { ReportCategory } from '@/types/rbac'
 import { useAccount } from 'wagmi'
 
@@ -119,7 +120,7 @@ export function ReportUserModal({
                 {tradeId && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">{t('report.tradeId')}:</span>
-                    <span className="text-foreground">{tradeId}</span>
+                    <span className="text-foreground">{shortTradeId(tradeId)}</span>
                   </div>
                 )}
                 {conversationId && (

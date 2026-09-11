@@ -292,10 +292,12 @@ export function ProfilePage() {
         </Avatar>
         <div className="flex-1">
           <div className="flex items-center gap-3 flex-wrap">
-            <Text variant="h2">{nickname}</Text>
             <Badge className="bg-success text-success-foreground hover:bg-success/90 text-sm">
               {onlineUsers.has(profile.id) ? t('profile.online') : t('profile.offline')}
             </Badge>
+            {/* `h2` bakes in `border-b pb-2`; override both so the name has no
+                underline (status badge now leads the row). */}
+            <Text variant="h2" className="border-b-0 pb-0">{nickname}</Text>
           </div>
           <div className="mt-1">
             <AddressWithActions
