@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { MessageCircle } from 'lucide-react'
 
 
@@ -15,6 +16,10 @@ import { useTypingIndicator, useConversationPresence } from '@/hooks/useTypingIn
 import { useGlobalPresence } from '@/hooks/useGlobalPresence'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useWalletSession } from '@/hooks/useWalletSession'
+import {
+  markConversationNotificationsRead,
+  setConversationViewing,
+} from '@/lib/supabase'
 import { ConversationList } from './ConversationList'
 import { ChatHeader } from './ChatHeader'
 import { MessageThread } from './MessageThread'
@@ -60,6 +65,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   const { data: user, isLoading: userLoading } = useCurrentUser()
   const { hasSession, isLoading: sessionLoading } = useWalletSession()
   const { t } = useTranslation()
+  const qc = useQueryClient()
   const conversations = useConversations()
   const { readIds, mark } = useLocallyReadConversations()
 
@@ -156,6 +162,43 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
       void markRead(last.id).catch((err) => { console.warn('[ChatLayout.tsx]', err); return undefined })
     }
   }, [activeId, user, messages.data, mark, markRead, isOurTeam])
+
+  // Tell the server this conversation is being viewed (heartbeat, refreshed
+  // every 60s). The `notify_conversation_message` trigger skips recipients
+  // whose `viewing_at` is recent, so a message landing in the open pane never
+  // creates a notification / email. Cleared on unmount / chat switch.
+  useEffect(() => {
+    if (!activeId || !user || isOurTeam) return
+    const conversationId = activeId
+    const userId = user.id
+    const ping = () => {
+      void setConversationViewing({ conversationId, userId, viewing: true })
+    }
+    ping()
+    const interval = window.setInterval(ping, 60_000)
+    return () => {
+      window.clearInterval(interval)
+      void setConversationViewing({ conversationId, userId, viewing: false })
+    }
+  }, [activeId, user, isOurTeam])
+
+  // Opening a chat clears that thread's unread notifications (and any that
+  // slipped in on the race before the viewing heartbeat landed, hence the
+  // `messages.data?.length` dep).
+  useEffect(() => {
+    if (!activeId || !user || isOurTeam) return
+    void markConversationNotificationsRead({
+      conversationId: activeId,
+      userId: user.id,
+    })
+      .then(() => {
+        void qc.invalidateQueries({ queryKey: ['notifications', user.id] })
+        void qc.invalidateQueries({ queryKey: ['notifications:unread', user.id] })
+      })
+      .catch((err) => {
+        console.warn('[ChatLayout] mark conversation notifications read failed:', err)
+      })
+  }, [activeId, user, isOurTeam, messages.data?.length, qc])
 
   const [draft, setDraft] = useState('')
 
