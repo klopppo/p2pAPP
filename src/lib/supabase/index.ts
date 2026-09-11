@@ -2012,6 +2012,53 @@ export async function markConversationRead(input: {
   }
 }
 
+/**
+ * Flag the current user as actively viewing a conversation. The
+ * `notify_conversation_message` trigger skips notification creation while
+ * `viewing_at` is within the last 2 minutes, so a message landing in an open
+ * chat pane never lights up the bell / sends an email. The client refreshes
+ * this on a heartbeat and clears it (viewing=false) when the pane unmounts.
+ *
+ * Best-effort: a failure just means the notification is created normally.
+ */
+export async function setConversationViewing(input: {
+  conversationId: string
+  userId: string
+  viewing: boolean
+}): Promise<void> {
+  const { error } = await supabase
+    .from('conversation_participants')
+    .update({ viewing_at: input.viewing ? new Date().toISOString() : null })
+    .eq('conversation_id', input.conversationId)
+    .eq('user_id', input.userId)
+
+  if (error) {
+    console.warn('[setConversationViewing] failed:', error)
+  }
+}
+
+/**
+ * Mark every unread notification tied to a conversation as read. Called when
+ * the user opens the chat pane so the bell clears for the thread they are now
+ * reading.
+ */
+export async function markConversationNotificationsRead(input: {
+  conversationId: string
+  userId: string
+}): Promise<void> {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read_at: new Date().toISOString() })
+    .eq('user_id', input.userId)
+    .eq('conversation_id', input.conversationId)
+    .is('read_at', null)
+
+  if (error) {
+    console.error('Error marking conversation notifications read:', error)
+    throw error
+  }
+}
+
 // =================================================================
 // NOTIFICATION QUERIES (see migration 20260724000005)
 // =================================================================
