@@ -231,6 +231,40 @@ export function TradePage() {
         `0x${string}`,
         `0x${string}`,
       ]
+
+      // The factory pins ONE token (immutable at construction). The offer's
+      // `crypto_token` is a free-text symbol, so an offer denominated in
+      // anything else (USDT/ETH/…) would otherwise deploy an escrow in the
+      // pinned token while the trade row claims the offer's token — silently
+      // escrowing the wrong asset. Reject the mismatch when the on-chain
+      // symbol is readable.
+      try {
+        const factorySymbol = (await publicClient.readContract({
+          address: tokenAddress,
+          abi: ERC20_ABI as Abi,
+          functionName: 'symbol',
+          args: [],
+        })) as string
+        if (
+          factorySymbol &&
+          String(token).toLowerCase() !== String(factorySymbol).toLowerCase()
+        ) {
+          toast.error(
+            t('trade.errorTokenMismatch', {
+              offered: token,
+              escrow: factorySymbol,
+              defaultValue:
+                'This offer is denominated in {{offered}}, but the escrow contract only supports {{escrow}}.',
+            }),
+          )
+          setStage('idle')
+          return
+        }
+      } catch {
+        // Non-standard ERC20 without symbol() — fall through; the factory's
+        // own token pinning still governs which asset is escrowed.
+      }
+
       const decimals = (await publicClient.readContract({
         address: tokenAddress,
         abi: ERC20_ABI as Abi,

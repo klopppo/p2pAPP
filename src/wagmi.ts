@@ -64,7 +64,7 @@ if (!projectId) {
  *   VITE_SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/<key>
  */
 const mainnetRpc = import.meta.env.VITE_MAINNET_RPC_URL?.trim() ||
-  'https://cloudflare-eth.com'
+  'https://ethereum-rpc.publicnode.com'
 const sepoliaRpc = import.meta.env.VITE_SEPOLIA_RPC_URL?.trim() ||
   'https://ethereum-sepolia.publicnode.com'
 

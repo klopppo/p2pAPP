@@ -146,7 +146,7 @@ export function LandingPage() {
                   </div>
                   <h3 className="text-lg md:text-2xl font-bold mb-3">Browse or add offers</h3>
                   <p className="text-sm text-muted-foreground max-w-[200px]">
-                    Vexl works as a private marketplace. Browse or add offers and choose who you want to connect with.
+                    CofferNode works as a private marketplace. Browse or add offers and choose who you want to connect with.
                   </p>
                 </div>
               </div>
@@ -174,7 +174,7 @@ export function LandingPage() {
                   </div>
                   <h3 className="text-lg md:text-2xl font-bold mb-3">Meet & trade privately</h3>
                   <p className="text-sm text-muted-foreground max-w-[200px]">
-                    Agree on the details, meet in person, and exchange privately. Vexl never handles your money or tracks your purchases.
+                    Agree on the details, meet in person, and exchange privately. CofferNode never handles your money or tracks your purchases.
                   </p>
                 </div>
               </div>

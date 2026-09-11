@@ -99,19 +99,6 @@ export function OperatorDashboardPage() {
   const [matrixRole, setMatrixRole] = useState('COMPLIANCE_LEAD')
   const [, setRbacUpdateTick] = useState(0)
 
-  // Load initial data
-  const loadInitial = async () => {
-    const ops = await listOperators()
-    setOperators(ops)
-    setCurOp(getCurrentOperator())
-    fetchReports()
-    fetchLogs()
-  }
-
-  useEffect(() => {
-    loadInitial()
-  }, [])
-
   // Fetch Reports
   const fetchReports = async () => {
     setReportsLoading(true)
@@ -157,11 +144,30 @@ export function OperatorDashboardPage() {
     }
   }
 
+  // Load initial data (declared after the fetchers it calls so there is no
+  // use-before-declaration).
+  const loadInitial = async () => {
+    const ops = await listOperators()
+    setOperators(ops)
+    setCurOp(getCurrentOperator())
+    fetchReports()
+    fetchLogs()
+  }
+
+  // Both effects below kick off async loaders that set state; the React
+  // Compiler lint flags the synchronous-within-effect call, but this is the
+  // canonical "load on mount / tab change" pattern.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    loadInitial()
+  }, [])
+
   useEffect(() => {
     if (activeTab === 'reports') fetchReports()
     if (activeTab === 'logs') fetchLogs()
     if (activeTab === 'messages') fetchConversations()
   }, [activeTab, reportFilterStatus, logFilterProgram])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Handle Operator Switcher
   const handleOperatorSwitch = (opId: string) => {

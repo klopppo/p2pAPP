@@ -17,20 +17,18 @@
  *   - WalletConnectButton to mirror the same state
  */
 import { useAccount } from 'wagmi'
-import { useCurrentUser } from './useCurrentUser'
+import { useWalletSession } from './useWalletSession'
 
 const SUCCESS_KEY = 'coffernode:siwe:last'
 const REJECTED_KEY_PREFIX = 'coffernode:siwe:declined:'
 
 function readStored(): {
   signedAddress: string | null
-  rejectedAddress: string | null
 } {
   if (typeof window === 'undefined') {
-    return { signedAddress: null, rejectedAddress: null }
+    return { signedAddress: null }
   }
   let signedAddress: string | null = null
-  let rejectedAddress: string | null = null
   try {
     const raw = window.localStorage.getItem(SUCCESS_KEY)
     if (raw) {
@@ -42,46 +40,42 @@ function readStored(): {
   } catch {
     /* ignore */
   }
-  // Look for any rejection marker — the active wallet (if any) matches
-  // when its key is set.
-  for (let i = 0; i < window.localStorage.length; i++) {
-    const k = window.localStorage.key(i)
-    if (k && k.startsWith(REJECTED_KEY_PREFIX)) {
-      rejectedAddress = k.slice(REJECTED_KEY_PREFIX.length).toLowerCase()
-      break
-    }
-  }
-  return { signedAddress, rejectedAddress }
+  return { signedAddress }
+}
+
+/** Whether the given wallet has a persisted "declined sign-in" marker. */
+function hasRejectedMarker(addr: string | null): boolean {
+  if (typeof window === 'undefined' || !addr) return false
+  return window.localStorage.getItem(`${REJECTED_KEY_PREFIX}${addr.toLowerCase()}`) === '1'
 }
 
 export function useSignedInStatus() {
   const { address, isConnected } = useAccount()
-  const { data: currentUser, isLoading: userLoading } = useCurrentUser()
+  const { sessionWallet, hasSession, isLoading: userLoading } = useWalletSession()
 
   // Read the persisted marker once per render. Cheap (a couple of
   // localStorage gets) — no need to memoise.
-  const { signedAddress, rejectedAddress } = readStored()
+  const { signedAddress } = readStored()
 
   const lowerAddr = address?.toLowerCase() ?? null
   const hasSuccessMarker = signedAddress != null && signedAddress === lowerAddr
-  const hasRejectionMarker =
-    lowerAddr != null && rejectedAddress === lowerAddr
+  // Check the ACTIVE wallet's key directly — scanning for the first
+  // `declined:` key returns an unrelated wallet when several were rejected.
+  const hasRejectionMarker = hasRejectedMarker(lowerAddr)
 
-  // The Supabase `users` row must exist for the connected wallet —
-  // confirms the backend processed the SIWE verify + upsert.
-  const userOk =
-    !!currentUser?.wallet_address &&
-    !!lowerAddr &&
-    currentUser.wallet_address.toLowerCase() === lowerAddr
-
-  const isFullySignedIn =
-    isConnected && hasSuccessMarker && userOk && !hasRejectionMarker
+  // The live Supabase JWT is the source of truth: a connected wallet plus a
+  // world-readable `users` row proves nothing to RLS, which authorizes off the
+  // `wallet_address` claim. A live session also supersedes a stale rejection
+  // marker (which only exists to stop us re-prompting MetaMask).
+  const isFullySignedIn = isConnected && hasSession
 
   return {
     address: lowerAddr,
     isConnected,
     isFullySignedIn,
     hasSuccessMarker,
+    hasLiveSession: hasSession,
+    sessionWallet,
     hasRejectionMarker,
     userLoading,
     /** True when the user is connected at the wallet layer but hasn't

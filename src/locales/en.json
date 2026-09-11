@@ -223,6 +223,7 @@
     "loading": "Loading…",
     "loadingConversation": "Loading conversation…",
     "conversationNotFound": "Conversation not found.",
+    "signInToView": "Sign in to load your conversations.",
     "sendFailed": "Couldn't send the message. Please try again.",
     "signInRequired": "Sign-in required — approve the wallet signature to send messages.",
     "reconnectRequired": "Session expired — disconnect and reconnect your wallet to send messages."
@@ -400,7 +401,9 @@
     "submittingEvidence": "Submitting evidence…",
     "evidenceRound": "Round {{n}}",
     "evidenceSubmittedSuccess": "Evidence submitted",
-    "evidenceSubmittedError": "Failed to submit evidence"
+    "evidenceSubmittedError": "Failed to submit evidence",
+    "errorUploadTimeout": "Upload timed out — check your connection and try again.",
+    "unknownState": "Unknown state"
   },
   "openOffer": {
     "viewOffer": "View Offer",
@@ -479,7 +482,9 @@
     "errorFailedToDeploy": "Failed to resolve the deployed escrow address.",
     "successDeployed": "Escrow deployed — fund the trade to continue.",
     "errorGeneric": "Failed to open trade. Please try again.",
-    "noRating": "No ratings yet"
+    "noRating": "No ratings yet",
+    "errorInvalidWallet": "Connected wallet is invalid. Reconnect and try again.",
+    "errorTokenMismatch": "This offer is denominated in {{offered}}, but the escrow contract only supports {{escrow}}."
   },
   "tradeDetail": {
     "loadingTrade": "Loading trade…",
@@ -645,7 +650,8 @@
     "warningSomeUploadsFailed": "Uploaded {{total}} file(s) but {{failed}} failed; the dispute will be raised with what we have.",
     "errorAllUploadsFailed": "All evidence uploads failed. Check your connection and try again.",
     "errorUploadTimeout": "Upload timed out — check your connection and try again.",
-    "errorRaiseReverted": "The on-chain raise was reverted. Any evidence files you uploaded have been removed; you can try again."
+    "errorRaiseReverted": "The on-chain raise was reverted. Any evidence files you uploaded have been removed; you can try again.",
+    "errorInvalidState": "This escrow is not in a state where a dispute can be raised."
   },
   "cookieConsent": {
     "privacyTitle": "We value your privacy",
@@ -763,6 +769,36 @@
     "signCta": "Sign message",
     "signing": "Signing…",
     "dismiss": "Dismiss",
-    "later": "Later"
+    "later": "Later",
+    "failed": "Sign-in was not completed. Please try again."
+  },
+  "report": {
+    "reportUser": "Report User",
+    "reportUserOrChat": "Report user or chat to operators",
+    "report": "Report",
+    "success": "Report sent to operators successfully.",
+    "modalTitle": "Send Operator Report",
+    "reportedUser": "Reported user",
+    "reason": "Report reason",
+    "description": "The details and related messages will be sent to the support and compliance team.",
+    "categoryLabel": "Category",
+    "detailLabel": "Detailed description",
+    "detailPlaceholder": "Describe what happened (e.g. forged bank receipt, threats in chat, request for off-platform payment...)",
+    "detailHint": "Provide as much information as possible to help operators verify.",
+    "abuseWarning": "False reports or abuse of the system can result in reputation penalties.",
+    "cancel": "Cancel",
+    "submitting": "Sending…",
+    "submit": "Send to Operators",
+    "tradeId": "Trade ID",
+    "chatId": "Chat ID",
+    "requiredReason": "Enter a detailed description of the problem.",
+    "submitError": "Error sending the report",
+    "catScam": "Scam Attempt",
+    "catPaymentFraud": "Payment Fraud (Fake Receipt)",
+    "catAbusive": "Abusive Messages / Threats",
+    "catOffPlatform": "Off-Platform Trading",
+    "catImpersonation": "Impersonation / Identity Theft",
+    "catTerms": "Terms of Service Violation",
+    "catOther": "Other"
   }
 }

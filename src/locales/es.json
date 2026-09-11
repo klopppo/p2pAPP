@@ -12,7 +12,8 @@
     "language": "Idioma",
     "currency": "Moneda",
     "back": "Volver",
-    "toggleMenu": "Alternar menú"
+    "toggleMenu": "Alternar menú",
+    "operator": "Portal de operadores"
   },
   "footer": {
     "copyright": "© 2026 CofferNode. Todos los derechos reservados.",
@@ -207,7 +208,8 @@
     "escrowReleased": "Liberada",
     "escrowRefunded": "Reembolsada",
     "escrowFunded": "Financiada",
-    "escrowCancelled": "Cancelada"
+    "escrowCancelled": "Cancelada",
+    "escrowGracePeriod": "Periodo de gracia"
   },
   "chat": {
     "messages": "Mensajes",
@@ -221,6 +223,7 @@
     "loading": "Cargando…",
     "loadingConversation": "Cargando conversación…",
     "conversationNotFound": "Conversación no encontrada.",
+    "signInToView": "Inicia sesión para cargar tus conversaciones.",
     "sendFailed": "No se pudo enviar el mensaje. Inténtalo de nuevo.",
     "signInRequired": "Requiere iniciar sesión: aprueba la firma de tu cartera para enviar mensajes.",
     "reconnectRequired": "Sesión caducada: desconecta y vuelve a conectar tu cartera para enviar mensajes."
@@ -401,7 +404,9 @@
     "submittingEvidence": "Presentando prueba…",
     "evidenceRound": "Ronda {{n}}",
     "evidenceSubmittedSuccess": "Prueba presentada",
-    "evidenceSubmittedError": "Error al presentar la prueba"
+    "evidenceSubmittedError": "Error al presentar la prueba",
+    "errorUploadTimeout": "La carga agotó el tiempo de espera; comprueba tu conexión e inténtalo de nuevo.",
+    "unknownState": "Estado desconocido"
   },
   "openOffer": {
     "viewOffer": "Ver oferta",
@@ -480,7 +485,9 @@
     "errorFailedToDeploy": "Error al resolver la dirección de custodia desplegada.",
     "successDeployed": "Custodia desplegada — financie la operación para continuar.",
     "errorGeneric": "Error al abrir la operación. Por favor, inténtelo de nuevo.",
-    "noRating": "Sin valoraciones todavía"
+    "noRating": "Sin valoraciones todavía",
+    "errorInvalidWallet": "La cartera conectada no es válida. Vuelve a conectarla e inténtalo de nuevo.",
+    "errorTokenMismatch": "Esta oferta está denominada en {{offered}}, pero el contrato de depósito solo admite {{escrow}}."
   },
   "tradeDetail": {
     "loadingTrade": "Cargando operación…",
@@ -547,12 +554,16 @@
     "releaseAvailableIn": "Liberación disponible en {{seconds}}",
     "tradeRemovedOrNoAccess": "Esta operación puede que haya sido eliminada o que no tenga acceso.",
     "messageCounterpart": "Mensaje a la contraparte",
-    "messageCounterpartTitle": "Abrir el chat con la contraparte"
+    "messageCounterpartTitle": "Abrir el chat con la contraparte",
+    "gracePeriodBody": "El comprador ha confirmado el pago fuera de la cadena. Cualquiera de las partes puede liquidar el depósito liberando las criptomonedas, sin terceros. Si el periodo de gracia termina sin acción, el vendedor puede liberar y el comprador ya no podrá disputar esta etapa.",
+    "gracePeriodEnded": "El periodo de gracia terminó: la liberación ya está disponible.",
+    "gracePeriodRemaining": "Restante: {{seconds}}s"
   },
   "editProfile": {
     "title": "Editar perfil",
     "subtitle": "Actualice su información pública",
-    "connectWallet": "Conecte su billetera",    "signIn": "Iniciar sesión",
+    "connectWallet": "Conecte su billetera",
+    "signIn": "Iniciar sesión",
     "connectWalletDescription": "Conecte una billetera para editar su perfil.",
     "loadingProfile": "Cargando perfil…",
     "nickname": "Apodo",
@@ -643,7 +654,8 @@
     "warningSomeUploadsFailed": "Se subieron {{total}} archivo(s) pero {{failed}} fallaron; la disputa se abrirá con lo que tenemos.",
     "errorAllUploadsFailed": "Todas las subidas de evidencia fallaron. Revisa tu conexión e inténtalo de nuevo.",
     "errorUploadTimeout": "Subida agotada — revisa tu conexión e inténtalo de nuevo.",
-    "errorRaiseReverted": "El envío on-chain fue revertido. Los archivos de evidencia se eliminaron; puedes intentarlo de nuevo."
+    "errorRaiseReverted": "El envío on-chain fue revertido. Los archivos de evidencia se eliminaron; puedes intentarlo de nuevo.",
+    "errorInvalidState": "Este depósito no está en un estado que permita abrir una disputa."
   },
   "cookieConsent": {
     "privacyTitle": "Valoramos su privacidad",
@@ -669,7 +681,8 @@
     "copyAddress": "Copiar dirección",
     "viewExplorer": "Ver en explorador",
     "editProfile": "Editar perfil",
-    "disconnect": "Desconectar"
+    "disconnect": "Desconectar",
+    "signIn": "Iniciar sesión"
   },
   "notifications": {
     "title": "Notificaciones",
@@ -735,8 +748,7 @@
     "description": "Tu billetera está en la cadena EVM equivocada. Cambia a {{chain}} para continuar.",
     "switchCta": "Cambiar a {{chain}}",
     "switchError": "No se pudo cambiar automáticamente: {{message}}"
-  }
-,
+  },
   "signInGate": {
     "connectTitle": "Conecta tu billetera para continuar",
     "connectBody": "CofferNode usa Sign-In With Ethereum. Conecta una billetera para iniciar sesión — tu dirección sigue bajo tu control.",
@@ -754,14 +766,43 @@
     "retryCta": "Reintentar",
     "errorTitle": "Falló el inicio de sesión",
     "errorBody": "Inténtalo de nuevo."
-  }
-,
+  },
   "signInPrompt": {
     "title": "Inicia sesión para continuar",
     "body": "Tu billetera está conectada pero el mensaje de inicio de sesión sigue pendiente. Inicia sesión para cargar tus intercambios y chats.",
     "signCta": "Firmar mensaje",
     "signing": "Firmando…",
     "dismiss": "Cerrar",
-    "later": "Más tarde"
+    "later": "Más tarde",
+    "failed": "No se completó el inicio de sesión. Inténtalo de nuevo."
+  },
+  "report": {
+    "reportUser": "Denunciar usuario",
+    "reportUserOrChat": "Denunciar usuario o chat a los operadores",
+    "report": "Denunciar",
+    "success": "Denuncia enviada a los operadores correctamente.",
+    "modalTitle": "Enviar denuncia a operadores",
+    "reportedUser": "Usuario denunciado",
+    "reason": "Motivo de la denuncia",
+    "description": "Los detalles y mensajes relacionados se enviarán al equipo de soporte y cumplimiento.",
+    "categoryLabel": "Categoría",
+    "detailLabel": "Descripción detallada",
+    "detailPlaceholder": "Describe lo que ocurrió (p. ej. recibo bancario falsificado, amenazas en el chat, solicitud de pago externo...)",
+    "detailHint": "Proporciona toda la información posible para facilitar la verificación de los operadores.",
+    "abuseWarning": "Las denuncias falsas o el abuso del sistema pueden conllevar sanciones de reputación.",
+    "cancel": "Cancelar",
+    "submitting": "Enviando…",
+    "submit": "Enviar a operadores",
+    "tradeId": "ID de operación",
+    "chatId": "ID de chat",
+    "requiredReason": "Introduce una descripción detallada del problema.",
+    "submitError": "Error al enviar la denuncia",
+    "catScam": "Intento de estafa",
+    "catPaymentFraud": "Fraude de pago (recibo falso)",
+    "catAbusive": "Mensajes abusivos / amenazas",
+    "catOffPlatform": "Comercio fuera de la plataforma",
+    "catImpersonation": "Suplantación de identidad",
+    "catTerms": "Violación de los términos de servicio",
+    "catOther": "Otro"
   }
 }

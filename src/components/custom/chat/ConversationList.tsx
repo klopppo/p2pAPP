@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { useMemo } from 'react'
 import { MessageCircle } from 'lucide-react'
-import { useConversations } from '@/hooks/useConversations'
+import type { useConversations } from '@/hooks/useConversations'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { ConversationItem } from './ConversationItem'
 import { createOurTeamConversation, OUR_TEAM_ID } from './ourTeam'
@@ -12,6 +12,12 @@ interface Props {
   activeId: string | null
   locallyReadIds: Set<string>
   onSelect: (id: string) => void
+  /**
+   * The parent's `useConversations()` result. Owned by the parent so the
+   * realtime channel + polling observer are created once — calling the hook
+   * again here would mount a second subscription for the same table.
+   */
+  conversations: ReturnType<typeof useConversations>
 }
 
 /**
@@ -23,10 +29,10 @@ interface Props {
  * prepended when the user is connected — there's no DB row, just a static
  * welcome pointing to the platform Discord.
  */
-export function ConversationList({ activeId, locallyReadIds, onSelect }: Props) {
+export function ConversationList({ activeId, locallyReadIds, onSelect, conversations }: Props) {
   const { t } = useTranslation()
   const { data: user } = useCurrentUser()
-  const { data, isLoading, isError } = useConversations()
+  const { data, isLoading, isError } = conversations
 
   const items = useMemo(() => {
     const real = data ?? []
@@ -38,7 +44,7 @@ export function ConversationList({ activeId, locallyReadIds, onSelect }: Props) 
   }, [data, user])
 
   return (
-    <div className="w-[380px] flex-shrink-0 bg-muted/60 backdrop-blur-sm flex flex-col min-h-0">
+    <div className="w-full md:w-[380px] h-full flex-shrink-0 bg-muted/60 backdrop-blur-sm flex flex-col min-h-0">
       <div className="p-4 shrink-0">
         <Text variant="h4" className="font-bold">
           {t('chat.messages')}

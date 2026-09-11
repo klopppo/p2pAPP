@@ -12,7 +12,8 @@
     "language": "语言",
     "currency": "货币",
     "back": "返回",
-    "toggleMenu": "切换菜单"
+    "toggleMenu": "切换菜单",
+    "operator": "运营门户"
   },
   "footer": {
     "copyright": "© 2026 CofferNode。保留所有权利。",
@@ -207,7 +208,8 @@
     "escrowReleased": "已释放",
     "escrowRefunded": "已退款",
     "escrowFunded": "已全额资助",
-    "escrowCancelled": "已取消"
+    "escrowCancelled": "已取消",
+    "escrowGracePeriod": "宽限期"
   },
   "chat": {
     "messages": "消息",
@@ -221,6 +223,7 @@
     "loading": "加载中…",
     "loadingConversation": "加载对话中…",
     "conversationNotFound": "未找到对话。",
+    "signInToView": "登录以加载你的对话。",
     "sendFailed": "无法发送消息，请重试。",
     "signInRequired": "需要登录——请批准钱包签名以发送消息。",
     "reconnectRequired": "会话已过期——请断开并重新连接钱包以发送消息。"
@@ -401,7 +404,9 @@
     "submittingEvidence": "正在提交证据…",
     "evidenceRound": "第 {{n}} 轮",
     "evidenceSubmittedSuccess": "证据已提交",
-    "evidenceSubmittedError": "提交证据失败"
+    "evidenceSubmittedError": "提交证据失败",
+    "errorUploadTimeout": "上传超时——请检查网络后重试。",
+    "unknownState": "未知状态"
   },
   "openOffer": {
     "viewOffer": "查看报价",
@@ -480,7 +485,9 @@
     "errorFailedToDeploy": "无法解析已部署的托管合约地址。",
     "successDeployed": "托管合约已部署——请注入资金以继续。",
     "errorGeneric": "发起交易失败，请重试。",
-    "noRating": "暂无评价"
+    "noRating": "暂无评价",
+    "errorInvalidWallet": "连接的钱包无效。请重新连接后再试。",
+    "errorTokenMismatch": "此报价以 {{offered}} 计价，但托管合约仅支持 {{escrow}}。"
   },
   "tradeDetail": {
     "loadingTrade": "正在加载交易…",
@@ -547,12 +554,16 @@
     "releaseAvailableIn": "{{seconds}} 后可释放",
     "tradeRemovedOrNoAccess": "此交易可能已被移除或您没有访问权限。",
     "messageCounterpart": "给对方发消息",
-    "messageCounterpartTitle": "打开与对方的聊天"
+    "messageCounterpartTitle": "打开与对方的聊天",
+    "gracePeriodBody": "买方已确认链下付款。任何一方都可以通过释放加密货币来结算托管，无需第三方。若宽限期结束时仍无操作，卖方可以释放，买方将无法再对此阶段提出争议。",
+    "gracePeriodEnded": "宽限期已结束——现在可以释放。",
+    "gracePeriodRemaining": "剩余：{{seconds}} 秒"
   },
   "editProfile": {
     "title": "编辑资料",
     "subtitle": "更新您的公开信息",
-    "connectWallet": "连接您的钱包",    "signIn": "登录",
+    "connectWallet": "连接您的钱包",
+    "signIn": "登录",
     "connectWalletDescription": "连接钱包以编辑您的资料。",
     "loadingProfile": "正在加载资料…",
     "nickname": "昵称",
@@ -643,7 +654,8 @@
     "warningSomeUploadsFailed": "已上传 {{total}} 个文件,但 {{failed}} 个失败;将用可用证据发起争议。",
     "errorAllUploadsFailed": "所有证据上传失败。请检查连接后重试。",
     "errorUploadTimeout": "上传超时 — 请检查连接后重试。",
-    "errorRaiseReverted": "链上发起已回滚。证据文件已删除,您可以重试。"
+    "errorRaiseReverted": "链上发起已回滚。证据文件已删除,您可以重试。",
+    "errorInvalidState": "该托管当前状态无法发起争议。"
   },
   "cookieConsent": {
     "privacyTitle": "我们重视您的隐私",
@@ -669,7 +681,8 @@
     "copyAddress": "复制地址",
     "viewExplorer": "在浏览器中查看",
     "editProfile": "编辑资料",
-    "disconnect": "断开连接"
+    "disconnect": "断开连接",
+    "signIn": "登录"
   },
   "notifications": {
     "title": "通知",
@@ -735,8 +748,7 @@
     "description": "您的钱包当前在错误的 EVM 链上。请切换到 {{chain}} 以继续。",
     "switchCta": "切换到 {{chain}}",
     "switchError": "无法自动切换：{{message}}"
-  }
-,
+  },
   "signInGate": {
     "connectTitle": "请连接钱包后继续",
     "connectBody": "CofferNode 使用 Sign-In With Ethereum 登录。请连接钱包以完成签名 —— 您的地址始终由您控制。",
@@ -754,14 +766,43 @@
     "retryCta": "重试",
     "errorTitle": "登录失败",
     "errorBody": "请重试。"
-  }
-,
+  },
   "signInPrompt": {
     "title": "请登录后继续",
     "body": "钱包已连接,但登录消息仍未签名。请登录以加载您的交易和聊天记录。",
     "signCta": "签名",
     "signing": "签名中…",
     "dismiss": "关闭",
-    "later": "稍后"
+    "later": "稍后",
+    "failed": "登录未完成，请重试。"
+  },
+  "report": {
+    "reportUser": "举报用户",
+    "reportUserOrChat": "向运营者举报用户或聊天",
+    "report": "举报",
+    "success": "举报已成功发送给运营者。",
+    "modalTitle": "发送运营举报",
+    "reportedUser": "被举报用户",
+    "reason": "举报原因",
+    "description": "详细信息及相关消息将发送给支持与合规团队。",
+    "categoryLabel": "类别",
+    "detailLabel": "详细说明",
+    "detailPlaceholder": "描述发生了什么（例如伪造银行回执、聊天中的威胁、要求平台外付款……）",
+    "detailHint": "请尽可能提供更多信息，以便运营者核实。",
+    "abuseWarning": "虚假举报或滥用系统可能导致信誉处罚。",
+    "cancel": "取消",
+    "submitting": "发送中……",
+    "submit": "发送给运营者",
+    "tradeId": "交易 ID",
+    "chatId": "聊天 ID",
+    "requiredReason": "请输入问题的详细说明。",
+    "submitError": "发送举报时出错",
+    "catScam": "诈骗企图",
+    "catPaymentFraud": "支付欺诈（伪造回执）",
+    "catAbusive": "辱骂/威胁信息",
+    "catOffPlatform": "平台外交易",
+    "catImpersonation": "冒充身份",
+    "catTerms": "违反服务条款",
+    "catOther": "其他"
   }
 }

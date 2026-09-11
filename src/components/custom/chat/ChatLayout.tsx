@@ -14,6 +14,7 @@ import { useMessages, useSendMessage } from '@/hooks/useMessages'
 import { useTypingIndicator, useConversationPresence } from '@/hooks/useTypingIndicator'
 import { useGlobalPresence } from '@/hooks/useGlobalPresence'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useWalletSession } from '@/hooks/useWalletSession'
 import { ConversationList } from './ConversationList'
 import { ChatHeader } from './ChatHeader'
 import { MessageThread } from './MessageThread'
@@ -57,6 +58,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   const navigate = useNavigate()
   const { conversationId: routeId } = useParams<{ conversationId: string }>()
   const { data: user, isLoading: userLoading } = useCurrentUser()
+  const { hasSession, isLoading: sessionLoading } = useWalletSession()
   const { t } = useTranslation()
   const conversations = useConversations()
   const { readIds, mark } = useLocallyReadConversations()
@@ -196,6 +198,28 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
     )
   }
 
+  // Wait for the session probe to settle before deciding. `useWalletSession`
+  // polls, so this is a real (brief) state, not a permanent gate.
+  if (sessionLoading) {
+    return (
+      <section className="flex-1 flex items-center justify-center p-8">
+        <ChatLoading size="lg" label={t('chat.connecting')} />
+      </section>
+    )
+  }
+
+  // Wallet connected but no live Supabase session. The RLS reads would be
+  // denied and come back as an empty array (no error), so render an explicit
+  // sign-in prompt rather than a misleading "conversation not found". The
+  // SignInPrompt overlay offers the button that fixes this.
+  if (!hasSession) {
+    return (
+      <section className="flex-1 flex items-center justify-center p-8 text-muted-foreground text-sm text-center">
+        {t('chat.signInToView')}
+      </section>
+    )
+  }
+
   const noConversations =
     !!conversations.data && conversations.data.length === 0 && !isOurTeam
   const showSidebar = !activeId || !forcedId
@@ -213,17 +237,13 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   }
 
   return (
-    // Constrain the chat to the viewport so the message thread scrolls
-    // inside its own `overflow-y-auto` div instead of pushing the whole
-    // page down when a new message lands. The previous `flex-1 + min-h-0`
-    // chain inherited its height from `AppLayout`'s `min-h-screen` parent
-    // — content taller than the viewport simply expanded the page, and
-    // `scrollIntoView({ block: 'end' })` then walked the page instead
-    // of the message thread. The `overflow-hidden` here clips the chat to
-    // the available viewport so the thread becomes the scrollable
-    // ancestor. `h-[calc(100dvh-...)]` reserves room for the navbar;
-    // adjust the var / value if the navbar height changes.
-    <section className="flex-1 flex flex-col min-h-0 -mb-8 overflow-hidden h-[calc(100dvh-4rem)]">
+    // Height chain: AppLayout gives the chat route a definite `h-[100dvh]`
+    // shell (navbar shrink-0, main flex-1 min-h-0, no footer), PageContainer
+    // is `flex-1 min-h-0` with zero padding, and this section fills it. From
+    // here every pane is `min-h-0` so only the intended child (ConversationList
+    // / MessageThread) gets its own `overflow-y-auto` — the document never
+    // scrolls.
+    <section className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div className="flex flex-1 min-h-0">
         {showSidebar && (
           <div className={activeId ? 'hidden md:block' : 'w-full md:w-auto'}>
@@ -231,6 +251,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
               activeId={activeId}
               locallyReadIds={readIds}
               onSelect={handleSelect}
+              conversations={conversations}
             />
           </div>
         )}
@@ -263,6 +284,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
                 }
                 loading={messages.isLoading}
                 hasMore={!!messages.hasMore}
+                loadingOlder={messages.isLoadingOlder}
                 onLoadOlder={messages.loadOlder}
               />
               {typing.typingUsers.length > 0 && (

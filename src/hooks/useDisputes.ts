@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useAccount, usePublicClient } from 'wagmi'
+import { useAccount, useChainId, usePublicClient } from 'wagmi'
 import type { Log } from 'viem'
 import {
   getDisputeById,
@@ -17,21 +17,25 @@ import {
   type KlerosEscStateValue,
 } from '@/lib/contracts'
 import type { Abi } from 'viem'
+import { useWalletSession } from './useWalletSession'
 
 /**
  * All disputes where the connected wallet is buyer or seller (Supabase).
- * Disabled until a wallet is connected (no userId to filter on).
+ * Gated on a live session — `disputes_select_parties` denies unauthenticated
+ * reads, which would otherwise return an empty (error-free) list. The session
+ * wallet is in the key so completing SIWE / switching wallets refetches.
  */
 export function useDisputes() {
   const { address } = useAccount()
+  const { sessionWallet, hasSession } = useWalletSession()
   return useQuery({
-    queryKey: ['disputes', 'by-wallet', address],
+    queryKey: ['disputes', 'by-wallet', address, sessionWallet],
     queryFn: async () => {
       const user = address ? await getUserByWallet(address) : null
       if (!user) return []
       return getDisputesByUser(user.id)
     },
-    enabled: !!address,
+    enabled: !!address && hasSession,
     // Surface status flips (in_review → escalated → resolved) without forcing
     // a manual refresh. Cheap because the table is small and the query is
     // filtered by user_id via PostgREST.
@@ -44,10 +48,11 @@ export function useDisputes() {
  * Single dispute by primary UUID, used by the detail viewer.
  */
 export function useDispute(id: string | undefined) {
+  const { sessionWallet, hasSession } = useWalletSession()
   return useQuery({
-    queryKey: ['dispute', id],
+    queryKey: ['dispute', id, sessionWallet],
     queryFn: () => getDisputeById(id as string),
-    enabled: !!id,
+    enabled: !!id && hasSession,
   })
 }
 
@@ -118,9 +123,14 @@ export function useUserEscrows() {
  */
 export function useEscrowState(escrowAddress: `0x${string}` | undefined) {
   const publicClient = usePublicClient()
+  const chainId = useChainId()
   return useQuery({
-    queryKey: ['escrow-state', escrowAddress],
+    queryKey: ['escrow-state', escrowAddress, chainId],
     enabled: !!publicClient && !!escrowAddress,
+    // Poll so a Kleros ruling that lands while the user is sitting on the
+    // trade page surfaces the executeRuling/finalize action without a reload.
+    refetchInterval: 15_000,
+    staleTime: 5_000,
     queryFn: async () => {
       if (!publicClient || !escrowAddress) return null
       const c = publicClient
@@ -232,8 +242,9 @@ export function useEscrowState(escrowAddress: `0x${string}` | undefined) {
  */
 export function useArbitrationCost(escrowAddress: `0x${string}` | undefined) {
   const publicClient = usePublicClient()
+  const chainId = useChainId()
   return useQuery({
-    queryKey: ['arbitration-cost', escrowAddress],
+    queryKey: ['arbitration-cost', escrowAddress, chainId],
     enabled: !!publicClient && !!escrowAddress,
     queryFn: async (): Promise<bigint | null> => {
       if (!publicClient || !escrowAddress) return null
@@ -281,8 +292,9 @@ export function useAppealInfo(
   klerosDisputeId: bigint | null | undefined,
 ) {
   const publicClient = usePublicClient()
+  const chainId = useChainId()
   return useQuery({
-    queryKey: ['appeal-info', escrowAddress, klerosDisputeId?.toString() ?? null],
+    queryKey: ['appeal-info', escrowAddress, klerosDisputeId?.toString() ?? null, chainId],
     enabled: !!publicClient && !!escrowAddress && klerosDisputeId != null && klerosDisputeId > 0n,
     // Poll the appeal window + status while the dispute is in flight so the
     // countdown updates without a manual refresh; Kleros status transitions

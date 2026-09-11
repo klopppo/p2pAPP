@@ -337,7 +337,7 @@ export function ProfilePage() {
             className="rounded-full shadow-none shrink-0 text-destructive border-destructive/30 hover:bg-destructive/10"
           >
             <ShieldAlert className="w-3.5 h-3.5 mr-1" />
-            Segnala Utente
+            {t('report.reportUser')}
           </Button>
         )}
       </div>

@@ -9,6 +9,120 @@
 
 ---
 
+## Multi-worker audit: Supabase/React, wallet, contracts, UI — 2026-09-12
+
+Four parallel audits (Supabase↔React, wallet/MetaMask, contract usage, UI) produced
+a bug list; the highest-signal items were fixed. Highlights:
+
+- **Silent RLS write/read failures**
+  - `updateTradeStatus`/`updateDisputeOnChain` wrote columns revoked from
+    `authenticated` (20260824000006), so every terminal trade/dispute mirror
+    failed with 42501 and was swallowed by `.catch()`. Both now route the
+    sensitive columns through SECURITY DEFINER RPCs: `set_trade_status`
+    (extended to stamp `completed_at`/`cancelled_at`/`disputed_at`/`has_dispute`)
+    and the new `set_dispute_on_chain`.
+  - Private-offer visibility and avatar-upload storage policies still read the
+    top-level `auth.jwt() ->> 'wallet_address'` claim; wrong path → always
+    denied. Migration `20260912000000_*` recreates them against
+    `user_metadata.wallet_address`.
+  - `listConversations` dropped the unread-count RPC error (supabase-js resolves
+    with `{ error }`), silently zeroing every badge.
+- **Chat**
+  - `useMessages.hasMore` was computed from the merged list length, so the
+    "Load older" button never went away; now tracked from each page + an
+    in-flight guard. `MessageThread` only autoscrolls when a NEW message
+    arrives (not when history is prepended). Duplicate `useConversations`
+    subscription removed (sidebar receives the parent's query result).
+  - `getMessageSortKey` no longer degrades a missing cursor to epoch.
+- **Auth/session**
+  - `SignInPrompt` now shows whenever there is no live session (a stale
+    remember-me marker previously hid it, leaving users stuck signed-out);
+    `ensureWalletSession` callers branch on the returned `session` instead of a
+    dead `catch`. `refreshToWalletClaim` honors `exp`; `signOut` only clears the
+    active wallet's rejection marker.
+  - ChainGuard's switch button no longer stays disabled after a failed switch,
+    and falls back to `wallet_addEthereumChain` on MetaMask 4902.
+  - Mainnet default RPC moved off the degraded `cloudflare-eth.com`.
+  - Trade/notification/dispute reads are session-gated and keyed by the session
+    wallet so a cold-load anonymous read can't cache `null`/`[]`.
+- **Contracts/UI**
+  - Trades: seller funding split into deposit-then-lock vs lock-only (fixes the
+    inverted gating and the 0%-deposit stuck escrow); buyer deposit hidden once
+    deposited; receipt `status` is checked before mirroring success/reputation;
+    `executeRuling` gated on Kleros `Solved`; `canAppeal`/`canTimeout` state
+    gates corrected; arbitrate sends a 10% fee buffer; escrow state polls.
+  - `TradePage` rejects offers whose token disagrees with the factory's pinned
+    escrow token.
+  - `FullDropdown` no longer hardcodes "All"; explorer link works; `EditOfferPage`
+    no longer spins forever on a bad id; operator report resolution works for
+    DB-backed rows; EvidenceThumb/NotificationsBell handle rejections; report
+    modal/chrome strings i18n'd; missing locale keys filled across all 5 locales;
+    lint is back to 0 errors.
+
+Files: many (see git diff). New: `supabase/migrations/20260912000000_claim_path_fixes_and_status_rpcs.sql`.
+
+---
+
+## Chat owns the viewport + eager prefetch after sign-in — 2026-09-12
+
+Two follow-ups from the session-gating fix: the chat page scrolled the document
+instead of the message pane, and page data only loaded on first visit.
+
+- **Fixed-height chat shell** (`AppLayout`, `PageContainer`, `ChatLayout`): the
+  chat route now gets a definite `h-[100dvh]` shell with the footer dropped and
+  `PageContainer` padding removed, so the document never scrolls. Every pane is
+  `min-h-0`; only `ConversationList` / `MessageThread` scroll internally. Normal
+  app pages keep the existing `min-h-screen` document flow + footer.
+  `PageContainer` gained a `padded` prop; the old `h-[calc(100dvh-4rem)]` /
+  `-mb-8` hack is gone.
+- **`usePrefetchAppData`** (mounted in `App.tsx`): once a live session exists,
+  warms the cache for every main surface — current user, profile, reviews,
+  reputation, own offers, active offers, conversations, notifications + unread
+  count + prefs, trades, disputes — using the exact page query keys so
+  navigation is instant. Runs once per session wallet.
+- **Disconnect lands on the marketplace** (`useSyncUser`): the `isConnected`
+  true→false transition navigates to `/app/offers` (covers disconnects from our
+  menu and RainbowKit's account modal alike). The initial not-yet-reconnected
+  mount is ignored.
+
+---
+
+## Chat loads off the live Supabase session, not a world-readable row — 2026-09-12
+
+"Messages don't load even though I'm connected and signed in" was a silent RLS
+denial: `useCurrentUser` resolves any *connected* wallet to a `users` row (that
+table is `select using (true)`), and the chat hooks gated only on that row — so
+with no/mismatched JWT the reads ran unauthenticated, `messages_read_participant`
+filtered every row, and PostgREST returned `[]` with no error. "Signed in" in the
+top nav was also just the localStorage marker, never the actual token.
+
+- **New `useWalletSession`** (`src/hooks/useWalletSession.ts`): exposes the wallet
+  encoded in the live Supabase JWT (`getSessionWallet`) and `hasSession`, polled so
+  a cold-load restore race or silently-expired token flips the gate.
+- **Chat hooks gated on the session** (`useMessages`, `useConversations`,
+  `useConversation`, `useConversationByTradeId`): `enabled` now requires
+  `hasSession`, and the session wallet is part of the query key so completing SIWE
+  or switching wallets can't reuse an anon/other-wallet cache entry. The same
+  treatment landed on the wallet-scoped DB reads in `useTrades` / `useDisputes` /
+  `useDispute`, which had the identical silent-empty failure.
+- **`AuthSessionSync`** (`src/hooks/useAuthSessionSync.tsx`, mounted in `App.tsx`):
+  bridges `supabase.auth.onAuthStateChange` into React Query (deferred past the
+  auth lock) so sign-in/out/refresh invalidates `wallet-session` + chat/user keys.
+- **`useSignedInStatus`** now derives `isFullySignedIn` from the live session, not
+  the marker + users row. `SignInPrompt` hides when a live session exists and
+  derives visibility during render; `ChatLayout` shows an explicit "sign in to load
+  your conversations" state instead of a misleading "conversation not found".
+- **Real refresh token** (`supabase/functions/siwe-auth/index.ts` + client): the
+  edge function dropped GoTrue's `refresh_token` and the client stored a
+  `'siwe-wallet-session'` placeholder — with `autoRefreshToken: true` that refresh
+  fails, GoTrue emits `SIGNED_OUT`, and the session dies silently. Both now carry
+  the real token.
+- **Navbar "Sign in"** (`WalletConnectButton`) runs SIWE for the already-connected
+  wallet (new `force` option on `ensureWalletSession`) instead of opening a connect
+  modal that could never complete the session.
+
+---
+
 ## RBAC, Audit Logger Movimenti & Operator Dashboard — 2026-09-10
 
 Implemented a complete Role-Based Access Control (RBAC) architecture, an immutable user/operator activity audit logger, user reporting mechanism, and an Operator Portal dashboard:

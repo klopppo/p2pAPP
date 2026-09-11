@@ -31,7 +31,7 @@ interface ProfileForm {
 
 const EMPTY_FORM: ProfileForm = {
   nickname: '',
-  avatarUrl: '',
+  avatarUrl: null,
   bio: '',
   location: '',
   website: '',

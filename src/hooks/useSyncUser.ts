@@ -57,6 +57,24 @@ export function useSyncUser() {
   // Token bumped on every wallet state change. Captured by async callbacks
   // so stale resolutions from a prior address can no-op.
   const tokenRef = useRef(0)
+  // Tracks whether the wallet was connected on a previous render, so a
+  // disconnect can be distinguished from the initial not-yet-reconnected
+  // mount (wagmi reports `isConnected: false` before it restores the session).
+  const wasConnectedRef = useRef(false)
+
+  // After a wallet disconnect, send the user back to the marketplace. Watched
+  // on the isConnected transition (not on our own Disconnect button) so a
+  // disconnect from RainbowKit's account modal behaves identically. The ref
+  // starts false, so a cold load that hasn't restored a session yet is a no-op.
+  useEffect(() => {
+    if (isConnected) {
+      wasConnectedRef.current = true
+      return
+    }
+    if (!wasConnectedRef.current) return
+    wasConnectedRef.current = false
+    navigate('/app/offers')
+  }, [isConnected, navigate])
 
   useEffect(() => {
     const myToken = ++tokenRef.current

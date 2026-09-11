@@ -33,6 +33,8 @@ import DocsDisputes from './pages/docs/Disputes'
 import DocsFAQ from './pages/docs/FAQ'
 import DocsTermsOfService from './pages/docs/TermsOfService'
 import { UserSync } from './hooks/useSyncUser'
+import { AuthSessionSync } from './hooks/useAuthSessionSync'
+import { usePrefetchAppData } from './hooks/usePrefetchAppData'
 import { TrustlessFlowOverlay } from './components/custom/TrustlessFlow'
 import { CookieConsent } from './components/custom/CookieConsent'
 import { attachQueryPersister, hydrateQueryCache } from './lib/queryPersister'
@@ -100,6 +102,8 @@ function QueryClientWithPersistence() {
   useEffect(() => {
     return attachQueryPersister(queryClient, () => currentBuster)
   }, [currentBuster])
+  // Warm every main-surface cache once a live session exists (see hook docs).
+  usePrefetchAppData()
   return null
 }
 
@@ -112,6 +116,7 @@ function App() {
           borderRadius: 'large',
         })}>
           <QueryClientWithPersistence />
+          <AuthSessionSync />
           <TrustlessFlowOverlay />
           <CookieConsent />
           <BrowserRouter>

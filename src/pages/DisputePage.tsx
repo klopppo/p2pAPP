@@ -272,11 +272,25 @@ const effectiveEscrow =
       toast.error(t('disputePage.errorDisputeWindowClosed'))
       return
     }
+    // raiseDispute() reverts with InvalidState() outside FUNDED /
+    // CONFIRMED_PENDING (e.g. still awaiting funding, already completed or
+    // cancelled). Block before paying gas + arbitration.
+    if (
+      escrowState.state !== KlerosEscState.FUNDED &&
+      escrowState.state !== KlerosEscState.CONFIRMED_PENDING
+    ) {
+      toast.error(t('disputePage.errorInvalidState'))
+      return
+    }
+    // Send a small buffer over the quoted fee: the contract re-reads
+    // arbitrationCost at execution and reverts WrongArbitrationFee() on any
+    // increase, but refunds excess — so overpaying is safe, underpaying isn't.
+    const arbitrationValueWei = arbitrationCostWei + arbitrationCostWei / 10n
     // ETH balance preflight: the tx pays arbitrationFee + gas for the
     // raiseDispute call + (best-effort) submitEvidence. ~0.005 ETH leaves
     // headroom on Sepolia; surface the warning if the balance is lower.
     const balance = (await publicClient.getBalance({ address })) as bigint
-    const required = arbitrationCostWei + 100000000000000n // arbitration + ~0.0001 ETH gas headroom
+    const required = arbitrationValueWei + 100000000000000n // arbitration + ~0.0001 ETH gas headroom
     if (balance < required) {
       toast.error(
         t('disputePage.errorInsufficientBalance', {
@@ -422,7 +436,7 @@ const effectiveEscrow =
         address: effectiveEscrow,
         abi: KLEROS_ESC_ABI as Abi,
         functionName: 'raiseDispute',
-        value: arbitrationCostWei,
+        value: arbitrationValueWei,
       })
 
       // 3) Wait for inclusion + decode the on-chain Kleros dispute ID assigned

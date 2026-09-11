@@ -181,6 +181,16 @@ function bytes(n: number) {
 }
 
 /**
+ * viem's `waitForTransactionReceipt` resolves for a mined-but-reverted tx;
+ * callers must check `status` before mirroring state / toasting success.
+ */
+function assertTxSuccess(receipt: { status: 'success' | 'reverted' }) {
+  if (receipt.status === 'reverted') {
+    throw new Error('Transaction reverted on-chain')
+  }
+}
+
+/**
  * Per-row evidence thumbnail. Mints a fresh signed URL on each render so
  * the image never expires (was: stored the signed URL on insert, 10-min
  * expiry meant every image 404s after the first session — H2 audit).
@@ -188,36 +198,60 @@ function bytes(n: number) {
 function EvidenceThumb({ path, name, size }: { path: string; name?: string; size?: number }) {
   const [url, setUrl] = useState<string | null>(null)
   useEffect(() => {
+    if (!path) return
     let cancelled = false
-    void getDisputeEvidenceSignedUrl(path).then((signed) => {
-      if (!cancelled) setUrl(signed)
-    })
+    void getDisputeEvidenceSignedUrl(path)
+      .then((signed) => {
+        if (!cancelled) setUrl(signed)
+      })
+      // A failed/expired signed-URL fetch used to be an unhandled rejection.
+      .catch(() => {
+        if (!cancelled) setUrl(null)
+      })
     return () => {
       cancelled = true
     }
   }, [path])
+  const content = (
+    <div className="rounded-xl overflow-hidden border border-border bg-background/60 aspect-square">
+      {url ? (
+        <img
+          src={url}
+          alt={name ?? ''}
+          loading="lazy"
+          className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+          {name ?? '…'}
+        </div>
+      )}
+    </div>
+  )
   return (
-    <a href={url ?? '#'} target="_blank" rel="noopener noreferrer" className="block group">
-      <div className="rounded-xl overflow-hidden border border-border bg-background/60 aspect-square">
-        {url ? (
-          <img
-            src={url}
-            alt={name ?? ''}
-            loading="lazy"
-            className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
-            {name ?? '…'}
-          </div>
-        )}
+    // Only an anchor once a usable URL exists — `href="#"` scrolled the page
+    // to the top when the signed URL was still resolving/failed.
+    url ? (
+      <a href={url} target="_blank" rel="noopener noreferrer" className="block group">
+        {content}
+        <EvidenceThumbCaption name={name} size={size} />
+      </a>
+    ) : (
+      <div className="block group">
+        {content}
+        <EvidenceThumbCaption name={name} size={size} />
       </div>
-      <p className="text-xs text-muted-foreground truncate mt-1 flex items-center gap-1">
-        <ImageIcon className="w-3 h-3 shrink-0" />
-        <span className="truncate">{name ?? '…'}</span>
-        {size != null && <span className="shrink-0">· {bytes(size)}</span>}
-      </p>
-    </a>
+    )
+  )
+}
+
+function EvidenceThumbCaption({ name, size }: { name?: string; size?: number }) {
+  return (
+    <p className="text-xs text-muted-foreground truncate mt-1 flex items-center gap-1">
+      <ImageIcon className="w-3 h-3 shrink-0" />
+      <span className="truncate">{name ?? '…'}</span>
+      {size != null && <span className="shrink-0">· {bytes(size)}</span>}
+    </p>
   )
 }
 
@@ -529,7 +563,7 @@ export function DisputeDetailPage() {
         abi: KLEROS_ESC_ABI as Abi,
         functionName: 'executeRuling',
       })
-      await publicClient.waitForTransactionReceipt({ hash, timeout: 90_000 })
+      assertTxSuccess(await publicClient.waitForTransactionReceipt({ hash, timeout: 90_000 }))
       // Mirror: state → RULING_EXECUTED, Kleros status → Solved (2), cache the
       // ruling. Prefer the DB-cached `on_chain_ruling` over the live chain
       // read so a stale `useEscrowState` doesn't flip the trade-side
@@ -573,7 +607,7 @@ export function DisputeDetailPage() {
         abi: KLEROS_ESC_ABI as Abi,
         functionName: 'finalize',
       })
-      await publicClient.waitForTransactionReceipt({ hash, timeout: 90_000 })
+      assertTxSuccess(await publicClient.waitForTransactionReceipt({ hash, timeout: 90_000 }))
       // Mirror: state → COMPLETED, dispute → resolved with resolved_at.
       await updateDisputeOnChain(dispute.id, {
         escrowState: KlerosEscState.COMPLETED,
@@ -617,7 +651,7 @@ export function DisputeDetailPage() {
         abi: KLEROS_ESC_ABI as Abi,
         functionName: 'timeoutDispute',
       })
-      await publicClient.waitForTransactionReceipt({ hash, timeout: 90_000 })
+      assertTxSuccess(await publicClient.waitForTransactionReceipt({ hash, timeout: 90_000 }))
       // Mirror: state → COMPLETED, dispute → closed (timeout is unilateral loss
       // for the disputer, not a Kleros-mediated resolution). Compute the
       // winner here too so the DB row is consistent with the watcher path
@@ -658,8 +692,13 @@ export function DisputeDetailPage() {
     }
   }
 
+  // `executeRuling()` reverts with DisputeNotSolved() while the Kleros court
+  // still reports the dispute as Appealable (status 1). Allow the action when
+  // the court says Solved (2), or when the court read is unavailable (null —
+  // e.g. mock court), which preserves the previous behaviour.
   const canExecuteRuling =
-    liveEscrowStateValue === KlerosEscState.RULING_RECEIVED
+    liveEscrowStateValue === KlerosEscState.RULING_RECEIVED &&
+    appealInfo?.klerosDisputeStatus !== 1n
   const canFinalize =
     liveEscrowStateValue === KlerosEscState.RULING_EXECUTED
 
@@ -674,9 +713,12 @@ export function DisputeDetailPage() {
   const timeoutReady =
     disputeTimestamp != null &&
     nowSeconds >= disputeTimestamp + DISPUTE_TIMEOUT_SECONDS
+  // KlerosEsc.timeoutDispute() is valid from AWAITING_RULING, RULING_RECEIVED,
+  // and RULING_EXECUTED (the defensive finalize path).
   const canTimeout =
     (liveEscrowStateValue === KlerosEscState.AWAITING_RULING ||
-      liveEscrowStateValue === KlerosEscState.RULING_RECEIVED) &&
+      liveEscrowStateValue === KlerosEscState.RULING_RECEIVED ||
+      liveEscrowStateValue === KlerosEscState.RULING_EXECUTED) &&
     timeoutReady
 
   const handleAppeal = async () => {
@@ -688,7 +730,7 @@ export function DisputeDetailPage() {
         functionName: 'appeal',
         value: appealInfo.appealCostWei,
       })
-      await publicClient.waitForTransactionReceipt({ hash, timeout: 90_000 })
+      assertTxSuccess(await publicClient.waitForTransactionReceipt({ hash, timeout: 90_000 }))
       // Mirror: state moves back to AWAITING_RULING for the new round; mark
       // the dispute as escalated.
       await updateDisputeOnChain(dispute.id, {
@@ -705,7 +747,13 @@ export function DisputeDetailPage() {
       toast.error(errorMessage(err, 'disputeDetail', t, 'appealFundedError'))
     }
   }
-  const canAppeal = !!appealInfo?.appealable
+  // KlerosEsc.appeal() is only valid from these states; an appealable court
+  // status while the escrow sits elsewhere would revert CannotAppeal().
+  const appealableState =
+    liveEscrowStateValue === KlerosEscState.AWAITING_RULING ||
+    liveEscrowStateValue === KlerosEscState.RULING_RECEIVED ||
+    liveEscrowStateValue === KlerosEscState.RULING_EXECUTED
+  const canAppeal = !!appealInfo?.appealable && appealableState
 
   return (
     <div className="w-full max-w-xl mx-auto">
@@ -777,7 +825,9 @@ export function DisputeDetailPage() {
                     {t('disputeDetail.tradeAmount')}
                   </Text>
                   <p className="font-mono">
-                    {escrowState.tradeAmount.toString()}
+                    {trade?.crypto_amount != null
+                      ? `${trade.crypto_amount} ${trade.crypto_token ?? ''}`.trim()
+                      : escrowState.tradeAmount.toString()}
                   </p>
                 </div>
                 <div>
@@ -802,7 +852,10 @@ export function DisputeDetailPage() {
                 <Gavel className="w-3.5 h-3.5 text-muted-foreground" />
                 <span className="text-muted-foreground">{t('disputeDetail.onChainState')}</span>
                 <span className="font-mono">
-                  {t(ON_CHAIN_STATE_I18N[liveEscrowStateValue as keyof typeof ON_CHAIN_STATE_I18N])}
+                  {t(
+                    ON_CHAIN_STATE_I18N[liveEscrowStateValue] ??
+                      'disputeDetail.unknownState',
+                  )}
                 </span>
                 {escrowState?.klerosDisputeID != null &&
                   escrowState.klerosDisputeID > 0n && (
@@ -1177,7 +1230,7 @@ function SubmitMoreEvidence({
         functionName: 'submitEvidence',
         args: [evidenceBytes32],
       })
-      await publicClient.waitForTransactionReceipt({ hash: txHash })
+      assertTxSuccess(await publicClient.waitForTransactionReceipt({ hash: txHash }))
       const rows: DisputeEvidenceFile[] = [
         {
           cid: upload.cid,

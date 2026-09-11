@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { ShieldAlert, Loader2, Inbox, Plus, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -232,15 +231,6 @@ export function DisputesListPage() {
           })}
         </ul>
       )}
-
-      <noscript>
-        <Text variant="muted">
-          {t('disputes.connectWalletDescription')}
-        </Text>
-        <div className="mt-2">
-          <ConnectButton showBalance={false} />
-        </div>
-      </noscript>
     </section>
   )
 }

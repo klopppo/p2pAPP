@@ -12,7 +12,8 @@
     "language": "Langue",
     "currency": "Devise",
     "back": "Retour",
-    "toggleMenu": "Basculer le menu"
+    "toggleMenu": "Basculer le menu",
+    "operator": "Portail opérateur"
   },
   "footer": {
     "copyright": "© 2026 CofferNode. Tous droits réservés.",
@@ -207,7 +208,8 @@
     "escrowReleased": "Libéré",
     "escrowRefunded": "Remboursé",
     "escrowFunded": "Financé",
-    "escrowCancelled": "Annulé"
+    "escrowCancelled": "Annulé",
+    "escrowGracePeriod": "Période de grâce"
   },
   "chat": {
     "messages": "Messages",
@@ -221,6 +223,7 @@
     "loading": "Chargement…",
     "loadingConversation": "Chargement de la conversation…",
     "conversationNotFound": "Conversation introuvable.",
+    "signInToView": "Connectez-vous pour charger vos conversations.",
     "sendFailed": "Impossible d'envoyer le message. Réessayez.",
     "signInRequired": "Connexion requise — approuvez la signature de votre portefeuille pour envoyer des messages.",
     "reconnectRequired": "Session expirée — déconnectez puis reconnectez votre portefeuille pour envoyer des messages."
@@ -401,7 +404,9 @@
     "submittingEvidence": "Soumission de la preuve…",
     "evidenceRound": "Tour {{n}}",
     "evidenceSubmittedSuccess": "Preuve soumise",
-    "evidenceSubmittedError": "Échec de la soumission de la preuve"
+    "evidenceSubmittedError": "Échec de la soumission de la preuve",
+    "errorUploadTimeout": "Délai d’envoi dépassé — vérifiez votre connexion et réessayez.",
+    "unknownState": "État inconnu"
   },
   "openOffer": {
     "viewOffer": "Voir l'offre",
@@ -480,7 +485,9 @@
     "errorFailedToDeploy": "Impossible de résoudre l'adresse du séquestre déployé.",
     "successDeployed": "Séquestre déployé — financez l'échange pour continuer.",
     "errorGeneric": "Échec de l'ouverture de l'échange. Veuillez réessayer.",
-    "noRating": "Aucune évaluation pour le moment"
+    "noRating": "Aucune évaluation pour le moment",
+    "errorInvalidWallet": "Le portefeuille connecté est invalide. Reconnectez-le et réessayez.",
+    "errorTokenMismatch": "Cette offre est libellée en {{offered}}, mais le contrat de dépôt ne prend en charge que {{escrow}}."
   },
   "tradeDetail": {
     "loadingTrade": "Chargement de l'échange…",
@@ -547,12 +554,16 @@
     "releaseAvailableIn": "Libération disponible dans {{seconds}}",
     "tradeRemovedOrNoAccess": "Cet échange a peut-être été supprimé ou vous n'y avez pas accès.",
     "messageCounterpart": "Message au partenaire",
-    "messageCounterpartTitle": "Ouvrir le chat avec le partenaire"
+    "messageCounterpartTitle": "Ouvrir le chat avec le partenaire",
+    "gracePeriodBody": "L’acheteur a confirmé le paiement hors chaîne. Chaque partie peut régler le dépôt en libérant les cryptos, sans tiers. Si la période de grâce s’achève sans action, le vendeur peut libérer et l’acheteur ne peut plus contester cette étape.",
+    "gracePeriodEnded": "Période de grâce terminée — la libération est disponible.",
+    "gracePeriodRemaining": "Restant : {{seconds}}s"
   },
   "editProfile": {
     "title": "Modifier le profil",
     "subtitle": "Mettez à jour vos informations publiques",
-    "connectWallet": "Connectez votre portefeuille",    "signIn": "Se connecter",
+    "connectWallet": "Connectez votre portefeuille",
+    "signIn": "Se connecter",
     "connectWalletDescription": "Connectez un portefeuille pour modifier votre profil.",
     "loadingProfile": "Chargement du profil…",
     "nickname": "Pseudonyme",
@@ -643,7 +654,8 @@
     "warningSomeUploadsFailed": "{{total}} fichier(s) envoyé(s) mais {{failed}} échoué(s) ; le litige sera ouvert avec ce que nous avons.",
     "errorAllUploadsFailed": "Tous les envois de preuves ont échoué. Vérifiez votre connexion et réessayez.",
     "errorUploadTimeout": "Envoi expiré — vérifiez votre connexion et réessayez.",
-    "errorRaiseReverted": "L'envoi on-chain a été annulé. Les fichiers de preuve ont été supprimés ; réessayez."
+    "errorRaiseReverted": "L'envoi on-chain a été annulé. Les fichiers de preuve ont été supprimés ; réessayez.",
+    "errorInvalidState": "Ce dépôt n’est pas dans un état permettant d’ouvrir un litige."
   },
   "cookieConsent": {
     "privacyTitle": "Nous respectons votre vie privée",
@@ -669,7 +681,8 @@
     "copyAddress": "Copier l'adresse",
     "viewExplorer": "Voir sur l'explorateur",
     "editProfile": "Modifier le profil",
-    "disconnect": "Déconnecter"
+    "disconnect": "Déconnecter",
+    "signIn": "Se connecter"
   },
   "notifications": {
     "title": "Notifications",
@@ -735,8 +748,7 @@
     "description": "Votre portefeuille est sur la mauvaise chaîne EVM. Basculez vers {{chain}} pour continuer.",
     "switchCta": "Basculer vers {{chain}}",
     "switchError": "Bascule impossible : {{message}}"
-  }
-,
+  },
   "signInGate": {
     "connectTitle": "Connectez votre portefeuille pour continuer",
     "connectBody": "CofferNode utilise Sign-In With Ethereum. Connectez un portefeuille pour vous connecter — votre adresse reste sous votre contrôle.",
@@ -754,14 +766,43 @@
     "retryCta": "Réessayer",
     "errorTitle": "Échec de la connexion",
     "errorBody": "Réessayez."
-  }
-,
+  },
   "signInPrompt": {
     "title": "Connectez-vous pour continuer",
     "body": "Votre portefeuille est connecté mais le message de connexion est toujours en attente. Connectez-vous pour charger vos échanges et discussions.",
     "signCta": "Signer le message",
     "signing": "Signature…",
     "dismiss": "Ignorer",
-    "later": "Plus tard"
+    "later": "Plus tard",
+    "failed": "La connexion n’a pas abouti. Veuillez réessayer."
+  },
+  "report": {
+    "reportUser": "Signaler l’utilisateur",
+    "reportUserOrChat": "Signaler l’utilisateur ou le chat aux opérateurs",
+    "report": "Signaler",
+    "success": "Signalement envoyé aux opérateurs.",
+    "modalTitle": "Envoyer un signalement",
+    "reportedUser": "Utilisateur signalé",
+    "reason": "Motif du signalement",
+    "description": "Les détails et les messages associés seront envoyés à l’équipe support et conformité.",
+    "categoryLabel": "Catégorie",
+    "detailLabel": "Description détaillée",
+    "detailPlaceholder": "Décrivez ce qui s’est passé (ex. faux reçu bancaire, menaces en chat, demande de paiement hors plateforme...)",
+    "detailHint": "Fournissez un maximum d’informations pour aider les opérateurs à vérifier.",
+    "abuseWarning": "Les faux signalements ou l’abus du système peuvent entraîner des sanctions de réputation.",
+    "cancel": "Annuler",
+    "submitting": "Envoi…",
+    "submit": "Envoyer aux opérateurs",
+    "tradeId": "ID de transaction",
+    "chatId": "ID de chat",
+    "requiredReason": "Saisissez une description détaillée du problème.",
+    "submitError": "Erreur lors de l’envoi du signalement",
+    "catScam": "Tentative d’arnaque",
+    "catPaymentFraud": "Fraude au paiement (faux reçu)",
+    "catAbusive": "Messages abusifs / menaces",
+    "catOffPlatform": "Échange hors plateforme",
+    "catImpersonation": "Usurpation d’identité",
+    "catTerms": "Violation des conditions d’utilisation",
+    "catOther": "Autre"
   }
 }

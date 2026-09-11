@@ -79,7 +79,7 @@ const ROLE_PERMISSIONS_SET = new Set<string>([
 ])
 
 // Seed Operators
-let OPERATORS_LIST: SysOperator[] = [
+const OPERATORS_LIST: SysOperator[] = [
   {
     id: '10000000-0000-0000-0000-000000000001',
     wallet_address: '0x1111111111111111111111111111111111111111',

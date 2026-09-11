@@ -41,12 +41,11 @@ export function FullDropdown({
 }: FullDropdownProps) {
   const [open, setOpen] = useState(false)
 
-  const displayValue =
-    showOptionLabel && value !== 'all'
-      ? options.find((o) => o.value === value)?.label ?? value
-      : value === 'all'
-        ? 'All'
-        : value
+  // Resolve the selected option's label for EVERY value (including 'all') so
+  // the trigger shows the localized option text instead of a hardcoded 'All'.
+  const displayValue = showOptionLabel
+    ? options.find((o) => o.value === value)?.label ?? value
+    : value
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
