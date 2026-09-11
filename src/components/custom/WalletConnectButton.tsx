@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { useDisconnect } from 'wagmi'
 import { useConnectModal } from '@rainbow-me/rainbowkit'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
 import MotionButton from '@/components/ui/motion-button'
 import {
   DropdownMenu,
@@ -12,18 +14,40 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Loader2, User, Copy, ExternalLink } from 'lucide-react'
 import { useSignedInStatus } from '@/hooks/useSignedInStatus'
-import { signOut } from '@/lib/supabase'
+import { ensureWalletSession, signOut } from '@/lib/supabase'
+import { signWalletMessage } from '@/lib/walletSigner'
 
 export function WalletConnectButton() {
   const { openConnectModal, connectModalOpen } = useConnectModal()
   // The navbar only flips to the "connected" affordance when BOTH the
   // wallet is connected AND the SIWE signature was captured. Until
-  // then, we show the "Connect wallet" CTA so the top header is
-  // consistent with the rest of the app (and with the SiweGate).
+  // then, we show the "Connect wallet" / "Sign in" CTA so the top header is
+  // consistent with the rest of the app (and with the SignInPrompt).
   const { address, isConnected, isFullySignedIn } = useSignedInStatus()
   const { disconnect } = useDisconnect()
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const qc = useQueryClient()
+  const [isSigning, setIsSigning] = useState(false)
+
+  const handleSignIn = async () => {
+    if (!address) return
+    setIsSigning(true)
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(`coffernode:siwe:declined:${address.toLowerCase()}`)
+      }
+      const res = await ensureWalletSession(address, { signMessage: signWalletMessage })
+      if (res.session) {
+        qc.invalidateQueries({ queryKey: ['current-user'] })
+        qc.invalidateQueries({ queryKey: ['user-profile'] })
+      }
+    } catch (err) {
+      console.error('[WalletConnectButton] sign in failed:', err)
+    } finally {
+      setIsSigning(false)
+    }
+  }
 
   const formatAddress = (addr: string) =>
     `${addr.slice(0, 6)}...${addr.slice(-4)}`
@@ -53,16 +77,20 @@ export function WalletConnectButton() {
   }
 
   if (!isFullySignedIn) {
-    // Either the wallet isn't connected, the signature wasn't captured,
-    // or the Supabase user row isn't visible yet. In every case the
-    // CTA is the same: open the RainbowKit picker, which will hand off
-    // to the SiweGate for the sign-in step.
-    return connectModalOpen ? (
-      <div className="flex items-center gap-2 h-10 px-4 bg-background text-foreground border border-border rounded-full">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        <span className="text-sm">{t('wallet.connecting')}</span>
-      </div>
-    ) : (
+    if (connectModalOpen || isSigning) {
+      return (
+        <div className="flex items-center gap-2 h-10 px-4 bg-background text-foreground border border-border rounded-full">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-sm">
+            {isSigning
+              ? t('signInPrompt.signing', { defaultValue: 'Signing…' })
+              : t('wallet.connecting')}
+          </span>
+        </div>
+      )
+    }
+
+    return (
       <MotionButton
         label={
           isConnected && !isFullySignedIn
@@ -70,7 +98,7 @@ export function WalletConnectButton() {
             : t('wallet.connectWallet')
         }
         classes="bg-background text-foreground border border-border"
-        onClick={openConnectModal}
+        onClick={isConnected ? () => void handleSignIn() : openConnectModal}
       />
     )
   }

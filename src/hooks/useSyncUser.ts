@@ -6,32 +6,12 @@ import { clearPersistedQueryCache } from '@/lib/queryPersister'
 import { ensureWalletSession, signOut } from '@/lib/supabase'
 import { signWalletMessage } from '@/lib/walletSigner'
 
-const SUCCESS_KEY = 'coffernode:siwe:last'
-
-/**
- * True iff a SIWE success marker is stored in localStorage for the given
- * wallet address (lower-cased). Read by useSyncUser to short-circuit the
- * auto-prompt on connect: if we've already signed in for this wallet on
- * this device, don't pop MetaMask again.
- */
-function hasSignedInMarker(addr: string): boolean {
-  if (typeof window === 'undefined') return false
-  try {
-    const raw = window.localStorage.getItem(SUCCESS_KEY)
-    if (!raw) return false
-    const parsed = JSON.parse(raw) as { address?: string }
-    return parsed?.address?.toLowerCase() === addr.toLowerCase()
-  } catch {
-    return false
-  }
-}
-
 /**
  * Keeps the Supabase `users` row in sync with the connected wallet.
  *
  * Whenever a wallet connects (or the active account changes) this:
- *   1. Establishes a Supabase session by signing an SIWE challenge (handled
- *      by the `siwe-auth` edge function → JWT → `ensureWalletSession`).
+ *   1. Establishes/verifies a Supabase session by checking live tokens or signing
+ *      an SIWE challenge (handled by `ensureWalletSession` -> `siwe-auth` edge function).
  *   2. Ensures a `users` row exists for the wallet.
  *
  * Race fix: a monotonically increasing `token` is bumped on every
@@ -40,11 +20,6 @@ function hasSignedInMarker(addr: string): boolean {
  * token still matches. Out-of-order resolutions are dropped on the floor.
  * Without this, a connect→disconnect→reconnect cycle could let the original
  * in-flight sign-in overwrite the new session with the old wallet's user row.
- *
- * Skip-on-success: if `coffernode:siwe:last` already names the
- * connected wallet, don't fire another signMessage. The user explicitly
- * asked for this — the original behavior popped MetaMask every single
- * connect, even on the same device for the same wallet.
  *
  * Onboarding: if the row has no profile yet (no nickname), the user is sent
  * straight to the Edit Profile page so they can create one.
@@ -77,14 +52,8 @@ export function useSyncUser() {
       return
     }
 
-    // Skip redundant sign-ins for an address we already synced.
+    // Skip redundant sign-ins for an address we already synced in this session.
     if (syncedAddress.current === address) return
-    // Skip when the device already has a stored signature for this wallet
-    // — the user explicitly asked not to keep popping the MetaMask popup.
-    // If the session is actually stale (marker present but JWT gone)
-    // `ensureWalletSession` short-circuits via `isSignedInAs` below, so
-    // we don't need to fan out the request to know.
-    if (hasSignedInMarker(address)) return
     syncedAddress.current = address
 
     ensureWalletSession(address, { signMessage: signWalletMessage })

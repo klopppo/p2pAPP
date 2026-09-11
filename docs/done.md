@@ -9,6 +9,14 @@
 
 ---
 
+## Fix WalletConnectButton Sign-In & Supabase Session Sync on Connect/Reload — 2026-09-11
+
+- **Navbar Sign-In CTA (`src/components/custom/WalletConnectButton.tsx`)**: Fixed the "Sign in" button state when the wallet is connected but SIWE signature is pending. Instead of incorrectly re-opening the RainbowKit connect modal, clicking "Sign in" now initiates the SIWE sign-in flow (`ensureWalletSession`), displays signing progress, and invalidates user queries on completion.
+- **Supabase Session Sync (`src/hooks/useSyncUser.ts`)**: Removed premature return on localStorage marker (`coffernode:siwe:last`). The hook now ensures the live Supabase session (`isSignedInAs`) is verified or restored on connect/reload, preventing expired/missing tokens from blocking database reads and RLS operations.
+- **Per-Wallet Rejection State (`src/hooks/useSignedInStatus.ts`)**: Replaced global loop over localStorage keys with an exact address lookup for `coffernode:siwe:declined:${addr}`.
+
+---
+
 ## RBAC, Audit Logger Movimenti & Operator Dashboard — 2026-09-10
 
 Implemented a complete Role-Based Access Control (RBAC) architecture, an immutable user/operator activity audit logger, user reporting mechanism, and an Operator Portal dashboard:
