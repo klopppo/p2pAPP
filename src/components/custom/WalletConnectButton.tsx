@@ -1,12 +1,8 @@
 import { useState } from 'react'
-import { useDisconnect, useSignMessage } from 'wagmi'
-import { useState } from 'react'
 import { useDisconnect } from 'wagmi'
 import { useConnectModal } from '@rainbow-me/rainbowkit'
 import { useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
 import MotionButton from '@/components/ui/motion-button'
 import {
@@ -19,26 +15,19 @@ import {
 import { Loader2, User, Copy, ExternalLink } from 'lucide-react'
 import { useSignedInStatus } from '@/hooks/useSignedInStatus'
 import { ensureWalletSession, signOut } from '@/lib/supabase'
-import { explorerBase } from '@/lib/explorer'
-import { ensureWalletSession, signOut } from '@/lib/supabase'
 import { signWalletMessage } from '@/lib/walletSigner'
+import { explorerBase } from '@/lib/explorer'
 
 export function WalletConnectButton() {
   const { openConnectModal, connectModalOpen } = useConnectModal()
   // The navbar only flips to the "connected" affordance when BOTH the
-  // wallet is connected AND a live Supabase session exists (see
-  // useSignedInStatus). Until then, we show the "Connect wallet" CTA so the
-  // top header is consistent with the rest of the app.
   // wallet is connected AND the SIWE signature was captured. Until
   // then, we show the "Connect wallet" / "Sign in" CTA so the top header is
   // consistent with the rest of the app (and with the SignInPrompt).
   const { address, isConnected, isFullySignedIn } = useSignedInStatus()
   const { disconnect } = useDisconnect()
-  const { signMessageAsync } = useSignMessage()
-  const qc = useQueryClient()
   const navigate = useNavigate()
   const { t } = useTranslation()
-  const [signingIn, setSigningIn] = useState(false)
   const qc = useQueryClient()
   const [isSigning, setIsSigning] = useState(false)
 
@@ -63,49 +52,6 @@ export function WalletConnectButton() {
 
   const formatAddress = (addr: string) =>
     `${addr.slice(0, 6)}...${addr.slice(-4)}`
-
-  /**
-   * One CTA, two jobs:
-   *   - no wallet        → open the RainbowKit picker
-   *   - wallet connected → run SIWE for the already-connected wallet. Without
-   *     this the label said "Sign in" but clicking opened a connect modal that
-   *     could never complete the missing session (the wallet was already
-   *     connected), leaving the user stuck on empty chats.
-   */
-  const handleConnectOrSign = async () => {
-    if (!isConnected || !address) {
-      openConnectModal?.()
-      return
-    }
-    if (!signMessageAsync) return
-    setSigningIn(true)
-    try {
-      const { session } = await ensureWalletSession(address, {
-        signMessage: signMessageAsync,
-        force: true,
-      })
-      // `ensureWalletSession` resolves even on failure (returns
-      // `session: false`); it never rejects. Treat a non-session as an error
-      // so the user isn't left with a silently-stopped spinner.
-      if (!session) {
-        toast.error(t('signInPrompt.failed', {
-          defaultValue: 'Sign-in was not completed. Please try again.',
-        }))
-        return
-      }
-      void qc.invalidateQueries({ queryKey: ['wallet-session'] })
-      void qc.invalidateQueries({ queryKey: ['current-user'] })
-      void qc.invalidateQueries({ queryKey: ['messages'] })
-      void qc.invalidateQueries({ queryKey: ['conversation'] })
-      void qc.invalidateQueries({ queryKey: ['conversations'] })
-    } catch {
-      toast.error(t('signInPrompt.failed', {
-        defaultValue: 'Sign-in was not completed. Please try again.',
-      }))
-    } finally {
-      setSigningIn(false)
-    }
-  }
 
   const copyAddress = async () => {
     if (!address) return
@@ -132,19 +78,6 @@ export function WalletConnectButton() {
   }
 
   if (!isFullySignedIn) {
-    // Either the wallet isn't connected, or it's connected without a live
-    // session. Both paths funnel through `handleConnectOrSign`, which opens
-    // the picker or runs SIWE depending on connection state.
-    return connectModalOpen || signingIn ? (
-      <div className="flex items-center gap-2 h-10 px-4 bg-background text-foreground border border-border rounded-full">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        <span className="text-sm">
-          {signingIn
-            ? t('signInPrompt.signing', { defaultValue: 'Signing…' })
-            : t('wallet.connecting')}
-        </span>
-      </div>
-    ) : (
     if (connectModalOpen || isSigning) {
       return (
         <div className="flex items-center gap-2 h-10 px-4 bg-background text-foreground border border-border rounded-full">
@@ -166,7 +99,6 @@ export function WalletConnectButton() {
             : t('wallet.connectWallet')
         }
         classes="bg-background text-foreground border border-border"
-        onClick={() => void handleConnectOrSign()}
         onClick={isConnected ? () => void handleSignIn() : openConnectModal}
       />
     )
