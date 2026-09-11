@@ -484,7 +484,10 @@
     "errorGeneric": "Failed to open trade. Please try again.",
     "noRating": "No ratings yet",
     "errorInvalidWallet": "Connected wallet is invalid. Reconnect and try again.",
-    "errorTokenMismatch": "This offer is denominated in {{offered}}, but the escrow contract only supports {{escrow}}."
+    "errorTokenMismatch": "This offer is denominated in {{offered}}, but the escrow contract only supports {{escrow}}.",
+    "gracePeriod": "Grace period (hours)",
+    "gracePeriodHint": "How long the counterparty has to confirm the payment before release is allowed.",
+    "gracePeriodError": "Grace period must be between 1 hour and 365 days."
   },
   "tradeDetail": {
     "loadingTrade": "Loading trade…",
@@ -554,7 +557,10 @@
     "releaseAvailableIn": "Release available in {{seconds}}",
     "tradeRemovedOrNoAccess": "This trade may have been removed or you don't have access.",
     "messageCounterpart": "Message counterpart",
-    "messageCounterpartTitle": "Open the chat with your counterpart"
+    "messageCounterpartTitle": "Open the chat with your counterpart",
+    "sendDeposit": "Send",
+    "lockFunds": "Lock funds",
+    "approveSuccess": "Approval successful."
   },
   "editProfile": {
     "title": "Edit Profile",

@@ -487,7 +487,10 @@
     "errorGeneric": "Échec de l'ouverture de l'échange. Veuillez réessayer.",
     "noRating": "Aucune évaluation pour le moment",
     "errorInvalidWallet": "Le portefeuille connecté est invalide. Reconnectez-le et réessayez.",
-    "errorTokenMismatch": "Cette offre est libellée en {{offered}}, mais le contrat de dépôt ne prend en charge que {{escrow}}."
+    "errorTokenMismatch": "Cette offre est libellée en {{offered}}, mais le contrat de dépôt ne prend en charge que {{escrow}}.",
+    "gracePeriod": "Période de grâce (heures)",
+    "gracePeriodHint": "Durée dont dispose la contrepartie pour confirmer le paiement avant que la libération soit autorisée.",
+    "gracePeriodError": "La période de grâce doit être comprise entre 1 heure et 365 jours."
   },
   "tradeDetail": {
     "loadingTrade": "Chargement de l'échange…",
@@ -557,7 +560,10 @@
     "messageCounterpartTitle": "Ouvrir le chat avec le partenaire",
     "gracePeriodBody": "L’acheteur a confirmé le paiement hors chaîne. Chaque partie peut régler le dépôt en libérant les cryptos, sans tiers. Si la période de grâce s’achève sans action, le vendeur peut libérer et l’acheteur ne peut plus contester cette étape.",
     "gracePeriodEnded": "Période de grâce terminée — la libération est disponible.",
-    "gracePeriodRemaining": "Restant : {{seconds}}s"
+    "gracePeriodRemaining": "Restant : {{seconds}}s",
+    "sendDeposit": "Envoyer",
+    "lockFunds": "Verrouiller les fonds",
+    "approveSuccess": "Approbation réussie."
   },
   "editProfile": {
     "title": "Modifier le profil",

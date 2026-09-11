@@ -172,6 +172,38 @@ export function TradeDetailPage() {
   const isSeller =
     !!address && !!escrowState && address.toLowerCase() === escrowState.seller.toLowerCase()
 
+  // ── Allowance (drives the "Approve + …" → "Send" button label) ────────────
+  // Re-read after an approve so the CTA flips the moment the wallet confirms.
+  const { data: allowance, refetch: refetchAllowance } = useQuery<bigint | null>({
+    queryKey: ['escrow-allowance', tokenAddress, escrowAddress, address],
+    queryFn: async () => {
+      if (!publicClient || !tokenAddress || !escrowAddress || !address) return null
+      return (await publicClient.readContract({
+        address: tokenAddress,
+        abi: ERC20_ABI as Abi,
+        functionName: 'allowance',
+        args: [address as `0x${string}`, escrowAddress],
+      })) as bigint
+    },
+    enabled: !!publicClient && !!tokenAddress && !!escrowAddress && !!address,
+    staleTime: 5_000,
+  })
+
+  // Amount the current role needs approved (seller may need deposit + lock).
+  const sellerNeedsDeposit =
+    !!escrowState &&
+    escrowState.securityDepositPct > 0n &&
+    !escrowState.sellerSecurityDeposited
+  const buyerAmountWei = escrowState?.securityDepositAmount ?? 0n
+  const sellerAmountWei = escrowState
+    ? escrowState.tradeAmount +
+      (sellerNeedsDeposit ? escrowState.securityDepositAmount : 0n)
+    : 0n
+  const buyerAllowanceReady =
+    buyerAmountWei > 0n && allowance != null && allowance >= buyerAmountWei
+  const sellerAllowanceReady =
+    sellerAmountWei > 0n && allowance != null && allowance >= sellerAmountWei
+
   const onChainState = escrowState?.state
   // escrowState.state is typed as KlerosEscStateValue (already narrowed in
   // the hook). Guard the lookup so TS doesn't try to index with `undefined`.
@@ -210,10 +242,16 @@ export function TradeDetailPage() {
           functionName: 'approve',
           args: [escrowAddress, maxUint256],
         })
-        await publicClient.waitForTransactionReceipt({
-          hash: approveHash,
-          timeout: 90_000,
-        })
+        assertTxSuccess(
+          await publicClient.waitForTransactionReceipt({
+            hash: approveHash,
+            timeout: 90_000,
+          }),
+        )
+        // Confirm the approval, then flip the CTA to "Send" (the allowance
+        // query is invalidated so the button label updates immediately).
+        toast.success(t('tradeDetail.approveSuccess'))
+        void refetchAllowance()
       }
 
       // 2) Call the appropriate deposit function on the escrow. The seller's
@@ -880,7 +918,11 @@ export function TradeDetailPage() {
                 ) : (
                   <ShieldCheck className="w-4 h-4 mr-2" />
                 )}
-                {isTxBusy ? getTxLabel(t, txStage) : t('tradeDetail.approveAndPostDeposit')}
+                {isTxBusy
+                  ? getTxLabel(t, txStage)
+                  : buyerAllowanceReady
+                    ? t('tradeDetail.sendDeposit')
+                    : t('tradeDetail.approveAndPostDeposit')}
               </Button>
             )}
 
@@ -895,7 +937,11 @@ export function TradeDetailPage() {
                 ) : (
                   <Coins className="w-4 h-4 mr-2" />
                 )}
-                {isTxBusy ? getTxLabel(t, txStage) : t('tradeDetail.approveAndPostDeposit')}
+                {isTxBusy
+                  ? getTxLabel(t, txStage)
+                  : sellerAllowanceReady
+                    ? t('tradeDetail.sendDeposit')
+                    : t('tradeDetail.approveAndPostDeposit')}
               </Button>
             )}
 
@@ -910,7 +956,11 @@ export function TradeDetailPage() {
                 ) : (
                   <Coins className="w-4 h-4 mr-2" />
                 )}
-                {isTxBusy ? getTxLabel(t, txStage) : t('tradeDetail.approveAndLock')}
+                {isTxBusy
+                  ? getTxLabel(t, txStage)
+                  : sellerAllowanceReady
+                    ? t('tradeDetail.lockFunds')
+                    : t('tradeDetail.approveAndLock')}
               </Button>
             )}
 

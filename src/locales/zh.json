@@ -487,7 +487,10 @@
     "errorGeneric": "发起交易失败，请重试。",
     "noRating": "暂无评价",
     "errorInvalidWallet": "连接的钱包无效。请重新连接后再试。",
-    "errorTokenMismatch": "此报价以 {{offered}} 计价，但托管合约仅支持 {{escrow}}。"
+    "errorTokenMismatch": "此报价以 {{offered}} 计价，但托管合约仅支持 {{escrow}}。",
+    "gracePeriod": "宽限期（小时）",
+    "gracePeriodHint": "对方在允许释放之前确认付款的时间。",
+    "gracePeriodError": "宽限期必须在 1 小时到 365 天之间。"
   },
   "tradeDetail": {
     "loadingTrade": "正在加载交易…",
@@ -557,7 +560,10 @@
     "messageCounterpartTitle": "打开与对方的聊天",
     "gracePeriodBody": "买方已确认链下付款。任何一方都可以通过释放加密货币来结算托管，无需第三方。若宽限期结束时仍无操作，卖方可以释放，买方将无法再对此阶段提出争议。",
     "gracePeriodEnded": "宽限期已结束——现在可以释放。",
-    "gracePeriodRemaining": "剩余：{{seconds}} 秒"
+    "gracePeriodRemaining": "剩余：{{seconds}} 秒",
+    "sendDeposit": "发送",
+    "lockFunds": "锁定资金",
+    "approveSuccess": "授权成功。"
   },
   "editProfile": {
     "title": "编辑资料",

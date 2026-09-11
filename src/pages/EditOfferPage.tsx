@@ -55,12 +55,14 @@ interface OfferForm {
   type: 'buy' | 'sell'
   token: string
   fiatCurrency: string
-  price: number
-  minAmount: number
-  maxAmount: number
+  // Strings so the controlled inputs can be cleared while editing; parsed with
+  // Number() at validation/submit time (see CreateOfferPage for the rationale).
+  price: string
+  minAmount: string
+  maxAmount: string
   paymentMethod: string
   location: string
-  gracePeriod: number
+  gracePeriod: string
   description: string
   isPrivate: boolean
   targetUser: string
@@ -120,12 +122,12 @@ export function EditOfferPage() {
       type: offer.type,
       token: offer.crypto_token,
       fiatCurrency: offer.fiat_currency,
-      price: Number(offer.price_per_unit) || 0,
-      minAmount: Number(offer.min_amount) || 0,
-      maxAmount: Number(offer.max_amount) || 0,
+      price: offer.price_per_unit != null ? String(offer.price_per_unit) : '',
+      minAmount: offer.min_amount != null ? String(offer.min_amount) : '',
+      maxAmount: offer.max_amount != null ? String(offer.max_amount) : '',
       paymentMethod: offer.payment_methods?.[0] ?? 'Bank Transfer',
       location: locationLabel,
-      gracePeriod: 24,
+      gracePeriod: '1',
       description: offer.description ?? '',
       isPrivate: offer.is_private,
       targetUser: offer.target_user ?? '',
@@ -194,15 +196,15 @@ export function EditOfferPage() {
       return
     }
 
-    if (formData.price <= 0) {
+    if (!(Number(formData.price) > 0)) {
       toast.error(t('editOffer.errorPriceZero'))
       return
     }
-    if (formData.minAmount <= 0) {
+    if (!(Number(formData.minAmount) > 0)) {
       toast.error(t('editOffer.errorMinAmountZero'))
       return
     }
-    if (formData.maxAmount < formData.minAmount) {
+    if (!(Number(formData.maxAmount) >= Number(formData.minAmount))) {
       toast.error(t('editOffer.errorMaxLessThanMin'))
       return
     }
@@ -248,7 +250,7 @@ export function EditOfferPage() {
       }
 
       const cryptoAmount = roundTo(
-        formData.maxAmount / formData.price,
+        Number(formData.maxAmount) / Number(formData.price),
         tokenDecimals(formData.token),
       )
 
@@ -257,10 +259,10 @@ export function EditOfferPage() {
         crypto_token: formData.token,
         crypto_amount: cryptoAmount,
         fiat_currency: formData.fiatCurrency,
-        fiat_amount: roundFiat(formData.maxAmount),
-        price_per_unit: formData.price,
-        min_amount: roundFiat(formData.minAmount),
-        max_amount: roundFiat(formData.maxAmount),
+        fiat_amount: roundFiat(Number(formData.maxAmount)),
+        price_per_unit: Number(formData.price),
+        min_amount: roundFiat(Number(formData.minAmount)),
+        max_amount: roundFiat(Number(formData.maxAmount)),
         is_private: formData.isPrivate,
         target_user: formData.isPrivate
           ? formData.targetUser.trim().toLowerCase()
@@ -476,8 +478,9 @@ export function EditOfferPage() {
               <Input
                 id="price"
                 type="number"
+                inputMode="decimal"
                 value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
+                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                 className="rounded-full border border-border"
                 placeholder="52340"
               />
@@ -497,8 +500,9 @@ export function EditOfferPage() {
                 <Input
                   id="minAmount"
                   type="number"
+                  inputMode="decimal"
                   value={formData.minAmount}
-                  onChange={(e) => setFormData({ ...formData, minAmount: Number(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, minAmount: e.target.value })}
                   className="rounded-full border border-border"
                   placeholder="5000"
                 />
@@ -510,15 +514,16 @@ export function EditOfferPage() {
                 <Input
                   id="maxAmount"
                   type="number"
+                  inputMode="decimal"
                   value={formData.maxAmount}
-                  onChange={(e) => setFormData({ ...formData, maxAmount: Number(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, maxAmount: e.target.value })}
                   className="rounded-full border border-border"
                   placeholder="50000"
                 />
-                {formData.price > 0 && formData.maxAmount > 0 && (
+                {Number(formData.price) > 0 && Number(formData.maxAmount) > 0 && (
                   <p className="text-sm text-muted-foreground mt-1">
                     {t('editOffer.cryptoEstimate', {
-                      amount: formatTokenAmount(formData.maxAmount / formData.price, formData.token),
+                      amount: formatTokenAmount(Number(formData.maxAmount) / Number(formData.price), formData.token),
                       token: formData.token,
                     })}
                   </p>

@@ -9,6 +9,35 @@
 
 ---
 
+## Per-trade grace period + Sepolia redeploy — 2026-09-13
+
+**Grace period was always 7 days because `TradePage` hardcoded
+`DEFAULT_GRACE_PERIOD_SECONDS` (7d) into `createEscrow` — the offer's grace
+field was never persisted and never reached the contract.** The contracts pass
+`gracePeriod` through faithfully (`KlerosEscrowFactory.createEscrow` →
+`KlerosEsc.initialize`, validated `0 < g ≤ 365d`), so there was no contract bug.
+
+- **`TradePage`**: added a "Grace period (hours)" input (string state, clearable,
+  `inputMode="decimal"`), default **1 hour**, validated `1h…365d`, and passed to
+  both the gas estimate and the real `createEscrow` call. Removed the hardcoded
+  default usage; `DEFAULT_GRACE_PERIOD_SECONDS` is now 1h and unused.
+- New locale keys `trade.gracePeriod` / `gracePeriodHint` / `gracePeriodError`
+  in all 5 locales.
+
+**New Sepolia deployment** (contracts repo `script/DeploySepolia.s.sol`, `--slow`
+because the deployer is an EIP-7702 delegated account):
+- FakeUSD `0x8026BDb39c4BF99FEeb840fe4a450a19cbEaa9F2`
+- MockKlerosCourt `0x0854a7b25e09856e315Be9CA49A143a144Afa1f0`
+- KlerosEscrowFactory `0x8F747eCa387Fae1e6c9f997be7e1abe50d667f1C`
+- KlerosEsc implementation `0x5d82fc17BC8CBc662Af64Bf677d0f09d2B945aBE`
+- treasury moved to `0x1cE3959a3466F0bBC3792A2fd78c97514A531130` (two-step).
+
+UI `.env` updated (`VITE_KLEROS_ESCROW_FACTORY`, `VITE_KLEROS_ESCROW_TOKEN`).
+Note: the fresh fUSD has **no balance** in user wallets — `FakeUSD.mint` is
+public, so testers must mint before funding.
+
+---
+
 ## Multi-worker audit: Supabase/React, wallet, contracts, UI — 2026-09-12
 
 Four parallel audits (Supabase↔React, wallet/MetaMask, contract usage, UI) produced

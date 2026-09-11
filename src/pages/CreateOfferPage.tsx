@@ -51,12 +51,16 @@ interface OfferForm {
   type: 'buy' | 'sell'
   token: string
   fiatCurrency: string
-  price: number
-  minAmount: number
-  maxAmount: number
+  // Numeric fields are kept as STRINGS so the controlled inputs can be empty
+  // while editing (clearing "100" to type a new value). Converting to a number
+  // on every keystroke would coerce `''` to `0` and make the field impossible
+  // to clear/edit. Parsed with Number() at validation/submit time.
+  price: string
+  minAmount: string
+  maxAmount: string
   paymentMethod: string
   location: string
-  gracePeriod: number
+  gracePeriod: string
   description: string
   isPrivate: boolean
   targetUser: string
@@ -71,12 +75,12 @@ export function CreateOfferPage() {
     type: 'buy',
     token: 'fUSD',
     fiatCurrency: 'USD',
-    price: 1,
-    minAmount: 100,
-    maxAmount: 5000,
+    price: '1',
+    minAmount: '100',
+    maxAmount: '5000',
     paymentMethod: 'Bank Transfer',
     location: 'Global',
-    gracePeriod: 24,
+    gracePeriod: '1',
     description: '',
     isPrivate: false,
     targetUser: ''
@@ -93,15 +97,15 @@ export function CreateOfferPage() {
     }
 
     // Form validation
-    if (formData.price <= 0) {
+    if (!(Number(formData.price) > 0)) {
       toast.error(t('createOffer.errorPriceZero'))
       return
     }
-    if (formData.minAmount <= 0) {
+    if (!(Number(formData.minAmount) > 0)) {
       toast.error(t('createOffer.errorMinAmountZero'))
       return
     }
-    if (formData.maxAmount < formData.minAmount) {
+    if (!(Number(formData.maxAmount) >= Number(formData.minAmount))) {
       toast.error(t('createOffer.errorMaxLessThanMin'))
       return
     }
@@ -154,7 +158,7 @@ export function CreateOfferPage() {
       }
 
       const cryptoAmount = roundTo(
-        formData.maxAmount / formData.price,
+        Number(formData.maxAmount) / Number(formData.price),
         tokenDecimals(formData.token),
       )
       const offerData = {
@@ -163,10 +167,10 @@ export function CreateOfferPage() {
         crypto_token: formData.token,
         crypto_amount: cryptoAmount,
         fiat_currency: formData.fiatCurrency,
-        fiat_amount: roundFiat(formData.maxAmount),
-        price_per_unit: formData.price,
-        min_amount: roundFiat(formData.minAmount),
-        max_amount: roundFiat(formData.maxAmount),
+        fiat_amount: roundFiat(Number(formData.maxAmount)),
+        price_per_unit: Number(formData.price),
+        min_amount: roundFiat(Number(formData.minAmount)),
+        max_amount: roundFiat(Number(formData.maxAmount)),
         is_private: formData.isPrivate,
         target_user: formData.isPrivate
           ? formData.targetUser.trim().toLowerCase()
@@ -397,8 +401,9 @@ export function CreateOfferPage() {
                       <Input
                         id="price"
                         type="number"
+                        inputMode="decimal"
                         value={formData.price}
-                        onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
+                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                         className="rounded-full border border-border"
                         placeholder="52340"
                       />
@@ -418,8 +423,9 @@ export function CreateOfferPage() {
                       <Input
                         id="minAmount"
                         type="number"
+                        inputMode="decimal"
                         value={formData.minAmount}
-                        onChange={(e) => setFormData({ ...formData, minAmount: Number(e.target.value) })}
+                        onChange={(e) => setFormData({ ...formData, minAmount: e.target.value })}
                         className="rounded-full border border-border"
                         placeholder="5000"
                       />
@@ -431,15 +437,16 @@ export function CreateOfferPage() {
                       <Input
                         id="maxAmount"
                         type="number"
+                        inputMode="decimal"
                         value={formData.maxAmount}
-                        onChange={(e) => setFormData({ ...formData, maxAmount: Number(e.target.value) })}
+                        onChange={(e) => setFormData({ ...formData, maxAmount: e.target.value })}
                         className="rounded-full border border-border"
                         placeholder="50000"
                       />
-                      {formData.price > 0 && formData.maxAmount > 0 && (
+                      {Number(formData.price) > 0 && Number(formData.maxAmount) > 0 && (
                         <p className="text-sm text-muted-foreground mt-1">
                           {t('createOffer.cryptoEstimate', {
-                            amount: formatTokenAmount(formData.maxAmount / formData.price, formData.token),
+                            amount: formatTokenAmount(Number(formData.maxAmount) / Number(formData.price), formData.token),
                             token: formData.token,
                           })}
                         </p>
@@ -520,10 +527,11 @@ export function CreateOfferPage() {
                     <Input
                       id="gracePeriod"
                       type="number"
+                      inputMode="decimal"
                       value={formData.gracePeriod}
-                      onChange={(e) => setFormData({ ...formData, gracePeriod: Number(e.target.value) })}
+                      onChange={(e) => setFormData({ ...formData, gracePeriod: e.target.value })}
                       className="rounded-full border border-border"
-                      placeholder="24"
+                      placeholder="1"
                     />
                     <p className="text-sm text-muted-foreground mt-2">
                       {t('createOffer.gracePeriodHint')}
