@@ -495,7 +495,10 @@
     "errorGeneric": "İşlem açılamadı. Lütfen tekrar deneyin.",
     "noRating": "Henüz değerlendirme yok",
     "errorInvalidWallet": "Bağlı cüzdan geçersiz. Yeniden bağlayıp tekrar deneyin.",
-    "errorTokenMismatch": "Bu teklif {{offered}} cinsinden, ancak emanet sözleşmesi yalnızca {{escrow}} destekliyor."
+    "errorTokenMismatch": "Bu teklif {{offered}} cinsinden, ancak emanet sözleşmesi yalnızca {{escrow}} destekliyor.",
+    "gracePeriod": "Ek süre (saat)",
+    "gracePeriodHint": "Karşı tarafın, serbest bırakmaya izin verilmeden önce ödemeyi onaylaması için geçen süre.",
+    "gracePeriodError": "Ek süre 1 saat ile 365 gün arasında olmalıdır."
   },
   "tradeDetail": {
     "loadingTrade": "İşlem yükleniyor…",
@@ -565,7 +568,10 @@
     "messageCounterpartTitle": "Karşı tarafla sohbeti aç",
     "gracePeriodBody": "Alıcı zincir dışı ödemeyi onayladı. Her iki taraf da kriptoyu serbest bırakarak emaneti sonuçlandırabilir; üçüncü taraf yoktur. Ek süre işlem yapılmadan dolarsa satıcı serbest bırakabilir ve alıcı bu aşamayı artık itiraz edemez.",
     "gracePeriodEnded": "Ek süre doldu — serbest bırakma artık kullanılabilir.",
-    "gracePeriodRemaining": "Kalan: {{seconds}} sn"
+    "gracePeriodRemaining": "Kalan: {{seconds}} sn",
+    "sendDeposit": "Gönder",
+    "lockFunds": "Fonları kilitle",
+    "approveSuccess": "Onay başarılı."
   },
   "editProfile": {
     "title": "Profili Düzenle",

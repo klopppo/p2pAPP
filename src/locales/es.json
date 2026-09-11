@@ -495,7 +495,10 @@
     "errorGeneric": "Error al abrir la operación. Por favor, inténtelo de nuevo.",
     "noRating": "Sin valoraciones todavía",
     "errorInvalidWallet": "La cartera conectada no es válida. Vuelve a conectarla e inténtalo de nuevo.",
-    "errorTokenMismatch": "Esta oferta está denominada en {{offered}}, pero el contrato de depósito solo admite {{escrow}}."
+    "errorTokenMismatch": "Esta oferta está denominada en {{offered}}, pero el contrato de depósito solo admite {{escrow}}.",
+    "gracePeriod": "Periodo de gracia (horas)",
+    "gracePeriodHint": "Cuánto tiempo tiene la contraparte para confirmar el pago antes de permitir la liberación.",
+    "gracePeriodError": "El periodo de gracia debe estar entre 1 hora y 365 días."
   },
   "tradeDetail": {
     "loadingTrade": "Cargando operación…",
@@ -565,7 +568,10 @@
     "messageCounterpartTitle": "Abrir el chat con la contraparte",
     "gracePeriodBody": "El comprador ha confirmado el pago fuera de la cadena. Cualquiera de las partes puede liquidar el depósito liberando las criptomonedas, sin terceros. Si el periodo de gracia termina sin acción, el vendedor puede liberar y el comprador ya no podrá disputar esta etapa.",
     "gracePeriodEnded": "El periodo de gracia terminó: la liberación ya está disponible.",
-    "gracePeriodRemaining": "Restante: {{seconds}}s"
+    "gracePeriodRemaining": "Restante: {{seconds}}s",
+    "sendDeposit": "Enviar",
+    "lockFunds": "Bloquear fondos",
+    "approveSuccess": "Aprobación correcta."
   },
   "editProfile": {
     "title": "Editar perfil",

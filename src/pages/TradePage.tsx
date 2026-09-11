@@ -20,7 +20,6 @@ import {
   KLEROS_ESCROW_FACTORY_ABI,
   KLEROS_ESCROW_FACTORY_ADDRESS,
   ERC20_ABI,
-  DEFAULT_GRACE_PERIOD_SECONDS,
   DEFAULT_SECURITY_DEPOSIT_BPS,
   MAX_GRACE_PERIOD_SECONDS,
   isFactoryConfigured,
@@ -48,6 +47,9 @@ export function TradePage() {
   const [depositRate, setDepositRate] = useState(
     String(Number(DEFAULT_SECURITY_DEPOSIT_BPS) / 100),
   )
+  // Grace period in HOURS (kept as a string so it can be cleared while
+  // editing). Converted to seconds for `createEscrow`.
+  const [gracePeriod, setGracePeriod] = useState('1')
   const [paymentMethod, setPaymentMethod] = useState<string>('')
   const [stage, setStage] = useState<Stage>('idle')
 
@@ -110,18 +112,18 @@ export function TradePage() {
   const depositBps =
     depositRateNum === 0 ? 0n : BigInt(Math.round(depositRateNum * 100))
 
-  // Grace window is set by the seller at offer creation (hours, offers.grace_period).
-  // Convert to seconds for the factory's `createEscrow` gracePeriod param, clamped
-  // to KlerosEsc's 0..365d bounds. Falls back to the legacy 7-day default when the
-  // offer row carries no value (shouldn't happen post-migration).
-  const offerGraceSeconds = (() => {
-    const hours = Number(offer.grace_period)
-    if (!Number.isFinite(hours) || hours <= 0) return DEFAULT_GRACE_PERIOD_SECONDS
-    const seconds = BigInt(Math.round(hours * 3600))
-    return seconds > MAX_GRACE_PERIOD_SECONDS
-      ? MAX_GRACE_PERIOD_SECONDS
-      : seconds
-  })()
+  // Grace period: 1 hour … 365 days (KlerosEsc.MAX_GRACE_PERIOD). The value
+  // entered here is what `createEscrow` stores on the escrow — previously the
+  // page hardcoded a 7-day default regardless of any input.
+  const gracePeriodNum = Number(gracePeriod)
+  const gracePeriodValid =
+    gracePeriod !== '' &&
+    !Number.isNaN(gracePeriodNum) &&
+    gracePeriodNum > 0 &&
+    gracePeriodNum <= 365 * 24
+  const gracePeriodSeconds = gracePeriodValid
+    ? BigInt(Math.round(gracePeriodNum * 3600))
+    : 0n
 
   const expiresAt = offer.expires_at ? new Date(offer.expires_at) : null
 
@@ -146,6 +148,10 @@ export function TradePage() {
     }
     if (!depositValid) {
       toast.error(t('trade.errorDepositRate'))
+      return
+    }
+    if (!gracePeriodValid) {
+      toast.error(t('trade.gracePeriodError'))
       return
     }
     if (!publicClient) {
@@ -309,14 +315,14 @@ export function TradePage() {
           address: factoryAddress,
           abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
           functionName: 'createEscrow',
-args: [
-          buyerWallet as `0x${string}`,
-          sellerWallet as `0x${string}`,
-          offerGraceSeconds,
-          cryptoBaseUnits,
-          depositBps,
-        ],
-        account: address as `0x${string}`,
+          args: [
+            buyerWallet as `0x${string}`,
+            sellerWallet as `0x${string}`,
+            gracePeriodSeconds,
+            cryptoBaseUnits,
+            depositBps,
+          ],
+          account: address as `0x${string}`,
         })
       } catch (estErr) {
         const reason =
@@ -350,7 +356,7 @@ args: [
         args: [
           buyerWallet as `0x${string}`,
           sellerWallet as `0x${string}`,
-          offerGraceSeconds,
+          gracePeriodSeconds,
           cryptoBaseUnits,
           depositBps,
         ],
@@ -623,6 +629,29 @@ args: [
                 {depositRate !== '' && !depositValid && (
                   <Text variant="small" className="text-destructive">
                     {t('trade.depositError')}
+                  </Text>
+                )}
+              </div>
+
+              {/* Grace period input */}
+              <div className="space-y-2">
+                <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t('trade.gracePeriod')}
+                </Text>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  min={1}
+                  value={gracePeriod}
+                  onChange={(e) => setGracePeriod(e.target.value.replace(/[^0-9.]/g, ''))}
+                  className="rounded-full"
+                />
+                <Text variant="small" className="text-muted-foreground">
+                  {t('trade.gracePeriodHint')}
+                </Text>
+                {gracePeriod !== '' && !gracePeriodValid && (
+                  <Text variant="small" className="text-destructive">
+                    {t('trade.gracePeriodError')}
                   </Text>
                 )}
               </div>

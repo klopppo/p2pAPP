@@ -75,10 +75,9 @@ export const MAX_SECURITY_DEPOSIT_BPS = 1500n
 /** Buyer/seller each post this fraction of `tradeAmount` as a slashable
  *  security deposit. 10% = 1000 bps (within MIN..MAX bound). */
 export const DEFAULT_SECURITY_DEPOSIT_BPS = 1000n
-/** Legacy fallback grace window — how long after `confirm()` anyone may call
- *  `release()` without a dispute. 7 days (168h). Overridden per-offer by
- *  `offers.grace_period` when the offer carries one. */
-export const DEFAULT_GRACE_PERIOD_SECONDS = 7n * 24n * 60n * 60n
+/** Fallback default used only if a caller doesn't supply a per-trade grace
+ *  period. The Trade page now collects it explicitly (default 1 hour). */
+export const DEFAULT_GRACE_PERIOD_SECONDS = 1n * 60n * 60n
 /** KlerosDisputeStatus enum (matches IKlerosCourt / KlerosCourt). */
 export const KLEROS_DISPUTE_STATUS = {
   WAITING: 0n,

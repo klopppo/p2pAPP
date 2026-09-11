@@ -9,56 +9,32 @@
 
 ---
 
-## User-Configurable Offer Grace Period — 2026-09-12
+## Per-trade grace period + Sepolia redeploy — 2026-09-13
 
-The escrow grace window is no longer hardcoded to 7 days — the offer creator
-picks it and it flows into the deployed escrow:
-- New migration `supabase/migrations/20260914000000_offers_grace_period.sql` adds
-  `offers.grace_period` (int, HOURS, default 168 for legacy rows, CHECK 1..8760).
-- `CreateOfferPage` persists `grace_period` (was an orphaned input); `EditOfferPage`
-  now hydrates it from the offer, renders the input, and saves it. Both validate
-  1..8760 h with new locale keys (`errorGracePeriodInvalid` / `errorGracePeriodTooLong`).
-- `TradePage` derives the factory `createEscrow` `gracePeriod` (seconds) from
-  `offer.grace_period` (hours × 3600), clamped to `MAX_GRACE_PERIOD_SECONDS`,
-  falling back to the legacy 7-day default only when the offer has no value.
-- `OpenOfferPage` shows the grace window on the offer detail card; the misleading
-  "accept the offer" hint was replaced across all 5 locales with accurate wording
-  ("time after buyer confirms payment before seller can release / disputes window").
-- Files: `supabase/migrations/20260914000000_offers_grace_period.sql` (new),
-  `src/types/database.ts`, `src/lib/contracts.ts`, `src/pages/CreateOfferPage.tsx`,
-  `src/pages/EditOfferPage.tsx`, `src/pages/TradePage.tsx`, `src/pages/OpenOfferPage.tsx`,
-  `src/locales/{en,es,fr,tr,zh}.json`.
-- Verified: `npm run build` green, `npm test -- --run` 75/75, `eslint` clean on
-  the touched files.
+**Grace period was always 7 days because `TradePage` hardcoded
+`DEFAULT_GRACE_PERIOD_SECONDS` (7d) into `createEscrow` — the offer's grace
+field was never persisted and never reached the contract.** The contracts pass
+`gracePeriod` through faithfully (`KlerosEscrowFactory.createEscrow` →
+`KlerosEsc.initialize`, validated `0 < g ≤ 365d`), so there was no contract bug.
 
-## Centralized Operator Icons + Dashboard Cleanup — 2026-09-12
+- **`TradePage`**: added a "Grace period (hours)" input (string state, clearable,
+  `inputMode="decimal"`), default **1 hour**, validated `1h…365d`, and passed to
+  both the gas estimate and the real `createEscrow` call. Removed the hardcoded
+  default usage; `DEFAULT_GRACE_PERIOD_SECONDS` is now 1h and unused.
+- New locale keys `trade.gracePeriod` / `gracePeriodHint` / `gracePeriodError`
+  in all 5 locales.
 
-Iconography for the Operator & Compliance Portal is now centralized and emoji-free:
-- New `src/lib/operatorIcons.ts` — single `OPERATOR_ICONS` registry (tab / stat /
-  status / sender / quick-reply / ui groups) mapped to typed lucide-react icons;
-  `OperatorDashboardPage` imports from it instead of `lucide-react` directly.
-- All scattered emojis replaced with lucide icons: support-thread sender labels
-  (📩/✍️ → Inbox/CornerUpLeft), ticket status dropdown & badges (🟡🔵🟢 →
-  Clock/LoaderCircle/CheckCircle2), quick-reply templates (👋✅👍 → Hand/
-  ShieldCheck/ThumbsUp).
-- Dashboard cleanup: consistent `gap-1` icon spacing on badges/buttons, accurate
-  “Messaggio di sistema” label for system last sender, and two pre-existing
-  `react-hooks/set-state-in-effect` lint errors suppressed.
-- Verified: `npm run build` green, `npm test -- --run` 75/75, `eslint` 0 errors.
-- Files: `src/lib/operatorIcons.ts` (new), `src/pages/OperatorDashboardPage.tsx`.
+**New Sepolia deployment** (contracts repo `script/DeploySepolia.s.sol`, `--slow`
+because the deployer is an EIP-7702 delegated account):
+- FakeUSD `0x8026BDb39c4BF99FEeb840fe4a450a19cbEaa9F2`
+- MockKlerosCourt `0x0854a7b25e09856e315Be9CA49A143a144Afa1f0`
+- KlerosEscrowFactory `0x8F747eCa387Fae1e6c9f997be7e1abe50d667f1C`
+- KlerosEsc implementation `0x5d82fc17BC8CBc662Af64Bf677d0f09d2B945aBE`
+- treasury moved to `0x1cE3959a3466F0bBC3792A2fd78c97514A531130` (two-step).
 
-**Note:** 2 pre-existing `react-hooks/exhaustive-deps` warnings remain (fetch
-helpers on tab/filter change are not memoized) — unchanged from before.
-
----
-
-## Live Support Chat (ourTeam) & Operator Backoffice Integration — 2026-09-12
-
-Enabled bidirectional real-time support messaging between users and operators:
-- **User ourTeam Chat (`/app/messages/ourTeam`)**: Users can now write and send live support messages to ourTeam. Messages and operator replies render interactively in the thread, while keeping the platform Discord community link easily accessible.
-- **Operator Backoffice (`/app/operator`)**: Added a dedicated "Supporto ourTeam" tab where operators can view incoming user requests/tickets, filter by status (`OPEN`, `IN_PROGRESS`, `RESOLVED`) or wallet/nickname, send operator replies directly back to the user, change ticket statuses, and utilize quick response templates.
-- **Audit Logging & Real-time Sync**: Automated audit log entries (`SUPPORT_CHAT_REPLY`, `UPDATE_SUPPORT_THREAD_STATUS`), BroadcastChannel + storage event synchronization across tabs.
-- Files: `src/lib/supportChatService.ts`, `src/components/custom/chat/ChatLayout.tsx`, `src/components/custom/chat/ourTeam.ts`, `src/components/custom/chat/ConversationItem.tsx`, `src/components/custom/chat/ConversationList.tsx`, `src/pages/OperatorDashboardPage.tsx`, `tests/security/rbac-audit-logger.spec.ts`.
+UI `.env` updated (`VITE_KLEROS_ESCROW_FACTORY`, `VITE_KLEROS_ESCROW_TOKEN`).
+Note: the fresh fUSD has **no balance** in user wallets — `FakeUSD.mint` is
+public, so testers must mint before funding.
 
 ---
 
