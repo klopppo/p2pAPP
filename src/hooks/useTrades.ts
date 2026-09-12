@@ -115,5 +115,11 @@ export function useTrades() {
       }
     },
     enabled: !!address && hasSession,
+    // Background poll every 5 minutes. The DB mirror can lag and the list has
+    // no realtime subscription, but the on-chain-derived phase is also
+    // re-checked on mount / window focus, and the last snapshot is persisted,
+    // so 5 minutes is just a safety net.
+    refetchInterval: 300_000,
+    staleTime: 5_000,
   })
 }

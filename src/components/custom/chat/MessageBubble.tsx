@@ -6,6 +6,9 @@ interface Props {
   isOwn: boolean
   partnerAvatarUrl: string | null
   partnerInitial: string
+  /** When false, suppress the per-message time (grouped with the previous
+   *  message — same sender within 5 minutes). */
+  showTime?: boolean
 }
 
 function formatTime(d: string) {
@@ -20,7 +23,7 @@ function formatTime(d: string) {
  * incoming left-aligned with muted background. Avatars only render for the
  * incoming side (matches the original ChatPage visual).
  */
-export function MessageBubble({ message, isOwn, partnerAvatarUrl, partnerInitial }: Props) {
+export function MessageBubble({ message, isOwn, partnerAvatarUrl, partnerInitial, showTime = true }: Props) {
   return (
     <div className={cn('flex', isOwn ? 'justify-end' : 'justify-start')}>
       {!isOwn && (
@@ -51,14 +54,16 @@ export function MessageBubble({ message, isOwn, partnerAvatarUrl, partnerInitial
             <p className="whitespace-pre-wrap break-words">{message.body}</p>
           </div>
         )}
-        <span
-          className={cn(
-            'text-xs text-muted-foreground mt-1',
-            isOwn ? 'text-right' : 'text-left'
-          )}
-        >
-          {formatTime(message.created_at)}
-        </span>
+        {showTime && (
+          <span
+            className={cn(
+              'text-xs text-muted-foreground mt-1',
+              isOwn ? 'text-right' : 'text-left'
+            )}
+          >
+            {formatTime(message.created_at)}
+          </span>
+        )}
       </div>
     </div>
   )

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { currencySymbol } from '@/lib/utils'
+import { currencySymbol, formatGracePeriod, formatDuration } from '@/lib/utils'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -830,7 +830,7 @@ export function TradeDetailPage() {
                     {t('tradeDetail.gracePeriod')}
                   </Text>
                   <p className="font-mono">
-                    {(Number(escrowState.gracePeriod) / 86400).toFixed(0)}d
+                    {formatGracePeriod(escrowState.gracePeriod)}
                   </p>
                 </div>
               </div>
@@ -863,10 +863,11 @@ export function TradeDetailPage() {
                       defaultValue: 'Grace period ended — release is now available.',
                     })
                   : t('tradeDetail.gracePeriodRemaining', {
-                      seconds:
+                      time: formatDuration(
                         graceEndSeconds > nowSecsBig
-                          ? (graceEndSeconds - nowSecsBig).toString()
-                          : '0',
+                          ? graceEndSeconds - nowSecsBig
+                          : 0n,
+                      ),
                     })}
               </span>
             </div>
@@ -1000,10 +1001,11 @@ export function TradeDetailPage() {
                 <p className="text-xs text-muted-foreground text-center inline-flex items-center justify-center gap-1.5">
                   <Timer className="w-3.5 h-3.5" />
                   {t('tradeDetail.releaseAvailableIn', {
-                    seconds:
+                    time: formatDuration(
                       graceEndSeconds > nowSecsBig
-                        ? (graceEndSeconds - nowSecsBig).toString()
-                        : '0',
+                        ? graceEndSeconds - nowSecsBig
+                        : 0n,
+                    ),
                   })}
                 </p>
               )}
