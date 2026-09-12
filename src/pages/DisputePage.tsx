@@ -33,6 +33,7 @@ import {
   isFactoryConfigured,
   type SeverityLabel,
 } from '@/lib/contracts'
+import { explorerBase } from '@/lib/explorer'
 import {
   createDispute,
   deleteDisputePlaceholder,
@@ -665,12 +666,12 @@ const effectiveEscrow =
                   {effectiveEscrow.slice(0, 10)}…{effectiveEscrow.slice(-8)}
                 </code>
                 <a
-                  href={`https://sepolia.etherscan.io/address/${effectiveEscrow}`}
+                  href={`${explorerBase.address}${effectiveEscrow}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="ml-auto text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
                 >
-                  Etherscan <ExternalLink className="w-3 h-3" />
+                  Blockscan <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
               <p className="text-sm text-muted-foreground mt-1">

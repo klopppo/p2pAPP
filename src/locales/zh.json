@@ -577,7 +577,7 @@
     "tradeRemovedOrNoAccess": "此交易可能已被移除或您没有访问权限。",
     "messageCounterpart": "给对方发消息",
     "messageCounterpartTitle": "打开与对方的聊天",
-    "gracePeriodBody": "买方已确认链下付款。任何一方都可以通过释放加密货币来结算托管，无需第三方。若宽限期结束时仍无操作，卖方可以释放，买方将无法再对此阶段提出争议。",
+    "gracePeriodBody": "宽限期是每笔托管特有的延迟，在买方确认链下付款时开始。在此期间，任何一方都可以发起争议；若期限届满且无争议，任何人都可以调用 release() 来完成交易并支付。",
     "gracePeriodEnded": "宽限期已结束——现在可以释放。",
     "gracePeriodRemaining": "剩余：{{time}}",
     "sendDeposit": "发送",
@@ -757,7 +757,7 @@
     "unverified": "未验证",
     "global": "全局",
     "now": "刚刚",
-    "etherscan": "Etherscan",
+    "etherscan": "Blockscan",
     "blockscan": "Blockscan",
     "eth": "ETH",
     "backTo": "返回{{target}}"

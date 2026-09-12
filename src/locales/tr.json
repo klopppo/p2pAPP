@@ -577,7 +577,7 @@
     "tradeRemovedOrNoAccess": "Bu işlem kaldırılmış olabilir veya erişim yetkiniz olmayabilir.",
     "messageCounterpart": "Karşı tarafa mesaj",
     "messageCounterpartTitle": "Karşı tarafla sohbeti aç",
-    "gracePeriodBody": "Alıcı zincir dışı ödemeyi onayladı. Her iki taraf da kriptoyu serbest bırakarak emaneti sonuçlandırabilir; üçüncü taraf yoktur. Ek süre işlem yapılmadan dolarsa satıcı serbest bırakabilir ve alıcı bu aşamayı artık itiraz edemez.",
+    "gracePeriodBody": "Ek süre, alıcı zincir dışı ödemeyi onayladığında başlayan emanete özel bir gecikmedir. Bu süre boyunca taraflardan herhangi biri itiraz başlatabilir; itiraz olmadan süre dolduğunda herkes işlemi tamamlamak ve ödemeyi yapmak için release() çağırabilir.",
     "gracePeriodEnded": "Ek süre doldu — serbest bırakma artık kullanılabilir.",
     "gracePeriodRemaining": "Kalan: {{time}}",
     "sendDeposit": "Gönder",
@@ -757,7 +757,7 @@
     "unverified": "doğrulanmamış",
     "global": "Genel",
     "now": "şimdi",
-    "etherscan": "Etherscan",
+    "etherscan": "Blockscan",
     "blockscan": "Blockscan",
     "eth": "ETH",
     "backTo": "{{target}}'e dön"

@@ -577,7 +577,7 @@
     "tradeRemovedOrNoAccess": "Esta operación puede que haya sido eliminada o que no tenga acceso.",
     "messageCounterpart": "Mensaje a la contraparte",
     "messageCounterpartTitle": "Abrir el chat con la contraparte",
-    "gracePeriodBody": "El comprador ha confirmado el pago fuera de la cadena. Cualquiera de las partes puede liquidar el depósito liberando las criptomonedas, sin terceros. Si el periodo de gracia termina sin acción, el vendedor puede liberar y el comprador ya no podrá disputar esta etapa.",
+    "gracePeriodBody": "El periodo de gracia es un retraso por depósito que comienza cuando el comprador confirma el pago fuera de la cadena. Durante esta ventana, cualquiera de las partes puede abrir una disputa; una vez transcurrida sin ninguna, cualquiera puede llamar a release() para finalizar la operación y pagar.",
     "gracePeriodEnded": "El periodo de gracia terminó: la liberación ya está disponible.",
     "gracePeriodRemaining": "Restante: {{time}}",
     "sendDeposit": "Enviar",
@@ -757,7 +757,7 @@
     "unverified": "no verificado",
     "global": "Global",
     "now": "ahora",
-    "etherscan": "Etherscan",
+    "etherscan": "Blockscan",
     "blockscan": "Blockscan",
     "eth": "ETH",
     "backTo": "Volver a {{target}}"

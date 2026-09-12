@@ -803,7 +803,7 @@ export function DisputeDetailPage() {
                 rel="noopener noreferrer"
                 className="text-xs text-primary hover:underline inline-flex items-center gap-1 shrink-0"
               >
-                Etherscan <ExternalLink className="w-3 h-3" />
+                Blockscan <ExternalLink className="w-3 h-3" />
               </a>
             </div>
 

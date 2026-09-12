@@ -58,7 +58,7 @@ export function MessageThread({
   return (
     <div
       ref={containerRef}
-      className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-4 no-scrollbar"
+      className="flex-1 min-h-0 overflow-y-auto overscroll-contain no-scrollbar"
     >
       {hasMore && (
         <div className="flex justify-center">
@@ -87,27 +87,41 @@ export function MessageThread({
       )}
 
       {messages.map((m, i) => {
-        // Only show the timestamp when a new "block" starts: first message,
-        // sender/kind change, or a gap of ≥ 5 minutes from the previous one.
-        // A rapid back-and-forth then reads as one block instead of a time
-        // label under every bubble.
         const prev = messages[i - 1]
+        const next = messages[i + 1]
+        const gapMs = (
+          a: { created_at: string },
+          b: { created_at: string },
+        ) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+
+        // A message is "grouped" with the previous one when it's the same
+        // sender/kind and under 5 minutes apart — those get tight spacing.
+        const groupedWithPrev =
+          !!prev &&
+          prev.sender_id === m.sender_id &&
+          prev.kind === m.kind &&
+          gapMs(prev, m) < 5 * 60 * 1000
+
+        // Show the timestamp only on the LAST message of a "block" — the next
+        // message is from someone else / another kind, or more than 5 minutes
+        // later (or this is the end of the thread). A rapid burst then reads
+        // as one block with a single time label.
         const showTime =
-          !prev ||
-          prev.sender_id !== m.sender_id ||
-          prev.kind !== m.kind ||
-          new Date(m.created_at).getTime() -
-            new Date(prev.created_at).getTime() >=
-            5 * 60 * 1000
+          !next ||
+          next.sender_id !== m.sender_id ||
+          next.kind !== m.kind ||
+          gapMs(m, next) >= 5 * 60 * 1000
+
         return (
-          <MessageBubble
-            key={m.id}
-            message={m}
-            isOwn={m.sender_id === currentUserId}
-            partnerAvatarUrl={partnerAvatarUrl}
-            partnerInitial={partnerInitial}
-            showTime={showTime}
-          />
+          <div key={m.id} className={i === 0 ? '' : groupedWithPrev ? 'mt-1' : 'mt-4'}>
+            <MessageBubble
+              message={m}
+              isOwn={m.sender_id === currentUserId}
+              partnerAvatarUrl={partnerAvatarUrl}
+              partnerInitial={partnerInitial}
+              showTime={showTime}
+            />
+          </div>
         )
       })}
       <div ref={endRef} />

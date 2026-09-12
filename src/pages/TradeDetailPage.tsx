@@ -785,7 +785,7 @@ export function TradeDetailPage() {
                 rel="noopener noreferrer"
                 className="text-xs text-primary hover:underline inline-flex items-center gap-1 shrink-0"
               >
-                Etherscan <ExternalLink className="w-3 h-3" />
+                Blockscan <ExternalLink className="w-3 h-3" />
               </a>
             </div>
 
@@ -861,7 +861,7 @@ export function TradeDetailPage() {
           <Text variant="small" className="text-muted-foreground">
             {t('tradeDetail.gracePeriodBody', {
               defaultValue:
-                "The buyer has confirmed the off-chain payment. Either side can settle the escrow by releasing the crypto — no third party involved. If the grace window closes without action, the seller can release and the buyer can no longer dispute this stage.",
+                "The grace period is a per-escrow delay, that starts when the buyer confirms the off-chain payment. During this window either party may raise a dispute; once it elapses without one, anyone can call release() to finalize the trade and pay out.",
             })}
           </Text>
           {graceEndSeconds != null && (

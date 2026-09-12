@@ -577,7 +577,7 @@
     "tradeRemovedOrNoAccess": "Cet échange a peut-être été supprimé ou vous n'y avez pas accès.",
     "messageCounterpart": "Message au partenaire",
     "messageCounterpartTitle": "Ouvrir le chat avec le partenaire",
-    "gracePeriodBody": "L’acheteur a confirmé le paiement hors chaîne. Chaque partie peut régler le dépôt en libérant les cryptos, sans tiers. Si la période de grâce s’achève sans action, le vendeur peut libérer et l’acheteur ne peut plus contester cette étape.",
+    "gracePeriodBody": "La période de grâce est un délai propre à chaque dépôt qui commence lorsque l’acheteur confirme le paiement hors chaîne. Pendant cette fenêtre, chaque partie peut ouvrir un litige ; une fois qu’elle s’écoule sans litige, n’importe qui peut appeler release() pour finaliser la transaction et effectuer le paiement.",
     "gracePeriodEnded": "Période de grâce terminée — la libération est disponible.",
     "gracePeriodRemaining": "Restant : {{time}}",
     "sendDeposit": "Envoyer",
@@ -757,7 +757,7 @@
     "unverified": "non vérifié",
     "global": "Global",
     "now": "à l'instant",
-    "etherscan": "Etherscan",
+    "etherscan": "Blockscan",
     "blockscan": "Blockscan",
     "eth": "ETH",
     "backTo": "Retour à {{target}}"

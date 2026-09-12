@@ -525,7 +525,7 @@
     "securityDeposit": "Security deposit",
     "fee": "Fee",
     "gracePeriod": "Grace period",
-    "gracePeriodBody": "The buyer has confirmed the off-chain payment. Either side can settle the escrow by releasing the crypto — no third party involved. If the grace window closes without action, the seller can release and the buyer can no longer dispute this stage.",
+    "gracePeriodBody": "The grace period is a per-escrow delay, that starts when the buyer confirms the off-chain payment. During this window either party may raise a dispute; once it elapses without one, anyone can call release() to finalize the trade and pay out.",
     "gracePeriodEnded": "Grace period ended — release is now available.",
     "gracePeriodRemaining": "Remaining: {{time}}",
     "funding": "Funding",
@@ -753,7 +753,7 @@
     "unverified": "unverified",
     "global": "Global",
     "now": "now",
-    "etherscan": "Etherscan",
+    "etherscan": "Blockscan",
     "blockscan": "Blockscan",
     "eth": "ETH",
     "backTo": "Back to {{target}}"
