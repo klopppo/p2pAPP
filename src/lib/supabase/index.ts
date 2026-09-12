@@ -1654,7 +1654,7 @@ export async function getConversationByTradeId(tradeId: string) {
     .select(`
       *,
       trade:trades(
-        id, trade_id, status, escrow_status,
+        id, trade_id, status, escrow_status, escrow_contract_addr,
         crypto_token, crypto_amount, fiat_currency, fiat_amount
       ),
       participants:conversation_participants(
@@ -1702,7 +1702,7 @@ export async function listConversations(
          id, trade_id, status, last_message_at, last_message_preview,
          created_at, updated_at,
          trade:trades(
-           id, trade_id, status, escrow_status,
+           id, trade_id, status, escrow_status, escrow_contract_addr,
            crypto_token, crypto_amount, fiat_currency, fiat_amount
          ),
          participants:conversation_participants(
@@ -1883,7 +1883,7 @@ export async function getConversation(conversationId: string, userId: string) {
     .select(`
       *,
       trade:trades(
-        id, trade_id, status, escrow_status,
+        id, trade_id, status, escrow_status, escrow_contract_addr,
         crypto_token, crypto_amount, fiat_currency, fiat_amount
       ),
       participants:conversation_participants(

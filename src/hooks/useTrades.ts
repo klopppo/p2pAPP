@@ -13,7 +13,7 @@ type EscrowStateValue = (typeof KlerosEscState)[keyof typeof KlerosEscState]
  * lag (or fail if the SECURITY DEFINER RPC isn't deployed), so the list reads
  * the chain and lets this override the stored value.
  */
-function deriveEscrowStatus(
+export function deriveEscrowStatus(
   state: number,
   buyerDeposited: boolean,
   sellerDeposited: boolean,

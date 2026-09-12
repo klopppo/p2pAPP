@@ -616,6 +616,7 @@ export interface ConversationView extends Conversation {
     trade_id: string
     status: TradeStatus
     escrow_status: EscrowStatus
+    escrow_contract_addr: string | null
     crypto_token: string
     crypto_amount: number
     fiat_currency: string
