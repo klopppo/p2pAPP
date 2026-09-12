@@ -9,6 +9,28 @@
 
 ---
 
+## Archived chats + trade tags in the message list — 2026-09-13
+
+- **DB** (`20260914000000_conversation_archive.sql`): `conversations.status`
+  already had an `'archived'` value but nothing set it. New trigger
+  `archive_conversation_on_trade_terminal` archives a trade-linked conversation
+  when the trade becomes `completed` / `cancelled` / `refunded` (direct chats,
+  `trade_id IS NULL`, are never touched → profile-started chats stay
+  persistent). Backfills existing terminal trades.
+- **Data** (`listConversations` / `useConversations`): optional
+  `{ archived?: boolean }` — `undefined` = all (profile/offer lookups),
+  `false` = active inbox, `true` = archive. `useConversations` also takes
+  `{ enabled }` so the archive query is only mounted when the view opens;
+  query key gained a view segment.
+- **UI** (`ConversationList` / `ChatLayout`): an **"Archived"** row at the top
+  of the inbox opens a separate archived list (with a back button). The
+  sidebar list now scrolls (`overflow-y-auto`, bounded height chain). Each
+  `ConversationItem` shows the linked **trade tag** (`TRD...TUK`) under the
+  username for trade-anchored chats. Archived conversations are read-only
+  (composer disabled). New `chat.*` keys across all 5 locales.
+
+---
+
 ## Per-trade grace period + Sepolia redeploy — 2026-09-13
 
 **Grace period was always 7 days because `TradePage` hardcoded

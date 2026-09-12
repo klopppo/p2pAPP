@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { ConversationView, ConversationWithParticipant } from '@/types/database'
-import { cn } from '@/lib/utils'
+import { cn, shortTradeId } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
 
 interface Props {
   conversation: ConversationView
@@ -59,6 +60,17 @@ export function ConversationItem({
           <span className="text-sm font-semibold truncate">{name}</span>
           {time && <span className="text-xs text-muted-foreground shrink-0">{time}</span>}
         </div>
+        {/* Trade tag: only trade-anchored chats have a linked trade. */}
+        {conversation.trade && (
+          <div className="mt-0.5">
+            <Badge
+              variant="outline"
+              className="rounded-full px-1.5 py-0 text-[10px] font-mono text-muted-foreground"
+            >
+              {shortTradeId(conversation.trade.trade_id)}
+            </Badge>
+          </div>
+        )}
         <p className="text-sm text-muted-foreground truncate">{preview}</p>
       </div>
       {showUnread && (

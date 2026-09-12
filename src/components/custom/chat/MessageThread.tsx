@@ -86,15 +86,30 @@ export function MessageThread({
         </div>
       )}
 
-      {messages.map((m) => (
-        <MessageBubble
-          key={m.id}
-          message={m}
-          isOwn={m.sender_id === currentUserId}
-          partnerAvatarUrl={partnerAvatarUrl}
-          partnerInitial={partnerInitial}
-        />
-      ))}
+      {messages.map((m, i) => {
+        // Only show the timestamp when a new "block" starts: first message,
+        // sender/kind change, or a gap of ≥ 5 minutes from the previous one.
+        // A rapid back-and-forth then reads as one block instead of a time
+        // label under every bubble.
+        const prev = messages[i - 1]
+        const showTime =
+          !prev ||
+          prev.sender_id !== m.sender_id ||
+          prev.kind !== m.kind ||
+          new Date(m.created_at).getTime() -
+            new Date(prev.created_at).getTime() >=
+            5 * 60 * 1000
+        return (
+          <MessageBubble
+            key={m.id}
+            message={m}
+            isOwn={m.sender_id === currentUserId}
+            partnerAvatarUrl={partnerAvatarUrl}
+            partnerInitial={partnerInitial}
+            showTime={showTime}
+          />
+        )
+      })}
       <div ref={endRef} />
     </div>
   )

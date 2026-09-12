@@ -63,7 +63,9 @@ export function usePrefetchAppData() {
     warm(['offers'], () => getActiveOffers(50))
 
     // Private, wallet-scoped surfaces (all require the RLS session).
-    warm(['conversations', userId, sessionWallet], () => listConversations(userId))
+    warm(['conversations', userId, sessionWallet, 'active'], () =>
+      listConversations(userId, { archived: false }),
+    )
     warm(['notifications', userId, sessionWallet], () => listNotifications(userId))
     warm(['notifications:unread', userId, sessionWallet], () => getUnreadNotificationCount(userId))
     warm(['notification-prefs', userId, sessionWallet], async () => {

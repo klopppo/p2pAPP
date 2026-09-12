@@ -16,10 +16,10 @@
  */
 import type { QueryClient } from '@tanstack/react-query'
 
-// Bumped to :v2 after the namespace-whitelist fix (audit M3 second half):
-// payloads written by the pre-fix build may contain PII from queries we
-// now filter out (user-profile, current-user, disputes, etc.). Discard
-// those on first load by treating the old key as stale.
+// v2 namespace: kept so existing installs don't lose their snapshot. Only
+// `wallet-session` is filtered out on write/hydrate (see
+// NON_PERSISTABLE_NAMESPACES) — everything else is persisted, wallet-scoped by
+// the buster, so a cold start renders the last-known data immediately.
 const STORAGE_KEY = 'coffernode:react-query:v2'
 const MAX_AGE_MS = 1000 * 60 * 60 * 24 // 24h
 
@@ -51,13 +51,35 @@ function safeRead(): PersistedClient | null {
 
 function safeWrite(payload: PersistedClient): void {
   if (typeof window === 'undefined') return
+  const tryWrite = (p: PersistedClient) =>
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(p))
+
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
-  } catch (err) {
-    // Quota exceeded or storage disabled — silently drop. The next write
-    // attempt will retry on the next mutation.
-    console.warn('[queryPersister] write failed:', err)
+    tryWrite(payload)
+    return
+  } catch {
+    // Likely QuotaExceededError — the chat/message cache is the usual culprit.
+    // Progressively drop the largest namespaces and retry so the lightweight
+    // data (offers, trades, profile…) still persists.
   }
+
+  const namespaceOf = (q: PersistedQuery) =>
+    typeof q.queryKey?.[0] === 'string' ? (q.queryKey[0] as string) : ''
+  const dropped = new Set<string>()
+  for (const drop of ['messages', 'conversation', 'conversations', 'notifications', 'trades']) {
+    dropped.add(drop)
+    const reduced: PersistedClient = {
+      ...payload,
+      queries: payload.queries.filter((q) => !dropped.has(namespaceOf(q))),
+    }
+    try {
+      tryWrite(reduced)
+      return
+    } catch {
+      // still too big — drop the next namespace and retry
+    }
+  }
+  console.warn('[queryPersister] write failed (quota) even after pruning large namespaces')
 }
 
 /**
@@ -100,6 +122,10 @@ export function hydrateQueryCache(
   }
   let hydrated = 0
   for (const q of payload.queries) {
+    const firstKey = q.queryKey?.[0]
+    if (typeof firstKey === 'string' && NON_PERSISTABLE_NAMESPACES.has(firstKey)) {
+      continue
+    }
     // setQueryData with an `updatedAt` override so React Query treats the
     // entry as fresh-but-stale, triggering a background refetch on next
     // mount but serving the snapshot immediately.
@@ -121,22 +147,17 @@ export function hydrateQueryCache(
  * it stays in sync with wallet changes.
  */
 /**
- * Whitelist of React Query namespaces that are safe to persist to
- * localStorage. Anything not on this list (user-profile, current-user,
- * trades, trade, dispute, user-escrows, escrow-state, arbitration-cost,
- * appeal-info, notifications, messages, has-rated, user-reputation, ...)
- * is dropped on write — those contain PII, payment details, escrow
- * state, chat bodies, or auth signals we don't want to sit in
- * localStorage across sessions / wallet switches.
+ * Namespaces that must NEVER be served from a stale snapshot. We persist
+ * everything else so the UI can render the last-known data instantly on
+ * reload / cold start and revalidate quietly in the background (the cache is
+ * wallet-scoped via the buster, so a different wallet discards it).
+ *
+ *   - `wallet-session`: the live Supabase-session gate. Serving a stale
+ *     "signed in" would let RLS-denied queries fire and mislead the navbar,
+ *     so it must always be resolved fresh.
  */
-const PERSISTABLE_NAMESPACES: ReadonlySet<string> = new Set([
-  'offers', // marketplace list (the /app/offers list)
-  'offer', // offer detail page (/app/offer/:id) — audit M4
-  'conversation', // single conversation view
-  'conversations', // conversation list for a user
-  'user-reviews', // ratings received by a user (profile page)
-  'trade-ratings', // ratings on a specific trade
-  'notification-prefs', // per-channel enable/disable (no PII)
+const NON_PERSISTABLE_NAMESPACES: ReadonlySet<string> = new Set([
+  'wallet-session',
 ])
 
 /**
@@ -163,7 +184,7 @@ export function attachQueryPersister(
       for (const q of all) {
         const firstKey = q.queryKey[0]
         if (typeof firstKey !== 'string') continue
-        if (!PERSISTABLE_NAMESPACES.has(firstKey)) continue
+        if (NON_PERSISTABLE_NAMESPACES.has(firstKey)) continue
         queries.push({
           queryKey: q.queryKey,
           queryHash: q.queryHash,
@@ -179,7 +200,7 @@ export function attachQueryPersister(
       })
       if (typeof window !== 'undefined' && (window as { __coffernodeDebug?: boolean }).__coffernodeDebug) {
         console.log(
-          `[queryPersister] wrote ${queries.length}/${all.length} queries (buster=${getBuster()}) — rest filtered by namespace whitelist`,
+          `[queryPersister] wrote ${queries.length}/${all.length} queries (buster=${getBuster()}) — only wallet-session is filtered`,
         )
       }
     } catch (err) {

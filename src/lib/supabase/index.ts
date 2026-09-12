@@ -1682,8 +1682,16 @@ export async function getConversationByTradeId(tradeId: string) {
  *
  * Each row carries the other party's profile and the linked trade summary
  * so the chat sidebar can render without extra round-trips.
+ *
+ * `options.archived`:
+ *   - `undefined` → all conversations (default; used by profile/offer lookups)
+ *   - `false`     → active inbox (status != 'archived')
+ *   - `true`      → archived only (terminal trades)
  */
-export async function listConversations(userId: string) {
+export async function listConversations(
+  userId: string,
+  options: { archived?: boolean } = {},
+) {
   // First get the user's conversation ids (cheap). The result has nested
   // arrays from PostgREST joins; we flatten + shape them below.
   const { data: rows, error } = await supabase
@@ -1746,6 +1754,10 @@ export async function listConversations(userId: string) {
 
     const participants = (conv.participants ?? []) as ConversationWithParticipant[]
     const me = participants.find((p) => p.user_id === userId)
+
+    // View filter: active inbox vs archive vs all.
+    if (options.archived === true && conv.status !== 'archived') continue
+    if (options.archived === false && conv.status === 'archived') continue
 
     out.push({
       ...conv,

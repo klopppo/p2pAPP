@@ -6,7 +6,16 @@ import { useWalletSession } from './useWalletSession'
 import { uniqueRealtimeTopic } from '@/lib/realtimeTopic'
 
 /**
- * All conversations the current user participates in, newest activity first.
+ * Conversations the current user participates in, newest activity first.
+ *
+ * `options.archived`:
+ *   - `undefined` (default) → all conversations — used by profile / offer
+ *     lookups that just need to find an existing thread.
+ *   - `false` → the active inbox (status != 'archived').
+ *   - `true`  → the archive (terminal-trade chats).
+ *
+ * `options.enabled` lets the caller defer the archive query until the
+ * "Archived" view is opened.
  *
  * Wires a single Supabase Realtime channel on `conversations` only — the
  * `bump_conversation_last_message` trigger updates `last_message_at` and
@@ -15,17 +24,21 @@ import { uniqueRealtimeTopic } from '@/lib/realtimeTopic'
  * table would invalidate this query). Per-conversation realtime lives in
  * `useMessages` for the active chat.
  */
-export function useConversations() {
+export function useConversations(
+  options: { archived?: boolean; enabled?: boolean } = {},
+) {
+  const { archived, enabled = true } = options
   const { data: user } = useCurrentUser()
   const { sessionWallet, hasSession } = useWalletSession()
   const qc = useQueryClient()
+  const viewKey = archived === undefined ? 'all' : archived ? 'archived' : 'active'
 
   const query = useQuery({
-    queryKey: ['conversations', user?.id, sessionWallet],
-    queryFn: () => listConversations(user!.id),
+    queryKey: ['conversations', user?.id, sessionWallet, viewKey],
+    queryFn: () => listConversations(user!.id, { archived }),
     // `!!user` alone is not enough — the world-readable `users` row resolves
     // even without a JWT, and the RLS read policy would return [] silently.
-    enabled: !!user && hasSession,
+    enabled: !!user && hasSession && enabled,
     // Poll fallback for environments without Realtime publication on
     // `conversations` (see useMessages). Realtime invalidations keep this
     // fresh when the publication is enabled.
@@ -35,10 +48,10 @@ export function useConversations() {
   const userId = user?.id
 
   useEffect(() => {
-    if (!userId || !hasSession) return
+    if (!userId || !hasSession || !enabled) return
 
     const channel = supabase
-      .channel(uniqueRealtimeTopic(`conversations:user:${userId}`))
+      .channel(uniqueRealtimeTopic(`conversations:user:${userId}:${viewKey}`))
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'conversations' },
@@ -49,7 +62,7 @@ export function useConversations() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [userId, hasSession, qc])
+  }, [userId, hasSession, enabled, viewKey, qc])
 
   return query
 }

@@ -23,6 +23,33 @@ export function shortTradeId(id: string | null | undefined): string {
   return `${s.slice(0, 3)}...${s.slice(-3)}`
 }
 
+/**
+ * Human label for an escrow grace period given in seconds: hours under a day,
+ * otherwise days (e.g. 3600 → "1h", 604800 → "7d").
+ */
+export function formatGracePeriod(seconds: number | bigint): string {
+  const s = Number(seconds)
+  if (!Number.isFinite(s) || s <= 0) return '—'
+  if (s < 24 * 60 * 60) return `${Math.max(1, Math.round(s / 3600))}h`
+  return `${Math.round(s / (24 * 60 * 60))}d`
+}
+
+/**
+ * Countdown label for a remaining duration (seconds):
+ *   ≥ 1 day  → "2d 3h"
+ *   ≥ 1 hour → "5h"
+ *   < 1 hour → "42m"
+ */
+export function formatDuration(seconds: number | bigint): string {
+  const s = Math.max(0, Math.floor(Number(seconds)))
+  const days = Math.floor(s / 86_400)
+  const hours = Math.floor((s % 86_400) / 3_600)
+  const minutes = Math.floor((s % 3_600) / 60)
+  if (days >= 1) return `${days}d ${hours}h`
+  if (hours >= 1) return `${hours}h`
+  return `${minutes}m`
+}
+
 /** International ISO 4217 Currency Symbols map */
 export const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: '$',

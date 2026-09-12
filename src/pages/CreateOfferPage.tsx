@@ -109,11 +109,12 @@ export function CreateOfferPage() {
       toast.error(t('createOffer.errorMaxLessThanMin'))
       return
     }
-    if (!Number.isFinite(formData.gracePeriod) || formData.gracePeriod <= 0) {
+    const graceHours = Number(formData.gracePeriod)
+    if (formData.gracePeriod === '' || !Number.isFinite(graceHours) || graceHours <= 0) {
       toast.error(t('createOffer.errorGracePeriodInvalid'))
       return
     }
-    if (formData.gracePeriod > 8760) {
+    if (graceHours > 8760) {
       toast.error(t('createOffer.errorGracePeriodTooLong'))
       return
     }
@@ -185,7 +186,7 @@ export function CreateOfferPage() {
           : null,
         payment_methods: [formData.paymentMethod],
         description: formData.description.trim() || null,
-        grace_period: Math.round(formData.gracePeriod),
+        grace_period: Math.round(Number(formData.gracePeriod)),
         available_regions:
           formData.location === 'Global'
             ? []
