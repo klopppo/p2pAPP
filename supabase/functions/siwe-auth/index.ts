@@ -61,7 +61,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Contro1l-Allow-Methods": "POST, OPTIONS",
 }
 
 interface SignInRequest {
@@ -186,6 +186,7 @@ async function handleVerify(
   }
   if (parsed.version !== "1")
     return json({ error: "Unsupported SIWE version" }, 400)
+  
 
   // Authz: the message is only valid if iat is fresh.
   const issuedAtMs = Date.parse(parsed.issuedAt)

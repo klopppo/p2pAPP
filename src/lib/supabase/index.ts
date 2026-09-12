@@ -52,6 +52,20 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   },
 })
 
+/**
+ * Matches a canonical (v5/v4) UUID string. Used to decide whether a trade
+ * identifier is the primary-key `trades.id` (uuid) or the human-readable
+ * `trades.trade_id` (varchar like `TEST-001`, `TRD-…`) before hitting a
+ * uuid-typed DB column — plugging a human id into one yields Postgres
+ * `22P02 invalid input syntax for type uuid`.
+ */
+export const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export function isUuid(value: string): boolean {
+  return UUID_RE.test(value)
+}
+
 // =================================================================
 // TYPES
 // =================================================================
@@ -778,9 +792,11 @@ export async function getTradeByTradeId(tradeId: string) {
 }
 
 /**
- * Get trade by its primary UUID `id` (the `:id` route param used by the
- * trade detail viewer). Joins the offer + both parties so the page can render
- * without N+1 follow-ups.
+ * Get a trade by either identifier: its primary UUID `id` (the `:id` route
+ * param used by the trade detail viewer) or its human-readable `trade_id`
+ * (`TEST-001`, `TRD-…`). Human ids would otherwise crash the uuid-typed `id`
+ * lookup with a `22P02` cast error, so the varchar column is targeted instead.
+ * Joins the offer + both parties so the page can render without N+1 follow-ups.
  */
 export async function getTradeById(id: string) {
   const { data, error } = await supabase
@@ -791,7 +807,7 @@ export async function getTradeById(id: string) {
       buyer:users!trades_buyer_id_fkey (wallet_address, nickname, avatar_url, verification_level),
       seller:users!trades_seller_id_fkey (wallet_address, nickname, avatar_url, verification_level)
     `)
-    .eq('id', id)
+    .eq(isUuid(id) ? 'id' : 'trade_id', id)
     .single()
 
   if (error) {
@@ -801,6 +817,23 @@ export async function getTradeById(id: string) {
   }
 
   return data
+}
+
+/**
+ * Resolve a trade identifier to the row's primary uuid `id`. UUIDs pass
+ * through unchanged; human-readable `trade_id` values are looked up on the
+ * varchar column first. `trade_ratings` keys off `trades.id` (a uuid FK), so
+ * every rating query funnels an id through here.
+ */
+export async function resolveTradeUuid(tradeId: string): Promise<string> {
+  if (isUuid(tradeId)) return tradeId
+  const trade = await getTradeByTradeId(tradeId)
+  if (!trade) {
+    throw new Error(
+      `Cannot resolve trade "${tradeId}" to a uuid: no trade found. Pass the trade's uuid id instead.`,
+    )
+  }
+  return trade.id
 }
 
 /**
@@ -1535,20 +1568,48 @@ export async function getDisputeById(id: string) {
 // =================================================================
 
 /**
- * Submit trade rating
+ * Submit trade rating.
+ *
+ * `trade_id` may be either the trade's PRIMARY KEY `id` (uuid, preferred) or
+ * its HUMAN-READABLE `trade_id` (a varchar like `TEST-001` / `TRD-…`).
+ * `trade_ratings.trade_id` is a uuid FK to `trades.id`, so a human id is
+ * resolved to the row's uuid via `resolveTradeUuid` before the insert —
+ * otherwise Postgres rejects it with a `22P02 invalid input syntax for type
+ * uuid` error.
+ *
+ * Non-uuid `rater_id` / `rated_id` are rejected up front with a clear message
+ * (they are always uuids referencing `users.id`).
  */
 export async function submitTradeRating(ratingData: Partial<TradeRating>) {
+  const payload: Partial<TradeRating> = { ...ratingData }
+
+  if (payload.trade_id) {
+    payload.trade_id = await resolveTradeUuid(payload.trade_id)
+  }
+  console.log('[rating] trade_id', ratingData.trade_id, '->', payload.trade_id)
+
+  for (const field of ['rater_id', 'rated_id'] as const) {
+    const val = payload[field]
+    if (val && !isUuid(val)) {
+      const err = new Error(
+        `Cannot submit rating: ${field} "${val}" is not a valid uuid.`,
+      )
+      console.error('Error submitting rating:', err)
+      throw err
+    }
+  }
+
   const { data, error } = await supabase
     .from('trade_ratings')
     .insert({
-      ...ratingData,
+      ...payload,
       submitted_at: new Date().toISOString(),
     })
     .select()
     .single()
 
   if (error) {
-    console.error('Error submitting rating:', error)
+    console.error('Error submitting rating:', error, 'sent payload:', payload)
     throw error
   }
 
@@ -1556,7 +1617,8 @@ export async function submitTradeRating(ratingData: Partial<TradeRating>) {
 }
 
 /**
- * Get ratings for trade
+ * Get ratings for trade. Accepts the trade's uuid `id` or its human-readable
+ * `trade_id` (both resolve through `resolveTradeUuid`).
  */
 export async function getRatingsForTrade(tradeId: string) {
   const { data, error } = await supabase
@@ -1566,7 +1628,7 @@ export async function getRatingsForTrade(tradeId: string) {
       rater:users!trade_ratings_rater_id_fkey (nickname, avatar_url),
       rated:users!trade_ratings_rated_id_fkey (nickname, avatar_url)
     `)
-    .eq('trade_id', tradeId)
+    .eq('trade_id', await resolveTradeUuid(tradeId))
     .order('submitted_at', { ascending: false })
 
   if (error) {
@@ -1618,13 +1680,14 @@ export async function getReputationScores(userId: string) {
 }
 
 /**
- * Check if a user has already rated a specific trade.
+ * Check if a user has already rated a specific trade. Accepts the trade's
+ * uuid `id` or its human-readable `trade_id`.
  */
 export async function hasUserRatedTrade(tradeId: string, userId: string) {
   const { data, error } = await supabase
     .from('trade_ratings')
     .select('id')
-    .eq('trade_id', tradeId)
+    .eq('trade_id', await resolveTradeUuid(tradeId))
     .eq('rater_id', userId)
     .maybeSingle()
 

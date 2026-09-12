@@ -9,6 +9,22 @@
 
 ---
 
+## Trade lookups accept human ids (fixes `22P02` on ratings) — 2026-09-12
+
+- **Bug**: `trade_ratings.trade_id` is a **uuid** FK to `trades.id`, but the
+  app received the human-readable `trades.trade_id` (varchar, e.g. `TEST-001`,
+  `TRD-…`) from several entry points (URL param, ratings/review queries).
+  Any such value fed into a uuid-typed column failed with
+  `22P02 invalid input syntax for type uuid`.
+- **Fix** (`src/lib/supabase/index.ts`): new `isUuid` + `resolveTradeUuid`
+  helpers. `getTradeById` now targets the `trade_id` varchar column when the
+  input isn't a uuid, so `/app/trades/TEST-001` resolves. `submitTradeRating`,
+  `getRatingsForTrade`, and `hasUserRatedTrade` resolve human ids to the
+  row's uuid before touching uuid columns; non-uuid `rater_id`/`rated_id` are
+  rejected with a clear message instead of the raw Postgres error.
+
+---
+
 ## Archived chats + trade tags in the message list — 2026-09-13
 
 - **DB** (`20260914000000_conversation_archive.sql`): `conversations.status`
