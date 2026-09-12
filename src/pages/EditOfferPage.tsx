@@ -127,7 +127,7 @@ export function EditOfferPage() {
       maxAmount: offer.max_amount != null ? String(offer.max_amount) : '',
       paymentMethod: offer.payment_methods?.[0] ?? 'Bank Transfer',
       location: locationLabel,
-      gracePeriod: Number(offer.grace_period) || 24,
+      gracePeriod: offer.grace_period != null ? String(offer.grace_period) : '1',
       description: offer.description ?? '',
       isPrivate: offer.is_private,
       targetUser: offer.target_user ?? '',
@@ -208,11 +208,12 @@ export function EditOfferPage() {
       toast.error(t('editOffer.errorMaxLessThanMin'))
       return
     }
-    if (!Number.isFinite(formData.gracePeriod) || formData.gracePeriod <= 0) {
+    const graceHours = Number(formData.gracePeriod)
+    if (formData.gracePeriod === '' || !Number.isFinite(graceHours) || graceHours <= 0) {
       toast.error(t('editOffer.errorGracePeriodInvalid'))
       return
     }
-    if (formData.gracePeriod > 8760) {
+    if (graceHours > 8760) {
       toast.error(t('editOffer.errorGracePeriodTooLong'))
       return
     }
@@ -277,7 +278,7 @@ export function EditOfferPage() {
           : null,
         payment_methods: [formData.paymentMethod],
         description: formData.description.trim() || null,
-        grace_period: Math.round(formData.gracePeriod),
+        grace_period: Math.round(Number(formData.gracePeriod)),
         available_regions:
           formData.location === 'Global'
             ? []
@@ -614,7 +615,7 @@ export function EditOfferPage() {
               id="gracePeriod"
               type="number"
               value={formData.gracePeriod}
-              onChange={(e) => setFormData({ ...formData, gracePeriod: Number(e.target.value) })}
+              onChange={(e) => setFormData({ ...formData, gracePeriod: e.target.value })}
               className="rounded-full border border-border"
               placeholder="24"
             />

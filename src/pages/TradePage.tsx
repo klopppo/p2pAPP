@@ -49,7 +49,12 @@ export function TradePage() {
   )
   // Grace period in HOURS (kept as a string so it can be cleared while
   // editing). Converted to seconds for `createEscrow`.
-  const [gracePeriod, setGracePeriod] = useState('1')
+  // Grace period in HOURS. Prefilled from the offer's persisted value (the
+  // seller chose it at create/edit time); `gracePeriodInput` holds a user
+  // override so we don't need a setState-in-effect to seed it.
+  const [gracePeriodInput, setGracePeriodInput] = useState<string | null>(null)
+  const gracePeriod =
+    gracePeriodInput ?? (offer?.grace_period != null ? String(offer.grace_period) : '1')
   const [paymentMethod, setPaymentMethod] = useState<string>('')
   const [stage, setStage] = useState<Stage>('idle')
 
@@ -115,12 +120,13 @@ export function TradePage() {
   // Grace period: 1 hour … 365 days (KlerosEsc.MAX_GRACE_PERIOD). The value
   // entered here is what `createEscrow` stores on the escrow — previously the
   // page hardcoded a 7-day default regardless of any input.
+  const maxGraceHours = Number(MAX_GRACE_PERIOD_SECONDS) / 3600
   const gracePeriodNum = Number(gracePeriod)
   const gracePeriodValid =
     gracePeriod !== '' &&
     !Number.isNaN(gracePeriodNum) &&
     gracePeriodNum > 0 &&
-    gracePeriodNum <= 365 * 24
+    gracePeriodNum <= maxGraceHours
   const gracePeriodSeconds = gracePeriodValid
     ? BigInt(Math.round(gracePeriodNum * 3600))
     : 0n
@@ -643,7 +649,7 @@ export function TradePage() {
                   inputMode="decimal"
                   min={1}
                   value={gracePeriod}
-                  onChange={(e) => setGracePeriod(e.target.value.replace(/[^0-9.]/g, ''))}
+                  onChange={(e) => setGracePeriodInput(e.target.value.replace(/[^0-9.]/g, ''))}
                   className="rounded-full"
                 />
                 <Text variant="small" className="text-muted-foreground">
