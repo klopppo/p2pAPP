@@ -209,7 +209,8 @@
     "escrowReleased": "Released",
     "escrowRefunded": "Refunded",
     "escrowFunded": "Funded",
-    "escrowCancelled": "Cancelled"
+    "escrowCancelled": "Cancelled",
+    "rateTrade": "Rate this trade"
   },
   "chat": {
     "messages": "Messages",

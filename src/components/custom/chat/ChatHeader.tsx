@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, ShieldAlert } from 'lucide-react'
+import { ArrowLeft, Flag } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { ConversationView, ConversationWithParticipant } from '@/types/database'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -112,7 +112,7 @@ export function ChatHeader({ conversation, currentUserId, online, onBack }: Prop
           title={t('report.reportUserOrChat')}
           aria-label={t('report.reportUserOrChat')}
         >
-          <ShieldAlert className="w-4 h-4" />
+          <Flag className="w-4 h-4" />
           <span className="hidden sm:inline">{t('report.report')}</span>
         </Button>
       </div>

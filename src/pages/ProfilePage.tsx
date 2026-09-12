@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { Button } from '@/components/ui/button'
 import { explorerBase } from '@/lib/explorer'
-import { Loader2, Pencil, ShieldAlert } from 'lucide-react'
+import { Loader2, Pencil, Flag } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ReportUserModal } from '@/components/custom/ReportUserModal'
@@ -338,7 +338,7 @@ export function ProfilePage() {
             onClick={() => setReportOpen(true)}
             className="rounded-full shadow-none shrink-0 text-destructive border-destructive/30 hover:bg-destructive/10"
           >
-            <ShieldAlert className="w-3.5 h-3.5 mr-1" />
+            <Flag className="w-3.5 h-3.5 mr-1" />
             {t('report.reportUser')}
           </Button>
         )}

@@ -209,7 +209,8 @@
     "escrowRefunded": "İade edildi",
     "escrowFunded": "Fonlandı",
     "escrowCancelled": "İptal edildi",
-    "escrowGracePeriod": "Ek süre"
+    "escrowGracePeriod": "Ek süre",
+    "rateTrade": "Bu işlemi değerlendir"
   },
   "chat": {
     "messages": "Mesajlar",

@@ -672,8 +672,18 @@ export function TradeDetailPage() {
   const ratedId = myRole === 'buyer' ? trade?.seller_id : trade?.buyer_id
   const ratingDirection = myRole === 'buyer' ? 'seller' as const : 'buyer' as const
 
+  // A trade is rateable once it reaches a terminal outcome: the on-chain escrow
+  // is COMPLETED, or the DB mirror already shows completed/refunded (refunded
+  // covers buyer-favorable rulings, which never set the on-chain COMPLETED
+  // state through `release()`).
+  const tradeTerminal =
+    trade?.status === 'completed' ||
+    trade?.status === 'refunded' ||
+    liveState === KlerosEscState.COMPLETED
+
   const showRatingForm =
-    liveState === KlerosEscState.COMPLETED &&
+    !!trade &&
+    tradeTerminal &&
     isConnected && !!myId && !!myRole && !!ratedId
 
   const { data: hasRated = false } = useHasRated(

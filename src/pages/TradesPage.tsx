@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   RotateCcw,
   XCircle,
+  Star,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -323,6 +324,12 @@ export function TradesPage() {
                           </div>
                         </div>
                       </div>
+                      {(trade.status === 'completed' || trade.status === 'refunded') && (
+                        <span className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-primary">
+                          <Star className="w-4 h-4 fill-primary" />
+                          {t('trades.rateTrade')}
+                        </span>
+                      )}
                     </div>
                   </Card>
                 </Link>

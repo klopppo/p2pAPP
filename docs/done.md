@@ -38,6 +38,23 @@ public, so testers must mint before funding.
 
 ---
 
+## Reviews & rating entry point + refunded-trade gating — 2026-09-12
+
+**The rating form was only reachable when the on-chain escrow read back exactly
+`KlerosEscState.COMPLETED` (`TradeDetailPage.tsx:675`), so refunded trades were
+never rateable and a terminal trade whose chain read failed showed no form.**
+
+- **`TradeDetailPage`**: `showRatingForm` now treats a trade as rateable when the
+  DB mirror already reports `status in ('completed','refunded')` **or** the live
+  escrow is `COMPLETED` — matching the plan written in `docs/dispute-status.md:69`
+  but never implemented. Buyers who win a ruling (`refunded`) can now rate the
+  seller.
+- **`TradesPage`**: completed/refunded rows show a filled `Star` + "Rate this
+  trade" badge linking through to the trade detail (where the form renders).
+- New locale keys `trades.rateTrade` in all 5 locales.
+
+---
+
 ## Multi-worker audit: Supabase/React, wallet, contracts, UI — 2026-09-12
 
 Four parallel audits (Supabase↔React, wallet/MetaMask, contract usage, UI) produced

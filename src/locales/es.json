@@ -209,7 +209,8 @@
     "escrowRefunded": "Reembolsada",
     "escrowFunded": "Financiada",
     "escrowCancelled": "Cancelada",
-    "escrowGracePeriod": "Periodo de gracia"
+    "escrowGracePeriod": "Periodo de gracia",
+    "rateTrade": "Calificar esta operación"
   },
   "chat": {
     "messages": "Mensajes",

@@ -209,7 +209,8 @@
     "escrowRefunded": "已退款",
     "escrowFunded": "已全额资助",
     "escrowCancelled": "已取消",
-    "escrowGracePeriod": "宽限期"
+    "escrowGracePeriod": "宽限期",
+    "rateTrade": "评价此交易"
   },
   "chat": {
     "messages": "消息",

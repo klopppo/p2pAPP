@@ -19,21 +19,28 @@ import { config } from '@/wagmi'
  * short window before signing — the same fix recommended by wagmi maintainers
  * for every "sign/write right after connect" path.
  */
-const READY_RETRIES = 10
+const READY_RETRIES = 20
 const READY_DELAY_MS = 150
 
 async function waitForConnector(): Promise<void> {
+  let lastError: unknown
   for (let attempt = 0; attempt < READY_RETRIES; attempt++) {
     try {
       await getConnectorClient(config)
       return
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      if (!msg.includes('getChainId')) throw err
+      // Treat ANY failure as transient while wagmi rehydrates the connector:
+      // a half-built connector throws `...getChainId is not a function` (the
+      // original wevm/wagmi#4216 symptom), and a connector whose provider
+      // transport blips throws `Connection interrupted while trying to
+      // subscribe` (dropped provider WebSocket). Both recover inside this
+      // window (3s), so only give up once it is exhausted instead of failing
+      // the sign-in on the first blip.
+      lastError = err
       await new Promise((resolve) => setTimeout(resolve, READY_DELAY_MS))
     }
   }
-  throw new Error('Wallet connector not ready')
+  throw new Error('Wallet connector not ready', { cause: lastError })
 }
 
 export async function signWalletMessage({
