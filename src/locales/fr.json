@@ -226,7 +226,17 @@
     "signInToView": "Connectez-vous pour charger vos conversations.",
     "sendFailed": "Impossible d'envoyer le message. Réessayez.",
     "signInRequired": "Connexion requise — approuvez la signature de votre portefeuille pour envoyer des messages.",
-    "reconnectRequired": "Session expirée — déconnectez puis reconnectez votre portefeuille pour envoyer des messages."
+    "reconnectRequired": "Session expirée — déconnectez puis reconnectez votre portefeuille pour envoyer des messages.",
+    "archived": "Archivés",
+    "archivedHint": "Discussions de transactions terminées",
+    "archivedEmpty": "Aucune conversation archivée pour l’instant.",
+    "archivedEmptyHint": "Les discussions sont déplacées ici une fois la transaction terminée.",
+    "backToMessages": "Retour aux messages",
+    "listError": "Échec du chargement des conversations.",
+    "noConversations": "Aucune conversation pour l’instant.",
+    "noConversationsHint": "Ouvrez une offre pour démarrer une discussion avec le trader. Les conversations vivent à côté de chaque transaction.",
+    "lockedPlaceholder": "Cette conversation est verrouillée.",
+    "archivedPlaceholder": "Cette conversation est archivée."
   },
   "editOffer": {
     "title": "Modifier l'offre",

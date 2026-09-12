@@ -226,7 +226,17 @@
     "signInToView": "Sohbetlerinizi yüklemek için giriş yapın.",
     "sendFailed": "Mesaj gönderilemedi. Lütfen tekrar deneyin.",
     "signInRequired": "Giriş gerekli — mesaj göndermek için cüzdan imzasını onaylayın.",
-    "reconnectRequired": "Oturum süresi doldu — mesaj göndermek için cüzdanınızı bağlayıp yeniden bağlayın."
+    "reconnectRequired": "Oturum süresi doldu — mesaj göndermek için cüzdanınızı bağlayıp yeniden bağlayın.",
+    "archived": "Arşiv",
+    "archivedHint": "Tamamlanan işlemlerin sohbetleri",
+    "archivedEmpty": "Henüz arşivlenmiş sohbet yok.",
+    "archivedEmptyHint": "Sohbetler, işlem tamamlandığında buraya taşınır.",
+    "backToMessages": "Mesajlara dön",
+    "listError": "Sohbetler yüklenemedi.",
+    "noConversations": "Henüz sohbet yok.",
+    "noConversationsHint": "Satıcıyla sohbet başlatmak için bir teklif açın. Sohbetler her işlemin yanında bulunur.",
+    "lockedPlaceholder": "Bu sohbet kilitli.",
+    "archivedPlaceholder": "Bu sohbet arşivlendi."
   },
   "editOffer": {
     "title": "Teklifi düzenle",

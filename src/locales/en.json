@@ -226,7 +226,17 @@
     "signInToView": "Sign in to load your conversations.",
     "sendFailed": "Couldn't send the message. Please try again.",
     "signInRequired": "Sign-in required — approve the wallet signature to send messages.",
-    "reconnectRequired": "Session expired — disconnect and reconnect your wallet to send messages."
+    "reconnectRequired": "Session expired — disconnect and reconnect your wallet to send messages.",
+    "archived": "Archived",
+    "archivedHint": "Chats from completed trades",
+    "archivedEmpty": "No archived conversations yet.",
+    "archivedEmptyHint": "Chats move here once their trade is completed.",
+    "backToMessages": "Back to messages",
+    "listError": "Failed to load conversations.",
+    "noConversations": "No conversations yet.",
+    "noConversationsHint": "Open an offer to start a chat with the trader. Conversations live next to each trade.",
+    "lockedPlaceholder": "This conversation is locked.",
+    "archivedPlaceholder": "This conversation is archived."
   },
   "editOffer": {
     "title": "Edit offer",

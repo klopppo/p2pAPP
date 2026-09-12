@@ -73,7 +73,12 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   const { hasSession, isLoading: sessionLoading } = useWalletSession()
   const { t } = useTranslation()
   const qc = useQueryClient()
-  const conversations = useConversations()
+  // Active inbox vs archive. The archive query is deferred until the view is
+  // opened so it doesn't add a subscription for every chat session.
+  const [showArchived, setShowArchived] = useState(false)
+  const activeConversations = useConversations({ archived: false })
+  const archivedConversations = useConversations({ archived: true, enabled: showArchived })
+  const conversations = showArchived ? archivedConversations : activeConversations
   const { readIds, mark } = useLocallyReadConversations()
 
   // Pinned id (user clicked a conversation) overrides the route / fallback.
@@ -92,7 +97,9 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
     setPinnedId(null)
   }, [routeId, forcedId])
 
-  const fallbackId = conversations.data?.[0]?.id ?? null
+  // Only the ACTIVE inbox drives the default selection — opening /app/messages
+  // must not auto-open the most recently archived chat.
+  const fallbackId = activeConversations.data?.[0]?.id ?? null
   const activeId = forcedId ?? pinnedId ?? routeId ?? fallbackId
 
   // Skip the DB hooks entirely for the synthetic ourTeam thread — no
@@ -248,14 +255,14 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   }
 
   const noConversations =
-    !!conversations.data && conversations.data.length === 0 && !isOurTeam
+    !!activeConversations.data && activeConversations.data.length === 0 && !isOurTeam
   const showSidebar = !activeId || !forcedId
 
   // Page-level loading state. Until the conversation list resolves we don't
   // know if there's an active conversation, so the right pane can't show
   // a meaningful empty state. Render a centered spinner across the full
   // chat area to make the hydration visible.
-  if (conversations.isLoading && !isOurTeam && !forcedId) {
+  if (activeConversations.isLoading && !isOurTeam && !forcedId) {
     return (
       <section className="flex-1 flex items-center justify-center p-8">
         <ChatLoading size="lg" label={t('chat.loading')} />
@@ -273,11 +280,13 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
     <section className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div className="flex flex-1 min-h-0">
         {showSidebar && (
-          <div className={activeId ? 'hidden md:block' : 'w-full md:w-auto'}>
+          <div className={activeId ? 'hidden md:flex md:min-h-0' : 'w-full md:w-auto'}>
             <ConversationList
               activeId={activeId}
               locallyReadIds={readIds}
               onSelect={handleSelect}
+              view={showArchived ? 'archived' : 'active'}
+              onViewChange={(v) => setShowArchived(v === 'archived')}
               conversations={conversations}
             />
           </div>
@@ -323,11 +332,17 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
                 onSend={handleSend}
                 onTyping={typing.notifyTyping}
                 onStopTyping={typing.notifyStopTyping}
-                disabled={convQuery.data.status === 'locked' || send.isPending}
+                disabled={
+                  convQuery.data.status === 'locked' ||
+                  convQuery.data.status === 'archived' ||
+                  send.isPending
+                }
                 placeholder={
                   convQuery.data.status === 'locked'
-                    ? 'This conversation is locked.'
-                    : 'Type a message…'
+                    ? t('chat.lockedPlaceholder')
+                    : convQuery.data.status === 'archived'
+                      ? t('chat.archivedPlaceholder')
+                      : t('chat.typeMessage')
                 }
               />
             </div>
