@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { useAccount, usePublicClient } from 'wagmi'
+import { useAccount, useChainId, usePublicClient } from 'wagmi'
 import type { Abi } from 'viem'
 import { getTradesByUser, getUserByWallet } from '@/lib/supabase'
 import { KLEROS_ESC_ABI, KlerosEscState } from '@/lib/contracts'
+import { setCachedEscrowStatus } from '@/lib/escrowStatusCache'
 import { useWalletSession } from './useWalletSession'
 
 type EscrowStateValue = (typeof KlerosEscState)[keyof typeof KlerosEscState]
@@ -59,8 +60,11 @@ export function useTrades() {
   const { address } = useAccount()
   const { sessionWallet, hasSession } = useWalletSession()
   const publicClient = usePublicClient()
+  const chainId = useChainId()
   return useQuery({
-    queryKey: ['trades', 'by-wallet', address, sessionWallet],
+    // `chainId` is part of the key: a chain switch changes which escrows we
+    // read, and the persisted snapshot is per-chain.
+    queryKey: ['trades', 'by-wallet', address, sessionWallet, chainId],
     queryFn: async () => {
       const user = address ? await getUserByWallet(address) : null
       if (!user) return []
@@ -69,6 +73,8 @@ export function useTrades() {
       const withEscrow = trades.filter(
         (t) => typeof t.escrow_contract_addr === 'string' && t.escrow_contract_addr,
       )
+      // `publicClient` is guaranteed here because the query is disabled until
+      // it exists (see `enabled`). The guard is only for TypeScript narrowing.
       if (!publicClient || withEscrow.length === 0) return trades
 
       try {
@@ -94,15 +100,16 @@ export function useTrades() {
           const buyerDep = results[base + 1]?.result as boolean | undefined
           const sellerDep = results[base + 2]?.result as boolean | undefined
           const locked = results[base + 3]?.result as boolean | undefined
-          liveByTradeId.set(
-            t.id,
-            deriveEscrowStatus(
-              Number(stateRes.result),
-              !!buyerDep,
-              !!sellerDep,
-              !!locked,
-            ),
+          const derived = deriveEscrowStatus(
+            Number(stateRes.result),
+            !!buyerDep,
+            !!sellerDep,
+            !!locked,
           )
+          liveByTradeId.set(t.id, derived)
+          // Persist the last-known phase per escrow so reloads can show it
+          // instantly, even if the query snapshot is missing/pruned.
+          setCachedEscrowStatus(t.escrow_contract_addr as string, derived)
         })
 
         return trades.map((t) => {
@@ -114,11 +121,13 @@ export function useTrades() {
         return trades
       }
     },
-    enabled: !!address && hasSession,
-    // Background poll every 5 minutes. The DB mirror can lag and the list has
-    // no realtime subscription, but the on-chain-derived phase is also
-    // re-checked on mount / window focus, and the last snapshot is persisted,
-    // so 5 minutes is just a safety net.
+    // Gate on a live public client too: without it we can't read the live
+    // escrow phase, and resolving with DB-only rows would cache the stale
+    // `escrow_status` (the reload flash). Disabled → the persisted snapshot is
+    // still served, so the last-known phase shows immediately.
+    enabled: !!address && hasSession && !!publicClient,
+    // Background poll every 5 minutes as a safety net; the on-chain phase is
+    // also re-checked on mount / window focus.
     refetchInterval: 300_000,
     staleTime: 5_000,
   })

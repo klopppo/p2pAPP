@@ -210,7 +210,8 @@
     "escrowFunded": "Financé",
     "escrowCancelled": "Annulé",
     "escrowGracePeriod": "Période de grâce",
-    "rateTrade": "Évaluer cet échange"
+    "rateTrade": "Évaluer cet échange",
+    "escrowSyncing": "Synchronisation…"
   },
   "chat": {
     "messages": "Messages",
@@ -237,7 +238,19 @@
     "noConversations": "Aucune conversation pour l’instant.",
     "noConversationsHint": "Ouvrez une offre pour démarrer une discussion avec le trader. Les conversations vivent à côté de chaque transaction.",
     "lockedPlaceholder": "Cette conversation est verrouillée.",
-    "archivedPlaceholder": "Cette conversation est archivée."
+    "archivedPlaceholder": "Cette conversation est archivée.",
+    "moreActions": "Plus d’actions",
+    "mute": "Mettre en sourdine",
+    "unmute": "Réactiver le son",
+    "block": "Bloquer",
+    "unblock": "Débloquer",
+    "mutedToast": "Notifications coupées pour cette discussion.",
+    "unmutedToast": "Notifications réactivées.",
+    "blockedToast": "Utilisateur bloqué.",
+    "unblockedToast": "Utilisateur débloqué.",
+    "actionFailed": "Une erreur est survenue. Veuillez réessayer.",
+    "blockedPlaceholder": "Vous avez bloqué cet utilisateur.",
+    "send": "Envoyer le message"
   },
   "editOffer": {
     "title": "Modifier l'offre",

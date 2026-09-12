@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { shortTradeId } from '@/lib/utils'
+import { getCachedEscrowStatus } from '@/lib/escrowStatusCache'
 import {
   Loader2,
   Inbox,
@@ -58,6 +59,7 @@ interface TradeRow {
   escrow_status: string
   /** Live phase read from the escrow contract (overrides the DB mirror). */
   live_escrow_status?: string
+  escrow_contract_addr?: string | null
   crypto_token: string
   crypto_amount: number | string
   fiat_currency: string
@@ -80,7 +82,7 @@ interface TradeRow {
 export function TradesPage() {
   const { t } = useTranslation()
   const { data: user } = useCurrentUser()
-  const { data: trades = [], isLoading, isError } = useTrades()
+  const { data: trades = [], isPending, isError } = useTrades()
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
 
@@ -189,7 +191,7 @@ export function TradesPage() {
       />
 
       {/* Body */}
-      {isLoading ? (
+      {isPending && user ? (
         <Card className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl">
           <div className="flex items-center justify-center py-12 text-muted-foreground">
             <Loader2 className="w-5 h-5 animate-spin mr-2" /> {t('trades.loadingTrades')}
@@ -225,16 +227,22 @@ export function TradesPage() {
       ) : (
         <ul className="space-y-3">
           {filtered.map((trade) => {
-            // Prefer the live on-chain phase; the DB mirror can lag behind
-            // (e.g. show "Awaiting deposit" while the escrow is already in the
-            // buyer-confirmed grace window).
-            const escrowStatus = trade.live_escrow_status ?? trade.escrow_status
-            const escrowMeta = ESCROW_LABELS[escrowStatus] ?? {
-              label: escrowStatus,
-              variant: 'outline' as const,
-              icon: Clock as typeof Clock,
-            }
-            const StatusIcon = escrowMeta.icon
+            // Escrow-backed trades NEVER fall back to the DB `escrow_status`
+            // (it can be a stale mirror, e.g. "Awaiting deposit" during the
+            // grace window). Live on-chain value first, then the last-known
+            // value from localStorage, then a neutral "syncing" strip.
+            const cachedStatus = getCachedEscrowStatus(trade.escrow_contract_addr)
+            const escrowStatus = trade.escrow_contract_addr
+              ? (trade.live_escrow_status ?? cachedStatus)
+              : trade.escrow_status
+            const escrowMeta = escrowStatus
+              ? (ESCROW_LABELS[escrowStatus] ?? {
+                  label: escrowStatus,
+                  variant: 'outline' as const,
+                  icon: Clock as typeof Clock,
+                })
+              : null
+            const StatusIcon = escrowMeta?.icon
             const counterparty =
               myId === trade.buyer_id ? trade.seller : trade.buyer
             const role = myId === trade.buyer_id ? 'buyer' : 'seller'
@@ -256,17 +264,28 @@ export function TradesPage() {
                         ID and the amount. */}
                     <div
                       className={`mb-2 -mx-2 -mt-2 px-2 pt-2 pb-2 rounded-xl flex items-center gap-2 ${
-                        escrowMeta.variant === 'destructive'
+                        escrowMeta?.variant === 'destructive'
                           ? 'bg-destructive/10 text-destructive'
-                          : escrowMeta.variant === 'default'
+                          : escrowMeta?.variant === 'default'
                             ? 'bg-primary/15 text-primary'
                             : 'bg-muted text-foreground'
                       }`}
                     >
-                      <StatusIcon className="w-4 h-4 shrink-0" />
-                      <span className="text-sm font-semibold tracking-wide uppercase">
-                        {escrowMeta.label}
-                      </span>
+                      {escrowMeta && StatusIcon ? (
+                        <>
+                          <StatusIcon className="w-4 h-4 shrink-0" />
+                          <span className="text-sm font-semibold tracking-wide uppercase">
+                            {escrowMeta.label}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Loader2 className="w-4 h-4 shrink-0 animate-spin text-muted-foreground" />
+                          <span className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
+                            {t('trades.escrowSyncing')}
+                          </span>
+                        </>
+                      )}
                     </div>
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0 flex-1 space-y-2">

@@ -153,7 +153,7 @@ function NotificationRow({
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
-          <p className="text-sm font-medium truncate">{notification.title}</p>
+          <p className="text-sm font-medium truncate">{highlightPrivateOffer(notification.title)}</p>
           <span className="text-[10px] text-muted-foreground shrink-0">
             {timeAgo(notification.created_at, t)}
           </span>
@@ -164,6 +164,24 @@ function NotificationRow({
         <span className="self-center h-2 w-2 rounded-full bg-primary shrink-0" />
       )}
     </button>
+  )
+}
+
+/**
+ * Styles the phrase "private offer" in a notification title with a blue
+ * accent. Titles are stored in the DB as English strings.
+ */
+function highlightPrivateOffer(title: string) {
+  const match = /private offer/i.exec(title)
+  if (!match || match.index == null) return title
+  const start = match.index
+  const end = start + match[0].length
+  return (
+    <>
+      {title.slice(0, start)}
+      <span className="text-blue-500">{title.slice(start, end)}</span>
+      {title.slice(end)}
+    </>
   )
 }
 

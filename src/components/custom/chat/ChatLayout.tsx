@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
@@ -17,6 +17,7 @@ import { useTypingIndicator, useConversationPresence } from '@/hooks/useTypingIn
 import { useGlobalPresence } from '@/hooks/useGlobalPresence'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useWalletSession } from '@/hooks/useWalletSession'
+import { isUserBlocked } from '@/lib/blocks'
 import {
   markConversationNotificationsRead,
   setConversationViewing,
@@ -129,6 +130,15 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   const partnerOnline =
     !!partner &&
     (onlineUsers.has(partner.user_id) || online.some((o) => o.user_id === partner.user_id))
+
+  // Device-local block state. Toggling it in the header bumps a reducer so
+  // this re-renders and re-reads the block list for the composer.
+  const [, bumpBlockTick] = useReducer((n: number) => n + 1, 0)
+  const partnerBlocked = !!(
+    user &&
+    partner?.user_id &&
+    isUserBlocked(user.id, partner.user_id)
+  )
 
   // Synthetic conversation for the ourTeam thread.
   const ourTeamConv: ConversationView | null = user ? createOurTeamConversation(user) : null
@@ -308,6 +318,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
                 currentUserId={user.id}
                 online={partnerOnline}
                 onBack={handleBack}
+                onBlockChange={() => bumpBlockTick()}
               />
               <MessageThread
                 messages={messages.data ?? []}
@@ -335,6 +346,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
                 disabled={
                   convQuery.data.status === 'locked' ||
                   convQuery.data.status === 'archived' ||
+                  partnerBlocked ||
                   send.isPending
                 }
                 placeholder={
@@ -342,7 +354,9 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
                     ? t('chat.lockedPlaceholder')
                     : convQuery.data.status === 'archived'
                       ? t('chat.archivedPlaceholder')
-                      : t('chat.typeMessage')
+                      : partnerBlocked
+                        ? t('chat.blockedPlaceholder')
+                        : t('chat.typeMessage')
                 }
               />
             </div>
@@ -380,6 +394,7 @@ function OurTeamPane({
   }, [user])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshMessages()
     const unsubscribe = subscribeSupportChat(refreshMessages)
     return () => unsubscribe()

@@ -147,17 +147,20 @@ export function hydrateQueryCache(
  * it stays in sync with wallet changes.
  */
 /**
- * Namespaces that must NEVER be served from a stale snapshot. We persist
- * everything else so the UI can render the last-known data instantly on
- * reload / cold start and revalidate quietly in the background (the cache is
- * wallet-scoped via the buster, so a different wallet discards it).
+ * Namespaces that must NEVER be served from a stale snapshot.
  *
  *   - `wallet-session`: the live Supabase-session gate. Serving a stale
  *     "signed in" would let RLS-denied queries fire and mislead the navbar,
  *     so it must always be resolved fresh.
+ *   - `trades`: the list combines a DB read with an on-chain phase read, and
+ *     the phase is also mirrored to the dedicated `escrowStatusCache`. A
+ *     hydrated snapshot can carry stale rows (old shape / old phase) that
+ *     render an intermediate wrong tag ("Awaiting deposit") before the fresh
+ *     fetch lands — so always fetch it fresh instead.
  */
 const NON_PERSISTABLE_NAMESPACES: ReadonlySet<string> = new Set([
   'wallet-session',
+  'trades',
 ])
 
 /**
@@ -200,7 +203,7 @@ export function attachQueryPersister(
       })
       if (typeof window !== 'undefined' && (window as { __coffernodeDebug?: boolean }).__coffernodeDebug) {
         console.log(
-          `[queryPersister] wrote ${queries.length}/${all.length} queries (buster=${getBuster()}) — only wallet-session is filtered`,
+          `[queryPersister] wrote ${queries.length}/${all.length} queries (buster=${getBuster()}) — wallet-session/trades filtered`,
         )
       }
     } catch (err) {

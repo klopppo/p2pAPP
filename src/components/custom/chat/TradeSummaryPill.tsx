@@ -1,9 +1,11 @@
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ConversationView } from '@/types/database'
 import { Badge } from '@/components/ui/badge'
 import { shortTradeId } from '@/lib/utils'
 import { useEscrowState } from '@/hooks/useDisputes'
 import { deriveEscrowStatus } from '@/hooks/useTrades'
+import { getCachedEscrowStatus, setCachedEscrowStatus } from '@/lib/escrowStatusCache'
 
 /**
  * Compact pill shown in the chat header — the linked trade id + its live
@@ -17,13 +19,24 @@ export function TradeSummaryPill({ trade }: { trade: NonNullable<ConversationVie
   const escrowAddr = (trade.escrow_contract_addr ?? undefined) as `0x${string}` | undefined
   const { data: escrowState } = useEscrowState(escrowAddr)
 
-  const status = escrowState
+  const liveStatus = escrowState
     ? deriveEscrowStatus(
         escrowState.state,
         escrowState.buyerSecurityDeposited,
         escrowState.sellerSecurityDeposited,
         escrowState.fundsLocked,
       )
+    : null
+
+  // Persist the last-known phase so the next load shows it instantly.
+  useEffect(() => {
+    if (escrowAddr && liveStatus) setCachedEscrowStatus(escrowAddr, liveStatus)
+  }, [escrowAddr, liveStatus])
+
+  // Live → last-known localStorage value → DB mirror (avoided when we have an
+  // escrow address, since the mirror can be stale).
+  const status = escrowAddr
+    ? (liveStatus ?? getCachedEscrowStatus(escrowAddr) ?? trade.escrow_status)
     : trade.escrow_status
 
   const ESCROW_LABELS: Record<

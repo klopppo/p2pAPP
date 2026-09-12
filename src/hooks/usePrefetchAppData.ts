@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useAccount } from 'wagmi'
+import { useAccount, useChainId } from 'wagmi'
 import {
   ensureUser,
   getActiveOffers,
@@ -32,6 +32,7 @@ import { useCurrentUser } from './useCurrentUser'
 export function usePrefetchAppData() {
   const qc = useQueryClient()
   const { address } = useAccount()
+  const chainId = useChainId()
   const { sessionWallet, hasSession } = useWalletSession()
   const { data: user } = useCurrentUser()
   const prefetchedFor = useRef<string | null>(null)
@@ -72,7 +73,7 @@ export function usePrefetchAppData() {
       await ensureDefaultNotificationPreferences(userId)
       return getNotificationPreferences(userId)
     })
-    warm(['trades', 'by-wallet', address, sessionWallet], async () => {
+    warm(['trades', 'by-wallet', address, sessionWallet, chainId], async () => {
       const u = await getUserByWallet(address)
       if (!u) return []
       return getTradesByUser(u.id)
@@ -82,5 +83,5 @@ export function usePrefetchAppData() {
       if (!u) return []
       return getDisputesByUser(u.id)
     })
-  }, [hasSession, sessionWallet, address, userId, qc])
+  }, [hasSession, sessionWallet, address, chainId, userId, qc])
 }

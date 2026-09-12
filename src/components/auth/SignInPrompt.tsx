@@ -31,10 +31,24 @@ import { useWalletSession } from '@/hooks/useWalletSession'
 
 const REJECTED_KEY_PREFIX = 'coffernode:siwe:declined:'
 const DISMISS_KEY_PREFIX = 'coffernode:siwe:promptDismissed:'
+const SUCCESS_KEY = 'coffernode:siwe:last'
 
 function hasRejection(addr: string): boolean {
   if (typeof window === 'undefined') return false
   return window.localStorage.getItem(`${REJECTED_KEY_PREFIX}${addr.toLowerCase()}`) === '1'
+}
+
+/** This device already completed SIWE for `addr` — don't auto-prompt again. */
+function hasSignedInMarker(addr: string): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    const raw = window.localStorage.getItem(SUCCESS_KEY)
+    if (!raw) return false
+    const parsed = JSON.parse(raw) as { address?: string }
+    return parsed?.address?.toLowerCase() === addr.toLowerCase()
+  } catch {
+    return false
+  }
 }
 
 function isDismissed(addr: string): boolean {
@@ -72,15 +86,16 @@ export function SignInPrompt() {
   //   - address / isConnected change (wallet connect/disconnect)
   //   - hasSession change (a live JWT hides the prompt outright)
   //   - signAttempts change (every attempt / dismissal)
-  // The rejection + dismissal flags are read from storage every render. The
-  // remember-me marker is intentionally NOT consulted: a stale marker with no
-  // live session used to hide this prompt entirely, leaving the user stuck
-  // signed-out with no recovery. `hasSession` is the real gate.
+  // The rejection + dismissal flags are read from storage every render.
+  // A success marker means this device already signed in before — recovering
+  // the session (or, failing that, the navbar "Sign in" button) is the path;
+  // we never auto-prompt MetaMask on reload.
   const lowerAddress = address?.toLowerCase() ?? null
   const visible =
     isConnected &&
     !!lowerAddress &&
     !hasSession &&
+    !hasSignedInMarker(lowerAddress) &&
     !hasRejection(lowerAddress) &&
     !isDismissed(lowerAddress)
 

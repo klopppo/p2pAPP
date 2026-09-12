@@ -210,7 +210,8 @@
     "escrowRefunded": "Refunded",
     "escrowFunded": "Funded",
     "escrowCancelled": "Cancelled",
-    "rateTrade": "Rate this trade"
+    "rateTrade": "Rate this trade",
+    "escrowSyncing": "Syncing…"
   },
   "chat": {
     "messages": "Messages",
@@ -237,7 +238,19 @@
     "noConversations": "No conversations yet.",
     "noConversationsHint": "Open an offer to start a chat with the trader. Conversations live next to each trade.",
     "lockedPlaceholder": "This conversation is locked.",
-    "archivedPlaceholder": "This conversation is archived."
+    "archivedPlaceholder": "This conversation is archived.",
+    "moreActions": "More actions",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "block": "Block",
+    "unblock": "Unblock",
+    "mutedToast": "Notifications muted for this chat.",
+    "unmutedToast": "Notifications unmuted.",
+    "blockedToast": "User blocked.",
+    "unblockedToast": "User unblocked.",
+    "actionFailed": "Something went wrong. Please try again.",
+    "blockedPlaceholder": "You blocked this user.",
+    "send": "Send message"
   },
   "editOffer": {
     "title": "Edit offer",

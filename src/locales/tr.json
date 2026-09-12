@@ -210,7 +210,8 @@
     "escrowFunded": "Fonlandı",
     "escrowCancelled": "İptal edildi",
     "escrowGracePeriod": "Ek süre",
-    "rateTrade": "Bu işlemi değerlendir"
+    "rateTrade": "Bu işlemi değerlendir",
+    "escrowSyncing": "Eşitleniyor…"
   },
   "chat": {
     "messages": "Mesajlar",
@@ -237,7 +238,19 @@
     "noConversations": "Henüz sohbet yok.",
     "noConversationsHint": "Satıcıyla sohbet başlatmak için bir teklif açın. Sohbetler her işlemin yanında bulunur.",
     "lockedPlaceholder": "Bu sohbet kilitli.",
-    "archivedPlaceholder": "Bu sohbet arşivlendi."
+    "archivedPlaceholder": "Bu sohbet arşivlendi.",
+    "moreActions": "Daha fazla işlem",
+    "mute": "Sessize al",
+    "unmute": "Sesi aç",
+    "block": "Engelle",
+    "unblock": "Engeli kaldır",
+    "mutedToast": "Bu sohbet için bildirimler sessize alındı.",
+    "unmutedToast": "Bildirimler açıldı.",
+    "blockedToast": "Kullanıcı engellendi.",
+    "unblockedToast": "Kullanıcının engeli kaldırıldı.",
+    "actionFailed": "Bir şeyler ters gitti. Lütfen tekrar deneyin.",
+    "blockedPlaceholder": "Bu kullanıcıyı engellediniz.",
+    "send": "Mesaj gönder"
   },
   "editOffer": {
     "title": "Teklifi düzenle",

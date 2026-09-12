@@ -51,15 +51,17 @@ export function MessageComposer({
   }
 
   return (
-    <div className="pt-4 border-t border-border/50 shrink-0">
-      <div className="flex gap-2">
+    <div className="pt-4 border-t border-border/40 shrink-0">
+      <div className="flex items-center gap-2">
         <Input
           placeholder={placeholder ?? t('chat.typeMessage')}
           value={value}
           onChange={(e) => handleChange(e.target.value)}
           onKeyDown={handleKey}
           disabled={disabled}
-          className="rounded-full"
+          enterKeyHint="send"
+          autoComplete="off"
+          className="flex-1 h-10 rounded-full border-border bg-muted/40 placeholder:text-muted-foreground/70 focus-visible:border-primary/50 focus-visible:ring-primary/20"
         />
         <Button
           onClick={() => {
@@ -67,9 +69,9 @@ export function MessageComposer({
             onStopTyping()
           }}
           disabled={disabled || !value.trim()}
-          size="icon"
-          className="rounded-full"
-          aria-label="Send message"
+          size="icon-lg"
+          aria-label={t('chat.send')}
+          className="rounded-full shrink-0 shadow-none transition-transform active:scale-95 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
         >
           <Send className="w-4 h-4" />
         </Button>

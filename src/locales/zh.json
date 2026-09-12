@@ -210,7 +210,8 @@
     "escrowFunded": "已全额资助",
     "escrowCancelled": "已取消",
     "escrowGracePeriod": "宽限期",
-    "rateTrade": "评价此交易"
+    "rateTrade": "评价此交易",
+    "escrowSyncing": "同步中…"
   },
   "chat": {
     "messages": "消息",
@@ -237,7 +238,19 @@
     "noConversations": "暂无对话。",
     "noConversationsHint": "打开一个报价即可与交易者开始聊天。对话与每笔交易关联。",
     "lockedPlaceholder": "该对话已锁定。",
-    "archivedPlaceholder": "该对话已归档。"
+    "archivedPlaceholder": "该对话已归档。",
+    "moreActions": "更多操作",
+    "mute": "静音",
+    "unmute": "取消静音",
+    "block": "屏蔽",
+    "unblock": "取消屏蔽",
+    "mutedToast": "已静音此聊天的通知。",
+    "unmutedToast": "已恢复通知。",
+    "blockedToast": "已屏蔽该用户。",
+    "unblockedToast": "已取消屏蔽该用户。",
+    "actionFailed": "出错了，请重试。",
+    "blockedPlaceholder": "你已屏蔽该用户。",
+    "send": "发送消息"
   },
   "editOffer": {
     "title": "编辑报价",

@@ -2,9 +2,29 @@ import { useEffect, useRef } from 'react'
 import type { FC } from 'react'
 import { useAccount } from 'wagmi'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { clearPersistedQueryCache } from '@/lib/queryPersister'
-import { ensureWalletSession, signOut } from '@/lib/supabase'
+import { ensureWalletSession, recoverWalletSession, signOut } from '@/lib/supabase'
 import { signWalletMessage } from '@/lib/walletSigner'
+
+const SUCCESS_KEY = 'coffernode:siwe:last'
+
+/**
+ * Whether this device already completed SIWE for `addr` (remember-me marker).
+ * A marker means we must NOT auto-prompt MetaMask on reload — only an explicit
+ * Disconnect clears it.
+ */
+function hasSignedInMarker(addr: string): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    const raw = window.localStorage.getItem(SUCCESS_KEY)
+    if (!raw) return false
+    const parsed = JSON.parse(raw) as { address?: string }
+    return parsed?.address?.toLowerCase() === addr.toLowerCase()
+  } catch {
+    return false
+  }
+}
 
 /**
  * Keeps the Supabase `users` row in sync with the connected wallet.
@@ -29,6 +49,7 @@ export function useSyncUser() {
   const syncedAddress = useRef<string | null>(null)
   const redirectedAddress = useRef<string | null>(null)
   const navigate = useNavigate()
+  const qc = useQueryClient()
   // Token bumped on every wallet state change. Captured by async callbacks
   // so stale resolutions from a prior address can no-op.
   const tokenRef = useRef(0)
@@ -74,6 +95,24 @@ export function useSyncUser() {
     if (syncedAddress.current === address) return
     syncedAddress.current = address
 
+    // Returning user on this device: recover the persisted Supabase session
+    // silently (valid claim, or exchange the stored refresh token) and NEVER
+    // pop MetaMask. If recovery fails, the app stays read-only until the user
+    // explicitly clicks "Sign in" — matching "no signature on every reload".
+    if (hasSignedInMarker(address)) {
+      recoverWalletSession(address)
+        .then((recovered) => {
+          if (tokenRef.current !== myToken || !recovered) return
+          // The token may have been refreshed/repaired — let the gate re-read.
+          void qc.invalidateQueries({ queryKey: ['wallet-session'] })
+          void qc.invalidateQueries({ queryKey: ['current-user'] })
+        })
+        .catch((error) => {
+          console.warn('[useSyncUser] silent session recovery failed:', error)
+        })
+      return
+    }
+
     ensureWalletSession(address, { signMessage: signWalletMessage })
       .then(({ user }) => {
         // Drop the result if a newer connect/disconnect has superseded us.
@@ -93,7 +132,7 @@ export function useSyncUser() {
         // Reset so a later re-render can retry.
         syncedAddress.current = null
       })
-  }, [address, isConnected, navigate])
+  }, [address, isConnected, navigate, qc])
 }
 
 /**

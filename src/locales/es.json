@@ -210,7 +210,8 @@
     "escrowFunded": "Financiada",
     "escrowCancelled": "Cancelada",
     "escrowGracePeriod": "Periodo de gracia",
-    "rateTrade": "Calificar esta operación"
+    "rateTrade": "Calificar esta operación",
+    "escrowSyncing": "Sincronizando…"
   },
   "chat": {
     "messages": "Mensajes",
@@ -237,7 +238,19 @@
     "noConversations": "Aún no hay conversaciones.",
     "noConversationsHint": "Abre una oferta para iniciar un chat con el comerciante. Las conversaciones viven junto a cada operación.",
     "lockedPlaceholder": "Esta conversación está bloqueada.",
-    "archivedPlaceholder": "Esta conversación está archivada."
+    "archivedPlaceholder": "Esta conversación está archivada.",
+    "moreActions": "Más acciones",
+    "mute": "Silenciar",
+    "unmute": "Activar sonido",
+    "block": "Bloquear",
+    "unblock": "Desbloquear",
+    "mutedToast": "Notificaciones silenciadas para este chat.",
+    "unmutedToast": "Notificaciones reactivadas.",
+    "blockedToast": "Usuario bloqueado.",
+    "unblockedToast": "Usuario desbloqueado.",
+    "actionFailed": "Algo salió mal. Inténtalo de nuevo.",
+    "blockedPlaceholder": "Has bloqueado a este usuario.",
+    "send": "Enviar mensaje"
   },
   "editOffer": {
     "title": "Editar oferta",

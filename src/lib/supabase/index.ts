@@ -2050,6 +2050,28 @@ export async function setConversationViewing(input: {
 }
 
 /**
+ * Mute / unmute a conversation for the current participant. The
+ * `notify_conversation_message` trigger skips `muted = true` rows, so a muted
+ * chat produces no notifications (in-app or email).
+ */
+export async function setConversationMuted(input: {
+  conversationId: string
+  userId: string
+  muted: boolean
+}): Promise<void> {
+  const { error } = await supabase
+    .from('conversation_participants')
+    .update({ muted: input.muted })
+    .eq('conversation_id', input.conversationId)
+    .eq('user_id', input.userId)
+
+  if (error) {
+    console.error('Error muting conversation:', error)
+    throw error
+  }
+}
+
+/**
  * Mark every unread notification tied to a conversation as read. Called when
  * the user opens the chat pane so the bell clears for the thread they are now
  * reading.
@@ -2438,6 +2460,24 @@ async function refreshToWalletClaim(address: string): Promise<boolean> {
   const accessToken = data?.session?.access_token
   if (!accessToken) return false
   return readMemoizedClaim(accessToken) === addr
+}
+
+/**
+ * Silently recover a session for `walletAddress` WITHOUT ever prompting the
+ * wallet: verifies a live/refreshed claim, or exchanges the stored refresh
+ * token for a claim-bearing access token (`refreshToWalletClaim`).
+ *
+ * Used on reload when the device already has a SIWE marker, so a returning
+ * user isn't asked to sign again — only an explicit Disconnect clears the
+ * session/marker. Returns true when a usable session exists afterwards.
+ */
+export async function recoverWalletSession(walletAddress: string): Promise<boolean> {
+  const addr = walletAddress.toLowerCase()
+  // `isSignedInAs` also honours `exp`; supabase-js may refresh the token while
+  // resolving `getSession()`, so an expired-but-refreshable session recovers.
+  if (await isSignedInAs(addr)) return true
+  if (await refreshToWalletClaim(addr)) return true
+  return false
 }
 
 /**
