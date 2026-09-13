@@ -40,6 +40,7 @@ interface Offer {
   trader: string
   trades: number
   type: 'buy' | 'sell'
+  status: string
   token: string
   amount: string
   price: number
@@ -142,6 +143,7 @@ export function ProfilePage() {
         min_amount: number | string
         max_amount: number | string
         is_private?: boolean
+        status?: string
         tags?: string[]
         payment_methods?: string[]
         seller?: {
@@ -160,6 +162,7 @@ export function ProfilePage() {
         trader: sellerAddr,
         trades: row.seller?.total_trades ?? 0,
         type: row.type,
+        status: row.status ?? 'active',
         token: row.crypto_token,
         amount: String(row.crypto_amount ?? 0),
         price,
@@ -453,6 +456,15 @@ export function ProfilePage() {
                       {offer.isPrivate && (
                         <Badge variant="outline" className="rounded-full">
                           {t('offers.private')}
+                        </Badge>
+                      )}
+                      {offer.status !== 'active' && (
+                        <Badge variant="secondary" className="rounded-full">
+                          {offer.status === 'completed'
+                            ? t('trades.statusCompleted')
+                            : offer.status === 'cancelled'
+                              ? t('trades.statusCancelled')
+                              : offer.status}
                         </Badge>
                       )}
                       </div>

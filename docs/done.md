@@ -9,6 +9,20 @@
 
 ---
 
+## Offer auto-archived when a trade is opened — 2026-09-13
+
+- **Product rule**: an offer is one-shot — the moment a taker opens a trade
+  against it, the offer is consumed and must leave the public marketplace
+  (getActiveOffers only returns `status='active'`), living on only in the
+  seller's own offers table.
+- **Fix** (`supabase/migrations/20260913000001_archive_offer_on_trade_created.sql`):
+  new SECURITY DEFINER trigger `trg_archive_offer_on_trade_created` (AFTER
+  INSERT on `trades`) flips `offers.status` → `completed` atomically with trade
+  creation — no client race, works for every write path.
+- **UI** (`src/pages/ProfilePage.tsx`): the seller's offers table now shows a
+  status badge (`completed` / `cancelled`) on non-active offers, so consumed
+  offers read as the seller's archive.
+
 ## Trade lookups accept human ids (fixes `22P02` on ratings) — 2026-09-12
 
 - **Bug**: `trade_ratings.trade_id` is a **uuid** FK to `trades.id`, but the
