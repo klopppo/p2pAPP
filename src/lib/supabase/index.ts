@@ -52,6 +52,74 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   },
 })
 
+// =================================================================
+// OD-02 — Restricted reader: public column projections.
+//
+// The `anon` role can SELECT only these columns on `offers` / `users` (see
+// migration 20260915000002_od02_public_reader_projection.sql). Every anonymous
+// query MUST stay inside this list, or PostgREST returns 42501 for a column
+// outside the projection. These must mirror `functions/_lib/public-data.ts`.
+// Signed-in (`authenticated`) reads keep full table access.
+// =================================================================
+
+export const PUBLIC_USER_COLUMNS = [
+  'id', 'wallet_address', 'nickname', 'avatar_url', 'verification_level',
+  'bio', 'avg_rating', 'reputation_score',
+  'total_trades', 'completed_trades', 'cancelled_trades', 'dispute_count',
+  'created_at',
+].join(',')
+
+export const PUBLIC_OFFER_COLUMNS = [
+  'id', 'offer_id', 'seller_id', 'status', 'type',
+  'crypto_token', 'crypto_amount', 'fiat_currency', 'fiat_amount',
+  'price_per_unit', 'min_amount', 'max_amount',
+  'payment_methods', 'available_regions',
+  'platform_fee_bps', 'network_fee', 'tags', 'description',
+  'is_private', 'target_user', 'grace_period',
+  'published_at', 'expires_at', 'created_at',
+].join(',')
+
+/** Seller join used by the marketplace/detail queries. All inside the users
+ *  projection so anonymous reads keep working under OD-02. */
+export const SELLER_JOIN = [
+  'id', 'wallet_address', 'nickname', 'avatar_url',
+  'verification_level', 'total_trades', 'avg_rating',
+].join(',')
+
+/**
+ * Public seller profile as joined onto offer reads (OD-02 projection subset).
+ * `id` is required so consumers can key off it (OpenOfferPage chat RPC).
+ */
+export type SellerProfile = {
+  id: string
+  wallet_address: string
+  nickname: string | null
+  avatar_url: string | null
+  verification_level: VerificationLevel
+  total_trades: number
+  avg_rating: number
+}
+
+/**
+ * Offer row + the seller profile join (subset) as rendered by the public
+ * marketplace / offer detail. Explicit type so pages don't depend on the
+ * supabase-js query-string parser (the selects are built from the OD-02
+ * projection constants, not from a literal string).
+ */
+export type OfferWithSeller = Offer & { seller?: SellerProfile | null }
+
+/**
+ * Column list for a `users` read. Returns `'*'` when the caller is reading
+ * their OWN row while signed in (EditProfilePage needs the writable fields,
+ * e.g. social handles, which are outside the public projection), otherwise the
+ * public projection. Anonymous reads are limited to PUBLIC_USER_COLUMNS by the
+ * DB anyway (OD-02) — asking for `'*'` anonymously would 42501.
+ */
+async function userColumnsForRead(walletAddress: string): Promise<string> {
+  const sessionWallet = await getSessionWallet()
+  return sessionWallet === walletAddress.toLowerCase() ? '*' : PUBLIC_USER_COLUMNS
+}
+
 /**
  * Matches a canonical (v5/v4) UUID string. Used to decide whether a trade
  * identifier is the primary-key `trades.id` (uuid) or the human-readable
@@ -179,9 +247,10 @@ export type DisputeStatus = typeof DisputeStatus[keyof typeof DisputeStatus]
  * Get user by wallet address
  */
 export async function getUserByWallet(walletAddress: string) {
+  const cols = await userColumnsForRead(walletAddress)
   const { data, error } = await supabase
     .from('users')
-    .select('*')
+    .select(cols)
     .eq('wallet_address', walletAddress.toLowerCase())
     .single()
 
@@ -194,7 +263,7 @@ export async function getUserByWallet(walletAddress: string) {
     throw error
   }
 
-  return data as User
+  return data as unknown as User
 }
 
 import { getCachedUser, setCachedUser, invalidateUserCache, clearAllUserCache } from '@/lib/userCache'
@@ -217,15 +286,19 @@ import { getCachedUser, setCachedUser, invalidateUserCache, clearAllUserCache } 
  */
 export async function ensureUser(walletAddress: string): Promise<User | null> {
   const addr = walletAddress.toLowerCase()
+  const sessionWallet = await getSessionWallet()
+  const isSelf = sessionWallet === addr
 
   // 1. Check cache first
   const cached = getCachedUser(addr)
   if (cached) return cached
 
-  // 2. Try to read existing row
+  // 2. Try to read existing row. Anonymous reads use the public projection
+  //    (OD-02); the signed-in owner can read the full row (EditProfilePage).
+  const cols = isSelf ? '*' : PUBLIC_USER_COLUMNS
   const { data: existing, error: readErr } = await supabase
     .from('users')
-    .select('*')
+    .select(cols)
     .eq('wallet_address', addr)
     .maybeSingle()
 
@@ -245,7 +318,7 @@ export async function ensureUser(walletAddress: string): Promise<User | null> {
         if (error) console.warn('[ensureUser] last_active_at update failed:', error)
       })
 
-    const user = existing as User
+    const user = existing as unknown as User
     setCachedUser(user)
     return user
   }
@@ -253,7 +326,6 @@ export async function ensureUser(walletAddress: string): Promise<User | null> {
   // 3b. New user — insert with defaults, but only when the signed-in wallet
   //     matches (RLS will reject anything else). Missing row + no matching
   //     session = user hasn't completed SIWE yet; return null quietly.
-  const sessionWallet = await getSessionWallet()
   if (sessionWallet !== addr) return null
 
   const { data: inserted, error: insertErr } = await supabase
@@ -267,7 +339,7 @@ export async function ensureUser(walletAddress: string): Promise<User | null> {
     throw insertErr
   }
 
-  const user = inserted as User
+  const user = inserted as unknown as User
   setCachedUser(user)
   return user
 }
@@ -539,13 +611,13 @@ export async function updateUserReputation(userId: string, delta: number) {
 /**
  * Get active offers
  */
-export async function getActiveOffers(limit = 50, offset = 0) {
+export async function getActiveOffers(
+  limit = 50,
+  offset = 0,
+): Promise<OfferWithSeller[] | null> {
   const { data, error } = await supabase
     .from('offers')
-    .select(`
-      *,
-      seller:users!offers_seller_id_fkey (id, wallet_address, nickname, avatar_url, verification_level, total_trades, avg_rating)
-    `)
+    .select(`${PUBLIC_OFFER_COLUMNS},seller:users!offers_seller_id_fkey(${SELLER_JOIN})`)
     .eq('status', OfferStatus.ACTIVE)
     .gte('expires_at', new Date().toISOString())
     .order('published_at', { ascending: false })
@@ -556,19 +628,19 @@ export async function getActiveOffers(limit = 50, offset = 0) {
     throw error
   }
 
-  return data
+  return data as unknown as OfferWithSeller[]
 }
 
 /**
  * Get offers by seller
  */
-export async function getOffersBySeller(sellerId: string, status?: OfferStatus) {
+export async function getOffersBySeller(
+  sellerId: string,
+  status?: OfferStatus,
+): Promise<OfferWithSeller[] | null> {
   const query = supabase
     .from('offers')
-    .select(`
-      *,
-      seller:users!offers_seller_id_fkey (id, wallet_address, nickname, avatar_url, verification_level, avg_rating, total_trades)
-    `)
+    .select(`${PUBLIC_OFFER_COLUMNS},seller:users!offers_seller_id_fkey(${SELLER_JOIN})`)
     .eq('seller_id', sellerId)
     .order('created_at', { ascending: false })
 
@@ -583,7 +655,7 @@ export async function getOffersBySeller(sellerId: string, status?: OfferStatus) 
     throw error
   }
 
-  return data
+  return data as unknown as OfferWithSeller[]
 }
 
 /**
@@ -616,13 +688,10 @@ export function generateOfferId(): string {
  * Get a single offer by its primary key (the `:id` route param), with the
  * seller profile joined so TradePage / OpenOfferPage can render trader info.
  */
-export async function getOfferById(id: string) {
+export async function getOfferById(id: string): Promise<OfferWithSeller | null> {
   const { data, error } = await supabase
     .from('offers')
-    .select(`
-      *,
-      seller:users!offers_seller_id_fkey (id, wallet_address, nickname, avatar_url, verification_level, total_trades, avg_rating)
-    `)
+    .select(`${PUBLIC_OFFER_COLUMNS},seller:users!offers_seller_id_fkey(${SELLER_JOIN})`)
     .eq('id', id)
     .single()
 
@@ -634,7 +703,7 @@ export async function getOfferById(id: string) {
     throw error
   }
 
-  return data
+  return data as unknown as OfferWithSeller
 }
 
 /**

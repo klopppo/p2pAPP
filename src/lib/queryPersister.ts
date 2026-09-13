@@ -96,6 +96,7 @@ function safeWrite(payload: PersistedClient): void {
 export function hydrateQueryCache(
   client: QueryClient,
   getBuster: () => string,
+  options?: { skipExisting?: boolean },
 ): void {
   const payload = safeRead()
   if (!payload) {
@@ -124,6 +125,11 @@ export function hydrateQueryCache(
   for (const q of payload.queries) {
     const firstKey = q.queryKey?.[0]
     if (typeof firstKey === 'string' && NON_PERSISTABLE_NAMESPACES.has(firstKey)) {
+      continue
+    }
+    // When callers seeded earlier data (edge hydration), let it win over the
+    // possibly-stale localStorage snapshot.
+    if (options?.skipExisting && client.getQueryData(q.queryKey) !== undefined) {
       continue
     }
     // setQueryData with an `updatedAt` override so React Query treats the

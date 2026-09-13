@@ -10,6 +10,15 @@
 
 # Working agreements
 
+## Architecture decisions are logged in `docs/adr.md`
+
+Significant architecture / product choices (code splitting, caching strategy,
+edge deployment, offer lifecycle…) are recorded as ADRs in `docs/adr.md`
+(Accepted = shipped + verified · Proposed · Deferred). Open directions live
+there as `OD-*` and are mirrored as checklist items in `docs/todo.md`. When a
+new architectural decision is made during a session, add an ADR entry (or
+promote an existing proposal) in the same change.
+
 ## Docs must be updated after each meaningful change
 
 **Every commit that lands a non-trivial change updates `docs/` in the same

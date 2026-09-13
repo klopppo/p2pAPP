@@ -1,0 +1,7 @@
+# Local-only runtime env for `wrangler pages dev`. Copy to `.dev.vars`
+# (gitignored). NEVER commit real keys — production secrets go through
+# `wrangler pages secret put`.
+
+SUPABASE_URL=https://tauyciaavhnopeseecmz.supabase.co
+SUPABASE_READ_KEY=<anon or restricted-reader key — server-side only in prod>
+PURGE_SECRET=change-me-in-production

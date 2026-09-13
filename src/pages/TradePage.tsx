@@ -667,7 +667,7 @@ export function TradePage() {
                 <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground">
                   {t('trade.paymentMethodLabel')}
                 </Text>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                     <SelectTrigger className="w-full rounded-full">
                       <SelectValue placeholder={t('trade.selectMethod')} />
@@ -679,7 +679,7 @@ export function TradePage() {
                     </SelectContent>
                   </Select>
                   <Button
-                    className="rounded-full shadow-none px-8"
+                    className="rounded-full shadow-none px-8 flex-1 sm:flex-none"
                     disabled={isSubmitting}
                     onClick={handleOpenTrade}
                   >

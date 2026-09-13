@@ -13,9 +13,12 @@
     "format:check": "prettier --check \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
+    "preview:cf": "npm run build && wrangler pages dev dist --port 8788",
+    "deploy:cf": "npm run build && wrangler pages deploy dist --project-name coffernode --branch main",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
+    "test:e2e": "node tests/e2e/edge-hydration.cjs",
     "db:migrate": "supabase db push",
     "db:studio": "supabase status && supabase start && supabase db studio",
     "db:reset": "supabase db reset"
@@ -72,7 +75,8 @@
     "typescript": "~6",
     "typescript-eslint": "^8",
     "vite": "^8.0.16",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "wrangler": "^4.131.1"
   },
   "engines": {
     "node": ">=18.0.0",

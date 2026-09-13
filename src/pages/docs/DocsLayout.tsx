@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { AppPageFallback } from '@/components/custom/AppPageFallback'
 import {
   BookOpen,
   Rocket,
@@ -164,7 +165,9 @@ export function DocsLayout() {
 
         {/* Main content */}
         <main className="flex-1 min-w-0 py-6 px-4 md:px-8">
-          <Outlet />
+          <Suspense fallback={<AppPageFallback />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
 

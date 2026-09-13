@@ -180,3 +180,22 @@
 - [ ] **Server-side indexer** — Supabase edge function watching `KlerosEsc` events to mirror state, so disputes update even when no one is viewing them.
 - [ ] **Multicall in `useEscrowState`** — already converted to viem `multicall` (single round-trip for 24 fields). _(2026-08-22)_ — needs `confirmationTime` and `treasury` added (see B-6).
 - [ ] **Evidence file encryption** — DB schema has `file_encrypted` columns; UI stores plaintext CID. Decide real crypto + storage approach. (`dispute_evidence` columns are currently mis-named: `file_hash` stores the IPFS CID, `file_encrypted` stores the gateway URL — see `contract-execution-status.md` §B4 + `dispute-status.md` Bug #4.)
+
+## 🚀 Frontend — Fase 0→3 (see `docs/adr.md` ADR-001…006 / OD-01…05)
+
+- [x] **Fase 0A — Route-level code splitting** — `React.lazy` per route; layouts as Suspense boundaries; `AppPageFallback` skeleton. Entry chunk 1.9→0.11 MB. _(ADR-001, 004; 2026-09-13)_
+- [x] **Fase 0B — Lazy i18n** — `en` bundled, others via `import.meta.glob`; verified by switching to `es` in browser. _(ADR-002; 2026-09-13)_
+- [x] **Fase 0C — Vendor chunk buckets** — `manualChunks` (`web3/charts/ipfs/ui/backend/data/fx/react`), `chunkSizeWarningLimit` 500 KB. _(ADR-003; 2026-09-13)_
+- [x] **Fase 0D — Browser verification baseline** — Playwright/Chromium smoke over `/`, `/app/offers`, `/app/trades`, `/docs`, language switch. _(ADR-006; 2026-09-13)_
+- [ ] **Promote the Playwright smoke to `tests/e2e/` + CI** — formalize the ad-hoc script `ADR-006` used (route × chunk × i18n assertions) behind `npm run test:e2e`.
+- [x] **Fase 2 — Per-route edge behaviour (code in repo)** — `functions/_middleware.ts` + `public/_routes.json`: public routes get shell + `__EDGE_DATA__` + `s-maxage`/SWR, private routes `no-store`; `src/lib/edgeData.ts` seeds react-query pre-render (wins over snapshot via `skipExisting`). Verified by `npm run test:e2e`. _(OD-03, ADR-007; 2026-09-13)_
+- [x] **Fase 2 — Cache invalidation endpoint** — `functions/api/cache-purge.ts` (`PURGE_SECRET`-guarded, offers→marketplace+detail, users→profile). _(OD-04; 2026-09-13)_
+- [x] **Fase 2 — `_headers` security baseline** — CSP, HSTS-adjacent headers, frame-ancestors, referrer-policy, COOP/CORP; immutable caching for `/assets/*`. _(OD-05 partial; 2026-09-13)_
+- [x] **Fase 2 — DEPLOY + live verify** — create Cloudflare Pages project, `wrangler pages secret put SUPABASE_READ_KEY / PURGE_SECRET`, `npm run deploy:cf`, then verify `x-edge-route` (public vs private), `s-maxage`/`no-store`, and that `/api/cache-purge` responds 401 without secret. **Runbook pronto: `docs/cloudflare-deploy.md`.** (workerd can't run locally on this mac — needs macOS ≥13.5/DevContainer or remote.) _(live 2026-09-13 → https://coffernode.pages.dev; vedi `done.md`)_
+- [ ] **Fase 2 — Supabase webhooks** — configure DB webhooks on `offers`/`users` writes → `POST /api/cache-purge` with `x-webhook-secret: $PURGE_SECRET`.
+- [ ] **Fase 2 follow-up — full per-route SSR/SEO HTML** — current ADR-007 injects data into the SPA shell; prerender real per-route HTML for crawlers is a follow-up.
+- [x] **Fase 1 — Edge data layer (OD-02)** — restricted reader + minimal public projection: DB column-level projection for `anon` (drop-and-regrant) + worker/client explicit selects. **Carve-out:** l'anon key resta nel bundle per GoTrue (rimozione = fase BFF/OD-05). _(ADR-008; live 2026-09-13 → vedi `done.md`)_
+- [ ] **BFF follow-up (OD-05 / OD-02 carve-out)** — move auth out of the anon-key path so the key can leave the bundle entirely (edge-issued short-TTL tokens / BFF proxy).
+- [ ] **Fase 3 — Defer wallet stack** — lazy-mount Connect button + wallet providers on first interaction; landing/docs/offers ship without `web3` (~3 MB). _(OD-01)_
+- [ ] **Offer archive follow-ups (ADR-005)** — decide: retroactive backfill of consumed offers; UNIQUE(`trades.offer_id`) double-accept guard; re-activate offer if the trade is cancelled.
+- [x] **Responsive pass 320px → 4K** — full sweep of all 23 pages + 69 components at 320→4K (INP < 200 ms, nessuna rottura funzionale). Fixes: OffersPage filters wrap + search `w-full sm:max-w-xs`; LandingPage hero `flex-wrap`; CreateOffer/EditOffer Buy-Sell toggle `grid-cols-2 md:flex md:w-40`; TradePage payment row `flex-col sm:flex-row`; OperatorDashboard conversation/message headers `truncate min-w-0` + `shortAddress`, modal footers stack + `grid sm:grid-cols-3` actions, search inputs `w-full sm:max-w-xs`. Tables già scroll-orizzontale (pattern accettato). _(2026-09-13)_

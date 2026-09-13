@@ -9,13 +9,123 @@
 
 ---
 
+## Responsive pass 320px → 4K — 2026-09-13
+
+- Full sweep of all 23 pages + 69 components at 320px → 4K/ultrawide (INP < 200 ms,
+  no functionality broken). At 320px the usable column is 288px (px-4) → ~192px inside
+  `p-6` cards, so the failures were `whitespace-nowrap` action rows and `max-w-xs`
+  (320px) inputs wider than their container.
+- **Fixes** (logged: `OffersPage`, `LandingPage`, `CreateOfferPage`, `EditOfferPage`,
+  `TradePage`, `OperatorDashboardPage`):
+  - OffersPage filter bar → `flex flex-wrap`, search `w-full sm:max-w-xs`.
+  - LandingPage hero → `flex-wrap justify-center`, `ml-2` removed.
+  - Buy/Sell toggle (Create/EditOffer) → `grid grid-cols-2 gap-3 md:flex md:justify-center md:gap-4`, buttons `w-full md:w-40`.
+  - TradePage payment row → `flex flex-col sm:flex-row`, button `flex-1 sm:flex-none`.
+  - OperatorDashboard → conversation/transcript headers `truncate min-w-0` + `shortAddress()`,
+    badge/time `shrink-0`; report-resolution modal footer stacks + action cluster
+    `grid grid-cols-1 sm:grid-cols-3 w-full md:w-auto`; search inputs `w-full sm:max-w-xs`
+    (3 posti).
+- Verified: `npm run build` green, `npm run lint` 0 errors (3 pre-existing warnings).
+  Sweep confirmed OK: chat `w-[380px]` md-only, `min-w-[200px]` TableHead only inside a
+  scrollable table, modals `fixed inset-0 p-4` + `w-full max-w-*`, Navbar/DocsLayout
+  mobile drawers. A future browser pass can add 320px width assertions (see ADR-006
+  Playwright smoke follow-up).
+
+## OD-02 — Restricted reader: `anon` column projection live (ADR-008) — 2026-09-13
+
+- **Migrations pushed live** (progetto `tauyciaavhnopeseecmz`):
+  - `20260915000002_od02_public_reader_projection.sql` — `revoke select` tabella
+    da `anon` su `users`/`offers` + `grant select` dinamico delle sole colonne pubbliche
+    (drop-and-regrant: il column-REVOKE da solo è no-op con grant tabella ancora attivo).
+    `authenticated`/sessioni SIWE intatte.
+  - Repair preesistente: due migration con lo stesso nome `20260913000001`
+    (una veniva mascherata da `db push`) → rinominata in `20260915000003_fix_trade_ratings_insert_policy.sql`
+    e `20260915000004_archive_offer_on_trade_created.sql` (idempotenti) + `migration repair
+    --status reverted 20260913000001` + `db push --include-all`.
+- **Worker + client in sync con la proiezione** (`PUBLIC_OFFER_COLUMNS` / `PUBLIC_USER_COLUMNS` /
+  `SELLER_JOIN`): `functions/_lib/public-data.ts` (select espliciti, addio `select=*` sul profilo) e
+  `src/lib/supabase/index.ts` (`getActiveOffers`, `getOfferById`, `getOffersBySeller`, `getUserByWallet`,
+  `ensureUser` via `userColumnsForRead` — il proprietario autenticato legge `'*'`, il resto la proiezione).
+  Tolte dalla proiezione le colonne stat denormalized (`total_volume`, `last_30d_trades`,
+  `last_30d_volume`) perché non esistono sul DB live (schema drift) — 42703 nel worker altrimenti.
+- **Verified live**:
+  - anon `select=role|website|last_active_at|views|updated_at` → **42501**; `select=*` → 42501
+  - proiezione anon e join `seller:users!offers_seller_id_fkey(...)` → **200**
+  - edge pages: `/app/offers`, `/app/offer/09efcc61…`, `/app/profile/0x9c4c…` → 200,
+    `__EDGE_DATA__` senza colonne escluse; claim RLS di anon 401/403 di prima pagina come baseline
+  - `npm run test:e2e` su live: rowsRendered, `noOffersApiCall`, `noPageErrors`
+- **Carve-out**: l'anon key resta nel bundle per GoTrue (rimozione totale = fase BFF, OD-05).
+
+## Fase 2 — LIVE deploy Cloudflare Pages (ADR-007 complete) — 2026-09-13
+
+- **Project**: `coffernode` Pages account P2pescrow2026 → **https://coffernode.pages.dev**
+  (deploy `--branch main`, produzione; `master` resta ambiente preview senza secrets).
+- **Secrets prod**: `SUPABASE_READ_KEY` (anon key da `.env.local`) + `PURGE_SECRET` autogenerato.
+- **Verified live** (curl, `Accept: text/html` come un browser):
+  - `/app/messages` privata → `cache-control: no-store` · `x-edge-route: private`
+  - `/app/offers` pubblica → `cache-control: public, max-age=0, s-maxage=300, stale-while-revalidate=300` ·
+    `x-edge-route: public` · `#__EDGE_DATA__` iniettato (7 offerte reali nel blob, navigato fino al
+    detail `09efcc61…` con seller risolto via `users!offers_seller_id_fkey`)
+  - `/api/cache-purge` → 401 senza segreto, 200 `{"purged":[marketplace+detail]}` con segreto
+  - `npm run test:e2e` locale verde (trader row render, 0 chiamate Supabase, node rimosso, nessun page error)
+- **Ops notes**: `curl` senza `Accept: text/html` bypassa il middleware (non-document → `next()`); le secrets sono
+  per-environment (la preview `master` non le ha → purge 500 "purge secret not configured" lì, normal).
+  `deploy:cf` ora include `--branch main`.
+- **Pendente**: webhook Supabase su `offers`/`users` → `/api/cache-purge` (dashboard, vedi `cloudflare-deploy.md` §5).
+
+## Fase 2 — Edge document layer + edge-data hydration — 2026-09-13
+
+- **Per-route edge** (`functions/_middleware.ts` + `public/_routes.json`):
+  document navigations go through the Pages Function. Public routes (landing,
+  docs, offers, offer detail, public profile) get the built shell with a
+  public projection injected as `#__EDGE_DATA__` and edge-cacheable
+  `s-maxage`+SWR; private routes (trades, messages, disputes, operator, edit)
+  return `Cache-Control: no-store` with no data. Non-document requests bypass.
+- **Client hydration** (`src/lib/edgeData.ts`): reads the blob pre-render and
+  seeds react-query (`['offers']` / `['offer',id]` / `['user-profile',addr]`);
+  `hydrateQueryCache` gained `skipExisting` so edge data wins over the stale
+  localStorage snapshot. → deep links paint with server-fresh data, no flash.
+- **Invalidation** (`functions/api/cache-purge.ts`): `PURGE_SECRET`-guarded
+  webhook endpoint purges the mapped public URLs on `offers`/`users` writes.
+- **Security baseline** (`public/_headers` + middleware): CSP, nosniff,
+  Referrer-Policy, X-Frame-Options, Permissions-Policy, COOP/CORP; `/assets/*`
+  immutable. `wrangler.toml` + `.dev.vars.example` for the Pages project.
+- **Verification**: `npm run test:e2e` (`tests/e2e/edge-hydration.cjs`) —
+  seeded offer renders, **0 Supabase offers calls** on first paint, node
+  removed, no page errors. Functions compile via `wrangler pages functions
+  build`. Local workerd can't run on this mac (OS ≤ 13.4) → live deploy still
+  pending (Pages project + secrets + Supabase webhooks).
+- Registered as ADR-007; OD-03/OD-04 moved to "implemented in repo".
+
+## Delivery: route-level code splitting + lazy i18n — 2026-09-13
+
+- **Split**: ogni pagina (`/app/*`, `/docs/*`, `/`) è ora un chunk lazy via
+  `React.lazy`; entry chunk sceso da **~1.9 MB a ~110 KB**. Layout, navbar e
+  shell restano eager come boundary Suspense.
+- **Loading UX**: nuovo `AppPageFallback` (scheletro con token design,
+  `aria-busy`) mostrato dentro ogni layout — la navbar resta montata mentre
+  il chunk della rotta carica.
+- **i18n** (`src/i18n.ts`): solo `en` è bundlato; le altre lingue sono chunk
+  Vite caricati on-demand (`import.meta.glob`) al primo switch, mai nel primo
+  payload. `t()` resta sincrono (fallback `en` sempre presente).
+- **Bundle vendor** (`vite.config.ts`): `manualChunks` stabile in bucket
+  cacheable (`web3`, `charts`, `ipfs`, `ui`, `backend`, `data`, `fx`,
+  `react`), `chunkSizeWarningLimit` 500 KB, `reportCompressedSize`.
+- Il peso residuo del primo load dominio proviene dallo stack wallet
+  (wagmi/rainbowkit/walletconnect ≈ 3 MB nel chunk `web3`), da assottigliare
+  in Fase 3 (deferred mount della Connect Wallet + prerender edge sulle
+  rotte pubbliche).
+
+> Decisioni registrate in `docs/adr.md` (ADR-001…006, OD-01…05) e tracciate in
+> `docs/todo.md` → "Frontend — Fase 0→3".
+
 ## Offer auto-archived when a trade is opened — 2026-09-13
 
 - **Product rule**: an offer is one-shot — the moment a taker opens a trade
   against it, the offer is consumed and must leave the public marketplace
   (getActiveOffers only returns `status='active'`), living on only in the
   seller's own offers table.
-- **Fix** (`supabase/migrations/20260913000001_archive_offer_on_trade_created.sql`):
+- **Fix** (`supabase/migrations/20260915000004_archive_offer_on_trade_created.sql`):
   new SECURITY DEFINER trigger `trg_archive_offer_on_trade_created` (AFTER
   INSERT on `trades`) flips `offers.status` → `completed` atomically with trade
   creation — no client race, works for every write path.

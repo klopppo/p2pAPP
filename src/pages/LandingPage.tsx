@@ -51,12 +51,12 @@ export function LandingPage() {
                   Online now
                 </span>
               </div>
-              <div className="flex justify-center">
+              <div className="flex flex-wrap justify-center gap-x-2">
                 <TypingEffect
                   texts={['Trustless', 'Secure', 'Private']}
                   className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground"
                 />
-                <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground tracking-tight ml-2">
+                <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground tracking-tight">
                   CofferNode
                 </h1>
               </div>

@@ -50,7 +50,7 @@ import {
   type SupportMessage,
   type SupportThreadStatus,
 } from '@/lib/supportChatService'
-import { shortTradeId } from '@/lib/utils'
+import { shortAddress, shortTradeId } from '@/lib/utils'
 import type {
   UserActivityLog,
   UserReport,
@@ -582,7 +582,7 @@ export function OperatorDashboardPage() {
                   placeholder="Cerca per wallet o messaggio..."
                   value={supportFilterSearch}
                   onChange={(e) => setSupportFilterSearch(e.target.value)}
-                  className="pl-9 rounded-full max-w-xs h-9 text-xs"
+                  className="pl-9 rounded-full w-full sm:max-w-xs h-9 text-xs"
                 />
               </div>
 
@@ -1093,22 +1093,22 @@ export function OperatorDashboardPage() {
                     </div>
                   )}
 
-                  <div className="flex justify-between items-center pt-3 border-t border-border/50">
+                  <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 pt-3 border-t border-border/50">
                     <Button
                       variant="ghost"
                       onClick={() => setSelectedReport(null)}
-                      className="rounded-full"
+                      className="rounded-full self-start md:self-auto"
                     >
                       Chiudi
                     </Button>
 
                     {canResolveReports && (
-                      <div className="flex gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full md:w-auto">
                         <Button
                           variant="outline"
                           disabled={resolving}
                           onClick={() => handleResolveReport('DISMISSED')}
-                          className="rounded-full gap-1 text-xs"
+                          className="rounded-full gap-1 text-xs w-full"
                         >
                           <uiIcons.xCircle className="w-4 h-4 text-muted-foreground" />{' '}
                           Respingi
@@ -1117,7 +1117,7 @@ export function OperatorDashboardPage() {
                           variant="secondary"
                           disabled={resolving}
                           onClick={() => handleResolveReport('IN_REVIEW')}
-                          className="rounded-full gap-1 text-xs"
+                          className="rounded-full gap-1 text-xs w-full"
                         >
                           <uiIcons.clock className="w-4 h-4" /> In Revisione
                         </Button>
@@ -1125,7 +1125,7 @@ export function OperatorDashboardPage() {
                           variant="default"
                           disabled={resolving}
                           onClick={() => handleResolveReport('RESOLVED')}
-                          className="rounded-full gap-1 text-xs"
+                          className="rounded-full gap-1 text-xs w-full"
                         >
                           <uiIcons.checkCircle className="w-4 h-4" /> Risolvi & Chiudi
                         </Button>
@@ -1150,7 +1150,7 @@ export function OperatorDashboardPage() {
                   placeholder="Cerca per wallet..."
                   value={logFilterWallet}
                   onChange={(e) => setLogFilterWallet(e.target.value)}
-                  className="pl-9 rounded-full max-w-xs h-9 text-xs"
+                  className="pl-9 rounded-full w-full sm:max-w-xs h-9 text-xs"
                 />
               </div>
 
@@ -1160,7 +1160,7 @@ export function OperatorDashboardPage() {
                   placeholder="Filtra per azione (es. ESCROW)..."
                   value={logFilterAction}
                   onChange={(e) => setLogFilterAction(e.target.value)}
-                  className="pl-9 rounded-full max-w-xs h-9 text-xs"
+                  className="pl-9 rounded-full w-full sm:max-w-xs h-9 text-xs"
                 />
               </div>
 
@@ -1435,14 +1435,14 @@ export function OperatorDashboardPage() {
                             : 'bg-card/40 border-border/40 hover:bg-card/70'
                         }`}
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-mono font-bold">
-                            {conv.user_a_wallet} ↔ {conv.user_b_wallet}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-mono font-bold truncate min-w-0">
+                            {shortAddress(conv.user_a_wallet)} ↔ {shortAddress(conv.user_b_wallet)}
                           </span>
                           {conv.has_report && (
                             <Badge
                               variant="destructive"
-                              className="rounded-full text-[10px] px-1.5 py-0"
+                              className="rounded-full text-[10px] px-1.5 py-0 shrink-0"
                             >
                               Segnalata
                             </Badge>
@@ -1516,11 +1516,11 @@ export function OperatorDashboardPage() {
                                 : 'bg-card border border-border/40'
                             }`}
                           >
-                            <div className="flex justify-between items-center">
-                              <span className="font-mono font-semibold text-foreground">
-                                {m.sender_wallet}
+                            <div className="flex justify-between items-center gap-2">
+                              <span className="font-mono font-semibold text-foreground truncate min-w-0">
+                                {shortAddress(m.sender_wallet)}
                               </span>
-                              <span className="text-[10px] text-muted-foreground">
+                              <span className="text-[10px] text-muted-foreground shrink-0">
                                 {new Date(m.created_at).toLocaleTimeString()}
                               </span>
                             </div>

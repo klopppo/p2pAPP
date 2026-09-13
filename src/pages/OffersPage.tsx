@@ -197,9 +197,9 @@ export function OffersPage() {
                 placeholder={t('offers.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="max-w-xs rounded-full border-border"
+                className="w-full sm:max-w-xs rounded-full border-border"
               />
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <FullDropdown
                   label={t('offers.typeLabel')}
                   value={typeFilter}

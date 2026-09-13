@@ -393,11 +393,11 @@ export function EditOfferPage() {
           {/* Type Selection */}
           <div>
             <Label className="text-base font-semibold mb-2 block">{t('editOffer.offerType')}</Label>
-            <div className="flex justify-center gap-4">
+            <div className="grid grid-cols-2 gap-3 md:flex md:justify-center md:gap-4">
               <Button
                 type="button"
                 onClick={() => setFormData({ ...formData, type: 'buy' })}
-                className={`w-40 justify-center rounded-full ${
+                className={`w-full md:w-40 justify-center rounded-full ${
                   formData.type === 'buy'
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted text-foreground hover:bg-muted/70'
@@ -408,7 +408,7 @@ export function EditOfferPage() {
               <Button
                 type="button"
                 onClick={() => setFormData({ ...formData, type: 'sell' })}
-                className={`w-40 justify-center rounded-full ${
+                className={`w-full md:w-40 justify-center rounded-full ${
                   formData.type === 'sell'
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted text-foreground hover:bg-muted/70'

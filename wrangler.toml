@@ -1,0 +1,17 @@
+# Cloudflare Pages project — Fase 2 edge layer
+#
+# Build output (Vite `dist/`) is uploaded by `wrangler pages deploy`.
+# Non-secret config lives here; SECRETS must be set via
+#   npx wrangler pages secret put SUPABASE_READ_KEY --project-name coffernode
+#   npx wrangler pages secret put PURGE_SECRET      --project-name coffernode
+#
+# Runtime env var names are already in code (see functions/_middleware.ts),
+# so `wrangler pages dev` needs a copies in .dev.vars (see .dev.vars.example).
+
+name = "coffernode"
+compatibility_date = "2026-08-01"
+pages_build_output_dir = "dist"
+
+[vars]
+# Public endpoint only — never put a service key here.
+SUPABASE_URL = "https://tauyciaavhnopeseecmz.supabase.co"

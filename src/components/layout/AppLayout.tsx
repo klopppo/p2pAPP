@@ -1,4 +1,5 @@
-import { useEffect, type ReactNode } from 'react'
+import { Suspense, useEffect, type ReactNode } from 'react'
+import { AppPageFallback } from '@/components/custom/AppPageFallback'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Navbar } from './Navbar'
 import { Footer } from './Footer'
@@ -61,7 +62,9 @@ export function AppLayout({ children }: AppLayoutProps) {
       <main className={cn('flex-1 flex flex-col min-h-0', isChat && 'overflow-hidden')}>
         <GlobalPresenceProvider>
           <PageContainer type="app" padded={!isChat}>
-            {children || <Outlet />}
+            <Suspense fallback={<AppPageFallback />}>
+              {children || <Outlet />}
+            </Suspense>
           </PageContainer>
         </GlobalPresenceProvider>
       </main>
