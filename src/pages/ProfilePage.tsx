@@ -30,8 +30,6 @@ import { getOrCreateDirectConversation } from '@/lib/supabase'
 import { AddressWithActions } from '@/components/custom/AddressWithActions'
 import { useTranslation } from 'react-i18next'
 import { ReviewList } from '@/components/custom/ReviewList'
-import { RatingBreakdown } from '@/components/custom/RatingBreakdown'
-import { useUserReviews, useUserReputation } from '@/hooks/useReviews'
 import { currencySymbol } from '@/lib/utils'
 
 // Local UI shape for the offers table. Mirrors what OffersTableWrapper expects;
@@ -367,23 +365,16 @@ export function ProfilePage() {
                 <div className="flex justify-between"><span className="text-muted-foreground">{t('profile.disputes')}</span><span>{formatNumber(disputeCount)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">{t('profile.completionRate')}</span><span>{completionRate}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">{t('profile.verification')}</span><span className="capitalize">{profile.verification_level ?? 'unverified'}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">{t('profile.reputation')}</span><span>{profile.reputation_score ?? 0}</span></div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Rating breakdown (uses cached trade_ratings) */}
-          <ProfileRatingsCard userId={profile.id} />
-
-          {/* Ratings & Feedback */}
+          {/* Ratings & Feedback — stars + written reviews */}
           <ReviewList userId={profile.id} />
         </div>
 
         {/* Right column */}
         <div className="flex flex-col gap-4">
-          {/* Reputation breakdown (cached reputation_scores row) */}
-          <ProfileReputationCard userId={profile.id} />
-
           {/* Total Trades */}
           <Card>
             <CardContent>
@@ -478,80 +469,5 @@ export function ProfilePage() {
         </OffersTableWrapper>
       </div>
     </section>
-  )
-}
-
-// ── Inline cards wired to reputation hooks ──────────────────────────────────
-
-function ProfileRatingsCard({ userId }: { userId: string }) {
-  const { t } = useTranslation()
-  const { data: reviews = [], isLoading } = useUserReviews(userId)
-  return (
-    <Card>
-      <CardContent className="space-y-3">
-        <Text variant="h4" className="font-bold">{t('profile.ratingsBreakdown')}</Text>
-        {isLoading ? (
-          <Text variant="muted" className="text-xs">{t('profile.loading')}</Text>
-        ) : reviews.length === 0 ? (
-          <Text variant="muted" className="text-xs">{t('profile.noRatingsYet')}</Text>
-        ) : (
-          <RatingBreakdown reviews={reviews as Array<Pick<import('@/types/database').TradeRating, 'score'>>} />
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
-function ProfileReputationCard({ userId }: { userId: string }) {
-  const { t } = useTranslation()
-  const { data: rep, isLoading } = useUserReputation(userId)
-  if (isLoading) {
-    return (
-      <Card>
-        <CardContent>
-          <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">{t('profile.reputation')}</Text>
-          <Text variant="muted" className="text-xs mt-1">{t('profile.loading')}</Text>
-        </CardContent>
-      </Card>
-    )
-  }
-  if (!rep) {
-    return (
-      <Card>
-        <CardContent>
-          <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">{t('profile.reputation')}</Text>
-          <Text variant="muted" className="text-xs mt-1">{t('profile.noReputationYet')}</Text>
-        </CardContent>
-      </Card>
-    )
-  }
-  return (
-    <Card>
-      <CardContent className="space-y-3">
-        <div>
-          <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">{t('profile.reputation')}</Text>
-          <Text variant="h3" className="mt-1">{rep.overall}<span className="text-sm text-muted-foreground ml-1">/ 100</span></Text>
-        </div>
-        <div className="space-y-2">
-          <RepRow label={t('profile.repCommunication')} value={rep.communication} />
-          <RepRow label={t('profile.repSpeed')} value={rep.speed} />
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function RepRow({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="text-sm text-muted-foreground w-32 shrink-0">{label}</span>
-      <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-        <div
-          className="h-full bg-primary rounded-full transition-all"
-          style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
-        />
-      </div>
-      <span className="font-mono text-xs w-8 text-right">{value}</span>
-    </div>
   )
 }

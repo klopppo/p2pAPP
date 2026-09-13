@@ -12,6 +12,7 @@ import {
   getUserByWallet,
   getOffersBySeller,
   listConversations,
+  listMessages,
   listNotifications,
   ensureDefaultNotificationPreferences,
   getNotificationPreferences,
@@ -83,5 +84,27 @@ export function usePrefetchAppData() {
       if (!u) return []
       return getDisputesByUser(u.id)
     })
+
+    // Warm the latest messages of EVERY conversation (active + archived) so
+    // opening any chat from anywhere in the app — or a notification deep-link —
+    // shows the already-received messages immediately instead of fetching on
+    // mount. Key matches `useMessages`'s `messagesKey`.
+    void (async () => {
+      try {
+        const [active, archived] = await Promise.all([
+          listConversations(userId, { archived: false }),
+          listConversations(userId, { archived: true }),
+        ])
+        for (const conv of [...active, ...archived]) {
+          void qc.prefetchQuery({
+            queryKey: ['messages', conv.id, sessionWallet],
+            queryFn: () => listMessages(conv.id, { limit: 50 }),
+            staleTime,
+          })
+        }
+      } catch (err) {
+        console.warn('[usePrefetchAppData] message warm-up failed:', err)
+      }
+    })()
   }, [hasSession, sessionWallet, address, chainId, userId, qc])
 }
