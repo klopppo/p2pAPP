@@ -5,6 +5,29 @@
 
 ---
 
+## 🌍 Referral program ("Invite & Earn") — ADR-009
+
+- [x] **Server credit on escrow release** — migration `20260915000005_referral_program.sql`:
+      `referral_codes` + `referral_relations` + `referral_fee_events`, RPCs
+      (`get_or_create_referral_code`, `claim_referral`, `credit_referral_fee`),
+      SECURITY DEFINER release-trigger, owner-scoped RLS, `calculate_fee_split`
+      mirrored in `src/lib/referral.ts`. _(2026-09-15)_
+- [x] **Client surface** — `InviteEarnCard` on own profile (link + copy, share
+      badge, pending/total ledger, friends list), `/r/:code` `ReferralLandingPage`,
+      automatic claim in `useSyncUser` on first authenticated session.
+      _(2026-09-15)_
+- [x] **Tests** — `tests/referral.spec.ts` (maths/code/URL) +
+      `tests/security/rls-referral.spec.ts` (fail-closed RLS + server-only
+      credit); `rls-model` CORE_TABLES extended. _(2026-09-15)_
+- [ ] **Payout/withdraw flow (OD-06)** — `pending` → `paid` transition UI and a
+      withdraw ledger or on-chain settlement for the referrer.
+- [ ] **Referral i18n for non-`en` locales** — `referral.*` keys exist in `en`
+      only; mirror `es/fr/tr/zh`.
+- [ ] **Referral FAQ + docs page** — explain share %, attribution, and the
+      GDPR posture in the marketing/docs surface.
+
+---
+
 ## 🔴 High priority — Security P1 (see `security-audit.md` for detail)
 
 > P0 items shipped 2026-08-29 (email relay + reputation RPC). The SIWE edge

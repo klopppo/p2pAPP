@@ -11,6 +11,10 @@
     "globalPreferences": "Genel tercihler",
     "language": "Dil",
     "currency": "Para birimi",
+    "theme": "Tema",
+    "themeLight": "Açık",
+    "themeDark": "Koyu",
+    "themeSystem": "Sistem",
     "back": "Geri",
     "toggleMenu": "Menüyü aç/kapat",
     "operator": "Operatör Portalı"

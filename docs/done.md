@@ -9,6 +9,38 @@
 
 ---
 
+## Theme selector in Global Preferences — 2026-09-14
+
+Theme picker (Light / Dark / System) added to the Navbar "Global preferences"
+dropdown, mirroring the Language/Currency row pattern. `useTheme` from
+`theme-provider.tsx` powers it; `localStorage('theme')` + `.dark` class
+unchanged. i18n: `nav.theme*` keys added to en/es/fr/tr/zh. Keyboard shortcut
+`d` still works.
+- Files: `src/components/layout/Navbar.tsx`, `src/locales/{en,es,fr,tr,zh}.json`.
+
+---
+
+## Referral program ("Invite & Earn") — 2026-09-15
+
+- **Migration `20260915000005_referral_program.sql`** — three new tables
+  (`referral_codes`, `referral_relations`, `referral_fee_events`) with
+  fail-closed, owner-scoped RLS (`current_user_id()` select-only; zero client
+  writes). RPCs: `get_or_create_referral_code`, `claim_referral`
+  (self-referral/double-claim/invalid guards), `credit_referral_fee` +
+  SECURITY DEFINER trigger on `trades.escrow_status → released` (idempotent,
+  UNIQUE `trade_id`). `calculate_fee_split` mirrors `src/lib/referral.ts`
+  (`REFERRER_SHARE_BPS = 1500` → 15% della fee piattaforma; fee =
+  `fiat × bps / 10000`).
+- **Client**: `InviteEarnCard` nel profilo owner (link + copia, badge share,
+  ledger pending/total, lista amici), `ReferralLandingPage` su `/r/:code`
+  (attribuzione first-touch senza PII via localStorage), claim automatico in
+  `useSyncUser` al primo session autenticato del nuovo wallet. `ReferralDashboard`
+  via `getReferralDashboard`.
+- **Tests green**: `tests/referral.spec.ts` (matematica/codici/URL) +
+  `tests/security/rls-referral.spec.ts` (fail-closed RLS, credit server-only,
+  mirror SQL↔TS); `rls-model` CORE_TABLES esteso alle 3 tabelle.
+- **ADR-009** + follow-up OD-06 in `docs/adr.md`; `docs/todo.md` aggiornato.
+
 ## Responsive pass 320px → 4K — 2026-09-13
 
 - Full sweep of all 23 pages + 69 components at 320px → 4K/ultrawide (INP < 200 ms,

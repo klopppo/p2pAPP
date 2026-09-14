@@ -4,8 +4,9 @@ import { useAccount } from 'wagmi'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { clearPersistedQueryCache } from '@/lib/queryPersister'
-import { ensureWalletSession, recoverWalletSession, signOut } from '@/lib/supabase'
+import { ensureWalletSession, recoverWalletSession, signOut, claimReferral } from '@/lib/supabase'
 import { signWalletMessage } from '@/lib/walletSigner'
+import { consumePendingReferral, isValidReferralCode } from '@/lib/referral'
 
 const SUCCESS_KEY = 'coffernode:siwe:last'
 
@@ -125,6 +126,11 @@ export function useSyncUser() {
         }
         // If `user` is null the user declined the wallet signature — stay
         // read-only for this wallet.
+        if (user) {
+          void claimPendingReferralIfPresent().catch((err) =>
+            console.warn('[useSyncUser] referral claim failed:', err),
+          )
+        }
       })
       .catch((error) => {
         if (tokenRef.current !== myToken) return
@@ -133,6 +139,21 @@ export function useSyncUser() {
         syncedAddress.current = null
       })
   }, [address, isConnected, navigate, qc])
+}
+
+/**
+ * Best-effort first-touch attribution: if this device landed on a /r/CODE
+ * link before the wallet completed its first session, claim the code now.
+ * `consumePendingReferral` clears the marker whatever the outcome, so a bad
+ * or already-used code can't loop on every reconnect.
+ */
+async function claimPendingReferralIfPresent(): Promise<void> {
+  const code = consumePendingReferral()
+  if (!code || !isValidReferralCode(code)) return
+  const result = await claimReferral(code)
+  if (!result.ok && result.error) {
+    console.warn('[useSyncUser] referral rejected:', result.error)
+  }
 }
 
 /**

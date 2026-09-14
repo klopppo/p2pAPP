@@ -33,6 +33,10 @@ const lazyNamed = (
 ) => lazy(() => loader().then((mod) => ({ default: mod[name] as ComponentType })))
 
 const LandingPage = lazyNamed(() => import('./pages/LandingPage'), 'LandingPage')
+const ReferralLandingPage = lazyNamed(
+  () => import('./pages/ReferralLandingPage'),
+  'ReferralLandingPage',
+)
 const OffersPage = lazyNamed(() => import('./pages/OffersPage'), 'OffersPage')
 const ProfilePage = lazyNamed(() => import('./pages/ProfilePage'), 'ProfilePage')
 const EditProfilePage = lazyNamed(() => import('./pages/EditProfilePage'), 'EditProfilePage')
@@ -153,6 +157,7 @@ function App() {
             <Suspense fallback={<AppPageFallback />}>
               <Routes>
                 <Route path="/" element={<LandingPage />} />
+                <Route path="/r/:code" element={<ReferralLandingPage />} />
                 <Route path="/app" element={<AppLayout><Outlet /></AppLayout>}>
                   <Route path="offers" element={<OffersPage />} />
                   <Route path="profile" element={<ProfilePage />} />

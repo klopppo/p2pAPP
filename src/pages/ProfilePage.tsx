@@ -30,6 +30,7 @@ import { getOrCreateDirectConversation } from '@/lib/supabase'
 import { AddressWithActions } from '@/components/custom/AddressWithActions'
 import { useTranslation } from 'react-i18next'
 import { ReviewList } from '@/components/custom/ReviewList'
+import { InviteEarnCard } from '@/components/custom/InviteEarnCard'
 import { currencySymbol } from '@/lib/utils'
 
 // Local UI shape for the offers table. Mirrors what OffersTableWrapper expects;
@@ -379,6 +380,9 @@ export function ProfilePage() {
 
         {/* Right column */}
         <div className="flex flex-col gap-4">
+          {/* Invite & Earn — own profile only (reads are owner-scoped by RLS). */}
+          {isOwnProfile && user && <InviteEarnCard userId={user.id} />}
+
           {/* Total Trades */}
           <Card>
             <CardContent>

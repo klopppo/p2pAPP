@@ -681,6 +681,69 @@ export interface NotificationPreferences {
 }
 
 // =================================================================
+// REFERRAL PROGRAM
+// =================================================================
+
+export const ReferralStatus = {
+  PENDING: 'pending',
+  ACTIVE: 'active',
+} as const
+export type ReferralStatus = typeof ReferralStatus[keyof typeof ReferralStatus]
+
+export const ReferralRewardStatus = {
+  PENDING: 'pending',
+  PAID: 'paid',
+} as const
+export type ReferralRewardStatus =
+  typeof ReferralRewardStatus[keyof typeof ReferralRewardStatus]
+
+export interface ReferralCode {
+  id: string
+  user_id: string
+  code: string
+  created_at: string
+}
+
+export interface ReferralRelation {
+  id: string
+  referrer_id: string
+  referred_user_id: string
+  code: string
+  status: ReferralStatus
+  attributed_at: string
+}
+
+export interface ReferralRelationWithUser extends ReferralRelation {
+  referred?: {
+    wallet_address: string
+    nickname: string | null
+    avatar_url: string | null
+  } | null
+}
+
+export interface ReferralFeeEvent {
+  id: string
+  trade_id: string
+  referrer_id: string
+  referred_user_id: string
+  fee_bps: number
+  fee_amount: number
+  referrer_share_bps: number
+  earned_amount: number
+  status: ReferralRewardStatus
+  created_at: string
+}
+
+export interface ReferralDashboard {
+  code: string | null
+  referred: ReferralRelationWithUser[]
+  events: ReferralFeeEvent[]
+  totalEarned: number
+  pendingEarned: number
+  paidEarned: number
+}
+
+// =================================================================
 // STUDIO-SAFE MOCKS (for development)
 // =================================================================
 

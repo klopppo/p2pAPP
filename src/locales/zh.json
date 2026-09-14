@@ -11,6 +11,10 @@
     "globalPreferences": "全局偏好",
     "language": "语言",
     "currency": "货币",
+    "theme": "主题",
+    "themeLight": "浅色",
+    "themeDark": "深色",
+    "themeSystem": "跟随系统",
     "back": "返回",
     "toggleMenu": "切换菜单",
     "operator": "运营门户"

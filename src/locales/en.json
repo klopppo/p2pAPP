@@ -12,6 +12,10 @@
     "globalPreferences": "Global preferences",
     "language": "Language",
     "currency": "Currency",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
     "back": "Back",
     "toggleMenu": "Toggle menu"
   },
@@ -168,6 +172,20 @@
     "errorStartChat": "Couldn't start the chat — please try again.",
     "messageStarting": "Opening…",
     "errorUnknownUser": "This user hasn't completed sign-in yet — try again in a few seconds."
+  },
+  "referral": {
+    "title": "Invite & Earn",
+    "loading": "Loading your invite link…",
+    "getMyLink": "Get my invite link",
+    "revealFailed": "Couldn't create your invite link — try again.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "linkCopied": "Invite link copied",
+    "copyFailed": "Couldn't copy the link — please copy it manually.",
+    "pending": "Pending",
+    "totalEarned": "Total earned",
+    "friends": "Friends referred",
+    "trades": "Earning trades"
   },
   "trades": {
     "title": "Trades",

@@ -133,6 +133,9 @@ describe("final RLS posture: allow/deny per table × role × command", () => {
       "notification_preferences",
       "disputes",
       "dispute_evidence",
+      "referral_codes",
+      "referral_relations",
+      "referral_fee_events",
     ]) {
       for (const p of policiesFor(t)) {
         if (p.cmd !== "all" && p.cmd !== "select") continue
@@ -202,7 +205,7 @@ describe("final RLS posture: allow/deny per table × role × command", () => {
     expect(insert).toBeDefined()
     expect(insert!.check).toContain("rater_id = public.current_user_id()")
     expect(insert!.check).toMatch(
-      /t\.buyer_id = public\.current_user_id\(\) or t\.seller_id = public\.current_user_id\(\)/
+      /t\.buyer_id = public\.current_user_id\(\)\s*or\s*t\.seller_id = public\.current_user_id\(\)/
     )
   })
 

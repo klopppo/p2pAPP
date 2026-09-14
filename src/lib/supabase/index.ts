@@ -18,6 +18,9 @@ import type {
   Notification,
   NotificationChannel,
   NotificationPreferences,
+  ReferralDashboard,
+  ReferralRelationWithUser,
+  ReferralFeeEvent,
 } from '@/types/database'
 
 // Environment variables (these should be set in .env.local)
@@ -2349,6 +2352,91 @@ export async function ensureDefaultNotificationPreferences(userId: string) {
     .upsert(rows, { onConflict: 'user_id,channel', ignoreDuplicates: true })
   if (error) {
     console.error('Error ensuring default notification preferences:', error)
+  }
+}
+
+// =================================================================
+// REFERRAL PROGRAM ("Invite & Earn")
+// =================================================================
+
+/**
+ * Return (minting on first call) the caller's opaque referral code.
+ * Writes go through the SECURITY DEFINER RPC — `referral_codes` has no client
+ * insert policy.
+ */
+export async function getOrCreateReferralCode(): Promise<string | null> {
+  const { data, error } = await supabase.rpc('get_or_create_referral_code')
+  if (error) {
+    console.error('Error fetching referral code:', error)
+    return null
+  }
+  return (data as string) ?? null
+}
+
+/**
+ * Attribute the current session user to a referrer code (first-touch claim).
+ * Fails safely on bad codes / self-referral / double-claim — the RPC raises
+ * exceptions the caller surfaces as an error string.
+ */
+export async function claimReferral(
+  code: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const { error } = await supabase.rpc('claim_referral', { p_code: code })
+  if (error) {
+    console.warn('[claimReferral] rejected:', error.message)
+    return { ok: false, error: error.message }
+  }
+  return { ok: true }
+}
+
+/**
+ * Full referral dashboard for the signed-in referrer: relations (with referred
+ * profile), earning events, and running totals. Reads are owner-scoped by RLS.
+ */
+export async function getReferralDashboard(
+  userId: string,
+): Promise<ReferralDashboard> {
+  const [codeRes, relationsRes, eventsRes] = await Promise.all([
+    supabase
+      .from('referral_codes')
+      .select('code')
+      .eq('user_id', userId)
+      .maybeSingle(),
+    supabase
+      .from('referral_relations')
+      .select(
+        `*, referred:users!referral_relations_referred_user_id_fkey (
+          wallet_address, nickname, avatar_url
+        )`,
+      )
+      .eq('referrer_id', userId)
+      .order('attributed_at', { ascending: false }),
+    supabase
+      .from('referral_fee_events')
+      .select('*')
+      .eq('referrer_id', userId)
+      .order('created_at', { ascending: false }),
+  ])
+
+  const relations: ReferralRelationWithUser[] = relationsRes.data ?? []
+  const events: ReferralFeeEvent[] = eventsRes.data ?? []
+
+  const totalEarned = events.reduce(
+    (sum, e) => sum + (Number(e.earned_amount) || 0),
+    0,
+  )
+  const pendingEarned = events
+    .filter((e) => e.status === 'pending')
+    .reduce((sum, e) => sum + (Number(e.earned_amount) || 0), 0)
+  const paidEarned = totalEarned - pendingEarned
+
+  return {
+    code: (codeRes.data?.code as string | undefined) ?? null,
+    referred: relations,
+    events,
+    totalEarned,
+    pendingEarned,
+    paidEarned,
   }
 }
 

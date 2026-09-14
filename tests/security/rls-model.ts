@@ -386,6 +386,9 @@ export const CORE_TABLES = [
   "reputation_points",
   "reputation_badges",
   "reputation_recent_stats",
+  "referral_codes",
+  "referral_relations",
+  "referral_fee_events",
   "siwe_nonces",
   "siwe_auth_links",
 ]

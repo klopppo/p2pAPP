@@ -11,6 +11,10 @@
     "globalPreferences": "Preferencias globales",
     "language": "Idioma",
     "currency": "Moneda",
+    "theme": "Tema",
+    "themeLight": "Claro",
+    "themeDark": "Oscuro",
+    "themeSystem": "Sistema",
     "back": "Volver",
     "toggleMenu": "Alternar menú",
     "operator": "Portal de operadores"

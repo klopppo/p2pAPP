@@ -20,6 +20,7 @@
 | ADR-006 | Route/chunk/i18n verification baseline: Playwright (Chromium) | Accepted | 2026-09-13 |
 | ADR-007 | Edge document layer + client-side edge-data hydration | Accepted (live deploy verified) | 2026-09-13 |
 | ADR-008 | Restricted public reader: `anon` column-level projection (DB + worker + client) | Accepted | 2026-09-13 |
+| ADR-009 | Referral program ("Invite & Earn"): server-credited share of platform fees | Accepted | 2026-09-15 |
 | OD-01 | Defer the wallet stack off the critical path | Proposed (Fase 3) | 2026-09-13 |
 | OD-02 | Restricted reader role + minimal public projection | Accepted (Fase 1: DB column projection; anon-key removal deferred to BFF) | 2026-09-13 |
 | OD-03 | Per-route edge behaviour via `functions/_middleware.ts` + `_routes.json` (public → inject data + `s-maxage`; private → `no-store`) | Implemented in repo (deploy pending) — see ADR-007 | 2026-09-13 |
@@ -192,6 +193,50 @@ Supabase REST with the same `anon` key. `select=*` returns internal columns
 
 ---
 
+## ADR-009 — Referral program ("Invite & Earn")
+
+**Context.** CofferNode has no acquisition loop: users join organically and the
+platform fees on every trade are fully retained. To grow via existing traders,
+a referral program must reward a referrer with a share of the platform fee on
+trades by referred users — without capturing PII (GDPR), without incentive
+structures that look like inducement-to-trade (MiCA/ESMA posture), and without
+any client-side trust in the earnings ledger.
+
+**Decision.**
+- **Attribution** is opaque-code, first-touch, zero-PII: each user gets one
+  8-hex code (`referral_codes`, minted by `get_or_create_referral_code`). A
+  visitor reaching `/r/<CODE>` stashes the code in localStorage
+  (`coffernode:referral:pending`); the first *authenticated* session of a NEW
+  wallet claims it via `claim_referral` (`referral_relations`, UNIQUE on
+  `referred_user_id`). Self-referral, bad codes and double claims are rejected
+  in SQL.
+- **Credit** is server-only and idempotent: a SECURITY DEFINER trigger on
+  `trades.escrow_status → released` calls `credit_referral_fee`, which writes
+  one row to `referral_fee_events` (UNIQUE `trade_id`, `on conflict do
+  nothing`). The referrer earns `REFERRER_SHARE_BPS = 1500` (15%) of the
+  platform fee `fiat_amount × platform_fee_bps / 10000`. `credit_referral_fee`
+  is **not** granted to client roles — the release path is the only way in.
+- **Maths is mirrored**: `calculate_fee_split` (SQL) and `src/lib/referral.ts`
+  (TS) implement the same formula; the client previews earnings without a DB
+  round-trip, the DB credits what the client sees.
+- **RLS** on the three new tables is fail-closed and owner-scoped: SELECT for
+  `authenticated` only via `current_user_id()`; zero client INSERT/UPDATE/
+  DELETE policies (writes are RPC/trigger only); `anon` sees nothing.
+- **Surface**: `InviteEarnCard` on the own profile (link + copy, share badge,
+  pending/total ledger, referred friends), `ReferralLandingPage` at `/r/:code`,
+  automatic claim wired into `useSyncUser`.
+
+**Consequences.**
+- No PII collected, no emails, no contact scraping — defensible under GDPR;
+  the reward is a passive % of fees on completed escrow releases, not a
+  deposit-volume or FOMO bonus.
+- Earnings are in-app credits (status `pending`/`paid`); an on-chain payout
+  path is deliberately deferred (od-06 follow-up).
+- Client can mislead about its OWN earnings only by UI text; the ledger is
+  server-authoritative and auditable against `trade_events`/`trades`.
+- `referral_relations` attribution is permanent once claimed (no expiry in v1);
+  a "referred-but-inactive" cleanup window is a future refinement.
+
 ## Open decisions
 
 ### OD-01 — Defer the wallet stack (Fase 3)
@@ -199,6 +244,12 @@ wagmi/rainbowkit/walletconnect ≈ 3 MB ride the initial load because the shell
 imports them for sign-in. **Direction:** lazy-mount the Connect button and the
 wallet providers on first interaction; landing/docs/offers then ship without
 `web3`. Proved convex to ADR-001/003; verify against RLS/anon gates.
+
+### OD-06 — Referral payout & program refinement (Proposed)
+In-app credit is `pending`/`paid`; there is no withdraw flow yet. **Direction:**
+`paid` events become claimable (off-chain ledger → future on-chain transfer or
+platform-token credit), add programme toggles (share %, attribution window,
+banner on the referred flow), and surface errors + a "how it works" FAQ entry.
 
 ### OD-02 — Edge data layer, "public projection" (Fase 1 — DONE)
 Public reads (offers, profiles, ratings) used to go straight to Supabase REST
