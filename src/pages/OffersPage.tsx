@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useAccount } from 'wagmi'
 import { useOffers } from '@/hooks/useOffers'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,7 +15,6 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { OffersTableWrapper } from '@/components/custom/OffersTableWrapper'
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import { SellerHoverCard, type SellerPreview } from '@/components/custom/SellerHoverCard'
 import { FullDropdown } from '@/components/custom/FullDropdown'
@@ -36,6 +36,8 @@ interface Offer {
   maxAmount: number
   isPositive: boolean
   isPrivate: boolean
+  /** Wallet the private offer is addressed to (null for public offers). */
+  targetUser: string | null
   seller: SellerPreview
   paymentMethods: string[]
 }
@@ -55,6 +57,7 @@ interface OfferRow {
   min_amount: number | string
   max_amount: number | string
   is_private?: boolean
+  target_user?: string | null
   payment_methods?: string[] | null
   tags?: string[] | null
   seller?: {
@@ -87,6 +90,7 @@ function mapOfferRow(o: OfferRow): Offer {
     maxAmount: Number(o.max_amount) || 0,
     isPositive: o.type === 'buy',
     isPrivate: Boolean(o.is_private),
+    targetUser: o.target_user ?? null,
     seller: {
       name: o.seller?.nickname ?? sellerAddr,
       address: sellerAddr,
@@ -127,6 +131,7 @@ function SortableHeader({
 export function OffersPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { address } = useAccount()
   const { data, isLoading, isError } = useOffers()
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -170,8 +175,14 @@ export function OffersPage() {
       })
     }
 
-    return filtered
-  }, [offers, searchQuery, typeFilter, tokenFilter, paymentFilter, sortKey, sortDir])
+    // Private offers addressed to the connected wallet float to the top.
+    const myAddr = address?.toLowerCase()
+    const isPrivateToMe = (o: Offer) =>
+      o.isPrivate && !!myAddr && o.targetUser?.toLowerCase() === myAddr
+    const pinned = filtered.filter(isPrivateToMe)
+    if (pinned.length === 0) return filtered
+    return [...pinned, ...filtered.filter((o) => !isPrivateToMe(o))]
+  }, [offers, searchQuery, typeFilter, tokenFilter, paymentFilter, sortKey, sortDir, address])
 
   const loadMore = () => {
     list.nextPage()
@@ -257,10 +268,14 @@ export function OffersPage() {
               <>
                 {/* ── Desktop table (md+) ── */}
                 <div className="hidden md:block">
-                  <OffersTableWrapper>
-                    <Table>
+                  <Table className="border-separate border-spacing-0">
                       <TableHeader>
-                        <TableRow className="border-b border-border/50 bg-muted/50 -mx-6 md:-mx-8 px-6 md:px-8">
+                        {/* `border-separate` is required for the corner radius
+                            on the header cells to render (with collapse,
+                            radius on th/tr is ignored). Cell backgrounds +
+                            borders provide the header fill and the row
+                            separators. */}
+                        <TableRow className="[&>th]:bg-muted/50 [&>th]:border-b [&>th]:border-border/50 [&>th:first-child]:rounded-tl-2xl [&>th:last-child]:rounded-tr-2xl">
                           <TableHead>{t('offers.tableTrader')}</TableHead>
                           <TableHead>{t('offers.tableType')}</TableHead>
                           <TableHead>{t('offers.tableToken')}</TableHead>
@@ -275,7 +290,7 @@ export function OffersPage() {
                           </TableHead>
                         </TableRow>
                       </TableHeader>
-                      <TableBody>
+                      <TableBody className="[&_td]:border-b [&_td]:border-border/50 [&_tr:last-child>td]:border-b-0">
                         <MaskedList {...list}>
                           {filteredOffers.map((offer) => (
                             <TableRow
@@ -330,7 +345,6 @@ export function OffersPage() {
                         </MaskedList>
                       </TableBody>
                     </Table>
-                  </OffersTableWrapper>
                 </div>
 
                 {/* ── Mobile cards (<md) ── */}

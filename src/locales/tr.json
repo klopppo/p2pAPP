@@ -215,7 +215,14 @@
     "escrowCancelled": "İptal edildi",
     "escrowGracePeriod": "Ek süre",
     "rateTrade": "Bu işlemi değerlendir",
-    "escrowSyncing": "Eşitleniyor…"
+    "escrowSyncing": "Eşitleniyor…",
+    "dateLabel": "Tarih",
+    "dateAll": "Tümü",
+    "dateToday": "Bugün",
+    "dateLast7": "Son 7 gün",
+    "dateLast30": "Son 30 gün",
+    "datePrevMonth": "Önceki ay",
+    "dateNextMonth": "Sonraki ay"
   },
   "chat": {
     "messages": "Mesajlar",
@@ -254,7 +261,11 @@
     "unblockedToast": "Kullanıcının engeli kaldırıldı.",
     "actionFailed": "Bir şeyler ters gitti. Lütfen tekrar deneyin.",
     "blockedPlaceholder": "Bu kullanıcıyı engellediniz.",
-    "send": "Mesaj gönder"
+    "send": "Mesaj gönder",
+    "archive": "Sohbeti arşivle",
+    "unarchive": "Arşivden çıkar",
+    "archivedToast": "Sohbet arşivlendi.",
+    "unarchivedToast": "Sohbet gelen kutusuna geri alındı."
   },
   "editOffer": {
     "title": "Teklifi düzenle",
@@ -747,7 +758,9 @@
     "minutesAgo": "{{count}}dk önce",
     "hoursAgo": "{{count}}sa önce",
     "daysAgo": "{{count}}g önce",
-    "monthsAgo": "{{count}}ay önce"
+    "monthsAgo": "{{count}}ay önce",
+    "allReviews": "Tüm yorumlar",
+    "close": "Kapat"
   },
   "sellerHoverCard": {
     "trades": "işlem",

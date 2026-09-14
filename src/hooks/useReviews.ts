@@ -3,6 +3,7 @@ import {
   getRatingsForTrade,
   getRatingsByUser,
   getReputationScores,
+  getRatedTradeIdsByUser,
   hasUserRatedTrade,
   submitTradeRating,
   updateUserReputation,
@@ -65,6 +66,19 @@ export function useHasRated(
 }
 
 /**
+ * Trade ids the user has already rated. Lets list pages (e.g. /trades) hide the
+ * "Rate this trade" CTA in one query instead of one per card.
+ */
+export function useRatedTradeIds(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['rated-trade-ids', userId],
+    queryFn: () => getRatedTradeIdsByUser(userId!),
+    enabled: !!userId,
+    staleTime: 30_000,
+  })
+}
+
+/**
  * Submit a rating for a trade. Bumps the rated user's reputation via the
  * `increment_reputation_score` RPC after the row lands. Reputation update is
  * best-effort — a failure logs but doesn't roll back the rating itself.
@@ -102,6 +116,10 @@ export function useSubmitRating() {
         )
         qc.invalidateQueries({
           queryKey: ['has-rated', variables.trade_id, variables.rater_id],
+        })
+        // Hide the "Rate this trade" CTA on the trades list immediately.
+        qc.invalidateQueries({
+          queryKey: ['rated-trade-ids', variables.rater_id],
         })
       }
       if (variables.rated_id && saved) {

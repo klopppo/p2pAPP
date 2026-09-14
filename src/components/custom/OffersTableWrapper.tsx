@@ -5,8 +5,10 @@ interface OffersTableWrapperProps {
 }
 
 export function OffersTableWrapper({ children }: OffersTableWrapperProps) {
+  // No padding: the table fills the card edge-to-edge, and `overflow-hidden`
+  // clips the header row to the card's rounded corners.
   return (
-    <div className="glass-panel rounded-2xl p-6 md:p-8">
+    <div className="glass-panel rounded-2xl overflow-hidden">
       {children}
     </div>
   )

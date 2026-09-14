@@ -215,7 +215,14 @@
     "escrowCancelled": "Annulé",
     "escrowGracePeriod": "Période de grâce",
     "rateTrade": "Évaluer cet échange",
-    "escrowSyncing": "Synchronisation…"
+    "escrowSyncing": "Synchronisation…",
+    "dateLabel": "Date",
+    "dateAll": "Toutes",
+    "dateToday": "Aujourd’hui",
+    "dateLast7": "7 derniers jours",
+    "dateLast30": "30 derniers jours",
+    "datePrevMonth": "Mois précédent",
+    "dateNextMonth": "Mois suivant"
   },
   "chat": {
     "messages": "Messages",
@@ -254,7 +261,11 @@
     "unblockedToast": "Utilisateur débloqué.",
     "actionFailed": "Une erreur est survenue. Veuillez réessayer.",
     "blockedPlaceholder": "Vous avez bloqué cet utilisateur.",
-    "send": "Envoyer le message"
+    "send": "Envoyer le message",
+    "archive": "Archiver la discussion",
+    "unarchive": "Désarchiver la discussion",
+    "archivedToast": "Discussion archivée.",
+    "unarchivedToast": "Discussion restaurée dans la boîte de réception."
   },
   "editOffer": {
     "title": "Modifier l'offre",
@@ -747,7 +758,9 @@
     "minutesAgo": "il y a {{count}} min",
     "hoursAgo": "il y a {{count}} h",
     "daysAgo": "il y a {{count}} j",
-    "monthsAgo": "il y a {{count}} mois"
+    "monthsAgo": "il y a {{count}} mois",
+    "allReviews": "Tous les avis",
+    "close": "Fermer"
   },
   "sellerHoverCard": {
     "trades": "échanges",

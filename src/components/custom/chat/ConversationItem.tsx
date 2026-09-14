@@ -60,22 +60,27 @@ export function ConversationItem({
           <span className="text-sm font-semibold truncate">{name}</span>
           {time && <span className="text-xs text-muted-foreground shrink-0">{time}</span>}
         </div>
-        {/* Trade tag: only trade-anchored chats have a linked trade. */}
-        {conversation.trade && (
+        {/* Trade chats show ONLY the trade tag (no last-message preview);
+            direct chats show the message preview. */}
+        {conversation.trade ? (
           <div className="mt-0.5">
             <Badge
               variant="outline"
-              className="rounded-full px-1.5 py-0 text-[10px] font-mono text-muted-foreground"
+              className="rounded-full px-2 py-0.5 text-xs font-mono text-muted-foreground"
             >
               {shortTradeId(conversation.trade.trade_id)}
             </Badge>
           </div>
+        ) : (
+          <p className="text-sm text-muted-foreground truncate">{preview}</p>
         )}
-        <p className="text-sm text-muted-foreground truncate">{preview}</p>
       </div>
       {showUnread && (
-        <span className="bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center shrink-0 font-medium">
-          {conversation.unread_count > 9 ? '9+' : conversation.unread_count}
+        <span
+          className="bg-primary text-primary-foreground text-xs rounded-full min-w-5 h-5 px-1.5 inline-flex items-center justify-center shrink-0 font-semibold tabular-nums"
+          aria-label={`${conversation.unread_count}`}
+        >
+          {conversation.unread_count > 99 ? '99+' : conversation.unread_count}
         </span>
       )}
     </button>

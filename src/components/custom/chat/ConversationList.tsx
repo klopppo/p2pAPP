@@ -19,6 +19,8 @@ interface Props {
   /** Which list to render: the active inbox or the archive. */
   view: ConversationView
   onViewChange: (view: ConversationView) => void
+  /** Show the "Archived" row only when the user actually has archived chats. */
+  hasArchived: boolean
   /**
    * The parent's `useConversations()` result for the current view. Owned by
    * the parent so the realtime channel + polling observer are created once —
@@ -46,6 +48,7 @@ export function ConversationList({
   onSelect,
   view,
   onViewChange,
+  hasArchived,
   conversations,
 }: Props) {
   const { t } = useTranslation()
@@ -74,7 +77,11 @@ export function ConversationList({
   }, [data, user, view, supportTick])
 
   return (
-    <div className="w-full md:w-[380px] h-full flex-shrink-0 bg-muted/60 backdrop-blur-sm flex flex-col min-h-0 overflow-hidden">
+    // Light mode's `--muted` is almost identical to its background, so the
+    // panel reads as a subtle surface. Dark mode's `--muted` is much lighter
+    // than its (near-black) background, so `/60` looks like a heavy gray slab —
+    // drop the opacity in dark to keep the same "barely there" panel as light.
+    <div className="w-full md:w-[380px] h-full flex-shrink-0 bg-muted/60 dark:bg-muted/25 backdrop-blur-sm flex flex-col min-h-0 overflow-hidden">
       <div className="p-4 shrink-0 flex items-center gap-2">
         {view === 'archived' && (
           <button
@@ -92,7 +99,7 @@ export function ConversationList({
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {view === 'active' && (
+        {view === 'active' && hasArchived && (
           <button
             type="button"
             onClick={() => onViewChange('archived')}

@@ -18,6 +18,7 @@ import { useGlobalPresence } from '@/hooks/useGlobalPresence'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useWalletSession } from '@/hooks/useWalletSession'
 import { isUserBlocked } from '@/lib/blocks'
+import { useIsDesktop } from '@/hooks/useMediaQuery'
 import {
   markConversationNotificationsRead,
   setConversationViewing,
@@ -78,7 +79,9 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   // opened so it doesn't add a subscription for every chat session.
   const [showArchived, setShowArchived] = useState(false)
   const activeConversations = useConversations({ archived: false })
-  const archivedConversations = useConversations({ archived: true, enabled: showArchived })
+  // Always loaded so we know whether to surface the "Archived" row at all.
+  const archivedConversations = useConversations({ archived: true })
+  const hasArchived = (archivedConversations.data?.length ?? 0) > 0
   const conversations = showArchived ? archivedConversations : activeConversations
   const { readIds, mark } = useLocallyReadConversations()
 
@@ -99,8 +102,10 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   }, [routeId, forcedId])
 
   // Only the ACTIVE inbox drives the default selection — opening /app/messages
-  // must not auto-open the most recently archived chat.
-  const fallbackId = activeConversations.data?.[0]?.id ?? null
+  // must not auto-open the most recently archived chat. On MOBILE we never
+  // auto-select: the list is the landing view and a tap opens a chat.
+  const isDesktop = useIsDesktop()
+  const fallbackId = isDesktop ? (activeConversations.data?.[0]?.id ?? null) : null
   const activeId = forcedId ?? pinnedId ?? routeId ?? fallbackId
 
   // Skip the DB hooks entirely for the synthetic ourTeam thread — no
@@ -216,7 +221,9 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
       onBack()
       return
     }
-    if (forcedId) navigate('/app/messages')
+    // Always return to the list view — this also clears the `:conversationId`
+    // route param, which is what the mobile back button needs.
+    navigate('/app/messages')
   }
 
   const handleSelect = (id: string) => {
@@ -288,7 +295,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
     // / MessageThread) gets its own `overflow-y-auto` — the document never
     // scrolls.
     <section className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 rounded-l-2xl overflow-hidden">
         {showSidebar && (
           <div className={activeId ? 'hidden md:flex md:min-h-0' : 'w-full md:w-auto'}>
             <ConversationList
@@ -297,6 +304,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
               onSelect={handleSelect}
               view={showArchived ? 'archived' : 'active'}
               onViewChange={(v) => setShowArchived(v === 'archived')}
+              hasArchived={hasArchived}
               conversations={conversations}
             />
           </div>

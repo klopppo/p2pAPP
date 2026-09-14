@@ -61,7 +61,7 @@ export function AddressWithActions({
   return (
     <span
       className={
-        'inline-flex items-center gap-1 rounded-full border border-border/50 bg-muted/40 py-1 pl-3 pr-1 ' +
+        'inline-flex items-center gap-1 rounded-full border border-border/50 bg-muted/40 py-0.5 pl-3 pr-1 ' +
         className
       }
     >
@@ -76,7 +76,7 @@ export function AddressWithActions({
       <Button
         size="icon-sm"
         variant="ghost"
-        className="rounded-full"
+        className="rounded-full h-6 w-6"
         onClick={handleCopy}
         title={t('addressActions.copyAddress')}
         aria-label={t('addressActions.copyAddress')}
@@ -86,7 +86,7 @@ export function AddressWithActions({
       <Button
         size="icon-sm"
         variant="ghost"
-        className="rounded-full"
+        className="rounded-full h-6 w-6"
         onClick={handleOpen}
         title={t('addressActions.openOnExplorer')}
         aria-label={t('addressActions.openOnExplorer')}
