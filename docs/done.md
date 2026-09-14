@@ -9,6 +9,57 @@
 
 ---
 
+## Chain gate scoped to contract-write pages only — 2026-09-14
+
+The app no longer demands Sepolia while just browsing or connecting a wallet.
+`<ChainGuard />` moved out of `AppLayout` (global) and is now mounted only on
+the four surfaces that talk to the on-chain escrow: TradePage, TradeDetailPage,
+DisputePage, DisputeDetailPage. Connecting on any EVM chain (mainnet, L2, …) is
+fully silent everywhere else; only when you open a trade/dispute page does the
+guard auto-switch to the Sepolia escrow network (the factory/escrow contracts
+live there). Companion to ADR-010.
+- Files: `src/components/layout/AppLayout.tsx`, `src/pages/{TradePage,TradeDetailPage,DisputePage,DisputeDetailPage}.tsx`.
+
+---
+
+## Remove the auto "Sign in" overlay (SignInPrompt) — 2026-09-15
+
+Deleted the SignInPrompt overlay that dimmed the page on connect when the
+wallet had no Supabase session. Connecting a wallet now shows NO overlay and
+nothing forces the signature: browse freely (offers are public), and only
+real actions that need a session surface an inline "sign-in required" toast /
+the navbar "Sign in" CTA. Complements ADR-010 (SIWE explicit opt-in).
+- Files: removed `src/components/auth/SignInPrompt.tsx`, slimmed
+  `src/components/layout/AppLayout.tsx`.
+
+---
+
+## ChainGuard: auto-switch to the expected chain on connect — 2026-09-15
+
+When a connected wallet is on the wrong EVM chain, `ChainGuard` now attempts
+`wallet_switchEthereumChain` automatically (once per mismatched chain, silent
+for well-known chains like Sepolia, `wallet_addEthereumChain` fallback for
+unknown chains). The "Wrong network" banner only appears if the automatic
+switch is rejected or fails, as a manual retry/guidance. Threshold stays
+`VITE_EXPECTED_CHAIN_ID=11155111` (Sepolia).
+- Files: `src/components/custom/ChainGuard.tsx`.
+
+---
+
+## Wallet connect: remove forced SIWE sync on connect — 2026-09-15
+
+Connecting a wallet no longer forces the Supabase SIWE signature popup:
+every wallet connects freely and the app stays read-only until the user
+explicitly signs in (navbar "Sign in" / WalletConnectButton / SignInPrompt /
+offer forms). `useSyncUser` only handles disconnect teardown, silent
+session recovery for returning users (success marker → `recoverWalletSession`),
+and referral claim (now keyed to the live `hasSession` state, not connect).
+Profile redirect on first sign-in removed — the explicit onboarding flow
+is unchanged.
+- Files: `src/hooks/useSyncUser.ts`.
+
+---
+
 ## Theme selector in Global Preferences — 2026-09-14
 
 Theme picker (Light / Dark / System) added to the Navbar "Global preferences"

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Text } from '@/components/ui/text'
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
+import { ChainGuard } from '@/components/custom/ChainGuard'
 import { FullDropdown } from '@/components/custom/FullDropdown'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -606,6 +607,7 @@ const effectiveEscrow =
 
   return (
     <div className="w-full max-w-xl mx-auto">
+      <ChainGuard />
       <AppPageHeader
         title={t('disputePage.title')}
         subtitle={t('disputePage.subtitle')}

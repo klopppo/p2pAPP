@@ -19,6 +19,7 @@ import { toast } from 'sonner'
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
 import { formatEther, type Abi } from 'viem'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { ChainGuard } from '@/components/custom/ChainGuard'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Text } from '@/components/ui/text'
@@ -758,6 +759,7 @@ export function DisputeDetailPage() {
 
   return (
     <div className="w-full max-w-xl mx-auto">
+      <ChainGuard />
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <Button
           variant="ghost"

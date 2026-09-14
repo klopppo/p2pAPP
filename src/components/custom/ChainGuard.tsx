@@ -8,8 +8,13 @@
  * factory silently reverts with no useful copy. Mounted once at the top
  * of the route tree via AppLayout so all in-app pages are covered,
  * including the detailed trade/dispute views.
+ *
+ * On wallet connect the guard ALSO attempts the switch automatically
+ * (silent for well-known chains like Sepolia; `wallet_addEthereumChain`
+ * fallback for wallets that don't know it). The banner is shown only if
+ * that auto-switch is rejected or unavailable.
  */
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { useAccount, useChainId, useConnectorClient, useSwitchChain } from 'wagmi'
@@ -29,15 +34,11 @@ export function ChainGuard() {
   const { switchChainAsync, error: switchError, isPending } = useSwitchChain()
   const { data: connectorClient } = useConnectorClient()
   const [adding, setAdding] = useState(false)
+  const autoAttemptedFor = useRef<number | null>(null)
 
   const ok = isOnExpectedChain(chainId) || !isConnected
 
-  // After a successful switch, the wagmi chainId will update and the
-  // guard automatically unmounts. No effect needed here.
-
-  if (ok || expectedChainId == null) return null
-
-  const handleSwitch = async () => {
+  const switchToExpectedChain = useCallback(async () => {
     if (expectedChainId == null) return
     try {
       await switchChainAsync({ chainId: expectedChainId })
@@ -71,7 +72,23 @@ export function ChainGuard() {
         }
       }
     }
-  }
+  }, [switchChainAsync, connectorClient])
+
+  // Auto-switch once per mismatched wallet chain. On success the `chainId`
+  // change re-renders and the banner never appears; on rejection the banner
+  // stays (manual retry / guidance). The effect doesn't re-run while both
+  // `ok` and `chainId` are unchanged, so a rejection can't cause a loop.
+  useEffect(() => {
+    if (ok || expectedChainId == null) {
+      autoAttemptedFor.current = null
+      return
+    }
+    if (autoAttemptedFor.current === chainId) return
+    autoAttemptedFor.current = chainId
+    void switchToExpectedChain()
+  }, [ok, chainId, switchToExpectedChain])
+
+  if (ok || expectedChainId == null) return null
 
   return (
     <div className="px-4 md:px-6 pt-3">
@@ -87,7 +104,7 @@ export function ChainGuard() {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => void handleSwitch()}
+            onClick={() => void switchToExpectedChain()}
             disabled={isPending || adding}
             className="rounded-full shadow-none border-destructive/40 text-destructive"
           >

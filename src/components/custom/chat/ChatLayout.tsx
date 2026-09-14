@@ -254,8 +254,8 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
 
   // Wallet connected but no live Supabase session. The RLS reads would be
   // denied and come back as an empty array (no error), so render an explicit
-  // sign-in prompt rather than a misleading "conversation not found". The
-  // SignInPrompt overlay offers the button that fixes this.
+  // sign-in prompt rather than a misleading "conversation not found". Signing
+  // in via the navbar CTA fixes this.
   if (!hasSession) {
     return (
       <section className="flex-1 flex items-center justify-center p-8 text-muted-foreground text-sm text-center">

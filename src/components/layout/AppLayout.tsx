@@ -4,8 +4,6 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { Navbar } from './Navbar'
 import { Footer } from './Footer'
 import { PageContainer } from './PageContainer'
-import { ChainGuard } from '@/components/custom/ChainGuard'
-import { SignInPrompt } from '@/components/auth/SignInPrompt'
 import { GlobalPresenceProvider } from '@/hooks/useGlobalPresence'
 import { warmUpIpns } from '@/lib/ipfs'
 import { cn } from '@/lib/utils'
@@ -58,7 +56,6 @@ export function AppLayout({ children }: AppLayoutProps) {
       )}
     >
       <Navbar showTabs />
-      <ChainGuard />
       <main className={cn('flex-1 flex flex-col min-h-0', isChat && 'overflow-hidden')}>
         <GlobalPresenceProvider>
           <PageContainer type="app" padded={!isChat}>
@@ -69,13 +66,6 @@ export function AppLayout({ children }: AppLayoutProps) {
         </GlobalPresenceProvider>
       </main>
       {!isChat && <Footer />}
-      {/* Non-blocking SIWE nudge. Only visible when the user has a
-          connected wallet but no signature; clicking the backdrop (or
-          the X / 'Later' button) dismisses for this browser session. The
-          page is fully interactive underneath — Supabase / chain queries
-          still require a session, so action buttons that need it surface
-          their own inline 'sign-in required' toast. */}
-      <SignInPrompt />
     </div>
   )
 }

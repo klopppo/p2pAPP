@@ -30,6 +30,7 @@ import { Text } from '@/components/ui/text'
 import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
+import { ChainGuard } from '@/components/custom/ChainGuard'
 import {
   CANCEL_TIMELOCK_SECONDS,
   ERC20_ABI,
@@ -739,6 +740,7 @@ export function TradeDetailPage() {
 
   return (
     <div className="w-full max-w-xl mx-auto">
+      <ChainGuard />
       {/* Same AppPageHeader centered shape as CreateOfferPage / TradesPage:
           back button left, title + subtitle centered, no horizontal
           divider. The escrow status badge used to live under the

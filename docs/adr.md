@@ -21,6 +21,8 @@
 | ADR-007 | Edge document layer + client-side edge-data hydration | Accepted (live deploy verified) | 2026-09-13 |
 | ADR-008 | Restricted public reader: `anon` column-level projection (DB + worker + client) | Accepted | 2026-09-13 |
 | ADR-009 | Referral program ("Invite & Earn"): server-credited share of platform fees | Accepted | 2026-09-15 |
+| ADR-010 | Wallet connect is sign-in-free: SIWE is explicit opt-in, never auto-triggered on connect | Accepted | 2026-09-15 |
+| ADR-011 | Chain gate is scoped to contract-write pages; browsing/connect is chain-agnostic | Accepted | 2026-09-14 |
 | OD-01 | Defer the wallet stack off the critical path | Proposed (Fase 3) | 2026-09-13 |
 | OD-02 | Restricted reader role + minimal public projection | Accepted (Fase 1: DB column projection; anon-key removal deferred to BFF) | 2026-09-13 |
 | OD-03 | Per-route edge behaviour via `functions/_middleware.ts` + `_routes.json` (public → inject data + `s-maxage`; private → `no-store`) | Implemented in repo (deploy pending) — see ADR-007 | 2026-09-13 |
@@ -284,6 +286,56 @@ webhooks to `POST /api/cache-purge` with the secret.
 **Direction:** `_headers` with CSP, HSTS, frame-ancestors, referrer-policy,
 COOP/COEP; move `anon`/service keys to real secret management (current tracked
 `.`env` values are placeholders); edge-issued short-TTL tokens for write paths.
+
+---
+
+## ADR-010 — Wallet connect is sign-in-free (SIWE = explicit opt-in)
+
+**Context.** On wallet connect, `useSyncUser` auto-invoked
+`ensureWalletSession`, which popped the SIWE signature and forced a Supabase
+session + `users` row before the wallet could be used. Any wallet needed this
+"sync" step to be considered connected.
+
+**Decision.** Connecting a wallet NEVER triggers the SIWE signature. Every
+wallet connects freely; the app is read-only until the user explicitly signs
+in via the navbar "Sign in", the SignInPrompt CTA, or an action that requires
+a session (e.g. publishing an offer — Create/EditOffer already call
+`ensureWalletSession`). Returning users on the same device keep the silent
+`recoverWalletSession` path (success marker → no popup). Referral attribution
+now fires off the live `hasSession` state (however sign-in happened) instead
+of wall-connect.
+
+**Consequences.**
+- Blocking UX removed: connecting a wallet is instant, no MetaMask popup.
+- Read-only browsing for unsigned wallets remains unchanged (RLS still gates
+  writes; action buttons surface "sign-in required" toasts).
+- Explicit sign-in paths (`force: true`) are untouched.
+- The profile-onboarding redirect on first sign-in was removed with the code
+  that carried it (users reach Edit Profile via the account menu).
+
+---
+
+## ADR-011 — Chain gate scoped to contract-write pages (browse = chain-agnostic)
+
+**Context.** `ChainGuard` lived on every authenticated route via `AppLayout`,
+so a wallet on any non-Sepolia network was greeted with a "wrong network"
+banner / auto-switch attempt on every page — even though only the four escrow
+surfaces (Trade, TradeDetail, Dispute, DisputeDetail) perform on-chain
+reads/writes. Browsing offers, profiles, messages and the P2P DB is
+chain-independent.
+
+**Decision.** The chain requirement applies *only* where contract interaction
+happens. `<ChainGuard />` moved from `AppLayout` to the four contract pages;
+everywhere else the wallet can sit on any EVM chain without prompts or
+auto-switches. Where it renders, the existing auto-switch + `wallet_addEthereumChain`
+fallback logic still applies (the escrow factory lives only on Sepolia).
+
+**Consequences.**
+- Connecting on mainnet/L2/anvil is fully silent outside the four escrow pages.
+- Trade/dispute pages still need the correct network because `usePublicClient`
+  (wagmi) resolves against the wallet's active chain and reads (allowance,
+  escrow state) would target the wrong chain.
+- No behavioural change on the pages that genuinely write to the contract.
 
 ---
 

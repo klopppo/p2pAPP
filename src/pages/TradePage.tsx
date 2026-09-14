@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
+import { ChainGuard } from '@/components/custom/ChainGuard'
 import { ShieldCheck, Clock, Globe, Tag, Loader2, Star } from 'lucide-react'
 import { useOffer } from '@/hooks/useOffers'
 import { createTrade, ensureUser } from '@/lib/supabase'
@@ -476,6 +477,7 @@ export function TradePage() {
 
   return (
     <section className="space-y-8">
+      <ChainGuard />
       <div className="max-w-xl mx-auto space-y-6">
         <AppPageHeader
           title={offer.type === 'sell' ? t('trade.buyToken', { token }) : t('trade.sellToken', { token })}

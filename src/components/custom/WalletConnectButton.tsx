@@ -24,7 +24,7 @@ export function WalletConnectButton() {
   // The navbar only flips to the "connected" affordance when BOTH the wallet
   // is connected AND a live Supabase session exists (see useSignedInStatus).
   // Until then, we show the "Connect wallet" / "Sign in" CTA so the top header
-  // is consistent with the rest of the app (and with SignInPrompt).
+  // is consistent with the rest of the app.
   const { address, isConnected, isFullySignedIn } = useSignedInStatus()
   const { disconnect } = useDisconnect()
   const qc = useQueryClient()
