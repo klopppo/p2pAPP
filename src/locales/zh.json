@@ -215,7 +215,14 @@
     "escrowCancelled": "已取消",
     "escrowGracePeriod": "宽限期",
     "rateTrade": "评价此交易",
-    "escrowSyncing": "同步中…"
+    "escrowSyncing": "同步中…",
+    "dateLabel": "日期",
+    "dateAll": "全部",
+    "dateToday": "今天",
+    "dateLast7": "最近 7 天",
+    "dateLast30": "最近 30 天",
+    "datePrevMonth": "上个月",
+    "dateNextMonth": "下个月"
   },
   "chat": {
     "messages": "消息",
@@ -747,7 +754,9 @@
     "minutesAgo": "{{count}} 分钟前",
     "hoursAgo": "{{count}} 小时前",
     "daysAgo": "{{count}} 天前",
-    "monthsAgo": "{{count}} 个月前"
+    "monthsAgo": "{{count}} 个月前",
+    "allReviews": "全部评价",
+    "close": "关闭"
   },
   "sellerHoverCard": {
     "trades": "笔交易",

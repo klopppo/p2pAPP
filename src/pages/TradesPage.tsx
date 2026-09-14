@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { shortTradeId } from '@/lib/utils'
 import { getCachedEscrowStatus } from '@/lib/escrowStatusCache'
+import { DateRangeFilter, type DateRange } from '@/components/custom/DateRangeFilter'
+import { endOfDay, startOfDay } from 'date-fns'
 import {
   Loader2,
   Inbox,
@@ -85,6 +87,7 @@ export function TradesPage() {
   const { data: trades = [], isPending, isError } = useTrades()
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [dateRange, setDateRange] = useState<DateRange>({ from: null, to: null })
 
   const ROLE_FILTERS: { value: RoleFilter; label: string }[] = [
     { value: 'all', label: t('trades.roleAll') },
@@ -150,9 +153,13 @@ export function TradesPage() {
         (roleFilter === 'seller' && t.seller_id === myId)
       const matchesStatus =
         statusFilter === 'all' || t.status === statusFilter
-      return matchesRole && matchesStatus
+      const opened = new Date(t.created_at).getTime()
+      const matchesDate =
+        (!dateRange.from || opened >= startOfDay(dateRange.from).getTime()) &&
+        (!dateRange.to || opened <= endOfDay(dateRange.to).getTime())
+      return matchesRole && matchesStatus && matchesDate
     })
-  }, [trades, myId, roleFilter, statusFilter])
+  }, [trades, myId, roleFilter, statusFilter, dateRange])
 
   return (
     <section className="space-y-8">
@@ -185,6 +192,11 @@ export function TradesPage() {
               value={statusFilter}
               onSelect={(v) => setStatusFilter(v as StatusFilter)}
               options={STATUS_FILTERS}
+            />
+            <DateRangeFilter
+              label={t('trades.dateLabel')}
+              value={dateRange}
+              onChange={setDateRange}
             />
           </div>
         }

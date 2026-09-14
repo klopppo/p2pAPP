@@ -215,7 +215,14 @@
     "escrowCancelled": "Cancelada",
     "escrowGracePeriod": "Periodo de gracia",
     "rateTrade": "Calificar esta operación",
-    "escrowSyncing": "Sincronizando…"
+    "escrowSyncing": "Sincronizando…",
+    "dateLabel": "Fecha",
+    "dateAll": "Todas",
+    "dateToday": "Hoy",
+    "dateLast7": "Últimos 7 días",
+    "dateLast30": "Últimos 30 días",
+    "datePrevMonth": "Mes anterior",
+    "dateNextMonth": "Mes siguiente"
   },
   "chat": {
     "messages": "Mensajes",
@@ -747,7 +754,9 @@
     "minutesAgo": "hace {{count}}m",
     "hoursAgo": "hace {{count}}h",
     "daysAgo": "hace {{count}}d",
-    "monthsAgo": "hace {{count}}m"
+    "monthsAgo": "hace {{count}}m",
+    "allReviews": "Todas las reseñas",
+    "close": "Cerrar"
   },
   "sellerHoverCard": {
     "trades": "operaciones",

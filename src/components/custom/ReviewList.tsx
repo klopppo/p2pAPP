@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator'
 import { useUserReviews } from '@/hooks/useReviews'
 import { RatingBreakdown } from '@/components/custom/RatingBreakdown'
 import { ReviewCard } from '@/components/custom/ReviewCard'
+import { ReviewsModal } from '@/components/custom/ReviewsModal'
 import { Loader2 } from 'lucide-react'
 
 interface ReviewListProps {
@@ -18,6 +19,7 @@ const PAGE_SIZE = 20
 export function ReviewList({ userId }: ReviewListProps) {
   const { t } = useTranslation()
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const [modalOpen, setModalOpen] = useState(false)
 
   const { data: reviews = [], isLoading } = useUserReviews(userId)
 
@@ -35,41 +37,59 @@ export function ReviewList({ userId }: ReviewListProps) {
   }
 
   return (
-    <Card className="glass-panel rounded-2xl p-6">
-      <div className="space-y-4">
-        <Text variant="h4" className="font-bold">
-          {t('review.ratingsAndFeedback')}
-        </Text>
+    <>
+      <Card className="glass-panel rounded-2xl p-6">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <Text variant="h4" className="font-bold">
+              {t('review.ratingsAndFeedback')}
+            </Text>
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0"
+            >
+              {t('review.allReviews')}
+            </button>
+          </div>
 
-        {reviews.length === 0 ? (
-          <Text variant="muted" className="text-sm py-4 text-center">
-            {t('review.noReviewsYet')}
-          </Text>
-        ) : (
-          <>
-            <RatingBreakdown reviews={reviews} />
+          {reviews.length === 0 ? (
+            <Text variant="muted" className="text-sm py-4 text-center">
+              {t('review.noReviewsYet')}
+            </Text>
+          ) : (
+            <>
+              <RatingBreakdown reviews={reviews} />
 
-            <Separator />
+              <Separator />
 
-            <div className="divide-y divide-border/50">
-              {visible.map((review) => (
-                <ReviewCard key={review.id} review={review} />
-              ))}
-            </div>
+              <div className="divide-y divide-border/50">
+                {visible.map((review) => (
+                  <ReviewCard key={review.id} review={review} />
+                ))}
+              </div>
 
-            {hasMore && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="rounded-full mx-auto"
-                onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-              >
-                {t('review.loadMore', { remaining: reviews.length - visibleCount })}
-              </Button>
-            )}
-          </>
-        )}
-      </div>
-    </Card>
+              {hasMore && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full mx-auto"
+                  onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                >
+                  {t('review.loadMore', { remaining: reviews.length - visibleCount })}
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+      </Card>
+
+      {/* Rendered outside the blurred Card so `fixed` covers the viewport. */}
+      <ReviewsModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        reviews={reviews}
+      />
+    </>
   )
 }

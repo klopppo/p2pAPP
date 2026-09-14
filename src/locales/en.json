@@ -229,7 +229,14 @@
     "escrowFunded": "Funded",
     "escrowCancelled": "Cancelled",
     "rateTrade": "Rate this trade",
-    "escrowSyncing": "Syncing…"
+    "escrowSyncing": "Syncing…",
+    "dateLabel": "Date",
+    "dateAll": "All",
+    "dateToday": "Today",
+    "dateLast7": "Last 7 days",
+    "dateLast30": "Last 30 days",
+    "datePrevMonth": "Previous month",
+    "dateNextMonth": "Next month"
   },
   "chat": {
     "messages": "Messages",
@@ -757,7 +764,9 @@
     "minutesAgo": "{{count}}m ago",
     "hoursAgo": "{{count}}h ago",
     "daysAgo": "{{count}}d ago",
-    "monthsAgo": "{{count}}mo ago"
+    "monthsAgo": "{{count}}mo ago",
+    "allReviews": "All reviews",
+    "close": "Close"
   },
   "sellerHoverCard": {
     "trades": "trades",
