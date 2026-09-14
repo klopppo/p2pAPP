@@ -16,7 +16,7 @@ export function MetricCard({ label, value, change, isPositive, children }: Metri
       <div className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">
         {label}
       </div>
-      <div className="text-4xl font-bold font-mono mb-3">{value}</div>
+      <div className="text-2xl sm:text-4xl font-bold font-mono mb-3 truncate">{value}</div>
       {change && (
         <div className="flex items-center text-sm font-semibold">
           {isPositive ? (

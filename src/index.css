@@ -134,6 +134,9 @@
     }
 body {
   @apply bg-background text-foreground;
+  /* Prevent horizontal scroll from overflowing surfaces at 320px without
+     creating a scroll container (`clip` keeps position:sticky working). */
+  overflow-x: clip;
   background:
     radial-gradient(circle at 0% 0%, rgba(212, 240, 240, 0.5) 0%, transparent 50%),
     radial-gradient(circle at 100% 0%, rgba(244, 225, 244, 0.5) 0%, transparent 50%),

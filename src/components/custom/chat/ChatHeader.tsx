@@ -160,7 +160,7 @@ export function ChatHeader({ conversation, currentUserId, online, onBack, onBloc
             <Button
               variant="ghost"
               size="icon"
-              className="rounded-full text-muted-foreground hover:text-foreground h-8 w-8 cursor-pointer shrink-0"
+              className="rounded-full text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
               aria-label={t('chat.moreActions')}
             >
               <MoreVertical className="w-4 h-4" />

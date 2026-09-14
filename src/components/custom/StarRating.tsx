@@ -37,7 +37,7 @@ export function StarRating({
           disabled={readonly}
           className={cn(
             'p-0 border-0 bg-transparent',
-            interactive && 'cursor-pointer hover:scale-110 transition-transform',
+            interactive && 'cursor-pointer hover:scale-110 transition-transform p-1.5',
             readonly && 'cursor-default',
           )}
           onMouseEnter={() => interactive && setHovered(star)}

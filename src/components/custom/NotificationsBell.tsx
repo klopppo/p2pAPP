@@ -79,7 +79,7 @@ export function NotificationsBell() {
       <DropdownMenuContent
         align="end"
         sideOffset={8}
-        className="w-80 max-h-[70vh] overflow-y-auto rounded-2xl border border-border bg-card/95 backdrop-blur-xl shadow-2xl p-0"
+        className="w-80 max-w-[calc(100vw-1rem)] max-h-[70vh] overflow-y-auto rounded-2xl border border-border bg-card/95 backdrop-blur-xl shadow-2xl p-0"
       >
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
           <DropdownMenuLabel className="p-0 text-base font-semibold text-foreground">

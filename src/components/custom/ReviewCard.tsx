@@ -43,8 +43,8 @@ export function ReviewCard({ review }: ReviewCardProps) {
       </Avatar>
 
       <div className="min-w-0 flex-1 space-y-1">
-        <div className="flex items-center gap-2">
-          <Text variant="small" className="font-medium">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <Text variant="small" className="font-medium truncate">
             {displayName}
           </Text>
           <StarRating value={review.score} readonly size="sm" />

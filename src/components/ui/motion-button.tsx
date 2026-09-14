@@ -16,7 +16,7 @@ const MotionButton: FC<Props> = ({ label, classes, onClick }) => {
     <button
       onClick={onClick}
       className={cn(
-        'bg-background group relative h-auto w-40 cursor-pointer rounded-full border-[none] p-1 outline-none',
+        'bg-background group relative h-auto w-40 max-w-full cursor-pointer overflow-hidden rounded-full border-[none] p-1 outline-none',
         classes
       )}
     >
@@ -27,7 +27,7 @@ const MotionButton: FC<Props> = ({ label, classes, onClick }) => {
       <div className='icon absolute top-1/2 left-3 translate-x-0 -translate-y-1/2 duration-500 group-hover:translate-x-[0.4rem]'>
         <ArrowRight className='text-background size-4' />
       </div>
-      <span className='button-text text-foreground group-hover:text-background font-manrope absolute top-2/4 left-2/4 ml-3 -translate-x-2/4 -translate-y-2/4 text-center text-sm font-medium tracking-tight whitespace-nowrap duration-500'>
+      <span className='button-text text-foreground group-hover:text-background font-manrope absolute top-2/4 left-2/4 ml-3 -translate-x-2/4 -translate-y-2/4 text-center text-sm font-medium tracking-tight whitespace-nowrap duration-500 block max-w-[calc(100%-2rem)] truncate'>
         {label}
       </span>
     </button>

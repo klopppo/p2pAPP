@@ -53,7 +53,7 @@ export function SellerHoverCard({ seller, children }: SellerHoverCardProps) {
       <HoverCardContent
         side="right"
         align="start"
-        className="w-80 p-0 shadow-none rounded-2xl"
+        className="w-80 max-w-[calc(100vw-1.5rem)] p-0 shadow-none rounded-2xl"
       >
         <div className="px-5 py-4 space-y-4">
           {/* Seller header */}

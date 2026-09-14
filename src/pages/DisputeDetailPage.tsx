@@ -758,24 +758,24 @@ export function DisputeDetailPage() {
 
   return (
     <div className="w-full max-w-xl mx-auto">
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
         <Button
           variant="ghost"
           size="icon"
           onClick={() => navigate('/app/disputes')}
           aria-label={t('disputeDetail.backToDisputes')}
-          className="rounded-full"
+          className="rounded-full shrink-0"
         >
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <Text
           variant="small"
-          className="uppercase tracking-wider text-muted-foreground"
+          className="uppercase tracking-wider text-muted-foreground truncate min-w-0"
         >
           {dispute.dispute_id}
         </Text>
         <span
-          className={`inline-flex items-center px-2 h-5 rounded-full text-xs font-medium ${STATUS_STYLES[status]}`}
+          className={`inline-flex items-center px-2 h-5 rounded-full text-xs font-medium shrink-0 ${STATUS_STYLES[status]}`}
         >
           {t(STATUS_LABEL_I18N[status])}
         </span>
@@ -808,7 +808,7 @@ export function DisputeDetailPage() {
             </div>
 
             {escrowState && (
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div>
                   <Text variant="small" className="text-muted-foreground">
                     {t('disputeDetail.buyer')}
@@ -849,8 +849,8 @@ export function DisputeDetailPage() {
             )}
 
             {liveEscrowStateValue !== null && (
-              <div className="flex items-center gap-2 text-sm pt-1">
-                <Gavel className="w-3.5 h-3.5 text-muted-foreground" />
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm pt-1">
+                <Gavel className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                 <span className="text-muted-foreground">{t('disputeDetail.onChainState')}</span>
                 <span className="font-mono">
                   {t(
@@ -992,7 +992,7 @@ export function DisputeDetailPage() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div>
                 <Label className="text-base font-semibold mb-2 block">{t('disputeDetail.buyer')}</Label>
                 <p className="font-mono text-sm">

@@ -113,20 +113,20 @@ export function ReportUserModal({
               </div>
 
               <div className="p-3 rounded-xl bg-muted/40 border border-border/50 text-xs space-y-1 font-mono">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t('report.reportedUser')}:</span>
-                  <span className="text-foreground font-semibold">{reportedWallet}</span>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">{t('report.reportedUser')}:</span>
+                  <span className="text-foreground font-semibold text-right break-all">{reportedWallet}</span>
                 </div>
                 {tradeId && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">{t('report.tradeId')}:</span>
-                    <span className="text-foreground">{shortTradeId(tradeId)}</span>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">{t('report.tradeId')}:</span>
+                    <span className="text-foreground text-right">{shortTradeId(tradeId)}</span>
                   </div>
                 )}
                 {conversationId && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">{t('report.chatId')}:</span>
-                    <span className="text-foreground">{conversationId}</span>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">{t('report.chatId')}:</span>
+                    <span className="text-foreground text-right break-all">{conversationId}</span>
                   </div>
                 )}
               </div>
@@ -161,7 +161,7 @@ export function ReportUserModal({
                   <span>{t('report.abuseWarning')}</span>
                 </div>
 
-                <div className="flex items-center justify-end gap-3 pt-2">
+                <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
                   <Button
                     type="button"
                     variant="ghost"
