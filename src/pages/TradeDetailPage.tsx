@@ -707,7 +707,7 @@ export function TradeDetailPage() {
 
   if (isLoading) {
     return (
-      <section className="flex items-center justify-center py-20 text-muted-foreground">
+      <section className="flex items-center justify-center py-10 text-muted-foreground">
         <Loader2 className="w-5 h-5 animate-spin mr-2" />         {t('tradeDetail.loadingTrade')}
       </section>
     )
@@ -790,7 +790,7 @@ export function TradeDetailPage() {
             </div>
 
             {escrowState && (
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div>
                   <Text variant="small" className="text-muted-foreground">
                     {t('trades.buyerLabel')}
@@ -1145,20 +1145,20 @@ function FundingRow({
   t: (key: string, opts?: Record<string, string>) => string
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
         {done ? (
-          <CheckCircle2 className="w-4 h-4 text-success" />
+          <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
         ) : (
-          <Timer className="w-4 h-4 text-muted-foreground" />
+          <Timer className="w-4 h-4 text-muted-foreground shrink-0" />
         )}
-        <span>{label}</span>
+        <span className="min-w-0">{label}</span>
         {isMe && (
-          <span className="text-xs text-muted-foreground">({t('tradeDetail.you')})</span>
+          <span className="text-xs text-muted-foreground shrink-0">({t('tradeDetail.you')})</span>
         )}
       </div>
       <span
-        className={`text-xs ${done ? 'text-success' : 'text-muted-foreground'}`}
+        className={`text-xs shrink-0 ${done ? 'text-success' : 'text-muted-foreground'}`}
       >
         {done ? (subDone ?? t('tradeDetail.done')) : t(`tradeDetail.waitingFor${who === 'buyer' ? 'Buyer' : 'Seller'}`)}
       </span>

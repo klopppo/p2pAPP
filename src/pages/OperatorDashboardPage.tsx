@@ -708,7 +708,7 @@ export function OperatorDashboardPage() {
 
             {/* Right Column: Chat Interattiva Operatore */}
             <div className="lg:col-span-2">
-              <Card className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl flex flex-col h-[650px]">
+              <Card className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl flex flex-col h-[65vh] min-h-[480px] lg:h-[650px]">
                 <CardContent className="space-y-4 flex flex-col flex-1 min-h-0">
                   {/* Chat Header */}
                   <div className="flex flex-wrap justify-between items-center border-b border-border/50 pb-3 gap-2 shrink-0">

@@ -857,20 +857,20 @@ const effectiveEscrow =
         </Card>
 
         {/* Actions */}
-        <div className="flex justify-between gap-3 pt-2">
+        <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-between">
           <Button
             type="button"
             variant="outline"
             onClick={handleReset}
             disabled={isSubmitting}
-            className="rounded-full px-8 py-3 shadow-none"
+            className="rounded-full px-8 py-3 shadow-none w-full sm:w-auto justify-center"
           >
             {t('disputePage.reset')}
           </Button>
           <Button
             type="submit"
             disabled={!canSubmit || !isConnected || !factoryReady}
-            className="rounded-full px-8 py-3 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="rounded-full px-8 py-3 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
           >
             {isSubmitting ? (
               <span className="flex items-center gap-2">

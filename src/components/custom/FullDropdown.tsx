@@ -51,12 +51,14 @@ export function FullDropdown({
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <button
-          className="flex items-center gap-1.5 px-4 h-9 rounded-full border border-border bg-card text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors cursor-pointer shadow-none"
+          className="flex items-center gap-1.5 px-4 h-9 max-w-full rounded-full border border-border bg-card text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors cursor-pointer shadow-none"
         >
-          {TriggerIcon && <TriggerIcon className="w-4 h-4" />}
-          {label}: <span className="text-foreground">{displayValue}</span>
+          {TriggerIcon && <TriggerIcon className="w-4 h-4 shrink-0" />}
+          <span className="min-w-0 truncate">
+            {label}: <span className="text-foreground">{displayValue}</span>
+          </span>
           <ChevronDown
-            className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`}
+            className={`w-3.5 h-3.5 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
           />
         </button>
       </DropdownMenuTrigger>

@@ -239,102 +239,164 @@ export function OffersPage() {
               </div>
             </div>
 
-            {/* Table */}
-            <OffersTableWrapper>
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-b border-border/50 bg-muted/50 -mx-3 md:-mx-4 px-3 md:px-4">
-                    <TableHead>{t('offers.tableTrader')}</TableHead>
-                    <TableHead>{t('offers.tableType')}</TableHead>
-                    <TableHead>{t('offers.tableToken')}</TableHead>
-                    <TableHead className="text-right">
-                      <SortableHeader label={t('offers.tablePrice')} sortField="price" sortKey={sortKey} onToggle={toggleSort} />
-                    </TableHead>
-                    <TableHead className="text-right">
-                      <SortableHeader label={t('offers.tableMinAmount')} sortField="minAmount" sortKey={sortKey} onToggle={toggleSort} />
-                    </TableHead>
-                    <TableHead className="text-right">
-                      <SortableHeader label={t('offers.tableMaxAmount')} sortField="maxAmount" sortKey={sortKey} onToggle={toggleSort} />
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow className="border-b border-border/50">
-                      <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                        <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />
-                        {t('offers.loadingOffers')}
-                      </TableCell>
-                    </TableRow>
-                  ) : isError ? (
-                    <TableRow className="border-b border-border/50">
-                      <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                        {t('offers.errorLoading')}
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredOffers.length === 0 ? (
-                    <TableRow className="border-b border-border/50">
-                      <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                        No offers match your filters.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
+            {/* Loading / Error / Empty — shared */}
+            {isLoading ? (
+              <div className="flex items-center justify-center py-16 text-muted-foreground">
+                <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />
+                {t('offers.loadingOffers')}
+              </div>
+            ) : isError ? (
+              <div className="text-center py-16 text-muted-foreground">
+                {t('offers.errorLoading')}
+              </div>
+            ) : filteredOffers.length === 0 ? (
+              <div className="text-center py-16 text-muted-foreground">
+                No offers match your filters.
+              </div>
+            ) : (
+              <>
+                {/* ── Desktop table (md+) ── */}
+                <div className="hidden md:block">
+                  <OffersTableWrapper>
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-b border-border/50 bg-muted/50 -mx-6 md:-mx-8 px-6 md:px-8">
+                          <TableHead>{t('offers.tableTrader')}</TableHead>
+                          <TableHead>{t('offers.tableType')}</TableHead>
+                          <TableHead>{t('offers.tableToken')}</TableHead>
+                          <TableHead className="text-right">
+                            <SortableHeader label={t('offers.tablePrice')} sortField="price" sortKey={sortKey} onToggle={toggleSort} />
+                          </TableHead>
+                          <TableHead className="text-right">
+                            <SortableHeader label={t('offers.tableMinAmount')} sortField="minAmount" sortKey={sortKey} onToggle={toggleSort} />
+                          </TableHead>
+                          <TableHead className="text-right">
+                            <SortableHeader label={t('offers.tableMaxAmount')} sortField="maxAmount" sortKey={sortKey} onToggle={toggleSort} />
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <MaskedList {...list}>
+                          {filteredOffers.map((offer) => (
+                            <TableRow
+                              key={offer.id}
+                              onClick={() => navigate(`/app/offer/${offer.id}`)}
+                              className="hover:bg-muted/50 transition-colors border-b border-border/50 cursor-pointer"
+                            >
+                              <TableCell>
+                                <SellerHoverCard seller={offer.seller}>
+                                  <Link
+                                    to={`/app/profile/${offer.trader}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                                  >
+                                    <Avatar className="h-8 w-8">
+                                      <AvatarFallback>
+                                        {offer.trader.slice(2, 4).toUpperCase()}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                      <div className="font-mono text-sm">
+                                        {offer.trader.slice(0, 6)}...{offer.trader.slice(-4)}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {offer.trades} trades
+                                      </div>
+                                    </div>
+                                  </Link>
+                                </SellerHoverCard>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Badge
+                                    variant={offer.type === 'buy' ? 'default' : 'secondary'}
+                                    className="rounded-full"
+                                  >
+                                    {offer.type}
+                                  </Badge>
+                                  {offer.isPrivate && (
+                                    <Badge variant="outline" className="rounded-full">
+                                      {t('offers.private')}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="font-medium">{offer.token}</TableCell>
+                              <TableCell className="text-right font-mono">{offer.priceDisplay}</TableCell>
+                              <TableCell className="text-right font-mono">{offer.currency}{offer.minAmount.toLocaleString()}</TableCell>
+                              <TableCell className="text-right font-mono">{offer.currency}{offer.maxAmount.toLocaleString()}</TableCell>
+                            </TableRow>
+                          ))}
+                        </MaskedList>
+                      </TableBody>
+                    </Table>
+                  </OffersTableWrapper>
+                </div>
+
+                {/* ── Mobile cards (<md) ── */}
+                <ul className="md:hidden space-y-3">
                   <MaskedList {...list}>
                     {filteredOffers.map((offer) => (
-                      <TableRow
-                        key={offer.id}
-                        onClick={() => navigate(`/app/offer/${offer.id}`)}
-                        className="hover:bg-muted/50 transition-colors border-b border-border/50 cursor-pointer"
-                      >
-                        <TableCell>
-                          <SellerHoverCard seller={offer.seller}>
-                            <Link
-                              to={`/app/profile/${offer.trader}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-                            >
-                              <Avatar className="h-8 w-8">
-                                <AvatarFallback>
-                                  {offer.trader.slice(2, 4).toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <div className="font-mono text-sm">
-                                  {offer.trader.slice(0, 6)}...{offer.trader.slice(-4)}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  {offer.trades} trades
-                                </div>
+                      <li key={offer.id}>
+                        <Link
+                          to={`/app/offer/${offer.id}`}
+                          className="block group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl"
+                        >
+                          <div className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-5 rounded-2xl transition-colors group-hover:border-primary/50 group-hover:bg-background/70">
+                            {/* Top row: token + price */}
+                            <div className="flex items-center justify-between gap-3 mb-3">
+                              <div className="min-w-0 flex-1">
+                                <span className="text-base font-semibold">{offer.token}</span>
+                                <span className="text-muted-foreground font-normal mx-1.5">·</span>
+                                <span className="font-mono font-semibold text-primary">{offer.priceDisplay}</span>
                               </div>
-                            </Link>
-                          </SellerHoverCard>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                          <Badge
-                            variant={offer.type === 'buy' ? 'default' : 'secondary'}
-                            className="rounded-full"
-                          >
-                            {offer.type}
-                          </Badge>
-                          {offer.isPrivate && (
-                            <Badge variant="outline" className="rounded-full">
-                              {t('offers.private')}
-                            </Badge>
-                          )}
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Badge
+                                  variant={offer.type === 'buy' ? 'default' : 'secondary'}
+                                  className="rounded-full text-xs"
+                                >
+                                  {offer.type}
+                                </Badge>
+                                {offer.isPrivate && (
+                                  <Badge variant="outline" className="rounded-full text-xs">
+                                    {t('offers.private')}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Trader row */}
+                            <SellerHoverCard seller={offer.seller}>
+                              <Link
+                                to={`/app/profile/${offer.trader}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex items-center gap-2 mb-3 hover:opacity-80 transition-opacity"
+                              >
+                                <Avatar className="h-7 w-7">
+                                  <AvatarFallback className="text-[10px]">
+                                    {offer.trader.slice(2, 4).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="font-mono text-sm truncate">{offer.trader.slice(0, 6)}...{offer.trader.slice(-4)}</span>
+                                <span className="text-xs text-muted-foreground shrink-0">{offer.trades} trades</span>
+                              </Link>
+                            </SellerHoverCard>
+
+                            {/* Meta row: amounts + payment */}
+                            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                              <span className="font-mono">{offer.currency}{offer.minAmount.toLocaleString()} – {offer.currency}{offer.maxAmount.toLocaleString()}</span>
+                              {offer.paymentMethods.length > 0 && (
+                                <span className="truncate">{offer.paymentMethods.slice(0, 2).join(', ')}</span>
+                              )}
+                            </div>
                           </div>
-                        </TableCell>
-                        <TableCell className="font-medium">{offer.token}</TableCell>
-                        <TableCell className="text-right font-mono">{offer.priceDisplay}</TableCell>
-                        <TableCell className="text-right font-mono">{offer.currency}{offer.minAmount.toLocaleString()}</TableCell>
-                        <TableCell className="text-right font-mono">{offer.currency}{offer.maxAmount.toLocaleString()}</TableCell>
-                      </TableRow>
+                        </Link>
+                      </li>
                     ))}
                   </MaskedList>
-                  )}
-                </TableBody>
-              </Table>
-            </OffersTableWrapper>
+                </ul>
+              </>
+            )}
 
             {/* Load More */}
             <div className="flex items-center justify-between mt-4">

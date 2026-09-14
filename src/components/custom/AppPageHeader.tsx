@@ -30,7 +30,7 @@ export function AppPageHeader({
             variant="ghost"
             size="icon"
             onClick={onBack}
-            className="rounded-full shadow-none"
+            className="rounded-full shadow-none shrink-0"
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
@@ -47,10 +47,12 @@ export function AppPageHeader({
 
   // split variant — title left, action right
   return (
-    <div className={`flex items-center justify-between mb-6 ${className}`}>
-      <div>
-        <Text variant="h3">{title}</Text>
-        {subtitle && <Text variant="muted">{subtitle}</Text>}
+    <div className={`flex flex-wrap items-center justify-between gap-3 mb-6 ${className}`}>
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="min-w-0">
+          <Text variant="h3" className="truncate">{title}</Text>
+          {subtitle && <Text variant="muted" className="truncate">{subtitle}</Text>}
+        </div>
       </div>
       {action}
     </div>
