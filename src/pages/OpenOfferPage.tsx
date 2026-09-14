@@ -124,17 +124,17 @@ export function OpenOfferPage() {
           <Card className="glass-panel rounded-2xl p-6">
             <CardContent className="px-6 py-0">
               {/* Trader Info */}
-              <div className="flex items-center gap-4 mb-3">
+              <div className="flex flex-col items-center sm:flex-row sm:items-center gap-3 sm:gap-4 mb-3">
                 <Link to={`/app/profile/${sellerAddr}`}>
-                  <Avatar className="h-12 w-12 hover:opacity-80 transition-opacity">
+                  <Avatar className="h-12 w-12 shrink-0 hover:opacity-80 transition-opacity">
                     <AvatarImage src={seller?.avatar_url ?? undefined} />
                     <AvatarFallback>{sellerName.slice(0, 2).toUpperCase()}</AvatarFallback>
                   </Avatar>
                 </Link>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0 w-full flex flex-col items-center sm:items-start">
+                  <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start min-w-0 w-full">
                     {sellerAddr && sellerName === sellerAddr ? (
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className="flex items-center gap-2 min-w-0 flex-1 justify-center sm:justify-start">
                         <Link to={`/app/profile/${sellerAddr}`}>
                           <Text variant="h4" className="truncate hover:underline">{middleTruncate(sellerAddr)}</Text>
                         </Link>
@@ -145,11 +145,11 @@ export function OpenOfferPage() {
                         <Text variant="h4" className="truncate hover:underline">{sellerName}</Text>
                       </Link>
                     )}
-                    <Badge variant={seller?.verification_level === 'verified' || seller?.verification_level === 'trusted' ? 'default' : 'secondary'}>
+                    <Badge className="shrink-0" variant={seller?.verification_level === 'verified' || seller?.verification_level === 'trusted' ? 'default' : 'secondary'}>
                       {seller?.verification_level ?? t('openOffer.unverified')}
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-4 text-sm">
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-2 text-sm">
                     <div className="flex items-center gap-1">
                       <Star className="w-4 h-4 fill-primary text-primary" />
                       {Number(seller?.avg_rating) ? (

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { Button } from '@/components/ui/button'
 import { explorerBase } from '@/lib/explorer'
@@ -286,25 +286,26 @@ export function ProfilePage() {
 
   return (
     <section className="space-y-8">
-      <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-        <Avatar className="h-24 w-24">
+      <div className="flex flex-col items-center text-center md:flex-row md:items-center md:text-left gap-6">
+        <Avatar className="h-24 w-24 shrink-0">
           <AvatarImage src={avatarUrl} />
           <AvatarFallback>{nickname.slice(0, 2).toUpperCase()}</AvatarFallback>
         </Avatar>
-        <div className="flex-1">
-          <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex-1 min-w-0 flex flex-col items-center md:items-start">
+          <div className="flex items-center gap-3 flex-wrap justify-center md:justify-start min-w-0">
             {/* `h2` bakes in `border-b pb-2`; override both so the name has no
                 underline. */}
-            <Text variant="h2" className="border-b-0 pb-0">{nickname}</Text>
-            <Badge className="bg-success text-success-foreground hover:bg-success/90 text-sm">
+            <Text variant="h2" className="border-b-0 pb-0 truncate">{nickname}</Text>
+            <Badge className="bg-success text-success-foreground hover:bg-success/90 text-sm shrink-0">
               {onlineUsers.has(profile.id) ? t('profile.online') : t('profile.offline')}
             </Badge>
           </div>
-          <div className="mt-1">
+          <div className="mt-1 max-w-full">
             <AddressWithActions
               address={walletAddr}
               explorerBase={explorerBase.address}
               textClassName="font-mono text-xs text-muted-foreground"
+              className="mx-auto md:mx-0"
               {...(canMessage
                 ? {
                     onMessage: startChat,
@@ -327,7 +328,7 @@ export function ProfilePage() {
             size="sm"
             variant="outline"
             onClick={() => navigate('/app/profile/edit')}
-            className="rounded-full shadow-none shrink-0"
+            className="rounded-full shadow-none shrink-0 w-full md:w-auto justify-center"
           >
             <Pencil className="w-3.5 h-3.5 mr-1" />
             {t('profile.editProfile')}
@@ -337,7 +338,7 @@ export function ProfilePage() {
             size="sm"
             variant="outline"
             onClick={() => setReportOpen(true)}
-            className="rounded-full shadow-none shrink-0 text-destructive border-destructive/30 hover:bg-destructive/10"
+            className="rounded-full shadow-none shrink-0 w-full md:w-auto justify-center text-destructive border-destructive/30 hover:bg-destructive/10"
           >
             <Flag className="w-3.5 h-3.5 mr-1" />
             {t('report.reportUser')}
@@ -410,75 +411,118 @@ export function ProfilePage() {
       {/* User's Offers Table */}
       <div>
         <Text variant="h4" className="mb-4">{isOwnProfile ? t('profile.yourActiveOffers') : t('profile.activeOffers')}</Text>
-        <OffersTableWrapper>
-          <Table>
-            <TableHeader>
-              <TableRow className="border-b border-border/50 bg-muted/50 -mx-3 md:-mx-4 px-3 md:px-4">
-                <TableHead>{t('profile.tableType')}</TableHead>
-                <TableHead>{t('profile.tableToken')}</TableHead>
-                <TableHead className="text-right">
-                  <SortableHeader label={t('profile.tablePrice')} sortField="price" sortKey={sortKey} onToggle={toggleSort} />
-                </TableHead>
-                <TableHead className="text-right">
-                  <SortableHeader label={t('profile.tableMinAmount')} sortField="minAmount" sortKey={sortKey} onToggle={toggleSort} />
-                </TableHead>
-                <TableHead className="text-right">
-                  <SortableHeader label={t('profile.tableMaxAmount')} sortField="maxAmount" sortKey={sortKey} onToggle={toggleSort} />
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {offersLoading ? (
-                <TableRow className="border-b border-border/50">
-                  <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
-                    <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />
-                    {t('profile.loadingOffers')}
-                  </TableCell>
-                </TableRow>
-              ) : filteredOffers.length === 0 ? (
-                <TableRow className="border-b border-border/50">
-                  <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
-                    {t('profile.noActiveOffers')}{isOwnProfile && <Button className="rounded-full shadow-none ml-2" onClick={() => navigate('/app/create-offer')}>{t('profile.createOne')}</Button>}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredOffers.map((offer) => (
-                  <TableRow
-                    key={offer.id}
-                    onClick={() => navigate(`/app/offer/${offer.id}`)}
-                    className="hover:bg-muted/50 transition-colors border-b border-border/50 cursor-pointer"
+        {offersLoading ? (
+          <div className="flex items-center justify-center py-16 text-muted-foreground">
+            <Loader2 className="w-5 h-5 animate-spin mr-2" />
+            {t('profile.loadingOffers')}
+          </div>
+        ) : filteredOffers.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground">
+            {t('profile.noActiveOffers')}
+            {isOwnProfile && <Button className="rounded-full shadow-none ml-2" onClick={() => navigate('/app/create-offer')}>{t('profile.createOne')}</Button>}
+          </div>
+        ) : (
+          <>
+            {/* Desktop table (md+) */}
+            <div className="hidden md:block">
+              <OffersTableWrapper>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b border-border/50 bg-muted/50 -mx-6 md:-mx-8 px-6 md:px-8">
+                      <TableHead>{t('profile.tableType')}</TableHead>
+                      <TableHead>{t('profile.tableToken')}</TableHead>
+                      <TableHead className="text-right">
+                        <SortableHeader label={t('profile.tablePrice')} sortField="price" sortKey={sortKey} onToggle={toggleSort} />
+                      </TableHead>
+                      <TableHead className="text-right">
+                        <SortableHeader label={t('profile.tableMinAmount')} sortField="minAmount" sortKey={sortKey} onToggle={toggleSort} />
+                      </TableHead>
+                      <TableHead className="text-right">
+                        <SortableHeader label={t('profile.tableMaxAmount')} sortField="maxAmount" sortKey={sortKey} onToggle={toggleSort} />
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredOffers.map((offer) => (
+                      <TableRow
+                        key={offer.id}
+                        onClick={() => navigate(`/app/offer/${offer.id}`)}
+                        className="hover:bg-muted/50 transition-colors border-b border-border/50 cursor-pointer"
+                      >
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                          <Badge variant={offer.type === 'buy' ? 'default' : 'secondary'} className="rounded-full">
+                            {offer.type}
+                          </Badge>
+                          {offer.isPrivate && (
+                            <Badge variant="outline" className="rounded-full">
+                              {t('offers.private')}
+                            </Badge>
+                          )}
+                          {offer.status !== 'active' && (
+                            <Badge variant="secondary" className="rounded-full">
+                              {offer.status === 'completed'
+                                ? t('trades.statusCompleted')
+                                : offer.status === 'cancelled'
+                                  ? t('trades.statusCancelled')
+                                  : offer.status}
+                            </Badge>
+                          )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">{offer.token}</TableCell>
+                        <TableCell className="text-right font-mono">{offer.priceDisplay}</TableCell>
+                        <TableCell className="text-right font-mono">{offer.currency}{offer.minAmount.toLocaleString()}</TableCell>
+                        <TableCell className="text-right font-mono">{offer.currency}{offer.maxAmount.toLocaleString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </OffersTableWrapper>
+            </div>
+
+            {/* Mobile cards (<md) */}
+            <ul className="md:hidden space-y-3">
+              {filteredOffers.map((offer) => (
+                <li key={offer.id}>
+                  <Link
+                    to={`/app/offer/${offer.id}`}
+                    className="block group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl"
                   >
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                      <Badge variant={offer.type === 'buy' ? 'default' : 'secondary'} className="rounded-full">
-                        {offer.type}
-                      </Badge>
-                      {offer.isPrivate && (
-                        <Badge variant="outline" className="rounded-full">
-                          {t('offers.private')}
-                        </Badge>
-                      )}
-                      {offer.status !== 'active' && (
-                        <Badge variant="secondary" className="rounded-full">
-                          {offer.status === 'completed'
-                            ? t('trades.statusCompleted')
-                            : offer.status === 'cancelled'
-                              ? t('trades.statusCancelled')
-                              : offer.status}
-                        </Badge>
-                      )}
+                    <div className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-5 rounded-2xl transition-colors group-hover:border-primary/50 group-hover:bg-background/70">
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <span className="text-base font-semibold min-w-0 truncate">{offer.token}</span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <Badge variant={offer.type === 'buy' ? 'default' : 'secondary'} className="rounded-full text-xs">
+                            {offer.type}
+                          </Badge>
+                          {offer.isPrivate && (
+                            <Badge variant="outline" className="rounded-full text-xs">
+                              {t('offers.private')}
+                            </Badge>
+                          )}
+                          {offer.status !== 'active' && (
+                            <Badge variant="secondary" className="rounded-full text-xs">
+                              {offer.status === 'completed'
+                                ? t('trades.statusCompleted')
+                                : offer.status === 'cancelled'
+                                  ? t('trades.statusCancelled')
+                                  : offer.status}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                    </TableCell>
-                    <TableCell className="font-medium">{offer.token}</TableCell>
-                    <TableCell className="text-right font-mono">{offer.priceDisplay}</TableCell>
-                    <TableCell className="text-right font-mono">{offer.currency}{offer.minAmount.toLocaleString()}</TableCell>
-                    <TableCell className="text-right font-mono">{offer.currency}{offer.maxAmount.toLocaleString()}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </OffersTableWrapper>
+                      <div className="flex items-center justify-between gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                        <span className="font-mono shrink-0">{offer.priceDisplay}</span>
+                        <span className="truncate">{offer.currency}{offer.minAmount.toLocaleString()} – {offer.currency}{offer.maxAmount.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </div>
     </section>
   )
