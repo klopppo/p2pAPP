@@ -266,7 +266,8 @@ export function EditProfilePage() {
                 id="bio"
                 value={form.bio}
                 onChange={(e) => update('bio', e.target.value)}
-                className="border border-border min-h-[80px] resize-none"
+                rows={3}
+                className="border border-border min-h-[72px] leading-relaxed resize-none"
                 placeholder={t('editProfile.bioPlaceholder')}
                 maxLength={500}
               />

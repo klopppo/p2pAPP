@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Flag, MoreVertical, BellOff, Bell, Ban } from 'lucide-react'
+import { ArrowLeft, Flag, MoreVertical, BellOff, Bell, Ban, Archive } from 'lucide-react'
 import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import type { ConversationView, ConversationWithParticipant } from '@/types/database'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Text } from '@/components/ui/text'
@@ -17,7 +18,7 @@ import {
 import { TradeSummaryPill } from './TradeSummaryPill'
 import { shortAddress } from '@/lib/utils'
 import { ReportUserModal } from '@/components/custom/ReportUserModal'
-import { setConversationMuted } from '@/lib/supabase'
+import { setConversationMuted, setConversationArchived } from '@/lib/supabase'
 import { isUserBlocked, setUserBlocked } from '@/lib/blocks'
 
 interface Props {
@@ -36,6 +37,7 @@ interface Props {
  */
 export function ChatHeader({ conversation, currentUserId, online, onBack, onBlockChange }: Props) {
   const { t } = useTranslation()
+  const qc = useQueryClient()
   const [reportOpen, setReportOpen] = useState(false)
 
   const other: ConversationWithParticipant | undefined = conversation.participants.find(
@@ -54,6 +56,7 @@ export function ChatHeader({ conversation, currentUserId, online, onBack, onBloc
   const [blocked, setBlocked] = useState(
     () => !!currentUserId && !!otherUserId && isUserBlocked(currentUserId, otherUserId),
   )
+  const [archived, setArchived] = useState(conversation.status === 'archived')
 
   // Partner avatar + name link to their profile. Falls back to a plain block
   // when the counterparty (and its wallet address) isn't resolved yet.
@@ -69,6 +72,22 @@ export function ChatHeader({ conversation, currentUserId, online, onBack, onBloc
       toast.success(t(next ? 'chat.mutedToast' : 'chat.unmutedToast'))
     } catch {
       setMuted(!next)
+      toast.error(t('chat.actionFailed'))
+    }
+  }
+
+  const handleToggleArchive = async () => {
+    const next = !archived
+    setArchived(next)
+    try {
+      await setConversationArchived({ conversationId: conversation.id, archived: next })
+      toast.success(t(next ? 'chat.archivedToast' : 'chat.unarchivedToast'))
+      void qc.invalidateQueries({ queryKey: ['conversations'] })
+      void qc.invalidateQueries({ queryKey: ['conversation', conversation.id] })
+      // After archiving, leave the chat so the sidebar/archive view takes over.
+      if (next) onBack()
+    } catch {
+      setArchived(!next)
       toast.error(t('chat.actionFailed'))
     }
   }
@@ -170,6 +189,10 @@ export function ChatHeader({ conversation, currentUserId, online, onBack, onBloc
             <DropdownMenuItem onClick={() => void handleToggleMute()} className="rounded-xl cursor-pointer">
               {muted ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
               {muted ? t('chat.unmute') : t('chat.mute')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void handleToggleArchive()} className="rounded-xl cursor-pointer">
+              <Archive className="w-4 h-4" />
+              {archived ? t('chat.unarchive') : t('chat.archive')}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setReportOpen(true)} className="rounded-xl cursor-pointer">
               <Flag className="w-4 h-4" />

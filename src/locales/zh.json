@@ -261,7 +261,11 @@
     "unblockedToast": "已取消屏蔽该用户。",
     "actionFailed": "出错了，请重试。",
     "blockedPlaceholder": "你已屏蔽该用户。",
-    "send": "发送消息"
+    "send": "发送消息",
+    "archive": "归档聊天",
+    "unarchive": "取消归档",
+    "archivedToast": "聊天已归档。",
+    "unarchivedToast": "聊天已恢复到收件箱。"
   },
   "editOffer": {
     "title": "编辑报价",

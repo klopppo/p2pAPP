@@ -28,6 +28,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import { FullDropdown } from '@/components/custom/FullDropdown'
 import { useTrades } from '@/hooks/useTrades'
+import { useRatedTradeIds } from '@/hooks/useReviews'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 
 type RoleFilter = 'all' | 'buyer' | 'seller'
@@ -143,6 +144,9 @@ export function TradesPage() {
   }
 
   const myId = user?.id
+  // Trades the user already rated — hide the "Rate this trade" CTA for those.
+  const { data: ratedTradeIds = [] } = useRatedTradeIds(myId)
+  const ratedTradeIdSet = useMemo(() => new Set(ratedTradeIds), [ratedTradeIds])
 
   const filtered = useMemo(() => {
     return (trades as TradeRow[]).filter((t) => {
@@ -325,7 +329,7 @@ export function TradesPage() {
                         </Text>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-1 text-sm">
-                          <div className="flex flex-col">
+                          <div className="flex flex-col gap-1.5">
                             <span className="text-muted-foreground text-xs">
                               {role === 'buyer' ? t('trades.sellerLabel') : t('trades.buyerLabel')}
                             </span>
@@ -341,13 +345,13 @@ export function TradesPage() {
                               <span className="truncate">{cpName}</span>
                             </span>
                           </div>
-                          <div className="flex flex-col">
+                          <div className="flex flex-col gap-1.5">
                             <span className="text-muted-foreground text-xs">
                               {t('trades.tradeStatus')}
                             </span>
                             <span className="capitalize">{trade.status}</span>
                           </div>
-                          <div className="flex flex-col">
+                          <div className="flex flex-col gap-1.5">
                             <span className="text-muted-foreground text-xs">
                               {t('trades.opened')}
                             </span>
@@ -355,7 +359,8 @@ export function TradesPage() {
                           </div>
                         </div>
                       </div>
-                      {(trade.status === 'completed' || trade.status === 'refunded') && (
+                      {(trade.status === 'completed' || trade.status === 'refunded') &&
+                        !ratedTradeIdSet.has(trade.id) && (
                         <span className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-primary">
                           <Star className="w-4 h-4 fill-primary" />
                           {t('trades.rateTrade')}

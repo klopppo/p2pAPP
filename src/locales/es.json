@@ -261,7 +261,11 @@
     "unblockedToast": "Usuario desbloqueado.",
     "actionFailed": "Algo salió mal. Inténtalo de nuevo.",
     "blockedPlaceholder": "Has bloqueado a este usuario.",
-    "send": "Enviar mensaje"
+    "send": "Enviar mensaje",
+    "archive": "Archivar chat",
+    "unarchive": "Desarchivar chat",
+    "archivedToast": "Chat archivado.",
+    "unarchivedToast": "Chat restaurado a la bandeja de entrada."
   },
   "editOffer": {
     "title": "Editar oferta",

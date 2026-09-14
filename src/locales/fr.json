@@ -261,7 +261,11 @@
     "unblockedToast": "Utilisateur débloqué.",
     "actionFailed": "Une erreur est survenue. Veuillez réessayer.",
     "blockedPlaceholder": "Vous avez bloqué cet utilisateur.",
-    "send": "Envoyer le message"
+    "send": "Envoyer le message",
+    "archive": "Archiver la discussion",
+    "unarchive": "Désarchiver la discussion",
+    "archivedToast": "Discussion archivée.",
+    "unarchivedToast": "Discussion restaurée dans la boîte de réception."
   },
   "editOffer": {
     "title": "Modifier l'offre",

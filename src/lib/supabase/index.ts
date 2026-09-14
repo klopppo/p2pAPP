@@ -1771,6 +1771,25 @@ export async function hasUserRatedTrade(tradeId: string, userId: string) {
   return !!data
 }
 
+/**
+ * Trade ids (uuids) the given user has already rated (as the rater). Used to
+ * hide the "Rate this trade" CTA on the trades list without an N+1 of
+ * `hasUserRatedTrade` per card.
+ */
+export async function getRatedTradeIdsByUser(userId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('trade_ratings')
+    .select('trade_id')
+    .eq('rater_id', userId)
+
+  if (error) {
+    console.error('Error listing rated trade ids:', error)
+    throw error
+  }
+
+  return (data ?? []).map((r: { trade_id: string }) => r.trade_id)
+}
+
 // =================================================================
 // CHAT QUERIES (see migration 20260724000004)
 // =================================================================
@@ -2202,6 +2221,29 @@ export async function setConversationMuted(input: {
 
   if (error) {
     console.error('Error muting conversation:', error)
+    throw error
+  }
+}
+
+/**
+ * Archive / unarchive a conversation for the current participant. Archived
+ * chats move out of the active inbox (the trades list trigger archives them
+ * automatically on completion; this is the manual path from the chat menu).
+ */
+export async function setConversationArchived(input: {
+  conversationId: string
+  archived: boolean
+}): Promise<void> {
+  const { error } = await supabase
+    .from('conversations')
+    .update({
+      status: input.archived ? 'archived' : 'open',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', input.conversationId)
+
+  if (error) {
+    console.error('Error archiving conversation:', error)
     throw error
   }
 }

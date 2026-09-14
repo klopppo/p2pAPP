@@ -275,7 +275,11 @@
     "unblockedToast": "User unblocked.",
     "actionFailed": "Something went wrong. Please try again.",
     "blockedPlaceholder": "You blocked this user.",
-    "send": "Send message"
+    "send": "Send message",
+    "archive": "Archive chat",
+    "unarchive": "Unarchive chat",
+    "archivedToast": "Chat archived.",
+    "unarchivedToast": "Chat restored to inbox."
   },
   "editOffer": {
     "title": "Edit offer",

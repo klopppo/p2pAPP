@@ -30,6 +30,7 @@ import { getOrCreateDirectConversation } from '@/lib/supabase'
 import { AddressWithActions } from '@/components/custom/AddressWithActions'
 import { useTranslation } from 'react-i18next'
 import { ReviewList } from '@/components/custom/ReviewList'
+import { ProfileSocialLinks } from '@/components/custom/ProfileSocialLinks'
 import { InviteEarnCard } from '@/components/custom/InviteEarnCard'
 import { currencySymbol } from '@/lib/utils'
 
@@ -301,12 +302,12 @@ export function ProfilePage() {
               {onlineUsers.has(profile.id) ? t('profile.online') : t('profile.offline')}
             </Badge>
           </div>
-          <div className="mt-1 max-w-full">
+          {/* Wallet-address chip, social handles to its RIGHT. */}
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-2 md:justify-start">
             <AddressWithActions
               address={walletAddr}
               explorerBase={explorerBase.address}
               textClassName="font-mono text-xs text-muted-foreground"
-              className="mx-auto md:mx-0"
               {...(canMessage
                 ? {
                     onMessage: startChat,
@@ -318,9 +319,20 @@ export function ProfilePage() {
                   }
                 : {})}
             />
+            <ProfileSocialLinks
+              twitterHandle={profile.twitter_handle}
+              telegramHandle={profile.telegram_handle}
+              githubHandle={profile.github_handle}
+              website={profile.website}
+            />
           </div>
           {profile.bio && (
-            <Text variant="muted" className="mt-2 max-w-2xl">{profile.bio}</Text>
+            <Text
+              variant="muted"
+              className="mt-2 max-w-2xl whitespace-pre-line line-clamp-3 leading-relaxed"
+            >
+              {profile.bio}
+            </Text>
           )}
         </div>
         {/* Edit profile button or Report User button */}
@@ -369,7 +381,6 @@ export function ProfilePage() {
                 <div className="flex justify-between"><span className="text-muted-foreground">{t('profile.cancelled')}</span><span>{formatNumber(cancelledTrades)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">{t('profile.disputes')}</span><span>{formatNumber(disputeCount)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">{t('profile.completionRate')}</span><span>{completionRate}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">{t('profile.verification')}</span><span className="capitalize">{profile.verification_level ?? 'unverified'}</span></div>
               </div>
             </CardContent>
           </Card>
@@ -383,21 +394,22 @@ export function ProfilePage() {
           {/* Invite & Earn — own profile only (reads are owner-scoped by RLS). */}
           {isOwnProfile && user && <InviteEarnCard userId={user.id} />}
 
-          {/* Total Trades */}
-          <Card>
-            <CardContent>
-              <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">{t('profile.totalTrades')}</Text>
-              <Text variant="h3" className="mt-1">{formatNumber(totalTrades)}</Text>
-            </CardContent>
-          </Card>
+          {/* Total Trades + Total Volume — side by side, half width each */}
+          <div className="grid grid-cols-2 gap-4">
+            <Card>
+              <CardContent>
+                <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">{t('profile.totalTrades')}</Text>
+                <Text variant="h3" className="mt-1">{formatNumber(totalTrades)}</Text>
+              </CardContent>
+            </Card>
 
-          {/* Total Volume */}
-          <Card>
-            <CardContent>
-              <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">{t('profile.totalVolume')}</Text>
-              <Text variant="h3" className="mt-1">{formatVolume(profile.total_volume)}</Text>
-            </CardContent>
-          </Card>
+            <Card>
+              <CardContent>
+                <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground block">{t('profile.totalVolume')}</Text>
+                <Text variant="h3" className="mt-1">{formatVolume(profile.total_volume)}</Text>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Last 30d Stats */}
           <Card>
@@ -432,7 +444,7 @@ export function ProfilePage() {
               <OffersTableWrapper>
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-b border-border/50 bg-muted/50 -mx-6 md:-mx-8 px-6 md:px-8">
+                    <TableRow className="border-b border-border/50 bg-muted/50">
                       <TableHead>{t('profile.tableType')}</TableHead>
                       <TableHead>{t('profile.tableToken')}</TableHead>
                       <TableHead className="text-right">

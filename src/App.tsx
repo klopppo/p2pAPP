@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { WagmiProvider, useAccount } from 'wagmi'
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit'
 import { Toaster } from 'sonner'
+import { useTheme } from '@/components/theme-provider'
 import '@rainbow-me/rainbowkit/styles.css'
 import { config } from './wagmi'
 import { AppLayout } from './components/layout/AppLayout'
@@ -138,6 +139,7 @@ function QueryClientWithPersistence() {
 }
 
 function App() {
+  const { theme } = useTheme()
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
@@ -191,7 +193,7 @@ function App() {
             </Suspense>
           </BrowserRouter>
           {/* Single, app-wide toast host. Use `toast` from 'sonner' anywhere. */}
-          <Toaster theme="dark" position="bottom-right" richColors closeButton />
+          <Toaster theme={theme} position="bottom-right" richColors closeButton />
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

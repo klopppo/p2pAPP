@@ -261,7 +261,11 @@
     "unblockedToast": "Kullanıcının engeli kaldırıldı.",
     "actionFailed": "Bir şeyler ters gitti. Lütfen tekrar deneyin.",
     "blockedPlaceholder": "Bu kullanıcıyı engellediniz.",
-    "send": "Mesaj gönder"
+    "send": "Mesaj gönder",
+    "archive": "Sohbeti arşivle",
+    "unarchive": "Arşivden çıkar",
+    "archivedToast": "Sohbet arşivlendi.",
+    "unarchivedToast": "Sohbet gelen kutusuna geri alındı."
   },
   "editOffer": {
     "title": "Teklifi düzenle",
