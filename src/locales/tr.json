@@ -99,6 +99,8 @@
     "typeLabel": "Tür",
     "tokenLabel": "Jeton",
     "paymentLabel": "Ödeme",
+    "locationLabel": "Konum",
+    "locationGlobal": "Global",
     "filterAll": "Tümü",
     "filterBuy": "Al",
     "filterSell": "Sat",

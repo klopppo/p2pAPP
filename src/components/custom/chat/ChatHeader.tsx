@@ -145,8 +145,8 @@ export function ChatHeader({ conversation, currentUserId, online, onBack, onBloc
       <div className="flex items-center gap-3 mb-4 shrink-0">
         <button
           onClick={onBack}
-          className="md:hidden text-muted-foreground hover:text-foreground cursor-pointer"
-          aria-label="Back to conversations"
+          className="md:hidden -ml-2 p-2 rounded-full min-w-11 min-h-11 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+          aria-label={t('chat.backToMessages')}
         >
           <ArrowLeft className="w-5 h-5" />
         </button>

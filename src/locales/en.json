@@ -99,6 +99,8 @@
     "typeLabel": "Type",
     "tokenLabel": "Token",
     "paymentLabel": "Payment",
+    "locationLabel": "Location",
+    "locationGlobal": "Global",
     "filterAll": "All",
     "filterBuy": "Buy",
     "filterSell": "Sell",

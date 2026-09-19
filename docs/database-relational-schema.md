@@ -383,6 +383,12 @@ CREATE TABLE users (
 );
 ```
 
+> `avg_rating` is an unauthenticated cache of the `trade_ratings` average for
+> the user. Kept fresh by the `trg_trade_ratings_refresh_avg` trigger
+> (`20260920000000_trade_ratings_avg_rating_sync.sql`): recomputes
+> `round(avg(score), 2)` → `0` when no ratings remain, on any
+> insert/update/delete of `trade_ratings`.
+
 ### **2. USER PRIVATE**
 
 ```sql

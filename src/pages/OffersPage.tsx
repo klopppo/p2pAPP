@@ -19,8 +19,9 @@ import { AppPageHeader } from '@/components/custom/AppPageHeader'
 import { SellerHoverCard, type SellerPreview } from '@/components/custom/SellerHoverCard'
 import { FullDropdown } from '@/components/custom/FullDropdown'
 import { MaskedList, useInfiniteList } from '@/components/infinite-list'
-import { ArrowUpDown, Loader2 } from 'lucide-react'
+import { ArrowUpDown, Loader2, MapPin } from 'lucide-react'
 import { currencySymbol } from '@/lib/utils'
+import { LOCATIONS, REGION_NAMES, offerMatchesLocation } from '@/lib/locations'
 
 interface Offer {
   id: string
@@ -40,6 +41,10 @@ interface Offer {
   targetUser: string | null
   seller: SellerPreview
   paymentMethods: string[]
+  /** ISO region codes persisted on the offer (empty = Global). */
+  regions: string[]
+  /** Human location labels persisted on the offer (same as picker values). */
+  tags: string[]
 }
 
 type SortKey = 'price' | 'minAmount' | 'maxAmount'
@@ -60,6 +65,7 @@ interface OfferRow {
   target_user?: string | null
   payment_methods?: string[] | null
   tags?: string[] | null
+  available_regions?: string[] | null
   seller?: {
     wallet_address?: string
     nickname?: string | null
@@ -85,7 +91,7 @@ function mapOfferRow(o: OfferRow): Offer {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}`,
-    currency: symbol,
+    currency: o.fiat_currency,
     minAmount: Number(o.min_amount) || 0,
     maxAmount: Number(o.max_amount) || 0,
     isPositive: o.type === 'buy',
@@ -101,6 +107,8 @@ function mapOfferRow(o: OfferRow): Offer {
       tags: o.tags ?? [],
     },
     paymentMethods: o.payment_methods ?? [],
+    regions: o.available_regions ?? [],
+    tags: o.tags ?? [],
   }
 }
 
@@ -137,6 +145,7 @@ export function OffersPage() {
   const [typeFilter, setTypeFilter] = useState('all')
   const [tokenFilter, setTokenFilter] = useState('all')
   const [paymentFilter, setPaymentFilter] = useState('all')
+  const [locationFilter, setLocationFilter] = useState('all')
   const offers = useMemo<Offer[]>(() => (data ?? []).map(mapOfferRow), [data])
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>('asc')
@@ -164,7 +173,13 @@ export function OffersPage() {
         offer.paymentMethods.some((m: string) =>
           m.toLowerCase().includes(paymentFilter.toLowerCase())
         )
-      return matchesSearch && matchesType && matchesToken && matchesPayment
+      // Location filter — matches persisted region codes (or tag labels).
+      const matchesLocation =
+        locationFilter === 'all' ||
+        offerMatchesLocation(offer.regions, offer.tags, locationFilter)
+      return (
+        matchesSearch && matchesType && matchesToken && matchesPayment && matchesLocation
+      )
     })
 
     if (sortKey) {
@@ -182,7 +197,7 @@ export function OffersPage() {
     const pinned = filtered.filter(isPrivateToMe)
     if (pinned.length === 0) return filtered
     return [...pinned, ...filtered.filter((o) => !isPrivateToMe(o))]
-  }, [offers, searchQuery, typeFilter, tokenFilter, paymentFilter, sortKey, sortDir, address])
+  }, [offers, searchQuery, typeFilter, tokenFilter, paymentFilter, locationFilter, sortKey, sortDir, address])
 
   const loadMore = () => {
     list.nextPage()
@@ -245,6 +260,15 @@ export function OffersPage() {
                     { label: t('offers.filterPaymentBank'), value: 'bank' },
                     { label: t('offers.filterPaymentPaypal'), value: 'paypal' },
                     { label: t('offers.filterPaymentWise'), value: 'wise' },
+                  ]}
+                />
+                <FullDropdown
+                  label={t('offers.locationLabel')}
+                  value={locationFilter}
+                  onSelect={setLocationFilter}
+                  options={[
+                    { label: t('offers.filterAll'), value: 'all' },
+                    ...LOCATIONS.map((l) => ({ label: l, value: l })),
                   ]}
                 />
               </div>
@@ -338,8 +362,8 @@ export function OffersPage() {
                               </TableCell>
                               <TableCell className="font-medium">{offer.token}</TableCell>
                               <TableCell className="text-right font-mono">{offer.priceDisplay}</TableCell>
-                              <TableCell className="text-right font-mono">{offer.currency}{offer.minAmount.toLocaleString()}</TableCell>
-                              <TableCell className="text-right font-mono">{offer.currency}{offer.maxAmount.toLocaleString()}</TableCell>
+                              <TableCell className="text-right font-mono">{offer.currency} {offer.minAmount.toLocaleString()}</TableCell>
+                              <TableCell className="text-right font-mono">{offer.currency} {offer.maxAmount.toLocaleString()}</TableCell>
                             </TableRow>
                           ))}
                         </MaskedList>
@@ -396,9 +420,17 @@ export function OffersPage() {
                               </Link>
                             </SellerHoverCard>
 
-                            {/* Meta row: amounts + payment */}
+                            {/* Meta row: location + amounts + payment */}
                             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                              <span className="font-mono">{offer.currency}{offer.minAmount.toLocaleString()} – {offer.currency}{offer.maxAmount.toLocaleString()}</span>
+                              <span className="inline-flex items-center gap-1">
+                                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                                <span className="truncate">
+                                  {offer.regions.length > 0
+                                    ? offer.regions.map((r) => REGION_NAMES[r] ?? r).join(', ')
+                                    : t('offers.locationGlobal')}
+                                </span>
+                              </span>
+                              <span className="font-mono">{offer.currency} {offer.minAmount.toLocaleString()} – {offer.currency} {offer.maxAmount.toLocaleString()}</span>
                               {offer.paymentMethods.length > 0 && (
                                 <span className="truncate">{offer.paymentMethods.slice(0, 2).join(', ')}</span>
                               )}

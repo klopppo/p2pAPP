@@ -69,11 +69,11 @@ export function InviteEarnCard({ userId }: { userId: string }) {
     <Card className="bg-background/50 backdrop-blur-xl shadow-xl border border-border/50 p-6 rounded-2xl">
       <CardContent className="space-y-4">
         <div className="flex items-center gap-2">
-          <span className="rounded-full bg-brand-accent/20 text-brand-accent p-2 shrink-0">
+          <span className="rounded-full bg-muted text-muted-foreground p-2 shrink-0">
             <Gift className="w-4 h-4" />
           </span>
           <Text variant="h4" className="font-bold">{t('referral.title')}</Text>
-          <Badge className="rounded-full ml-auto">{share}</Badge>
+          <Badge variant="secondary" className="rounded-full ml-auto">{share}</Badge>
         </div>
 
         {isLoading ? (

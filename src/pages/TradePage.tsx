@@ -28,10 +28,7 @@ import {
 import { parseUnits } from 'viem'
 import { errorMessage } from '@/lib/errorMessage'
 import { currencySymbol } from '@/lib/utils'
-
-const REGION_NAMES: Record<string, string> = {
-  IT: 'Italy', DE: 'Germany', FR: 'France', ES: 'Spain',
-}
+import { REGION_NAMES } from '@/lib/locations'
 
 type Stage = 'idle' | 'creating-escrow' | 'mining' | 'saving'
 
@@ -511,11 +508,16 @@ export function TradePage() {
                 </div>
                 <div className="flex items-center gap-4 text-sm">
                   <div className="flex items-center gap-1">
-                    <Star className="w-4 h-4 fill-primary text-primary" />
                     {Number(seller?.avg_rating) ? (
-                      <span className="font-medium">{Number(seller?.avg_rating).toFixed(1)}</span>
+                      <>
+                        <Star className="w-4 h-4 fill-primary text-primary" />
+                        <span className="font-medium">{Number(seller?.avg_rating).toFixed(1)}</span>
+                      </>
                     ) : (
-                      <span className="text-muted-foreground">{t('trade.noRating')}</span>
+                      <>
+                        <Star className="w-4 h-4 text-muted-foreground/60" />
+                        <span className="text-muted-foreground">{t('trade.noRating')}</span>
+                      </>
                     )}
                   </div>
                   <span className="text-muted-foreground">·</span>

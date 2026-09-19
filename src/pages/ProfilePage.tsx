@@ -169,7 +169,7 @@ export function ProfilePage() {
         amount: String(row.crypto_amount ?? 0),
         price,
         priceDisplay: `${symbol}${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        currency: symbol,
+        currency: row.fiat_currency,
         minAmount: Number(row.min_amount) || 0,
         maxAmount: Number(row.max_amount) || 0,
         isPositive: row.type === 'buy',
@@ -488,8 +488,8 @@ export function ProfilePage() {
                         </TableCell>
                         <TableCell className="font-medium">{offer.token}</TableCell>
                         <TableCell className="text-right font-mono">{offer.priceDisplay}</TableCell>
-                        <TableCell className="text-right font-mono">{offer.currency}{offer.minAmount.toLocaleString()}</TableCell>
-                        <TableCell className="text-right font-mono">{offer.currency}{offer.maxAmount.toLocaleString()}</TableCell>
+                        <TableCell className="text-right font-mono">{offer.currency} {offer.minAmount.toLocaleString()}</TableCell>
+                        <TableCell className="text-right font-mono">{offer.currency} {offer.maxAmount.toLocaleString()}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -530,7 +530,7 @@ export function ProfilePage() {
                       </div>
                       <div className="flex items-center justify-between gap-x-4 gap-y-1 text-sm text-muted-foreground">
                         <span className="font-mono shrink-0">{offer.priceDisplay}</span>
-                        <span className="truncate">{offer.currency}{offer.minAmount.toLocaleString()} – {offer.currency}{offer.maxAmount.toLocaleString()}</span>
+                        <span className="truncate">{offer.currency} {offer.minAmount.toLocaleString()} – {offer.currency} {offer.maxAmount.toLocaleString()}</span>
                       </div>
                     </div>
                   </Link>

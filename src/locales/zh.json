@@ -99,6 +99,8 @@
     "typeLabel": "类型",
     "tokenLabel": "代币",
     "paymentLabel": "支付方式",
+    "locationLabel": "地区",
+    "locationGlobal": "全球",
     "filterAll": "全部",
     "filterBuy": "买入",
     "filterSell": "卖出",

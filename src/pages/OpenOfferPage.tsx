@@ -18,10 +18,7 @@ import { useConversations } from '@/hooks/useConversations'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { getOrCreateDirectConversation } from '@/lib/supabase'
 import { currencySymbol } from '@/lib/utils'
-
-const REGION_NAMES: Record<string, string> = {
-  IT: 'Italy', DE: 'Germany', FR: 'France', ES: 'Spain',
-}
+import { REGION_NAMES } from '@/lib/locations'
 
 export function OpenOfferPage() {
   const { id } = useParams()
@@ -151,11 +148,16 @@ export function OpenOfferPage() {
                   </div>
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-2 text-sm">
                     <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 fill-primary text-primary" />
                       {Number(seller?.avg_rating) ? (
-                        <span>{Number(seller?.avg_rating).toFixed(1)}</span>
+                        <>
+                          <Star className="w-4 h-4 fill-primary text-primary" />
+                          <span>{Number(seller?.avg_rating).toFixed(1)}</span>
+                        </>
                       ) : (
-                        <span className="text-muted-foreground">{t('openOffer.noRating')}</span>
+                        <>
+                          <Star className="w-4 h-4 text-muted-foreground/60" />
+                          <span className="text-muted-foreground">{t('openOffer.noRating')}</span>
+                        </>
                       )}
                     </div>
                      <div>{(seller?.total_trades ?? 0).toLocaleString()} {t('openOffer.trades')}</div>

@@ -26,6 +26,7 @@ import { signWalletMessage } from '@/lib/walletSigner'
 import { useOffer } from '@/hooks/useOffers'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { currencySymbol, CURRENCY_SYMBOLS } from '@/lib/utils'
+import { LOCATIONS, locationToRegions, regionToLocation } from '@/lib/locations'
 
 // Standard unit-of-measure decimals per asset. offers.crypto_amount /
 // min/max_amount are NUMERIC(30,18) but stored in the asset's natural human
@@ -87,31 +88,7 @@ export function EditOfferPage() {
     // Reverse the region code → human label map so the dropdown opens with
     // the same label the seller picked at create time. Empty array means
     // "Global" (the default in the picker).
-    const REGION_LABELS: Record<string, string> = {
-      US: 'United States',
-      EU: 'European Union',
-      GB: 'United Kingdom',
-      BR: 'Brazil',
-      TR: 'Turkey',
-      AR: 'Argentina',
-      IN: 'India',
-      NG: 'Nigeria',
-      CA: 'Canada',
-      AU: 'Australia',
-      MX: 'Mexico',
-      CO: 'Colombia',
-      CH: 'Switzerland',
-      JP: 'Japan',
-      PH: 'Philippines',
-      VN: 'Vietnam',
-      AE: 'United Arab Emirates',
-      IT: 'Italy',
-      DE: 'Germany',
-      FR: 'France',
-      ES: 'Spain',
-    }
-    const code = offer.available_regions?.[0]
-    const locationLabel = code ? (REGION_LABELS[code] ?? 'Global') : 'Global'
+    const locationLabel = regionToLocation(offer.available_regions?.[0])
 
     // Hydrate the form once from the loaded offer. This is the canonical
     // "seed editable state from async data" pattern; the React Compiler lint
@@ -279,10 +256,7 @@ export function EditOfferPage() {
         payment_methods: [formData.paymentMethod],
         description: formData.description.trim() || null,
         grace_period: Math.round(Number(formData.gracePeriod)),
-        available_regions:
-          formData.location === 'Global'
-            ? []
-            : [REGION_CODES[formData.location] ?? formData.location.slice(0, 2).toUpperCase()],
+        available_regions: locationToRegions(formData.location),
         tags: [formData.location],
       }
 
@@ -321,54 +295,6 @@ export function EditOfferPage() {
     'Interac e-Transfer',
     'Cash in Person',
   ]
-  const locations = [
-    'Global',
-    'United States',
-    'European Union',
-    'United Kingdom',
-    'Brazil',
-    'Turkey',
-    'Argentina',
-    'India',
-    'Nigeria',
-    'Canada',
-    'Australia',
-    'Mexico',
-    'Colombia',
-    'Switzerland',
-    'Japan',
-    'Philippines',
-    'Vietnam',
-    'United Arab Emirates',
-    'Italy',
-    'Germany',
-    'France',
-    'Spain',
-  ]
-  const REGION_CODES: Record<string, string> = {
-    'United States': 'US',
-    'European Union': 'EU',
-    'United Kingdom': 'GB',
-    Brazil: 'BR',
-    Turkey: 'TR',
-    Argentina: 'AR',
-    India: 'IN',
-    Nigeria: 'NG',
-    Canada: 'CA',
-    Australia: 'AU',
-    Mexico: 'MX',
-    Colombia: 'CO',
-    Switzerland: 'CH',
-    Japan: 'JP',
-    Philippines: 'PH',
-    Vietnam: 'VN',
-    'United Arab Emirates': 'AE',
-    Italy: 'IT',
-    Germany: 'DE',
-    France: 'FR',
-    Spain: 'ES',
-  }
-
   const currSymbol = currencySymbol(formData.fiatCurrency)
 
   return (
@@ -591,7 +517,7 @@ export function EditOfferPage() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
                   <DropdownMenuGroup>
-                    {locations.map((location) => (
+                    {LOCATIONS.map((location) => (
                       <DropdownMenuItem
                         key={location}
                         onSelect={() => setFormData({ ...formData, location })}

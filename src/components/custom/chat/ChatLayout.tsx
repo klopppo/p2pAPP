@@ -221,6 +221,9 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
       onBack()
       return
     }
+    // A conversation must actually be open — a stray tap on the list view
+    // (which renders no back button anyway) should be a no-op.
+    if (!activeId) return
     // Always return to the list view — this also clears the `:conversationId`
     // route param, which is what the mobile back button needs.
     navigate('/app/messages')

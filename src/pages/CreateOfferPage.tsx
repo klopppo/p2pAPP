@@ -22,6 +22,7 @@ import { Check, ChevronDown, Loader2 } from 'lucide-react'
 import { createOffer, ensureUser, ensureWalletSession } from '@/lib/supabase'
 import { signWalletMessage } from '@/lib/walletSigner'
 import { currencySymbol, CURRENCY_SYMBOLS } from '@/lib/utils'
+import { LOCATIONS, locationToRegions } from '@/lib/locations'
 
 // Standard unit-of-measure decimals per asset. offers.crypto_amount /
 // min/max_amount are NUMERIC(30,18) but stored in the asset's natural human
@@ -187,10 +188,7 @@ export function CreateOfferPage() {
         payment_methods: [formData.paymentMethod],
         description: formData.description.trim() || null,
         grace_period: Math.round(Number(formData.gracePeriod)),
-        available_regions:
-          formData.location === 'Global'
-            ? []
-            : [REGION_CODES[formData.location] ?? formData.location.slice(0, 2).toUpperCase()],
+        available_regions: locationToRegions(formData.location),
         platform_fee_bps: 50, // 0.5%
         network_fee: 0,
         tags: [formData.location],
@@ -237,54 +235,6 @@ export function CreateOfferPage() {
     'Interac e-Transfer',
     'Cash in Person',
   ]
-  const locations = [
-    'Global',
-    'United States',
-    'European Union',
-    'United Kingdom',
-    'Brazil',
-    'Turkey',
-    'Argentina',
-    'India',
-    'Nigeria',
-    'Canada',
-    'Australia',
-    'Mexico',
-    'Colombia',
-    'Switzerland',
-    'Japan',
-    'Philippines',
-    'Vietnam',
-    'United Arab Emirates',
-    'Italy',
-    'Germany',
-    'France',
-    'Spain',
-  ]
-  const REGION_CODES: Record<string, string> = {
-    'United States': 'US',
-    'European Union': 'EU',
-    'United Kingdom': 'GB',
-    'Brazil': 'BR',
-    'Turkey': 'TR',
-    'Argentina': 'AR',
-    'India': 'IN',
-    'Nigeria': 'NG',
-    'Canada': 'CA',
-    'Australia': 'AU',
-    'Mexico': 'MX',
-    'Colombia': 'CO',
-    'Switzerland': 'CH',
-    'Japan': 'JP',
-    'Philippines': 'PH',
-    'Vietnam': 'VN',
-    'United Arab Emirates': 'AE',
-    'Italy': 'IT',
-    'Germany': 'DE',
-    'France': 'FR',
-    'Spain': 'ES',
-  }
-
   const currSymbol = currencySymbol(formData.fiatCurrency)
 
   return (
@@ -514,7 +464,7 @@ export function CreateOfferPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start">
                           <DropdownMenuGroup>
-                            {locations.map((location) => (
+                            {LOCATIONS.map((location) => (
                               <DropdownMenuItem
                                 key={location}
                                 onSelect={() => setFormData({ ...formData, location })}

@@ -9,6 +9,36 @@
 
 ---
 
+## Location filter on the offers marketplace — 2026-09-20
+
+The offers list now filters by location. A `Location` dropdown (FullDropdown) was
+added to the OffersPage filter bar — options come from the same list as the
+create/edit offer picker, and matching checks the offer's persisted
+`available_regions` codes (an empty array = "Global"). Mobile offer cards also
+show the offer location inline. The location picker labels, `REGION_CODES` and
+`REGION_NAMES` were previously duplicated across four pages; they now live in a
+single `src/lib/locations.ts` module consumed by CreateOfferPage, EditOfferPage,
+TradePage, OpenOfferPage and OffersPage (fixes TradePage/OpenOfferPage rendering
+only IT/DE/FR/ES names — they now resolve every stored code).
+- Files: `src/lib/locations.ts`, `src/pages/{OffersPage,CreateOfferPage,EditOfferPage,TradePage,OpenOfferPage}.tsx`, `src/locales/*.json`.
+
+---
+
+## Fix `users.avg_rating` — real ratings now show instead of "No ratings yet" — 2026-09-20
+
+`users.avg_rating` was a denormalized column that defaulted to 0 and was never
+recomputed when a `trade_ratings` row landed, so a seller with reviews still
+showed "No ratings yet" on the trade / open-offer pages (and a bare `0` on
+offer rows / hover cards). Added a SECURITY DEFINER AFTER INSERT/UPDATE/DELETE
+trigger on `trade_ratings` (`refresh_user_avg_rating`) that recomputes
+`round(avg(score),2)` → 0 when no ratings remain, plus a backfill for existing
+rows. TradePage / OpenOfferPage now only show "No ratings yet" for sellers with
+genuinely zero reviews, and render a muted (unfilled) star when they do.
+- Files: `supabase/migrations/20260920000000_trade_ratings_avg_rating_sync.sql`,
+  `src/pages/{TradePage,OpenOfferPage}.tsx`.
+
+---
+
 ## Chain gate scoped to contract-write pages only — 2026-09-14
 
 The app no longer demands Sepolia while just browsing or connecting a wallet.
