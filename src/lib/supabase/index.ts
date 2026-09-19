@@ -2533,7 +2533,15 @@ export async function signInWithWallet(
     'siwe-auth',
     { body: { action: 'nonce', address: addr } },
   )
-  if (nonceErr || !nonceRes?.nonce) throw nonceErr ?? new Error('no nonce')
+  if (nonceErr || !nonceRes?.nonce) {
+    // The edge re-issues a wallet's fresh unused nonce, so a 429 here is the
+    // rare remaining abuse-guard hit, not a tap-retry pile-up. Surface it as
+    // something a human can act on instead of a bare FunctionsHttpError.
+    if (isEdgeFunctionRateLimited(nonceErr)) {
+      throw new Error('Too many sign-in attempts. Wait a few minutes and try again.')
+    }
+    throw nonceErr ?? new Error('no nonce')
+  }
   const nonce = String(nonceRes.nonce)
   if (!/^[a-zA-Z0-9_-]{8,64}$/.test(nonce)) throw new Error('bad nonce')
 
@@ -2581,6 +2589,16 @@ function setSiweMarker(marker: { address: string; issuedAt: string }): void {
 
 class SiweRejectedError extends Error {
   override name = 'SiweRejectedError'
+}
+
+/**
+ * True when the error was thrown by our own `siwe-auth` edge function with a
+ * 429 (its MAX_ACTIVE_NONCES guard). supabase-js wraps non-2xx invoked
+ * responses in a FunctionsHttpError carrying the status in `context.status`.
+ */
+function isEdgeFunctionRateLimited(err: unknown): boolean {
+  const ctx = (err as { context?: { status?: number } })?.context
+  return ctx?.status === 429
 }
 
 /**
@@ -2806,6 +2824,11 @@ export async function ensureWalletSession(
     setSiweRejectedMarker(addr)
     if (err instanceof SiweRejectedError) {
       console.warn('[ensureWalletSession] sign-in rejected:', err.message)
+    } else if (isEdgeFunctionRateLimited(err)) {
+      console.warn(
+        '[ensureWalletSession] sign-in rate-limited:',
+        err instanceof Error ? err.message : err,
+      )
     } else {
       console.error('[ensureWalletSession] sign-in failed:', err)
     }

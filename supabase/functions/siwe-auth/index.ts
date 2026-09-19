@@ -124,6 +124,33 @@ async function issueNonce(
       .delete()
       .lt("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString())
 
+    // Idempotent retries: re-issue the address's still-fresh unused nonce
+    // instead of always minting a new one. Repeated "Sign in" taps (dismissed
+    // MetaMask prompts, failed verification, mid-flow retries) used to mint a
+    // fresh row each time — after 5 attempts the MAX_ACTIVE_NONCES guard below
+    // returned 429 and locked the wallet out for the rest of the 10-min window.
+    // Only a nonce still inside its TTL is reusable, otherwise the /verify step
+    // would reject it as expired. A nonce is only ever consumed (used_at set)
+    // by /verify, so re-issuing here is one-shot and address-bound by design.
+    const { data: existing, error: reuseErr } = await admin
+      .from("siwe_nonces")
+      .select("nonce")
+      .eq("address", addr)
+      .is("used_at", null)
+      .gt(
+        "created_at",
+        new Date(Date.now() - NONCE_TTL_MINUTES * 60_000).toISOString()
+      )
+      .order("created_at", { ascending: false })
+      .limit(1)
+    if (reuseErr) {
+      console.error("siwe-auth: nonce reuse lookup failed", reuseErr)
+      return json({ error: "Failed to issue nonce" }, 500)
+    }
+    if (existing?.[0]?.nonce) {
+      return json({ nonce: existing[0].nonce })
+    }
+
     // Raise the bar for repeat nonce requests from the same address.
     const { count } = await admin
       .from("siwe_nonces")

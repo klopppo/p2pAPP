@@ -9,6 +9,21 @@
 
 ---
 
+## SIWE `429 Too Many Requests` on repeated "Sign in" taps — 2026-09-20
+
+Tapping "Sign in" a few times inside a 10-min window (dismissed MetaMask
+prompt, failed verification, retries) hit a hard `429` from our own `siwe-auth`
+edge function: every `nonce` request minted a fresh row, and abandoned nonces
+piled up until the `MAX_ACTIVE_NONCES` guard (5 / 10 min) locked the wallet out.
+`issueNonce` is now idempotent per address — it re-issues the wallet's
+still-fresh unused nonce (TTL-bounded) instead of always minting, so retries
+stop accumulating while the real anti-abuse cap stays intact. The client also
+detects 429 (`FunctionsHttpError.context.status`) and logs/logs it as a
+rate-limit instead of a bare "non-2xx status code".
+- Files: `supabase/functions/siwe-auth/index.ts` (needs `supabase functions deploy siwe-auth --no-verify-jwt`), `src/lib/supabase/index.ts`. Verified by `tests/security/siwe-auth.spec.ts` (12 pass).
+
+---
+
 ## Location filter on the offers marketplace — 2026-09-20
 
 The offers list now filters by location. A `Location` dropdown (FullDropdown) was

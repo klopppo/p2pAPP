@@ -132,6 +132,7 @@ export function ProfilePage() {
 
   const mappedOffers = useMemo<Offer[]>(() => {
     if (!offers) return []
+    
     // useOffersBySeller returns the joined offer+user shape from Supabase;
     // cast through unknown for the loose mapping into the table-friendly shape.
     return offers.map((o) => {
