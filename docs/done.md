@@ -176,6 +176,52 @@ genuinely zero reviews, and render a muted (unfilled) star when they do.
 
 ---
 
+## Switched to Ethereum mainnet (new KlerosEscrowFactory + USDC) — 2026-09-19
+
+The app now targets **Ethereum mainnet** with the freshly deployed factory. The
+UI reads the factory/token/decimals on-chain, so this was an env + token-config
+switch.
+
+- Deployment (`etherscan`):
+  - KlerosEscrowFactory `0x6f0fDB32EA0AB1869B14f7eC3c6e09d0594346E7`
+  - KlerosEsc impl `0xAD572fB002a5F9BA30224D22eb53D8A6Fd12c165`
+  - owner / treasury `0xcaDF076fACB5eE1C429a621b8d9e0e0dd138Da1d`
+  - token USDC `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` (6 decimals)
+  - klerosCourt `0x988b3A538b618C7A603e1c11Ab82Cd16dbE28069` (Kleros v1), subcourt 1 / minJurors 3, feeBps 0
+  - deploy tx `0xe482f14a084ad706d5787bc6e3c3a781fb3c7f2a01173ca27d1bdff6a36792e9`
+- `.env` / `.env.example`: `VITE_EXPECTED_CHAIN_ID=1`,
+  `VITE_KLEROS_ESCROW_FACTORY` + `VITE_KLEROS_ESCROW_TOKEN` updated.
+- `wagmi.ts`: mainnet stays the first supported chain (default); RPC already
+  `ethereum-rpc.publicnode.com`.
+- Create/Edit Offer: default token switched to **USDC** and the token list
+  reordered (USDC first, test `fUSD` removed) to match the factory's pinned
+  token.
+- Open follow-ups (ops): transfer factory ownership off the exposed deployer key
+  (see `docs/todo.md`); note `createEscrow` reverts if buyer/seller == treasury,
+  and treasury is currently the deployer.
+
+---
+
+## Restore the SignInPrompt overlay + connect-time session sync — 2026-09-16
+
+Reverted the auth half of the "wallet connect is sign-in-free" rework: bring back
+the non-blocking **SignInPrompt** overlay and the pre-pull `useSyncUser` sync, so
+a connected-but-unsigned wallet is nudged to sign in (button-driven — no
+automatic MetaMask popup), and returning users on the same device are silently
+recovered via `recoverWalletSession` (success marker → no popup on reload; only
+an explicit Disconnect clears it).
+
+- Restored `src/components/auth/SignInPrompt.tsx` (was deleted) and
+  `src/hooks/useSyncUser.ts` (auto-sync on first connect; silent recovery for a
+  stored marker; disconnect teardown; first-sign-in profile redirect).
+- Re-mounted `<SignInPrompt />` in `src/components/layout/AppLayout.tsx`.
+- **Kept** ADR-011: `ChainGuard` stays scoped to the four escrow pages (not
+  global). Only the auth UX is reverted.
+- Supersedes the "Remove the auto Sign in overlay (SignInPrompt)" entry and the
+  ADR-010 "deleted SignInPrompt" consequence.
+
+---
+
 ## Chain gate scoped to contract-write pages only — 2026-09-14
 
 The app no longer demands Sepolia while just browsing or connecting a wallet.

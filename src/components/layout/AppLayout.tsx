@@ -4,6 +4,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { Navbar } from './Navbar'
 import { Footer } from './Footer'
 import { PageContainer } from './PageContainer'
+import { SignInPrompt } from '@/components/auth/SignInPrompt'
 import { GlobalPresenceProvider } from '@/hooks/useGlobalPresence'
 import { warmUpIpns } from '@/lib/ipfs'
 import { cn } from '@/lib/utils'
@@ -66,6 +67,10 @@ export function AppLayout({ children }: AppLayoutProps) {
         </GlobalPresenceProvider>
       </main>
       {!isChat && <Footer />}
+      {/* Non-blocking SIWE nudge: visible when a wallet is connected but no
+          Supabase session exists yet. Button-driven — never auto-pops
+          MetaMask. `ChainGuard` stays scoped to the escrow pages (ADR-011). */}
+      <SignInPrompt />
     </div>
   )
 }

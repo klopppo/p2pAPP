@@ -263,13 +263,8 @@ export function OffersPage() {
             onSelect={setTokenFilter}
             options={[
               { label: t("offers.filterAll"), value: "all" },
-              { label: "fUSD", value: "fUSD" },
-              { label: "USDT", value: "USDT" },
+              // The factory pins a single ERC-20 (USDC on mainnet).
               { label: "USDC", value: "USDC" },
-              { label: "DAI", value: "DAI" },
-              { label: "ETH", value: "ETH" },
-              { label: "WBTC", value: "WBTC" },
-              { label: "BTC", value: "BTC" },
             ]}
           />
           <FullDropdown

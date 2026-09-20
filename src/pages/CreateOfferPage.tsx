@@ -29,12 +29,10 @@ import { LOCATIONS, locationToRegions } from '@/lib/locations'
 // units (e.g. 0.5 ETH), so derived crypto quantities are rounded to the
 // token's standard precision before persisting / previewing.
 const TOKEN_DECIMALS: Record<string, number> = {
-  // fUSD is the factory-deployed test token on Sepolia (see contracts/script/DeploySepolia.s.sol).
-  // 18 decimals, ERC-20 with a public mint() — testnet only. Replace this entry with
-  // mainnet tokens (USDC/USDT/DAI = 6, ETH/WBTC = 18/8) once a real factory is live.
-  fUSD: 18,
-  USDT: 6,
+  // Mainnet deployment pins USDC (6 decimals) as the escrow token. The map
+  // still covers the other symbols the offer form allows.
   USDC: 6,
+  USDT: 6,
   DAI: 18,
   ETH: 18,
   WBTC: 8,
@@ -74,7 +72,7 @@ export function CreateOfferPage() {
   const qc = useQueryClient()
   const [formData, setFormData] = useState<OfferForm>({
     type: 'buy',
-    token: 'fUSD',
+    token: 'USDC',
     fiatCurrency: 'USD',
     price: '1',
     minAmount: '100',
@@ -214,7 +212,9 @@ export function CreateOfferPage() {
     }
   }
 
-  const tokens = ['fUSD', 'USDT', 'USDC', 'DAI', 'ETH', 'WBTC', 'BTC']
+  // The factory pins a single ERC-20 (USDC on mainnet) as the escrow token —
+  // offers in any other token can never be escrowed.
+  const tokens = ['USDC']
   const fiatCurrencies = Object.keys(CURRENCY_SYMBOLS)
   const paymentMethods = [
     'Bank Transfer',

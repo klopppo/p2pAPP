@@ -82,6 +82,21 @@
 
 ---
 
+## 🔴 Ethereum mainnet — ops follow-ups (2026-09-19)
+
+- [ ] **Transfer factory ownership off the exposed deployer key** —
+      `KlerosEscrowFactory 0x6f0fDB32EA0AB1869B14f7eC3c6e09d0594346E7` is owned by
+      `0xcaDF076fACB5eE1C429a621b8d9e0e0dd138Da1d` (a key that has been shared in
+      chat). Anyone with it can `setPendingFee` / `setTreasury`. Move it to a
+      fresh address (ideally a Safe):
+      `cast send <factory> "transferOwnership(address)" <FRESH_OR_SAFE> --rpc-url https://ethereum-rpc.publicnode.com --private-key $PRIVATE_KEY`.
+- [ ] **Treasury == deployer blocks escrows with that address** — `createEscrow`
+      reverts `InvalidTreasury()` when `buyer`/`seller` equals `treasury`
+      (`0xcaDF076…`). Either change the treasury to a dedicated address, or only
+      trade with buyer/seller addresses that differ from it.
+
+---
+
 ## 🌍 Referral program ("Invite & Earn") — ADR-009
 
 - [x] **Server credit on escrow release** — migration `20260915000005_referral_program.sql`:

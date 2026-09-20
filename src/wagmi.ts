@@ -76,6 +76,7 @@ export const config = getDefaultConfig({
   appDescription: 'CofferNode — trustless peer-to-peer crypto exchange',
   appUrl: import.meta.env.VITE_APP_URL ?? 'http://localhost:5173',
   chains: SUPPORTED_CHAINS as unknown as readonly [Chain, ...Chain[]],
+  // First chain = default. Mainnet is the live deployment (see .env).
   transports: {
     [mainnet.id]: http(mainnetRpc),
     [sepolia.id]: http(sepoliaRpc),
