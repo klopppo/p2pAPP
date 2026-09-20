@@ -7,43 +7,22 @@
 // disputes, operator, edit pages) are excluded upstream in `_middleware.ts`
 // and never request data here.
 //
-// OD-02 (Restricted reader) + ADR-015 (Pseudo-offerta, migration
-// `20260920000003_offer_pseudonym.sql`): the worker's credential is the anon
-// key, so its selects MUST stay inside the column projection enforced DB-side
-// (REVOKE table-level SELECT + GRANT column list for `anon` AND
-// `authenticated`). Any column outside the projection would 42501 the fetch.
-// Note `offers` no longer requests `seller_id` / `target_user`, and the
-// seller join is `public_handle`-only — keep this in sync with that migration
-// AND with the PUBLIC_*-columns in `src/lib/supabase/index.ts`.
+// OD-02 (Restricted reader) + ADR-015 (Pseudo-offerta, migrations
+// `20260920000003_offer_pseudonym.sql` + `20260920000004_public_offer_rpc.sql`):
+// the worker's credential is the anon key, so its selects MUST stay inside the
+// column projection enforced DB-side (REVOKE table-level SELECT + GRANT column
+// list for `anon` AND `authenticated`). Any column outside the projection would
+// 42501 the fetch — including the `seller:users!…` FK embed, which needs
+// `offers.seller_id`. The marketplace + offer-detail reads
+// therefore go through the SECURITY DEFINER RPCs
+// (`get_public_offers` / `get_public_offer_by_id`, migration 0004): the join is
+// resolved server-side and the payloads carry only identity-free rows
+// (`public_handle`, never `seller_id`/`target_user`). Keep this in sync with
+// the migrations AND with the public-read paths in
+// `src/lib/supabase/index.ts` (getActiveOffers / getOfferById).
 
 import { edgeFetch } from "./supabase-rest"
 import type { EdgeEnv } from "./supabase-rest"
-
-// Mirrors the migration's accepted projection for `offers`.
-const PUBLIC_OFFER_COLUMNS = [
-  "id",
-  "offer_id",
-  "status",
-  "type",
-  "crypto_token",
-  "crypto_amount",
-  "fiat_currency",
-  "fiat_amount",
-  "price_per_unit",
-  "min_amount",
-  "max_amount",
-  "payment_methods",
-  "available_regions",
-  "platform_fee_bps",
-  "network_fee",
-  "tags",
-  "description",
-  "is_private",
-  "grace_period",
-  "published_at",
-  "expires_at",
-  "created_at",
-].join(",")
 
 // Mirrors the migration's accepted projection for `users` (public profile).
 // NOTE: the denormalized-stat columns (total_volume, last_30d_trades,
@@ -66,19 +45,11 @@ const PUBLIC_USER_COLUMNS = [
   "created_at",
 ].join(",")
 
-// join subset the marketplace/detail pages actually render from the seller —
-// identity-free (no `id`, no `wallet_address`; ADR-015).
-const SELLER_JOIN_COLUMNS = [
-  "public_handle",
-  "nickname",
-  "avatar_url",
-  "verification_level",
-  "total_trades",
-  "avg_rating",
-].join(",")
-
-// `/rest/v1/offers?...&select=<cols>,seller:users!offers_seller_id_fkey(<cols>)`
-const OFFER_SELECT = `${PUBLIC_OFFER_COLUMNS},seller:users!offers_seller_id_fkey(${SELLER_JOIN_COLUMNS})`
+// `/rest/v1/rpc/get_public_offers` (SECURITY DEFINER, migration 0004) — the
+// direct `/rest/v1/offers?...seller:users!...(...)` FK-embed path is dead for
+// the anon key (it needs offers.seller_id) and must not come back.
+const RPC_GET_PUBLIC_OFFERS = "/rest/v1/rpc/get_public_offers"
+const RPC_GET_PUBLIC_OFFER_BY_ID = "/rest/v1/rpc/get_public_offer_by_id"
 
 export interface PublicData {
   offers?: unknown[]
@@ -90,23 +61,24 @@ export async function collectPublicData(
   env: EdgeEnv,
   pathname: string
 ): Promise<PublicData> {
-  // Marketplace first page — mirrors getActiveOffers(20).
+  // Marketplace first page — mirrors getActiveOffers(20) via the RPC.
   if (pathname === "/app/offers") {
     const data = await edgeFetch(
       env,
-      `/rest/v1/offers?status=eq.active&expires_at=gte.${new Date().toISOString()}&order=published_at.desc&limit=20&select=${encodeURIComponent(OFFER_SELECT)}`
+      `${RPC_GET_PUBLIC_OFFERS}?p_limit=20&p_offset=0`
     )
     return { offers: Array.isArray(data) ? data : [] }
   }
 
-  // Single offer detail — mirrors getOfferById(id).
+  // Single offer detail — mirrors getOfferById(id) via the RPC. The RPC
+  // returns a single jsonb object (or SQL NULL → null) for a missing id.
   const offer = pathname.match(/^\/app\/offer\/([^/]+)$/)
   if (offer) {
-    const rows = await edgeFetch(
+    const row = await edgeFetch(
       env,
-      `/rest/v1/offers?id=eq.${encodeURIComponent(offer[1])}&select=${encodeURIComponent(OFFER_SELECT)}`
+      `${RPC_GET_PUBLIC_OFFER_BY_ID}?p_offer_id=${encodeURIComponent(offer[1])}`
     )
-    return { offer: Array.isArray(rows) && rows.length > 0 ? rows[0] : null }
+    return { offer: row ?? null }
   }
 
   // Public profile — mirrors ensureUser read (users row by wallet), limited

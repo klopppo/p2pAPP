@@ -545,6 +545,21 @@ identity columns. This supersedes the "direct REST reads for lists" shortcut of
 OD-02 for `offers`, now a documented exception: *list-and-detail offer reads
 go through `public.*` plan RPCs (cache-friendly GET), not edge functions*.
 
+**Revision 2 (deploy hotfix, 2026-09-20, migration
+`20260920000005_restore_authenticated_full_reads`).** The 0003 drop-and-regrant
+projection was applied to BOTH client roles, but the signed-in (`authenticated`)
+client reads full rows: profile read/write (`RETURNING *`, `SELECT *`), the
+self-edit columns (`location`, social handles) outside the public projection,
+the `users_update_self` WITH CHECK that reads `role`, and the trade queries'
+`offer:offers(*)` embed. Result: `42501 permission denied for table users`
+on profile save (`[updateUserProfile]`, `src/lib/supabase/index.ts:434`) and
+latent `42501`s across the trade reads. **`authenticated` therefore reverts to
+table-level SELECT on `users` and `offers`** (the OD-02 contract). Anonymity
+holds for the PUBLIC surface only, which is gated on `anon` (narrow column
+projection + SECURITY DEFINER RPCs). `anon` is untouched; the
+`update(role)` column revoke (20260824000006) is re-asserted but otherwise the
+hardening in 0003/0004 stands.
+
 **Implementation notes / traded risks.**
 
 - Column grants for `anon` exclude `seller_id` + `target_user`; **`authenticated`

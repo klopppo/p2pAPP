@@ -170,6 +170,11 @@ it("edge public-data mirror stays in sync (no seller_id/target_user)", () => {
     expect(mirror).not.toMatch(/["']seller_id["']/)
     expect(mirror).not.toMatch(/["']target_user["']/)
     expect(mirror).toMatch(/["']public_handle["']/)
+    // marketplace + detail go through the identity-free RPCs, never the
+    // seller-FK REST embed (the anon key can't select offers.seller_id)
+    expect(mirror).toMatch(/rpc\/get_public_offers/)
+    expect(mirror).toMatch(/rpc\/get_public_offer_by_id/)
+    expect(mirror).not.toMatch(/users!offers_seller_id_fkey/)
   })
 })
 

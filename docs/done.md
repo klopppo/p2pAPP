@@ -9,6 +9,22 @@
 
 ---
 
+## ADR-015 deploy hotfix — restore `authenticated` full reads (users/offers) — 2026-09-20
+
+Migration `20260920000003`'s drop-and-regrant column projection was applied to
+`authenticated` too, breaking every signed-in full-row read: profile save
+`42501 permission denied for table users` (`updateUserProfile` —
+`src/lib/supabase/index.ts:434`), the self-edit reads (`SELECT *`, `RETURNING *`
+over columns outside the projection: `location`, social handles, `role`, …) and
+the trade queries' `offer:offers(*)` embed (5 call sites). `authenticated` now
+reverts to table-level SELECT on `users` + `offers` (the OD-02 contract),
+keeping `anon` on the narrow identity-free projection + SECURITY DEFINER RPCs
+(`0004`) and the `update(role)` column revoke (`20260824000006`)
+re-asserted. See ADR-015 "Revision 2". Migration:
+`20260920000005_restore_authenticated_full_reads.sql`.
+
+---
+
 ## Pseudo-offerta — identity-free offer surface (ADR-015) — 2026-09-20
 
 Closed the OD-08 leak found while unmasking the offer-detail flow: an anonymous
@@ -39,13 +55,17 @@ user, not invertible), and party identity is resolved **server-side only**:
   off `public_handle`; `OffersPage`/`ProfilePage` render handles without
   wallet links; `createOffer`/`updateOffer` explicit `.select(...)`;
   `getActiveOffers`/`getOfferById` call the new RPCs;
-  `functions/_lib/public-data.ts` mirror in sync.
+  edge `functions/_lib/public-data.ts` mirror switched to the same RPCs (the
+  old FK-embed path is not addressable by the anon key).
 - Guards: `tests/security/pseudo-offer.spec.ts` (17 pass). Docs: ADR-015 +
   OD-08 partial in `docs/adr.md`, `docs/todo.md`.
 - Live-deploy note: pending migrations were pushed to `tauyciaavhnopeseecmz`
   on 2026-09-20 (incl. `public_handle` backfill); `gen_random_bytes(6)` is a
   `pgcrypto` function and the project lacks it, so the migration now uses
-  `gen_random_uuid()` (built-in).
+  `gen_random_uuid()` (built-in). Cloudflare Pages production deploy
+  (`coffernode`, `deploy:cf`) the same day: `/`, `/app/offers` and
+  `/app/offer/:id` all 200 with identity-free edge-injected data (no
+  `seller_id`/`wallet_address` in the payloads).
 
 ---
 
