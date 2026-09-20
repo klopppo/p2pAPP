@@ -9,6 +9,65 @@
 
 ---
 
+## Device-bound Coffer Identity (ADR-014) — 2026-09-20
+
+Fase 0 of the anonymity workstream. A client-only vault derives an HKDF-SHA256
+master from the deterministic SIWE signature (RFC 6979 — stable across logins,
+never sent or stored server-side, and incapable of moving funds), then expands
+per-label keys (`trade:<id>`, `conversation:<id>`, `self`) into opaque `CN-…`
+pseudonyms so a counterparty can't correlate activity to the wallet. Rotation
+bumps the epoch (every pseudonym changes); burn drops the device vault. Wired
+into `signInWithWallet` (best-effort), surfaced via `CofferIdentityCard` on
+the own profile, covered by 13 unit tests. No schema/RLS change landed —
+server-issued pseudonyms were rejected in ADR-014 as an invertible mapping
+(the operator would just re-link them); on-chain settlement still identifies
+wallets by design ("layer dati" depth). Chat privacy (OD-09) remains open.
+
+- Files: `src/lib/crypt.ts`, `src/lib/cofferIdentity.ts`,
+  `src/components/custom/CofferIdentityCard.tsx`, `src/pages/ProfilePage.tsx`,
+  `tests/coffer-identity.spec.ts`, `src/lib/supabase/index.ts`,
+  `src/locales/en.json`; docs in `docs/adr.md`, `docs/todo.md`.
+
+---
+
+## Self-hosted client error reporting (ADR-013) — 2026-09-20
+
+The app now captures client errors and keeps them in-project instead of
+shipping them to a third-party tracker. `error_logs` table (migration
+`20260920000001_error_logs.sql`, RLS default-deny, anon INSERT-only /
+authenticated SELECT) is fed by a scrubbing pipeline: client listens to
+`window` `error`/`unhandledrejection` plus a React boundary
+(`AppErrorBoundary`, resets on route change), dedupes by fingerprint,
+batches, and POSTs to `/api/error-report` (`keepalive`/`sendBeacon`; prod-only
+builds, `VITE_ERROR_REPORT=0` opt-out). The edge function re-scrubs
+defensively and rate-limits per IP (100/10 min), then appends via PostgREST.
+No PII reaches Postgres — addresses/emails/query values are masked twice.
+
+- Files: `src/lib/errorReports.ts`, `src/error-logger.ts`,
+  `src/components/ErrorBoundary.tsx`, `src/App.tsx`,
+  `functions/api/error-report.ts`,
+  `supabase/migrations/20260920000001_error_logs.sql`,
+  `tests/error-logging.spec.ts` (10 pass).
+
+---
+
+## Cookie-derived per-route cache keys at the edge (ADR-012) — 2026-09-20
+
+Every document route now carries a cache key bound to the request's session
+cookie. `SessionCookieSync` mirrors the (public) connected wallet into a
+`coffernode_session` cookie; `functions/_lib/cache-key.ts` derives a
+deterministic, route-scoped key (`ck:v1:<route>:<sha256(identity)[0..16]>`) that the
+middleware stamps on every response (`x-cache-key`) and uses to shard the CDN
+per cookie on public pages (`Vary: Cookie`). Private routes stay `no-store`.
+Missing/malformed cookies degrade to a shared `anon` slot; no token ever
+touches a JS cookie.
+
+- Files: `src/lib/sessionCookie.ts`, `src/hooks/useSessionCookieSync.tsx`,
+  `src/App.tsx`, `functions/_lib/cache-key.ts`, `functions/_middleware.ts`,
+  `tests/route-cache-key.spec.ts` (12 pass).
+
+---
+
 ## SIWE `429 Too Many Requests` on repeated "Sign in" taps — 2026-09-20
 
 Tapping "Sign in" a few times inside a 10-min window (dismissed MetaMask
@@ -20,6 +79,7 @@ still-fresh unused nonce (TTL-bounded) instead of always minting, so retries
 stop accumulating while the real anti-abuse cap stays intact. The client also
 detects 429 (`FunctionsHttpError.context.status`) and logs/logs it as a
 rate-limit instead of a bare "non-2xx status code".
+
 - Files: `supabase/functions/siwe-auth/index.ts` (needs `supabase functions deploy siwe-auth --no-verify-jwt`), `src/lib/supabase/index.ts`. Verified by `tests/security/siwe-auth.spec.ts` (12 pass).
 
 ---
@@ -35,6 +95,7 @@ show the offer location inline. The location picker labels, `REGION_CODES` and
 single `src/lib/locations.ts` module consumed by CreateOfferPage, EditOfferPage,
 TradePage, OpenOfferPage and OffersPage (fixes TradePage/OpenOfferPage rendering
 only IT/DE/FR/ES names — they now resolve every stored code).
+
 - Files: `src/lib/locations.ts`, `src/pages/{OffersPage,CreateOfferPage,EditOfferPage,TradePage,OpenOfferPage}.tsx`, `src/locales/*.json`.
 
 ---
@@ -49,6 +110,7 @@ trigger on `trade_ratings` (`refresh_user_avg_rating`) that recomputes
 `round(avg(score),2)` → 0 when no ratings remain, plus a backfill for existing
 rows. TradePage / OpenOfferPage now only show "No ratings yet" for sellers with
 genuinely zero reviews, and render a muted (unfilled) star when they do.
+
 - Files: `supabase/migrations/20260920000000_trade_ratings_avg_rating_sync.sql`,
   `src/pages/{TradePage,OpenOfferPage}.tsx`.
 
@@ -63,6 +125,7 @@ DisputePage, DisputeDetailPage. Connecting on any EVM chain (mainnet, L2, …) i
 fully silent everywhere else; only when you open a trade/dispute page does the
 guard auto-switch to the Sepolia escrow network (the factory/escrow contracts
 live there). Companion to ADR-010.
+
 - Files: `src/components/layout/AppLayout.tsx`, `src/pages/{TradePage,TradeDetailPage,DisputePage,DisputeDetailPage}.tsx`.
 
 ---
@@ -74,6 +137,7 @@ wallet had no Supabase session. Connecting a wallet now shows NO overlay and
 nothing forces the signature: browse freely (offers are public), and only
 real actions that need a session surface an inline "sign-in required" toast /
 the navbar "Sign in" CTA. Complements ADR-010 (SIWE explicit opt-in).
+
 - Files: removed `src/components/auth/SignInPrompt.tsx`, slimmed
   `src/components/layout/AppLayout.tsx`.
 
@@ -87,6 +151,7 @@ for well-known chains like Sepolia, `wallet_addEthereumChain` fallback for
 unknown chains). The "Wrong network" banner only appears if the automatic
 switch is rejected or fails, as a manual retry/guidance. Threshold stays
 `VITE_EXPECTED_CHAIN_ID=11155111` (Sepolia).
+
 - Files: `src/components/custom/ChainGuard.tsx`.
 
 ---
@@ -101,6 +166,7 @@ session recovery for returning users (success marker → `recoverWalletSession`)
 and referral claim (now keyed to the live `hasSession` state, not connect).
 Profile redirect on first sign-in removed — the explicit onboarding flow
 is unchanged.
+
 - Files: `src/hooks/useSyncUser.ts`.
 
 ---
@@ -112,6 +178,7 @@ dropdown, mirroring the Language/Currency row pattern. `useTheme` from
 `theme-provider.tsx` powers it; `localStorage('theme')` + `.dark` class
 unchanged. i18n: `nav.theme*` keys added to en/es/fr/tr/zh. Keyboard shortcut
 `d` still works.
+
 - Files: `src/components/layout/Navbar.tsx`, `src/locales/{en,es,fr,tr,zh}.json`.
 
 ---
@@ -169,7 +236,7 @@ unchanged. i18n: `nav.theme*` keys added to en/es/fr/tr/zh. Keyboard shortcut
   - Repair preesistente: due migration con lo stesso nome `20260913000001`
     (una veniva mascherata da `db push`) → rinominata in `20260915000003_fix_trade_ratings_insert_policy.sql`
     e `20260915000004_archive_offer_on_trade_created.sql` (idempotenti) + `migration repair
-    --status reverted 20260913000001` + `db push --include-all`.
+--status reverted 20260913000001` + `db push --include-all`.
 - **Worker + client in sync con la proiezione** (`PUBLIC_OFFER_COLUMNS` / `PUBLIC_USER_COLUMNS` /
   `SELLER_JOIN`): `functions/_lib/public-data.ts` (select espliciti, addio `select=*` sul profilo) e
   `src/lib/supabase/index.ts` (`getActiveOffers`, `getOfferById`, `getOffersBySeller`, `getUserByWallet`,
@@ -221,7 +288,7 @@ unchanged. i18n: `nav.theme*` keys added to en/es/fr/tr/zh. Keyboard shortcut
 - **Verification**: `npm run test:e2e` (`tests/e2e/edge-hydration.cjs`) —
   seeded offer renders, **0 Supabase offers calls** on first paint, node
   removed, no page errors. Functions compile via `wrangler pages functions
-  build`. Local workerd can't run on this mac (OS ≤ 13.4) → live deploy still
+build`. Local workerd can't run on this mac (OS ≤ 13.4) → live deploy still
   pending (Pages project + secrets + Supabase webhooks).
 - Registered as ADR-007; OD-03/OD-04 moved to "implemented in repo".
 
@@ -316,6 +383,7 @@ field was never persisted and never reached the contract.** The contracts pass
 
 **New Sepolia deployment** (contracts repo `script/DeploySepolia.s.sol`, `--slow`
 because the deployer is an EIP-7702 delegated account):
+
 - FakeUSD `0x8026BDb39c4BF99FEeb840fe4a450a19cbEaa9F2`
 - MockKlerosCourt `0x0854a7b25e09856e315Be9CA49A143a144Afa1f0`
 - KlerosEscrowFactory `0x8F747eCa387Fae1e6c9f997be7e1abe50d667f1C`
@@ -426,7 +494,7 @@ instead of the message pane, and page data only loaded on first visit.
 ## Chat loads off the live Supabase session, not a world-readable row — 2026-09-12
 
 "Messages don't load even though I'm connected and signed in" was a silent RLS
-denial: `useCurrentUser` resolves any *connected* wallet to a `users` row (that
+denial: `useCurrentUser` resolves any _connected_ wallet to a `users` row (that
 table is `select using (true)`), and the chat hooks gated only on that row — so
 with no/mismatched JWT the reads ran unauthenticated, `messages_read_participant`
 filtered every row, and PostgREST returned `[]` with no error. "Signed in" in the
@@ -484,7 +552,6 @@ Implemented a complete Role-Based Access Control (RBAC) architecture, an immutab
   - Unit & security test suite covering RBAC permissions, audit logger persistence, reports lifecycle, and message inspection permission checks (100% passing).
 
 ---
-
 
 ## Session hardening + wallet-claim backfill + live presence — 2026-09-09
 
@@ -576,7 +643,7 @@ the deployed project (nonce → SIWE verify → `access_token` → RLS-authorize
   `20260814000001` `"window"` keyword, `20260824000002/3/6/8` defensive reconciliation,
   `20260829000002` pre-drop policies + `to_regclass` guard); `message_attachments` does not
   exist on the remote (pre-existing gap, unrelated). Temp probe `envprobe` removed (deployed
-  + local). `send-email` is deployed but still untested.
+  - local). `send-email` is deployed but still untested.
 - **⚠ SECURITY**: several project credentials were exposed during debugging — rotate the
   PAT (`sbp_…`), service-role (`sb_secret_…`), publishable key, and the shared JWT secret
   value `faa6ba9b-…` at the next session.
@@ -616,7 +683,7 @@ Batch of fixes from the cross-audit, shipped together (typecheck + lint clean).
 - **Composite cursors** (`src/lib/supabase/index.ts`) — `listMessages` "before"
   filter and the unread-count cursor were written as `and(a,b),a`, which collapses
   to `a` (the `id` tiebreaker was dead). Now `and(created_at.[lt|gt].ts),
-  and(created_at.eq.ts,id.[lt|gt].id)`.
+and(created_at.eq.ts,id.[lt|gt].id)`.
 - **Direct-conversation scan-all** (`getOrCreateDirectConversation`) — replaced
   the full-table scan of `trade_id IS NULL` conversations with a
   `conversation_participants` intersection (current user's threads → shared with
@@ -659,6 +726,7 @@ Files: `src/components/custom/chat/ChatLayout.tsx`.
 Hardened six `useEffect` dependency arrays that re-ran effects on every render
 or created unstable references, eliminating chat/notification/esrow re-connect
 loops and redundant writes. Changes:
+
 - `src/components/custom/chat/ChatLayout.tsx` — `identity` object now memoized (`useMemo`) so `useTypingIndicator`/`useConversationPresence` stop tearing down/re-subscribing Supabase channels each render; added `lastMarkedRef` to de-dupe `markRead` calls across refetch.
 - `src/pages/TradeDetailPage.tsx` — `useEscrowEventWatcher` callback wrapped in `useCallback` so the contract-event watcher isn't re-subscribed on every render.
 - `src/components/custom/NotificationDispatcherHost.tsx` — reads latest `prefs.data` via ref instead of putting the array in the effect dep array (`user?.id` dep only).
@@ -678,14 +746,14 @@ Files: `src/pages/OpenOfferPage.tsx`, `src/pages/TradePage.tsx`,
 
 ## Private offers: notify the candidate target on first connect — 2026-08-30
 
-Closed the gap where a *candidate* target (wallet never connected → no
+Closed the gap where a _candidate_ target (wallet never connected → no
 `users` row) got a private offer but no notification and no surfaced
 visibility: the DB trigger `notify_private_offer_target` can only notify a
 registered `users.id`, so it skipped. Now `ensureWalletSession` calls new
 `backfillPendingPrivateOffers(userId, wallet)` — after sign-in it reads any
 active private offers pinned to the wallet (RLS-scoped, no cross-wallet leak)
 and inserts a `trade_update` notification for those with no existing
-`payload.offer_id`, so the offer is visible *only* to the target and they get
+`payload.offer_id`, so the offer is visible _only_ to the target and they get
 the bell/email notification the moment they connect. Idempotent (skips offers
 already notified by the trigger or on repeated connects). Files:
 `src/lib/supabase/index.ts`.
@@ -880,6 +948,7 @@ Closed the P0 avatar gap and the P1 surface issues found in the end-to-end
 flow audit (offers → trade → escrow → dispute → profile).
 
 **Avatar upload (P0)** — `EditProfilePage.tsx`
+
 - The hover "pencil" overlay now acts as a real upload trigger: clicking the
   avatar (or tabbing + Enter) opens a hidden `<input type="file" accept="image/*">`.
 - Validates MIME type + ≤5MB, uploads via `uploadToIpfs` (the same Helia path
@@ -890,6 +959,7 @@ flow audit (offers → trade → escrow → dispute → profile).
 - New i18n keys `editProfile.avatar*` / `removeAvatar` in all 5 locales.
 
 **Dispute evidence gallery (P1)** — `DisputeDetailPage.tsx`
+
 - The image gallery previously read `parsed.evidence` from the `description`
   blob, which the create-flow never populates — so images never rendered.
 - The `dispute_evidence` section now renders an actual `<img>` gallery built
@@ -897,12 +967,14 @@ flow audit (offers → trade → escrow → dispute → profile).
   submitter, timestamp and Etherscan tx deep-link metadata.
 
 **Missing i18n keys (P1)** — all 5 locales (`en/es/fr/tr/zh`)
+
 - Added 11 previously-missing keys that were rendering as raw strings:
   `disputeDetail.{submitEvidence,submitMoreEvidence,submittingEvidence,evidenceRound,evidenceSubmittedSuccess,evidenceSubmittedError}`, `profile.loading`, `tradeDetail.{releaseAvailableIn,tradeRemovedOrNoAccess}`, `trades.{escrowFunded,escrowCancelled}`.
 - Verified programmatically: no key drift across locales; `releaseAvailableIn`
   interpolation uses `{{seconds}}` to match `TradeDetailPage.tsx:860`.
 
 **Dead "Edit offer" button (P1)** — `ProfilePage.tsx`
+
 - Removed the offer-row Edit button that navigated to a non-existent
   `/app/offer/:id/edit` route, plus the now-empty Action column header and the
   `colSpan` 6→5 empty-state cells.
@@ -918,6 +990,7 @@ guard, friendly write-error helper, SIWE replacement for magic link) plus
 ran the full list against the codebase to confirm what's already in place.
 
 **Chain guard (§2 Network Mismatch)**
+
 - `src/lib/chain.ts` — reads `VITE_EXPECTED_CHAIN_ID`, resolves the wagmi
   chain descriptor, exposes `isOnExpectedChain(chainId)`.
 - `src/lib/useExpectedChain.ts` — hook variant for catch-blocks.
@@ -930,9 +1003,10 @@ ran the full list against the codebase to confirm what's already in place.
 - `.env.example` — new `VITE_EXPECTED_CHAIN_ID=11155111` (Sepolia) block.
 
 **Friendly write errors (§3.4 Unhandled Promise Rejection / §2 Tx Reverts)**
+
 - `src/lib/errors.ts` — `extractWriteError(err)` returns
   `{ kind: 'cancelled' | 'reverted' | 'network' | 'unknown', message,
-  original }`. Recognises viem v2 `UserRejectedRequestError`,
+original }`. Recognises viem v2 `UserRejectedRequestError`,
   `ContractFunctionRevertedError`, `ChainMismatchError`, `HttpRequestError`,
   `TimeoutError` plus ethers/legacy `ACTION_REJECTED` codes.
 - `src/lib/errorMessage.ts` — `errorMessage(err, page, t, fallbackKey)`
@@ -947,40 +1021,43 @@ ran the full list against the codebase to confirm what's already in place.
   with the clean `shortMessage` (e.g. `InvalidKlerosSubcourt()`).
 
 **SIWE replacement (§3.3 Auth State Disconnect)**
+
 - `src/lib/siwe.ts` — `buildSiweChallenge(address)`,
   `verifySiwe(message, signature, expectedAddress)`, `generateNonce()`,
   `SiweRejectedError`. Pure client-side verify via viem `verifyMessage` so
   no edge function / no server round-trip / no email server required.
 - `src/lib/supabase/index.ts` — `signInWithWallet(walletAddress, {
-  signMessage, verifyMessage, chainId, appName })` now generates a
+signMessage, verifyMessage, chainId, appName })` now generates a
   per-message nonce + Issued At, asks the wallet to `personal_sign`,
   verifies locally, and only then calls `ensureUser()`. Magic-link
   `signInWithOtp({ email: 0x…@wallet.p2p })` is gone. The previous
   behavior (which sent emails to a non-existent inbox) is fully removed.
 
 **Locales**
+
 - All 5 (`en`, `es`, `fr`, `tr`, `zh`) gained `errors.cancelledByUser`,
   `errors.networkError`, `errors.reverted`, `errors.fallback` and
   `chainGuard.{title,description,switchCta,switchError}`.
 
 **Checklist status** (every other item was verified in place)
 
-| Item | Status |
-| --- | --- |
-| Address case sensitivity (`wallet_address.toLowerCase()`) | ✅ already in `lib/supabase/index.ts:171/199/266/1682` |
-| ABI / bytecode parity | ✅ closed in the earlier B-1/B-8 pass |
-| Event listener cleanup | ✅ `useEscrowEventWatcher`, `useConversations`, `useMessages`, `useNotifications`, `useTypingIndicator` all unwind (`unwatch()` / `removeChannel(channel)`) |
-| Realtime Subscription crash | ✅ all five hooks call `supabase.removeChannel(channel)` in the cleanup |
-| BigNumber / BigInt | ✅ all reads cast through viem `bigint`; `Math.mulDiv` upstream |
-| Stale closure on write | ✅ `refetch()` after `waitForTransactionReceipt` everywhere |
-| Dynamic Tailwind purge | ✅ `rg "(\\w+-)\\$\\{"` returns no matches in `src/` |
-| Multiple WagmiProviders | ✅ single mount in `src/App.tsx:39/83` |
-| Web3 modal z-index | ✅ AppLayout wraps in `relative z-10`; RainbowKit modals use their own z-index internally |
-| RLS permissive posture | ✅ matches dev protocol (SIWE lays groundwork for tightening, per `contract-execution-status.md` TODO) |
-| CORS / Supabase Storage | n/a — uploads use IPFS via Helia, never Supabase Storage |
-| Hydration mismatch | n/a — Vite SPA, no SSR |
+| Item                                                      | Status                                                                                                                                                      |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Address case sensitivity (`wallet_address.toLowerCase()`) | ✅ already in `lib/supabase/index.ts:171/199/266/1682`                                                                                                      |
+| ABI / bytecode parity                                     | ✅ closed in the earlier B-1/B-8 pass                                                                                                                       |
+| Event listener cleanup                                    | ✅ `useEscrowEventWatcher`, `useConversations`, `useMessages`, `useNotifications`, `useTypingIndicator` all unwind (`unwatch()` / `removeChannel(channel)`) |
+| Realtime Subscription crash                               | ✅ all five hooks call `supabase.removeChannel(channel)` in the cleanup                                                                                     |
+| BigNumber / BigInt                                        | ✅ all reads cast through viem `bigint`; `Math.mulDiv` upstream                                                                                             |
+| Stale closure on write                                    | ✅ `refetch()` after `waitForTransactionReceipt` everywhere                                                                                                 |
+| Dynamic Tailwind purge                                    | ✅ `rg "(\\w+-)\\$\\{"` returns no matches in `src/`                                                                                                        |
+| Multiple WagmiProviders                                   | ✅ single mount in `src/App.tsx:39/83`                                                                                                                      |
+| Web3 modal z-index                                        | ✅ AppLayout wraps in `relative z-10`; RainbowKit modals use their own z-index internally                                                                   |
+| RLS permissive posture                                    | ✅ matches dev protocol (SIWE lays groundwork for tightening, per `contract-execution-status.md` TODO)                                                      |
+| CORS / Supabase Storage                                   | n/a — uploads use IPFS via Helia, never Supabase Storage                                                                                                    |
+| Hydration mismatch                                        | n/a — Vite SPA, no SSR                                                                                                                                      |
 
 **Files touched**
+
 - New: `src/lib/errors.ts`, `src/lib/errorMessage.ts`, `src/lib/chain.ts`,
   `src/lib/siwe.ts`, `src/lib/useExpectedChain.ts`,
   `src/components/custom/ChainGuard.tsx`.
@@ -1002,6 +1079,7 @@ cross-audit (`docs/contract-execution-status.md` §B). One commit, eleven files
 plus four new migrations.
 
 **ABI / contracts**
+
 - `src/lib/contracts.ts` — removed phantom `unlockAfterTimeout()` from
   `KLEROS_ESC_ABI` (B-1); added the six financing-phase events to
   `KLEROS_ESC_EVENTS_ABI` (`BuyerSecurityDeposited`, `SellerSecurityDeposited`,
@@ -1012,10 +1090,11 @@ plus four new migrations.
   `owner`) to `KLEROS_ESCROW_FACTORY_ABI` (B-8).
 
 **Types / Supabase client**
+
 - `src/types/database.ts` — added `EscrowStatus.FUNDED` + `EscrowStatus.CANCELLED`
-  + `TradeEventType` (granular Kleros event values). Extended `Dispute` /
-  `DisputeEvidence` / `Trade` / `CreateTradeInput` with the indexer-shaped
-  columns.
+  - `TradeEventType` (granular Kleros event values). Extended `Dispute` /
+    `DisputeEvidence` / `Trade` / `CreateTradeInput` with the indexer-shaped
+    columns.
 - `src/lib/supabase/index.ts` — `EscrowStatus.FUNDED` + `CANCELLED` mirrored
   here; `insertDisputeEvidence` now takes `submittedBy` (required), `keccak`,
   `txHash`, `evidenceGroupId`; `updateDisputeOnChain` writes new
@@ -1026,6 +1105,7 @@ plus four new migrations.
   `treasury` + `confirmationTime`). B-6.
 
 **TradePage / TradeDetailPage**
+
 - `src/pages/TradePage.tsx` — reads `treasury` + `klerosCourt` + `extraData`
   from the factory in one batched multicall, persists on `createTrade` (B-10).
 - `src/pages/TradeDetailPage.tsx` — mounts `useEscrowEventWatcher` so counterparty
@@ -1035,6 +1115,7 @@ plus four new migrations.
   `setTradeEscrowStatus` + `TradeEventType.ESCROW_FUNDED`.
 
 **DisputePage / DisputeDetailPage**
+
 - `src/pages/DisputePage.tsx` — bumps `disputes.status` to `'in_review'` on
   create (B-9). `insertDisputeEvidence` called with explicit filer role +
   keccak + tx hash for the primary CID (B-4). Persists `raiser` /
@@ -1051,6 +1132,7 @@ plus four new migrations.
   `evidence_group_id` + `appeal_count` on `AppealFunded`.
 
 **Migrations**
+
 - `supabase/migrations/20260101000000_init_users_offers.sql` — creates the
   `users` and `offers` tables from scratch with full RLS. Fixes the
   `relation "users" does not exist` failure on a fresh `supabase db push`.
@@ -1072,6 +1154,7 @@ plus four new migrations.
   badge entries.
 
 **Verification**
+
 - `npm run typecheck` clean, `npm run build` clean (only pre-existing node_modules
   warning from `@reown/appkit`). Files I touched lint clean (7 pre-existing
   `react-refresh` warnings in unrelated component files unchanged).

@@ -5,6 +5,72 @@
 
 ---
 
+## 🪙 Coffer Identity — per-trade pseudonymity (ADR-014)
+
+> Device-bound client vault: an HKDF master derived from the (deterministic)
+> SIWE signature yields opaque per-label pseudonyms. The counterparty can't
+> correlate trade/chat activity to the wallet; the operator still can (chosen
+> threat model: "anonimità dalla controparte", depth "layer dati" only).
+
+- [x] **Crypto core** — `src/lib/crypt.ts` (sha256/HKDF/hex, pure WebCrypto,
+      Node-testable) + `src/lib/cofferIdentity.ts` (master derive, vault
+      persistence with injectable storage, `tradePseudonym` /
+      `conversationPseudonym`, `rotateIdentity`, `burnCofferIdentity`).
+      _(2026-09-20)_
+- [x] **Sign-in integration** — `signInWithWallet` derives + persists the vault
+      after the SIWE session installs; best-effort (never blocks login), never
+      persists the signature. _(2026-09-20)_
+- [x] **UI** — `CofferIdentityCard` on the own profile: fingerprint + sample
+      trade pseudonym + Rotate/Burn (two-step inline confirms, toasts).
+      _(2026-09-20)_
+- [x] **Tests** — `tests/coffer-identity.spec.ts` (13 pass): determinism,
+      format, per-label variance, epoch rotation, persistence/burn.
+      _(2026-09-20)_
+- [ ] **E2E / server-readable chat keys (OD-09)** — privacy chat UNCLOSED;
+      default proposal stays server-readable-non-correlabile (keeps
+      MESSAGES_INSPECTOR/AML). The vault already exposes `conversationPseudonym`
+      for the corr-free handle layer.
+- [ ] **Metadata minimization (OD-08)** — expose `CN-…` labels instead of raw
+      wallets in any reader data (offers/messages/snippets) while keeping the
+      raw wallet server-side only.
+- [ ] **Non-correlabile transport (OD-07)** — 1-hop relay path for escrow
+      funding so deposit txs don't scan back to the pseudonym; deferred by the
+      "layer dati" depth choice.
+- [ ] **Vault hardening** — passphrase-locked slot + optional memory-only
+      (sessionStorage) mode; cross-tab rotation propagation.
+
+---
+
+> Client error reporting end-to-end: browser → edge → SQL. Errors are scrubbed
+> (addresses/emails/query values) in two places, rate-limited per IP, and
+> stored under RLS with `anon` INSERT-only.
+
+- [x] **Client capture + scrub + batch** — `src/lib/errorReports.ts` (pure:
+      scrub / fingerprint / normalise, unit-tested) + `src/error-logger.ts`
+      (window `error`/`unhandledrejection` listeners, fingerprint dedupe,
+      `keepalive`/`sendBeacon` POST to `/api/error-report`; prod-only,
+      `VITE_ERROR_REPORT=0` opt-out). _(2026-09-20)_
+- [x] **React boundary** — `AppErrorBoundary` catches render errors, reports
+      `react_render`, resets on route change; wired in `src/App.tsx`. _(2026-09-20)_
+- [x] **Edge endpoint** — `functions/api/error-report.ts`: defense-in-depth
+      re-scrub, in-memory per-IP rate limit (100/10 min), batch cap 20,
+      PostgREST insert. _(2026-09-20)_
+- [x] **DB** — migration `20260920000001_error_logs.sql`: RLS default-deny,
+      `anon` INSERT-only / `authenticated` SELECT, indexes on
+      `created_at`/`fingerprint`/`error_type`. _(2026-09-20)_
+- [x] **Tests** — `tests/error-logging.spec.ts` (10 pass): scrub text,
+      fingerprint stability, message extraction, truncation, report shape.
+      _(2026-09-20)_
+- [ ] **Operator/alerting surface** — a dashboard or view over `error_logs`
+      (`authenticated` SELECT is granted) + email/telegram alerting on spikes
+      (reuse the notification channels).
+- [ ] **Retention** — scheduled purge of `error_logs` older than N days
+      (suggest 30) + optional nightly dedupe/coalesce by fingerprint.
+- [ ] **Edge rate-limit hardening** — move the IP bucket to KV/Durable
+      Objects; revisit if a single isolate ever gets abused.
+
+---
+
 ## 🌍 Referral program ("Invite & Earn") — ADR-009
 
 - [x] **Server credit on escrow release** — migration `20260915000005_referral_program.sql`:
@@ -18,7 +84,7 @@
       _(2026-09-15)_
 - [x] **Tests** — `tests/referral.spec.ts` (maths/code/URL) +
       `tests/security/rls-referral.spec.ts` (fail-closed RLS + server-only
-      credit); `rls-model` CORE_TABLES extended. _(2026-09-15)_
+      credit); `rls-model` CORE*TABLES extended. *(2026-09-15)\_
 - [ ] **Payout/withdraw flow (OD-06)** — `pending` → `paid` transition UI and a
       withdraw ledger or on-chain settlement for the referrer.
 - [ ] **Referral i18n for non-`en` locales** — `referral.*` keys exist in `en`
@@ -34,7 +100,7 @@
 > function + RLS rewrite shipped 2026-08-29 but **requires a coordinated
 > deploy** (see ⚠ cutover below). Penetration-test matrix + vitest suite
 > shipped 2026-08-30 (see `penetration-test-matrix.md`; `npm run test --
-> tests/security`). Remaining roadmap below is tracked here.
+tests/security`). Remaining roadmap below is tracked here.
 
 - [x] **Penetration-test suite + matrix doc** — `tests/security/*` (63 tests:
       escrow allow/deny × ABI surface × client gates; RLS policy simulator +
@@ -49,7 +115,7 @@
       execution. _(2026-08-30)_
 
 - [x] **⚠ SIWE + RLS cutover (deploy)** — `supabase functions deploy
-      siwe-auth --no-verify-jwt` → `supabase db push` (20260829000002 + 20260830000000)
+    siwe-auth --no-verify-jwt` → `supabase db push` (20260829000002 + 20260830000000)
       → client ship, done **live 2026-08-30**. Sign-in + a full trade flow were
       exercised on the deployed build. _(code+SQL landed 2026-08-29)_
 - [x] **💚 GoTrue session claim-path fix (deploy 2026-09-08)** — GoTrue mints
@@ -214,6 +280,7 @@
 - [x] **Fase 2 — Per-route edge behaviour (code in repo)** — `functions/_middleware.ts` + `public/_routes.json`: public routes get shell + `__EDGE_DATA__` + `s-maxage`/SWR, private routes `no-store`; `src/lib/edgeData.ts` seeds react-query pre-render (wins over snapshot via `skipExisting`). Verified by `npm run test:e2e`. _(OD-03, ADR-007; 2026-09-13)_
 - [x] **Fase 2 — Cache invalidation endpoint** — `functions/api/cache-purge.ts` (`PURGE_SECRET`-guarded, offers→marketplace+detail, users→profile). _(OD-04; 2026-09-13)_
 - [x] **Fase 2 — `_headers` security baseline** — CSP, HSTS-adjacent headers, frame-ancestors, referrer-policy, COOP/CORP; immutable caching for `/assets/*`. _(OD-05 partial; 2026-09-13)_
+- [x] **Fase 2 — Cookie-derived per-route cache keys** — `coffernode_session` cookie mirror (wallet identity) + `functions/_lib/cache-key.ts` deriving `ck:v1:<route>:<sha256(identity)[0..16]>`; middleware stamps `x-cache-key` on every document and shards the public CDN per cookie (`Vary: Cookie`); private routes stay `no-store`. Verified by `tests/route-cache-key.spec.ts` (12 pass). _(ADR-012; 2026-09-20)_
 - [x] **Fase 2 — DEPLOY + live verify** — create Cloudflare Pages project, `wrangler pages secret put SUPABASE_READ_KEY / PURGE_SECRET`, `npm run deploy:cf`, then verify `x-edge-route` (public vs private), `s-maxage`/`no-store`, and that `/api/cache-purge` responds 401 without secret. **Runbook pronto: `docs/cloudflare-deploy.md`.** (workerd can't run locally on this mac — needs macOS ≥13.5/DevContainer or remote.) _(live 2026-09-13 → https://coffernode.pages.dev; vedi `done.md`)_
 - [ ] **Fase 2 — Supabase webhooks** — configure DB webhooks on `offers`/`users` writes → `POST /api/cache-purge` with `x-webhook-secret: $PURGE_SECRET`.
 - [ ] **Fase 2 follow-up — full per-route SSR/SEO HTML** — current ADR-007 injects data into the SPA shell; prerender real per-route HTML for crawlers is a follow-up.

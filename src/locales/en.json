@@ -173,7 +173,20 @@
     "messageTitle": "Open the chat with this user",
     "errorStartChat": "Couldn't start the chat — please try again.",
     "messageStarting": "Opening…",
-    "errorUnknownUser": "This user hasn't completed sign-in yet — try again in a few seconds."
+    "errorUnknownUser": "This user hasn't completed sign-in yet — try again in a few seconds.",
+    "cofferTitle": "Coffer Identity",
+    "cofferUnavailable": "Sign in with your wallet to derive your device-bound Coffer Identity.",
+    "cofferFingerprint": "Identity fingerprint",
+    "cofferSampleTrade": "Sample trade pseudonym",
+    "cofferUses": "Each trade and chat gets its own opaque pseudonym derived on this device. The server only sees strings that can't be traced back to your wallet.",
+    "cofferRotate": "Rotate",
+    "cofferRotateConfirm": "Confirm rotation",
+    "cofferRotated": "Coffer Identity rotated — new pseudonyms active.",
+    "cofferRotateFailed": "Couldn't rotate the identity — please try again.",
+    "cofferBurn": "Burn identity",
+    "cofferBurnConfirm": "Confirm burn",
+    "cofferBurned": "Coffer Identity burned — this device's pseudonym history is gone.",
+    "cofferBurnNote": "Burning only clears this device's identity — it never touches your wallet or funds."
   },
   "referral": {
     "title": "Invite & Earn",

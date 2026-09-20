@@ -3,7 +3,7 @@
  * @packageDocumentation
  */
 
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from "@supabase/supabase-js"
 import type {
   User,
   Offer,
@@ -21,10 +21,11 @@ import type {
   ReferralDashboard,
   ReferralRelationWithUser,
   ReferralFeeEvent,
-} from '@/types/database'
+} from "@/types/database"
 
 // Environment variables (these should be set in .env.local)
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
+const SUPABASE_URL =
+  import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
 // Prefer the new publishable key format (sb_publishable_*) when present;
 // fall back to the legacy anon JWT (VITE_SUPABASE_ANON_KEY) for older
 // projects. Both are safe to ship to the browser.
@@ -36,7 +37,7 @@ const SUPABASE_ANON_KEY =
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   throw new Error(
-    'Missing Supabase credentials. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY).'
+    "Missing Supabase credentials. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY)."
   )
 }
 
@@ -51,7 +52,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     detectSessionInUrl: true,
   },
   db: {
-    schema: 'public',
+    schema: "public",
   },
 })
 
@@ -66,28 +67,59 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 // =================================================================
 
 export const PUBLIC_USER_COLUMNS = [
-  'id', 'wallet_address', 'nickname', 'avatar_url', 'verification_level',
-  'bio', 'avg_rating', 'reputation_score',
-  'total_trades', 'completed_trades', 'cancelled_trades', 'dispute_count',
-  'created_at',
-].join(',')
+  "id",
+  "wallet_address",
+  "nickname",
+  "avatar_url",
+  "verification_level",
+  "bio",
+  "avg_rating",
+  "reputation_score",
+  "total_trades",
+  "completed_trades",
+  "cancelled_trades",
+  "dispute_count",
+  "created_at",
+].join(",")
 
 export const PUBLIC_OFFER_COLUMNS = [
-  'id', 'offer_id', 'seller_id', 'status', 'type',
-  'crypto_token', 'crypto_amount', 'fiat_currency', 'fiat_amount',
-  'price_per_unit', 'min_amount', 'max_amount',
-  'payment_methods', 'available_regions',
-  'platform_fee_bps', 'network_fee', 'tags', 'description',
-  'is_private', 'target_user', 'grace_period',
-  'published_at', 'expires_at', 'created_at',
-].join(',')
+  "id",
+  "offer_id",
+  "seller_id",
+  "status",
+  "type",
+  "crypto_token",
+  "crypto_amount",
+  "fiat_currency",
+  "fiat_amount",
+  "price_per_unit",
+  "min_amount",
+  "max_amount",
+  "payment_methods",
+  "available_regions",
+  "platform_fee_bps",
+  "network_fee",
+  "tags",
+  "description",
+  "is_private",
+  "target_user",
+  "grace_period",
+  "published_at",
+  "expires_at",
+  "created_at",
+].join(",")
 
 /** Seller join used by the marketplace/detail queries. All inside the users
  *  projection so anonymous reads keep working under OD-02. */
 export const SELLER_JOIN = [
-  'id', 'wallet_address', 'nickname', 'avatar_url',
-  'verification_level', 'total_trades', 'avg_rating',
-].join(',')
+  "id",
+  "wallet_address",
+  "nickname",
+  "avatar_url",
+  "verification_level",
+  "total_trades",
+  "avg_rating",
+].join(",")
 
 /**
  * Public seller profile as joined onto offer reads (OD-02 projection subset).
@@ -120,7 +152,9 @@ export type OfferWithSeller = Offer & { seller?: SellerProfile | null }
  */
 async function userColumnsForRead(walletAddress: string): Promise<string> {
   const sessionWallet = await getSessionWallet()
-  return sessionWallet === walletAddress.toLowerCase() ? '*' : PUBLIC_USER_COLUMNS
+  return sessionWallet === walletAddress.toLowerCase()
+    ? "*"
+    : PUBLIC_USER_COLUMNS
 }
 
 /**
@@ -142,25 +176,25 @@ export function isUuid(value: string): boolean {
 // =================================================================
 
 export const EscrowStatus = {
-  AWAITING_DEPOSIT: 'awaiting_deposit',
-  BUYER_DEPOSITED: 'buyer_deposited',
-  SELLER_DEPOSITED: 'seller_deposited',
+  AWAITING_DEPOSIT: "awaiting_deposit",
+  BUYER_DEPOSITED: "buyer_deposited",
+  SELLER_DEPOSITED: "seller_deposited",
   /** KlerosEsc.State.FUNDED — buyer + seller deposits in and seller has
    *  locked tradeAmount. Distinct from SELLER_DEPOSITED which only captures
    *  one of those transitions. */
-  FUNDED: 'funded',
-  CONFIRMED: 'confirmed',
-  DEPOSITED: 'deposited',
-  PENDING_RELEASE: 'pending_release',
-  DISPUTED: 'disputed',
-  RELEASED: 'released',
-  REFUNDED: 'refunded',
+  FUNDED: "funded",
+  CONFIRMED: "confirmed",
+  DEPOSITED: "deposited",
+  PENDING_RELEASE: "pending_release",
+  DISPUTED: "disputed",
+  RELEASED: "released",
+  REFUNDED: "refunded",
   /** KlerosEsc.State.CANCELLED — funding-phase mutual cancel via
    *  `cancelTrade()`. Distinct from REFUNDED (which is the buyer-favorable
    *  dispute payout). See contract-execution-status.md §B-3. */
-  CANCELLED: 'cancelled',
+  CANCELLED: "cancelled",
 } as const
-export type EscrowStatus = typeof EscrowStatus[keyof typeof EscrowStatus]
+export type EscrowStatus = (typeof EscrowStatus)[keyof typeof EscrowStatus]
 
 /**
  * Subset of the KlerosEsc event names that the trade_events audit log uses.
@@ -168,79 +202,81 @@ export type EscrowStatus = typeof EscrowStatus[keyof typeof EscrowStatus]
  * the UI can distinguish, for example, `RulingReceived` from `RulingExecuted`.
  */
 export const TradeEventType = {
-  OFFER_ACCEPTED: 'offer_accepted',
-  ESCROW_FUNDED: 'escrow_funded',
-  ESCROW_CONFIRMED: 'escrow_confirmed',
-  ESCROW_RELEASED: 'escrow_released',
-  ESCROW_REFUNDED: 'escrow_refunded',
-  ESCROW_DISPUTED: 'escrow_disputed',
-  ESCROW_RESOLVED: 'escrow_resolved',
-  ESCROW_CANCELLED: 'escrow_cancelled',
-  DISPUTE_RAISED: 'dispute_raised',
-  EVIDENCE_SUBMITTED: 'evidence_submitted',
-  APPEAL_FUNDED: 'appeal_funded',
-  RULING_RECEIVED: 'ruling_received',
-  RULING_EXECUTED: 'ruling_executed',
-  DISPUTE_FINALIZED: 'dispute_finalized',
-  DISPUTE_TIMED_OUT: 'dispute_timed_out',
-  FUNDS_RETURNED: 'funds_returned',
+  OFFER_ACCEPTED: "offer_accepted",
+  ESCROW_FUNDED: "escrow_funded",
+  ESCROW_CONFIRMED: "escrow_confirmed",
+  ESCROW_RELEASED: "escrow_released",
+  ESCROW_REFUNDED: "escrow_refunded",
+  ESCROW_DISPUTED: "escrow_disputed",
+  ESCROW_RESOLVED: "escrow_resolved",
+  ESCROW_CANCELLED: "escrow_cancelled",
+  DISPUTE_RAISED: "dispute_raised",
+  EVIDENCE_SUBMITTED: "evidence_submitted",
+  APPEAL_FUNDED: "appeal_funded",
+  RULING_RECEIVED: "ruling_received",
+  RULING_EXECUTED: "ruling_executed",
+  DISPUTE_FINALIZED: "dispute_finalized",
+  DISPUTE_TIMED_OUT: "dispute_timed_out",
+  FUNDS_RETURNED: "funds_returned",
   /** Generic fallback. */
-  ESCROW_STATUS_UPDATED: 'escrow_status_updated',
-  TRADE_STATUS_UPDATED: 'trade_status_updated',
+  ESCROW_STATUS_UPDATED: "escrow_status_updated",
+  TRADE_STATUS_UPDATED: "trade_status_updated",
 } as const
-export type TradeEventType = typeof TradeEventType[keyof typeof TradeEventType]
+export type TradeEventType =
+  (typeof TradeEventType)[keyof typeof TradeEventType]
 
 export const OfferStatus = {
-  ACTIVE: 'active',
-  PAUSED: 'paused',
-  COMPLETED: 'completed',
-  CANCELLED: 'cancelled',
-  EXPIRED: 'expired',
+  ACTIVE: "active",
+  PAUSED: "paused",
+  COMPLETED: "completed",
+  CANCELLED: "cancelled",
+  EXPIRED: "expired",
 } as const
-export type OfferStatus = typeof OfferStatus[keyof typeof OfferStatus]
+export type OfferStatus = (typeof OfferStatus)[keyof typeof OfferStatus]
 
 export const KYCStatus = {
-  PENDING: 'pending',
-  APPROVED: 'approved',
-  REJECTED: 'rejected',
-  EXPIRED: 'expired',
+  PENDING: "pending",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+  EXPIRED: "expired",
 } as const
-export type KYCStatus = typeof KYCStatus[keyof typeof KYCStatus]
+export type KYCStatus = (typeof KYCStatus)[keyof typeof KYCStatus]
 
 export const VerificationLevel = {
-  UNVERIFIED: 'unverified',
-  VERIFIED: 'verified',
-  TRUSTED: 'trusted',
-  SUSPICIOUS: 'suspicious',
+  UNVERIFIED: "unverified",
+  VERIFIED: "verified",
+  TRUSTED: "trusted",
+  SUSPICIOUS: "suspicious",
 } as const
-export type VerificationLevel = typeof VerificationLevel[keyof typeof VerificationLevel]
+export type VerificationLevel =
+  (typeof VerificationLevel)[keyof typeof VerificationLevel]
 
 export const UserRole = {
-  USER: 'user',
-  ADMIN: 'admin',
-  MEDIATOR: 'mediator',
-  SUPPORT: 'support',
+  USER: "user",
+  ADMIN: "admin",
+  MEDIATOR: "mediator",
+  SUPPORT: "support",
 } as const
-export type UserRole = typeof UserRole[keyof typeof UserRole]
+export type UserRole = (typeof UserRole)[keyof typeof UserRole]
 
 export const TradeStatus = {
-  PENDING: 'pending',
-  ACTIVE: 'active',
-  COMPLETED: 'completed',
-  CANCELLED: 'cancelled',
-  DISPUTED: 'disputed',
-  REFUNDED: 'refunded',
+  PENDING: "pending",
+  ACTIVE: "active",
+  COMPLETED: "completed",
+  CANCELLED: "cancelled",
+  DISPUTED: "disputed",
+  REFUNDED: "refunded",
 } as const
-export type TradeStatus = typeof TradeStatus[keyof typeof TradeStatus]
+export type TradeStatus = (typeof TradeStatus)[keyof typeof TradeStatus]
 
 export const DisputeStatus = {
-  OPEN: 'open',
-  IN_REVIEW: 'in_review',
-  RESOLVED: 'resolved',
-  ESCALATED: 'escalated',
-  CLOSED: 'closed',
+  OPEN: "open",
+  IN_REVIEW: "in_review",
+  RESOLVED: "resolved",
+  ESCALATED: "escalated",
+  CLOSED: "closed",
 } as const
-export type DisputeStatus = typeof DisputeStatus[keyof typeof DisputeStatus]
+export type DisputeStatus = (typeof DisputeStatus)[keyof typeof DisputeStatus]
 
 // =================================================================
 // USER QUERIES
@@ -252,24 +288,30 @@ export type DisputeStatus = typeof DisputeStatus[keyof typeof DisputeStatus]
 export async function getUserByWallet(walletAddress: string) {
   const cols = await userColumnsForRead(walletAddress)
   const { data, error } = await supabase
-    .from('users')
+    .from("users")
     .select(cols)
-    .eq('wallet_address', walletAddress.toLowerCase())
+    .eq("wallet_address", walletAddress.toLowerCase())
     .single()
 
   if (error) {
-    if (error.code === 'PGRST116') {
+    if (error.code === "PGRST116") {
       // No rows found - this is expected for new users
       return null
     }
-    console.error('Error fetching user:', error)
+    console.error("Error fetching user:", error)
     throw error
   }
 
   return data as unknown as User
 }
 
-import { getCachedUser, setCachedUser, invalidateUserCache, clearAllUserCache } from '@/lib/userCache'
+import {
+  getCachedUser,
+  setCachedUser,
+  invalidateUserCache,
+  clearAllUserCache,
+} from "@/lib/userCache"
+import { persistCofferIdentity } from "@/lib/cofferIdentity"
 
 /**
  * Ensure a user row exists for the given wallet address.
@@ -298,15 +340,15 @@ export async function ensureUser(walletAddress: string): Promise<User | null> {
 
   // 2. Try to read existing row. Anonymous reads use the public projection
   //    (OD-02); the signed-in owner can read the full row (EditProfilePage).
-  const cols = isSelf ? '*' : PUBLIC_USER_COLUMNS
+  const cols = isSelf ? "*" : PUBLIC_USER_COLUMNS
   const { data: existing, error: readErr } = await supabase
-    .from('users')
+    .from("users")
     .select(cols)
-    .eq('wallet_address', addr)
+    .eq("wallet_address", addr)
     .maybeSingle()
 
   if (readErr) {
-    console.error('[ensureUser] read error:', readErr)
+    console.error("[ensureUser] read error:", readErr)
     throw readErr
   }
 
@@ -314,11 +356,12 @@ export async function ensureUser(walletAddress: string): Promise<User | null> {
     // 3a. Row exists — just touch last_active_at (fire-and-forget, don't block).
     //     Only meaningful once signed in (RLS requires a session to UPDATE).
     supabase
-      .from('users')
+      .from("users")
       .update({ last_active_at: new Date().toISOString() })
-      .eq('wallet_address', addr)
+      .eq("wallet_address", addr)
       .then(({ error }) => {
-        if (error) console.warn('[ensureUser] last_active_at update failed:', error)
+        if (error)
+          console.warn("[ensureUser] last_active_at update failed:", error)
       })
 
     const user = existing as unknown as User
@@ -332,13 +375,13 @@ export async function ensureUser(walletAddress: string): Promise<User | null> {
   if (sessionWallet !== addr) return null
 
   const { data: inserted, error: insertErr } = await supabase
-    .from('users')
+    .from("users")
     .insert({ wallet_address: addr, last_active_at: new Date().toISOString() })
     .select()
     .single()
 
   if (insertErr) {
-    console.error('[ensureUser] insert error:', insertErr)
+    console.error("[ensureUser] insert error:", insertErr)
     throw insertErr
   }
 
@@ -367,7 +410,7 @@ export async function updateUserProfile(
   const addr = walletAddress.toLowerCase()
 
   const { data, error } = await supabase
-    .from('users')
+    .from("users")
     .upsert(
       {
         wallet_address: addr,
@@ -380,13 +423,13 @@ export async function updateUserProfile(
         telegram_handle: profile.telegramHandle ?? null,
         github_handle: profile.githubHandle ?? null,
       },
-      { onConflict: 'wallet_address' }
+      { onConflict: "wallet_address" }
     )
     .select()
     .single()
 
   if (error) {
-    console.error('[updateUserProfile] error:', error)
+    console.error("[updateUserProfile] error:", error)
     throw error
   }
 
@@ -396,7 +439,7 @@ export async function updateUserProfile(
   return user
 }
 
-const AVATAR_BUCKET = 'avatars'
+const AVATAR_BUCKET = "avatars"
 
 /**
  * Upload a user's avatar image to Supabase Storage and return a public URL.
@@ -407,24 +450,22 @@ const AVATAR_BUCKET = 'avatars'
  */
 export async function uploadAvatar(
   file: File,
-  walletAddress: string,
+  walletAddress: string
 ): Promise<{ url: string; path: string }> {
   const addr = walletAddress.toLowerCase()
-  const ext = file.name.split('.').pop()?.toLowerCase() || 'png'
+  const ext = file.name.split(".").pop()?.toLowerCase() || "png"
   const path = `${addr}-${Date.now()}.${ext}`
 
   const { error: uploadErr } = await supabase.storage
     .from(AVATAR_BUCKET)
-    .upload(path, file, { upsert: true, cacheControl: '3600' })
+    .upload(path, file, { upsert: true, cacheControl: "3600" })
 
   if (uploadErr) {
-    console.error('[uploadAvatar] upload error:', uploadErr)
+    console.error("[uploadAvatar] upload error:", uploadErr)
     throw uploadErr
   }
 
-  const { data } = supabase.storage
-    .from(AVATAR_BUCKET)
-    .getPublicUrl(path)
+  const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path)
 
   return { url: data.publicUrl, path }
 }
@@ -472,14 +513,14 @@ export interface DisputeEvidenceUpload {
   keccakBytes32: `0x${string}`
 }
 
-const DISPUTE_EVIDENCE_BUCKET = 'dispute-evidence'
+const DISPUTE_EVIDENCE_BUCKET = "dispute-evidence"
 /** Signed-URL TTL: 10 minutes — long enough for the detail page to render
  *  the image, short enough to limit exposure if the URL leaks. */
 const DISPUTE_EVIDENCE_SIGNED_URL_TTL_SECONDS = 600
 
 export async function uploadDisputeEvidenceFile(
   disputeId: string,
-  file: File,
+  file: File
 ): Promise<DisputeEvidenceUpload> {
   // Storage path: <dispute_id>/<basename>-<ts>.<ext>. The dispute UUID
   // prefix is what the RLS predicate (`storage_object_dispute_id(name)`)
@@ -489,23 +530,24 @@ export async function uploadDisputeEvidenceFile(
   // Strip path separators and ASCII control / DEL chars from the
   // user-supplied filename so it can't escape the <dispute_id>/ prefix
   // (a leading '.', '/', '\\', or NUL would change the resolved path).
-  const safeBase = (file.name || 'evidence')
-    .split('')
-    .map((ch) => {
-      const code = ch.charCodeAt(0)
-      if (ch === '/' || ch === '\\') return '_'
-      if (code <= 0x1f || code === 0x7f) return '_'
-      return ch
-    })
-    .join('')
-    .replace(/^[.]+/, '')
-    .slice(0, 80) || 'evidence'
-  const ext = safeBase.includes('.')
-    ? safeBase.slice(safeBase.lastIndexOf('.')).toLowerCase()
-    : ''
+  const safeBase =
+    (file.name || "evidence")
+      .split("")
+      .map((ch) => {
+        const code = ch.charCodeAt(0)
+        if (ch === "/" || ch === "\\") return "_"
+        if (code <= 0x1f || code === 0x7f) return "_"
+        return ch
+      })
+      .join("")
+      .replace(/^[.]+/, "")
+      .slice(0, 80) || "evidence"
+  const ext = safeBase.includes(".")
+    ? safeBase.slice(safeBase.lastIndexOf(".")).toLowerCase()
+    : ""
   const stamp = Date.now().toString(36)
   const rand = Math.random().toString(36).slice(2, 8)
-  const stem = safeBase.replace(new RegExp(`${ext}$`), '')
+  const stem = safeBase.replace(new RegExp(`${ext}$`), "")
   const path = `${disputeId}/${stem}-${stamp}-${rand}${ext}`
 
   const bytes = new Uint8Array(await file.arrayBuffer())
@@ -514,12 +556,12 @@ export async function uploadDisputeEvidenceFile(
     .from(DISPUTE_EVIDENCE_BUCKET)
     .upload(path, file, {
       upsert: false,
-      cacheControl: '3600',
+      cacheControl: "3600",
       contentType: file.type || undefined,
     })
 
   if (uploadErr) {
-    console.error('[uploadDisputeEvidenceFile] upload error:', uploadErr)
+    console.error("[uploadDisputeEvidenceFile] upload error:", uploadErr)
     throw uploadErr
   }
 
@@ -532,7 +574,7 @@ export async function uploadDisputeEvidenceFile(
   // Solidity / contract-test encoding used elsewhere (EVM-keccak, NOT
   // SHA3-256). Imported dynamically to keep startup cold-cost low — same
   // pattern as `cidToBytes32` in src/lib/ipfs.ts.
-  const { keccak256 } = await import('viem')
+  const { keccak256 } = await import("viem")
   const keccakBytes32 = keccak256(bytes) as `0x${string}`
 
   return {
@@ -558,13 +600,13 @@ export async function uploadDisputeEvidenceFile(
  */
 export async function getDisputeEvidenceSignedUrl(
   path: string,
-  ttlSeconds: number = DISPUTE_EVIDENCE_SIGNED_URL_TTL_SECONDS,
+  ttlSeconds: number = DISPUTE_EVIDENCE_SIGNED_URL_TTL_SECONDS
 ): Promise<string | null> {
   const { data, error } = await supabase.storage
     .from(DISPUTE_EVIDENCE_BUCKET)
     .createSignedUrl(path, ttlSeconds)
   if (error || !data?.signedUrl) {
-    console.error('[getDisputeEvidenceSignedUrl] sign failed:', error)
+    console.error("[getDisputeEvidenceSignedUrl] sign failed:", error)
     return null
   }
   return data.signedUrl
@@ -586,7 +628,10 @@ export async function upsertUser(
     githubHandle?: string | null
   }
 ) {
-  if (profile && Object.values(profile).some((v) => v !== undefined && v !== null)) {
+  if (
+    profile &&
+    Object.values(profile).some((v) => v !== undefined && v !== null)
+  ) {
     return updateUserProfile(walletAddress, profile)
   }
   return ensureUser(walletAddress)
@@ -596,13 +641,13 @@ export async function upsertUser(
  * Update user reputation score
  */
 export async function updateUserReputation(userId: string, delta: number) {
-  const { error } = await supabase.rpc('increment_reputation_score', {
+  const { error } = await supabase.rpc("increment_reputation_score", {
     user_id: userId,
     delta: delta,
   })
 
   if (error) {
-    console.error('Error updating reputation:', error)
+    console.error("Error updating reputation:", error)
     throw error
   }
 }
@@ -616,18 +661,20 @@ export async function updateUserReputation(userId: string, delta: number) {
  */
 export async function getActiveOffers(
   limit = 50,
-  offset = 0,
+  offset = 0
 ): Promise<OfferWithSeller[] | null> {
   const { data, error } = await supabase
-    .from('offers')
-    .select(`${PUBLIC_OFFER_COLUMNS},seller:users!offers_seller_id_fkey(${SELLER_JOIN})`)
-    .eq('status', OfferStatus.ACTIVE)
-    .gte('expires_at', new Date().toISOString())
-    .order('published_at', { ascending: false })
+    .from("offers")
+    .select(
+      `${PUBLIC_OFFER_COLUMNS},seller:users!offers_seller_id_fkey(${SELLER_JOIN})`
+    )
+    .eq("status", OfferStatus.ACTIVE)
+    .gte("expires_at", new Date().toISOString())
+    .order("published_at", { ascending: false })
     .range(offset, offset + limit - 1)
 
   if (error) {
-    console.error('Error fetching offers:', error)
+    console.error("Error fetching offers:", error)
     throw error
   }
 
@@ -639,22 +686,24 @@ export async function getActiveOffers(
  */
 export async function getOffersBySeller(
   sellerId: string,
-  status?: OfferStatus,
+  status?: OfferStatus
 ): Promise<OfferWithSeller[] | null> {
   const query = supabase
-    .from('offers')
-    .select(`${PUBLIC_OFFER_COLUMNS},seller:users!offers_seller_id_fkey(${SELLER_JOIN})`)
-    .eq('seller_id', sellerId)
-    .order('created_at', { ascending: false })
+    .from("offers")
+    .select(
+      `${PUBLIC_OFFER_COLUMNS},seller:users!offers_seller_id_fkey(${SELLER_JOIN})`
+    )
+    .eq("seller_id", sellerId)
+    .order("created_at", { ascending: false })
 
   if (status) {
-    query.eq('status', status)
+    query.eq("status", status)
   }
 
   const { data, error } = await query
 
   if (error) {
-    console.error('Error fetching seller offers:', error)
+    console.error("Error fetching seller offers:", error)
     throw error
   }
 
@@ -691,18 +740,22 @@ export function generateOfferId(): string {
  * Get a single offer by its primary key (the `:id` route param), with the
  * seller profile joined so TradePage / OpenOfferPage can render trader info.
  */
-export async function getOfferById(id: string): Promise<OfferWithSeller | null> {
+export async function getOfferById(
+  id: string
+): Promise<OfferWithSeller | null> {
   const { data, error } = await supabase
-    .from('offers')
-    .select(`${PUBLIC_OFFER_COLUMNS},seller:users!offers_seller_id_fkey(${SELLER_JOIN})`)
-    .eq('id', id)
+    .from("offers")
+    .select(
+      `${PUBLIC_OFFER_COLUMNS},seller:users!offers_seller_id_fkey(${SELLER_JOIN})`
+    )
+    .eq("id", id)
     .single()
 
   if (error) {
-    if (error.code === 'PGRST116') {
+    if (error.code === "PGRST116") {
       return null
     }
-    console.error('Error fetching offer:', error)
+    console.error("Error fetching offer:", error)
     throw error
   }
 
@@ -714,7 +767,7 @@ export async function getOfferById(id: string): Promise<OfferWithSeller | null> 
  */
 export async function createOffer(offerData: Partial<Offer>) {
   const { data, error } = await supabase
-    .from('offers')
+    .from("offers")
     .insert({
       ...offerData,
       offer_id: offerData.offer_id ?? generateOfferId(),
@@ -725,7 +778,7 @@ export async function createOffer(offerData: Partial<Offer>) {
     .single()
 
   if (error) {
-    console.error('Error creating offer:', error)
+    console.error("Error creating offer:", error)
     throw error
   }
 
@@ -749,14 +802,14 @@ export async function updateOffer(id: string, patch: Partial<Offer>) {
   delete sanitized.published_at
 
   const { data, error } = await supabase
-    .from('offers')
+    .from("offers")
     .update({ ...sanitized, updated_at: new Date().toISOString() })
-    .eq('id', id)
+    .eq("id", id)
     .select()
     .single()
 
   if (error) {
-    console.error('Error updating offer:', error)
+    console.error("Error updating offer:", error)
     throw error
   }
 
@@ -793,19 +846,21 @@ export function generateDisputeId(): string {
  */
 export async function getActiveTradesByBuyer(buyerId: string) {
   const { data, error } = await supabase
-    .from('trades')
-    .select(`
+    .from("trades")
+    .select(
+      `
       *,
       offer:offers(*),
       buyer:users!trades_buyer_id_fkey (nickname, avatar_url, verification_level),
       seller:users!trades_seller_id_fkey (nickname, avatar_url, verification_level)
-    `)
-    .eq('buyer_id', buyerId)
-    .eq('status', TradeStatus.ACTIVE)
-    .order('created_at', { ascending: false })
+    `
+    )
+    .eq("buyer_id", buyerId)
+    .eq("status", TradeStatus.ACTIVE)
+    .order("created_at", { ascending: false })
 
   if (error) {
-    console.error('Error fetching trades:', error)
+    console.error("Error fetching trades:", error)
     throw error
   }
 
@@ -817,19 +872,21 @@ export async function getActiveTradesByBuyer(buyerId: string) {
  */
 export async function getActiveTradesBySeller(sellerId: string) {
   const { data, error } = await supabase
-    .from('trades')
-    .select(`
+    .from("trades")
+    .select(
+      `
       *,
       offer:offers(*),
       buyer:users!trades_buyer_id_fkey (nickname, avatar_url, verification_level),
       seller:users!trades_seller_id_fkey (nickname, avatar_url, verification_level)
-    `)
-    .eq('seller_id', sellerId)
-    .eq('status', TradeStatus.ACTIVE)
-    .order('created_at', { ascending: false })
+    `
+    )
+    .eq("seller_id", sellerId)
+    .eq("status", TradeStatus.ACTIVE)
+    .order("created_at", { ascending: false })
 
   if (error) {
-    console.error('Error fetching trades:', error)
+    console.error("Error fetching trades:", error)
     throw error
   }
 
@@ -841,22 +898,24 @@ export async function getActiveTradesBySeller(sellerId: string) {
  */
 export async function getTradeByTradeId(tradeId: string) {
   const { data, error } = await supabase
-    .from('trades')
-    .select(`
+    .from("trades")
+    .select(
+      `
       *,
       offer:offers(*),
       buyer:users!trades_buyer_id_fkey (nickname, avatar_url, verification_level),
       seller:users!trades_seller_id_fkey (nickname, avatar_url, verification_level),
       ratings:trade_ratings(*)
-    `)
-    .eq('trade_id', tradeId)
+    `
+    )
+    .eq("trade_id", tradeId)
     .single()
 
   if (error) {
-    if (error.code === 'PGRST116') {
+    if (error.code === "PGRST116") {
       return null
     }
-    console.error('Error fetching trade:', error)
+    console.error("Error fetching trade:", error)
     throw error
   }
 
@@ -872,19 +931,21 @@ export async function getTradeByTradeId(tradeId: string) {
  */
 export async function getTradeById(id: string) {
   const { data, error } = await supabase
-    .from('trades')
-    .select(`
+    .from("trades")
+    .select(
+      `
       *,
       offer:offers(*),
       buyer:users!trades_buyer_id_fkey (wallet_address, nickname, avatar_url, verification_level),
       seller:users!trades_seller_id_fkey (wallet_address, nickname, avatar_url, verification_level)
-    `)
-    .eq(isUuid(id) ? 'id' : 'trade_id', id)
+    `
+    )
+    .eq(isUuid(id) ? "id" : "trade_id", id)
     .single()
 
   if (error) {
-    if (error.code === 'PGRST116') return null
-    console.error('Error fetching trade by id:', error)
+    if (error.code === "PGRST116") return null
+    console.error("Error fetching trade by id:", error)
     throw error
   }
 
@@ -902,7 +963,7 @@ export async function resolveTradeUuid(tradeId: string): Promise<string> {
   const trade = await getTradeByTradeId(tradeId)
   if (!trade) {
     throw new Error(
-      `Cannot resolve trade "${tradeId}" to a uuid: no trade found. Pass the trade's uuid id instead.`,
+      `Cannot resolve trade "${tradeId}" to a uuid: no trade found. Pass the trade's uuid id instead.`
     )
   }
   return trade.id
@@ -917,7 +978,7 @@ export async function resolveTradeUuid(tradeId: string): Promise<string> {
 export async function upsertTradeEscrowStatus(
   tradeId: string,
   escrowStatus: string,
-  txHash?: string,
+  txHash?: string
 ) {
   // Route through the SECURITY DEFINER RPC `set_trade_escrow_status`
   // (migration 20260911000000). The row-level RLS policy
@@ -925,21 +986,21 @@ export async function upsertTradeEscrowStatus(
   // `escrow_status` for direct UPDATEs — the RPC bypasses RLS with the
   // same internal authorization (caller must be buyer or seller) so we
   // don't open the door to arbitrary writes.
-  const { error } = await supabase.rpc('set_trade_escrow_status', {
+  const { error } = await supabase.rpc("set_trade_escrow_status", {
     p_trade_id: tradeId,
     p_new_status: escrowStatus,
     p_tx_hash: txHash ?? null,
-    p_event_type: 'escrow_status_updated',
+    p_event_type: "escrow_status_updated",
   })
   if (error) {
-    console.error('Error updating trade escrow status:', error)
+    console.error("Error updating trade escrow status:", error)
     throw error
   }
 
   const { data } = await supabase
-    .from('trades')
+    .from("trades")
     .select()
-    .eq('id', tradeId)
+    .eq("id", tradeId)
     .single()
 
   if (!data) return null
@@ -967,7 +1028,7 @@ export async function updateTradeStatus(
     escrowStatus?: string
     txHash?: string
     escrowEventType?: TradeEventType
-  },
+  }
 ) {
   // The `status` / `has_dispute` / `completed_at` columns are revoked from
   // `authenticated` (20260824000006), so a direct UPDATE always fails with
@@ -976,27 +1037,28 @@ export async function updateTradeStatus(
   // DEFINER `set_trade_status` RPC (extended in 20260912000000 to also stamp
   // completed_at/cancelled_at/disputed_at/has_dispute) which re-checks that
   // the caller is a party.
-  const { error } = await supabase.rpc('set_trade_status', {
+  const { error } = await supabase.rpc("set_trade_status", {
     p_trade_id: tradeId,
     p_new_status: status,
     p_tx_hash: options?.txHash ?? null,
   })
   if (error) {
-    console.error('Error updating trade status:', error)
+    console.error("Error updating trade status:", error)
     throw error
   }
 
   // Mirror the escrow column via its own RPC (also revoked for direct writes).
   // Its optional `p_event_type` writes the audit row.
   if (options?.escrowStatus) {
-    const { error: escrowErr } = await supabase.rpc('set_trade_escrow_status', {
+    const { error: escrowErr } = await supabase.rpc("set_trade_escrow_status", {
       p_trade_id: tradeId,
       p_new_status: options.escrowStatus,
       p_tx_hash: options?.txHash ?? null,
-      p_event_type: options.escrowEventType ?? TradeEventType.ESCROW_STATUS_UPDATED,
+      p_event_type:
+        options.escrowEventType ?? TradeEventType.ESCROW_STATUS_UPDATED,
     })
     if (escrowErr) {
-      console.error('Error updating trade escrow status:', escrowErr)
+      console.error("Error updating trade escrow status:", escrowErr)
       throw escrowErr
     }
   } else if (options?.escrowEventType) {
@@ -1004,18 +1066,18 @@ export async function updateTradeStatus(
     await logTradeEvent(
       tradeId,
       options.escrowEventType,
-      'system',
+      "system",
       `Trade status → ${status}`,
-      { status, tx_hash: options.txHash ?? null },
+      { status, tx_hash: options.txHash ?? null }
     ).catch(() => {
       /* non-fatal — the status mirror already landed */
     })
   }
 
   const { data } = await supabase
-    .from('trades')
+    .from("trades")
     .select()
-    .eq('id', tradeId)
+    .eq("id", tradeId)
     .single()
 
   return data
@@ -1030,7 +1092,7 @@ export async function updateTradeStatus(
 export async function setTradeEscrowStatus(
   tradeId: string,
   escrowStatus: EscrowStatus,
-  options?: { txHash?: string; escrowEventType?: TradeEventType },
+  options?: { txHash?: string; escrowEventType?: TradeEventType }
 ) {
   // Route through the SECURITY DEFINER RPC `set_trade_escrow_status`
   // (migration 20260911000000). The row-level RLS policy
@@ -1038,21 +1100,22 @@ export async function setTradeEscrowStatus(
   // `escrow_status` for direct UPDATEs — the RPC bypasses RLS with the
   // same internal authorization (caller must be buyer or seller) so we
   // don't open the door to arbitrary writes.
-  const { error } = await supabase.rpc('set_trade_escrow_status', {
+  const { error } = await supabase.rpc("set_trade_escrow_status", {
     p_trade_id: tradeId,
     p_new_status: escrowStatus,
     p_tx_hash: options?.txHash ?? null,
-    p_event_type: options?.escrowEventType ?? TradeEventType.ESCROW_STATUS_UPDATED,
+    p_event_type:
+      options?.escrowEventType ?? TradeEventType.ESCROW_STATUS_UPDATED,
   })
   if (error) {
-    console.error('Error setting trade escrow status:', error)
+    console.error("Error setting trade escrow status:", error)
     throw error
   }
 
   const { data } = await supabase
-    .from('trades')
+    .from("trades")
     .select()
-    .eq('id', tradeId)
+    .eq("id", tradeId)
     .single()
 
   if (!data) return null
@@ -1103,26 +1166,26 @@ export async function createTrade(input: CreateTradeInput) {
     insertRow.escrow_status = EscrowStatus.AWAITING_DEPOSIT
   }
   const { data, error } = await supabase
-    .from('trades')
+    .from("trades")
     .insert(insertRow)
     .select()
     .single()
 
   if (error) {
-    console.error('Error creating trade:', error)
+    console.error("Error creating trade:", error)
     throw error
   }
 
   await logTradeEvent(
     data.id,
-    'offer_accepted',
+    "offer_accepted",
     input.taker_role,
     `Trade opened by ${input.taker_role}`,
     {
       escrow_address: input.escrow_contract_addr ?? null,
       creator: input.creator ?? null,
       kleros_court: input.kleros_court_addr ?? null,
-    },
+    }
   )
 
   return data
@@ -1134,18 +1197,20 @@ export async function createTrade(input: CreateTradeInput) {
  */
 export async function getTradesByUser(userId: string) {
   const { data, error } = await supabase
-    .from('trades')
-    .select(`
+    .from("trades")
+    .select(
+      `
       *,
       offer:offers(*),
       buyer:users!trades_buyer_id_fkey (wallet_address, nickname, avatar_url, verification_level),
       seller:users!trades_seller_id_fkey (wallet_address, nickname, avatar_url, verification_level)
-    `)
+    `
+    )
     .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
-    .order('created_at', { ascending: false })
+    .order("created_at", { ascending: false })
 
   if (error) {
-    console.error('Error fetching user trades:', error)
+    console.error("Error fetching user trades:", error)
     throw error
   }
 
@@ -1159,13 +1224,13 @@ export async function getTradesByUser(userId: string) {
  */
 export async function getTradeByEscrowAddress(escrowAddress: string) {
   const { data, error } = await supabase
-    .from('trades')
-    .select('id, buyer_id, seller_id')
-    .eq('escrow_contract_addr', escrowAddress)
+    .from("trades")
+    .select("id, buyer_id, seller_id")
+    .eq("escrow_contract_addr", escrowAddress)
     .maybeSingle()
 
   if (error) {
-    console.error('Error fetching trade by escrow:', error)
+    console.error("Error fetching trade by escrow:", error)
     throw error
   }
 
@@ -1182,7 +1247,7 @@ export async function logTradeEvent(
   description?: string,
   metadata?: Record<string, unknown>
 ) {
-  const { error } = await supabase.from('trade_events').insert({
+  const { error } = await supabase.from("trade_events").insert({
     trade_id: tradeId,
     type: eventType,
     actor: actor,
@@ -1191,7 +1256,7 @@ export async function logTradeEvent(
   })
 
   if (error) {
-    console.error('Error logging trade event:', error)
+    console.error("Error logging trade event:", error)
     throw error
   }
 }
@@ -1203,9 +1268,12 @@ export async function logTradeEvent(
 /**
  * Create KYC application
  */
-export async function createKYCApplication(userId: string, kycData: Partial<KYCApplication>) {
+export async function createKYCApplication(
+  userId: string,
+  kycData: Partial<KYCApplication>
+) {
   const { data, error } = await supabase
-    .from('kyc_applications')
+    .from("kyc_applications")
     .insert({
       user_id: userId,
       ...kycData,
@@ -1216,7 +1284,7 @@ export async function createKYCApplication(userId: string, kycData: Partial<KYCA
     .single()
 
   if (error) {
-    console.error('Error creating KYC application:', error)
+    console.error("Error creating KYC application:", error)
     throw error
   }
 
@@ -1228,16 +1296,16 @@ export async function createKYCApplication(userId: string, kycData: Partial<KYCA
  */
 export async function getKYCApplicationByUser(userId: string) {
   const { data, error } = await supabase
-    .from('kyc_applications')
-    .select('*')
-    .eq('user_id', userId)
+    .from("kyc_applications")
+    .select("*")
+    .eq("user_id", userId)
     .single()
 
   if (error) {
-    if (error.code === 'PGRST116') {
+    if (error.code === "PGRST116") {
       return null
     }
-    console.error('Error fetching KYC application:', error)
+    console.error("Error fetching KYC application:", error)
     throw error
   }
 
@@ -1268,9 +1336,9 @@ export async function updateDisputeOnChain(
     resolvedAt?: string | null
     evidenceGroupId?: number | null
     appealCount?: number | null
-    raiser?: 'buyer' | 'seller' | null
+    raiser?: "buyer" | "seller" | null
     feePaidWei?: string | null
-    winner?: 'buyer' | 'seller' | null
+    winner?: "buyer" | "seller" | null
     disputeTimestamp?: string | null
     rulingReceivedTime?: string | null
     /** Kleros Court-assigned dispute ID (from DisputeRaised event). */
@@ -1283,7 +1351,7 @@ export async function updateDisputeOnChain(
     evidenceCid?: string | null
     /** Description blob (user text + on-chain metadata). */
     description?: string | null
-  },
+  }
 ) {
   const dbUpdate: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
@@ -1295,7 +1363,7 @@ export async function updateDisputeOnChain(
   // Collect them for the SECURITY DEFINER RPC instead.
   const sensitive: {
     p_status?: DisputeStatus
-    p_winner?: 'buyer' | 'seller' | null
+    p_winner?: "buyer" | "seller" | null
     p_on_chain_ruling?: number | null
     p_kleros_dispute_status?: number | null
     p_resolved_at?: string | null
@@ -1303,7 +1371,8 @@ export async function updateDisputeOnChain(
   } = { p_clear_resolved_at: false }
   if (update.status !== undefined) sensitive.p_status = update.status
   if (update.winner !== undefined) sensitive.p_winner = update.winner
-  if (update.onChainRuling !== undefined) sensitive.p_on_chain_ruling = update.onChainRuling
+  if (update.onChainRuling !== undefined)
+    sensitive.p_on_chain_ruling = update.onChainRuling
   if (update.klerosDisputeStatus !== undefined) {
     sensitive.p_kleros_dispute_status = update.klerosDisputeStatus
   }
@@ -1315,7 +1384,8 @@ export async function updateDisputeOnChain(
     sensitive.p_clear_resolved_at = update.resolvedAt === null
   }
 
-  if (update.escrowState !== undefined) dbUpdate.escrow_state = update.escrowState
+  if (update.escrowState !== undefined)
+    dbUpdate.escrow_state = update.escrowState
   if (update.evidenceGroupId !== undefined) {
     dbUpdate.evidence_group_id = update.evidenceGroupId
   }
@@ -1340,7 +1410,8 @@ export async function updateDisputeOnChain(
   if (update.evidenceCid !== undefined) {
     dbUpdate.evidence_cid = update.evidenceCid
   }
-  if (update.description !== undefined) dbUpdate.description = update.description
+  if (update.description !== undefined)
+    dbUpdate.description = update.description
 
   const hasSensitive =
     sensitive.p_status !== undefined ||
@@ -1350,12 +1421,12 @@ export async function updateDisputeOnChain(
     sensitive.p_resolved_at !== undefined
 
   if (hasSensitive) {
-    const { error: rpcErr } = await supabase.rpc('set_dispute_on_chain', {
+    const { error: rpcErr } = await supabase.rpc("set_dispute_on_chain", {
       p_dispute_id: id,
       ...sensitive,
     })
     if (rpcErr) {
-      console.error('Error setting dispute on-chain fields:', rpcErr)
+      console.error("Error setting dispute on-chain fields:", rpcErr)
       throw rpcErr
     }
   }
@@ -1366,14 +1437,14 @@ export async function updateDisputeOnChain(
   }
 
   const { data, error } = await supabase
-    .from('disputes')
+    .from("disputes")
     .update(dbUpdate)
-    .eq('id', id)
+    .eq("id", id)
     .select()
     .single()
 
   if (error) {
-    console.error('Error updating dispute on-chain state:', error)
+    console.error("Error updating dispute on-chain state:", error)
     throw error
   }
   return data
@@ -1386,7 +1457,7 @@ export async function updateDisputeOnChain(
  */
 export async function createDispute(disputeData: Partial<Dispute>) {
   const { data, error } = await supabase
-    .from('disputes')
+    .from("disputes")
     .insert({
       ...disputeData,
       status: disputeData.status ?? DisputeStatus.OPEN,
@@ -1396,7 +1467,7 @@ export async function createDispute(disputeData: Partial<Dispute>) {
     .single()
 
   if (error) {
-    console.error('Error creating dispute:', error)
+    console.error("Error creating dispute:", error)
     throw error
   }
 
@@ -1414,14 +1485,14 @@ export async function mirrorDisputeToTrade(
   tradeId: string,
   outcome: {
     /** Resulting trade status. */
-    tradeStatus: 'completed' | 'refunded' | 'disputed'
+    tradeStatus: "completed" | "refunded" | "disputed"
     /** Matching escrow_status (released / refunded / disputed). */
     escrowStatus: EscrowStatus
     /** Tx hash of the settlement call. */
     txHash: string
     /** Per-event type for the trade_events row. */
     escrowEventType: TradeEventType
-  },
+  }
 ) {
   return updateTradeStatus(tradeId, outcome.tradeStatus, {
     escrowStatus: outcome.escrowStatus,
@@ -1471,20 +1542,20 @@ export interface DisputeEvidenceFile {
 export async function insertDisputeEvidence(
   disputeId: string,
   files: DisputeEvidenceFile[],
-  submittedBy: 'buyer' | 'seller' | 'neutral',
-  evidenceGroupId: number | null = null,
+  submittedBy: "buyer" | "seller" | "neutral",
+  evidenceGroupId: number | null = null
 ) {
   if (files.length === 0) return []
   if (!submittedBy) {
     throw new Error(
-      '[insertDisputeEvidence] submittedBy is required — pass the filer role explicitly (B-4).',
+      "[insertDisputeEvidence] submittedBy is required — pass the filer role explicitly (B-4)."
     )
   }
   const now = new Date().toISOString()
   const rows = files.map((f) => ({
     dispute_id: disputeId,
     submitted_by: submittedBy,
-    evidence_kind: f.kind ?? 'image',
+    evidence_kind: f.kind ?? "image",
     ipfs_cid: f.cid,
     // Store the durable storage PATH (not a signed URL) — signed URLs
     // expire in 10 min and would 404 every image after the first session.
@@ -1497,11 +1568,11 @@ export async function insertDisputeEvidence(
     submitted_at: now,
   }))
   const { data, error } = await supabase
-    .from('dispute_evidence')
+    .from("dispute_evidence")
     .insert(rows)
     .select()
   if (error) {
-    console.error('Error inserting dispute evidence:', error)
+    console.error("Error inserting dispute evidence:", error)
     throw error
   }
   return data ?? []
@@ -1512,12 +1583,12 @@ export async function insertDisputeEvidence(
  */
 export async function getDisputesByTrade(tradeId: string) {
   const { data, error } = await supabase
-    .from('disputes')
-    .select('*')
-    .eq('trade_id', tradeId)
+    .from("disputes")
+    .select("*")
+    .eq("trade_id", tradeId)
 
   if (error) {
-    console.error('Error fetching disputes:', error)
+    console.error("Error fetching disputes:", error)
     throw error
   }
 
@@ -1531,18 +1602,20 @@ export async function getDisputesByTrade(tradeId: string) {
  */
 export async function getDisputesByUser(userId: string) {
   const { data, error } = await supabase
-    .from('disputes')
-    .select(`
+    .from("disputes")
+    .select(
+      `
       *,
       trade:trades(trade_id, crypto_token, crypto_amount),
       buyer:users!disputes_buyer_id_fkey (nickname, avatar_url),
       seller:users!disputes_seller_id_fkey (nickname, avatar_url)
-    `)
+    `
+    )
     .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
-    .order('created_at', { ascending: false })
+    .order("created_at", { ascending: false })
 
   if (error) {
-    console.error('Error fetching user disputes:', error)
+    console.error("Error fetching user disputes:", error)
     throw error
   }
 
@@ -1552,8 +1625,8 @@ export async function getDisputesByUser(userId: string) {
 /**
  * Get a single dispute by its primary UUID `id` (the `:id` route param on
  * the dispute detail viewer). Joins the trade, both parties, and all evidence
-  * rows so the detail page can render without N+1 follow-ups.
-   */
+ * rows so the detail page can render without N+1 follow-ups.
+ */
 
 /**
  * Delete a placeholder `disputes` row. Used by the dispute form when the
@@ -1579,39 +1652,43 @@ export async function deleteDisputePlaceholder(id: string): Promise<void> {
     if (!listErr && objects && objects.length > 0) {
       const paths = objects
         .map((o) => `${id}/${o.name}`)
-        .filter((p) => !p.includes('..'))
+        .filter((p) => !p.includes(".."))
       if (paths.length > 0) {
         const { error: removeErr } = await supabase.storage
           .from(DISPUTE_EVIDENCE_BUCKET)
           .remove(paths)
         if (removeErr) {
-          console.warn('[deleteDisputePlaceholder] storage remove failed:', removeErr)
+          console.warn(
+            "[deleteDisputePlaceholder] storage remove failed:",
+            removeErr
+          )
         }
       }
     }
   } catch (err) {
-    console.warn('[deleteDisputePlaceholder] storage list failed:', err)
+    console.warn("[deleteDisputePlaceholder] storage list failed:", err)
   }
 
   // 2) Clean up the dispute_evidence rows (FK cascade would also handle
   //    this, but explicit is clearer in audit logs).
   try {
-    await supabase.from('dispute_evidence').delete().eq('dispute_id', id)
+    await supabase.from("dispute_evidence").delete().eq("dispute_id", id)
   } catch (err) {
-    console.warn('[deleteDisputePlaceholder] evidence delete failed:', err)
+    console.warn("[deleteDisputePlaceholder] evidence delete failed:", err)
   }
 
   // 3) Drop the placeholder dispute row itself.
-  const { error } = await supabase.from('disputes').delete().eq('id', id)
+  const { error } = await supabase.from("disputes").delete().eq("id", id)
   if (error) {
-    console.warn('[deleteDisputePlaceholder] dispute delete failed:', error)
+    console.warn("[deleteDisputePlaceholder] dispute delete failed:", error)
   }
 }
 
 export async function getDisputeById(id: string) {
   const { data, error } = await supabase
-    .from('disputes')
-    .select(`
+    .from("disputes")
+    .select(
+      `
       *,
       trade:trades(
         trade_id, crypto_token, crypto_amount, fiat_currency, fiat_amount,
@@ -1622,13 +1699,14 @@ export async function getDisputeById(id: string) {
       buyer:users!disputes_buyer_id_fkey (wallet_address, nickname, avatar_url, verification_level),
       seller:users!disputes_seller_id_fkey (wallet_address, nickname, avatar_url, verification_level),
       evidence:dispute_evidence(*)
-    `)
-    .eq('id', id)
+    `
+    )
+    .eq("id", id)
     .single()
 
   if (error) {
-    if (error.code === 'PGRST116') return null
-    console.error('Error fetching dispute:', error)
+    if (error.code === "PGRST116") return null
+    console.error("Error fetching dispute:", error)
     throw error
   }
 
@@ -1658,21 +1736,21 @@ export async function submitTradeRating(ratingData: Partial<TradeRating>) {
   if (payload.trade_id) {
     payload.trade_id = await resolveTradeUuid(payload.trade_id)
   }
-  console.log('[rating] trade_id', ratingData.trade_id, '->', payload.trade_id)
+  console.log("[rating] trade_id", ratingData.trade_id, "->", payload.trade_id)
 
-  for (const field of ['rater_id', 'rated_id'] as const) {
+  for (const field of ["rater_id", "rated_id"] as const) {
     const val = payload[field]
     if (val && !isUuid(val)) {
       const err = new Error(
-        `Cannot submit rating: ${field} "${val}" is not a valid uuid.`,
+        `Cannot submit rating: ${field} "${val}" is not a valid uuid.`
       )
-      console.error('Error submitting rating:', err)
+      console.error("Error submitting rating:", err)
       throw err
     }
   }
 
   const { data, error } = await supabase
-    .from('trade_ratings')
+    .from("trade_ratings")
     .insert({
       ...payload,
       submitted_at: new Date().toISOString(),
@@ -1681,7 +1759,7 @@ export async function submitTradeRating(ratingData: Partial<TradeRating>) {
     .single()
 
   if (error) {
-    console.error('Error submitting rating:', error, 'sent payload:', payload)
+    console.error("Error submitting rating:", error, "sent payload:", payload)
     throw error
   }
 
@@ -1694,17 +1772,19 @@ export async function submitTradeRating(ratingData: Partial<TradeRating>) {
  */
 export async function getRatingsForTrade(tradeId: string) {
   const { data, error } = await supabase
-    .from('trade_ratings')
-    .select(`
+    .from("trade_ratings")
+    .select(
+      `
       *,
       rater:users!trade_ratings_rater_id_fkey (nickname, avatar_url),
       rated:users!trade_ratings_rated_id_fkey (nickname, avatar_url)
-    `)
-    .eq('trade_id', await resolveTradeUuid(tradeId))
-    .order('submitted_at', { ascending: false })
+    `
+    )
+    .eq("trade_id", await resolveTradeUuid(tradeId))
+    .order("submitted_at", { ascending: false })
 
   if (error) {
-    console.error('Error fetching ratings:', error)
+    console.error("Error fetching ratings:", error)
     throw error
   }
 
@@ -1716,17 +1796,19 @@ export async function getRatingsForTrade(tradeId: string) {
  */
 export async function getRatingsByUser(userId: string) {
   const { data, error } = await supabase
-    .from('trade_ratings')
-    .select(`
+    .from("trade_ratings")
+    .select(
+      `
       *,
       rater:users!trade_ratings_rater_id_fkey (nickname, avatar_url),
       trade:trades (trade_id, crypto_token, fiat_amount, fiat_currency)
-    `)
-    .eq('rated_id', userId)
-    .order('submitted_at', { ascending: false })
+    `
+    )
+    .eq("rated_id", userId)
+    .order("submitted_at", { ascending: false })
 
   if (error) {
-    console.error('Error fetching user ratings:', error)
+    console.error("Error fetching user ratings:", error)
     throw error
   }
 
@@ -1739,13 +1821,13 @@ export async function getRatingsByUser(userId: string) {
  */
 export async function getReputationScores(userId: string) {
   const { data, error } = await supabase
-    .from('reputation_scores')
-    .select('*')
-    .eq('user_id', userId)
+    .from("reputation_scores")
+    .select("*")
+    .eq("user_id", userId)
     .maybeSingle()
 
   if (error) {
-    console.error('Error fetching reputation scores:', error)
+    console.error("Error fetching reputation scores:", error)
     throw error
   }
   return data
@@ -1757,14 +1839,14 @@ export async function getReputationScores(userId: string) {
  */
 export async function hasUserRatedTrade(tradeId: string, userId: string) {
   const { data, error } = await supabase
-    .from('trade_ratings')
-    .select('id')
-    .eq('trade_id', await resolveTradeUuid(tradeId))
-    .eq('rater_id', userId)
+    .from("trade_ratings")
+    .select("id")
+    .eq("trade_id", await resolveTradeUuid(tradeId))
+    .eq("rater_id", userId)
     .maybeSingle()
 
   if (error) {
-    console.error('Error checking rating:', error)
+    console.error("Error checking rating:", error)
     throw error
   }
 
@@ -1776,14 +1858,16 @@ export async function hasUserRatedTrade(tradeId: string, userId: string) {
  * hide the "Rate this trade" CTA on the trades list without an N+1 of
  * `hasUserRatedTrade` per card.
  */
-export async function getRatedTradeIdsByUser(userId: string): Promise<string[]> {
+export async function getRatedTradeIdsByUser(
+  userId: string
+): Promise<string[]> {
   const { data, error } = await supabase
-    .from('trade_ratings')
-    .select('trade_id')
-    .eq('rater_id', userId)
+    .from("trade_ratings")
+    .select("trade_id")
+    .eq("rater_id", userId)
 
   if (error) {
-    console.error('Error listing rated trade ids:', error)
+    console.error("Error listing rated trade ids:", error)
     throw error
   }
 
@@ -1795,7 +1879,7 @@ export async function getRatedTradeIdsByUser(userId: string): Promise<string[]> 
 // =================================================================
 
 const USER_SELECT =
-  'id, wallet_address, nickname, avatar_url, verification_level, last_active_at'
+  "id, wallet_address, nickname, avatar_url, verification_level, last_active_at"
 
 /**
  * Find a conversation by the linked trade's primary UUID. Trades get a
@@ -1804,8 +1888,9 @@ const USER_SELECT =
  */
 export async function getConversationByTradeId(tradeId: string) {
   const { data, error } = await supabase
-    .from('conversations')
-    .select(`
+    .from("conversations")
+    .select(
+      `
       *,
       trade:trades(
         id, trade_id, status, escrow_status, escrow_contract_addr,
@@ -1815,13 +1900,14 @@ export async function getConversationByTradeId(tradeId: string) {
         conversation_id, user_id, role, last_read_message_id, muted, joined_at,
         user:users!conversation_participants_user_id_fkey (${USER_SELECT})
       )
-    `)
-    .eq('trade_id', tradeId)
+    `
+    )
+    .eq("trade_id", tradeId)
     .single()
 
   if (error) {
-    if (error.code === 'PGRST116') return null
-    console.error('Error fetching conversation by trade:', error)
+    if (error.code === "PGRST116") return null
+    console.error("Error fetching conversation by trade:", error)
     throw error
   }
 
@@ -1844,12 +1930,12 @@ export async function getConversationByTradeId(tradeId: string) {
  */
 export async function listConversations(
   userId: string,
-  options: { archived?: boolean } = {},
+  options: { archived?: boolean } = {}
 ) {
   // First get the user's conversation ids (cheap). The result has nested
   // arrays from PostgREST joins; we flatten + shape them below.
   const { data: rows, error } = await supabase
-    .from('conversation_participants')
+    .from("conversation_participants")
     .select(
       `conversation_id, role, last_read_message_id, muted,
        conversation:conversations(
@@ -1865,11 +1951,11 @@ export async function listConversations(
          )
        )`
     )
-    .eq('user_id', userId)
-    .order('joined_at', { ascending: false })
+    .eq("user_id", userId)
+    .order("joined_at", { ascending: false })
 
   if (error) {
-    console.error('Error listing conversations:', error)
+    console.error("Error listing conversations:", error)
     throw error
   }
 
@@ -1884,8 +1970,8 @@ export async function listConversations(
     // catch below never fired and every conversation silently got
     // `unread_count: 0`.
     const { data: counts, error: countsErr } = await supabase.rpc(
-      'get_unread_conversation_counts',
-      { p_user_id: userId },
+      "get_unread_conversation_counts",
+      { p_user_id: userId }
     )
     if (countsErr) throw countsErr
     for (const c of (counts ?? []) as Array<{
@@ -1895,7 +1981,10 @@ export async function listConversations(
       unreadMap.set(c.conversation_id, c.unread_count)
     }
   } catch (err) {
-    console.warn('[listConversations] unread count RPC failed, defaulting to 0:', err)
+    console.warn(
+      "[listConversations] unread count RPC failed, defaulting to 0:",
+      err
+    )
   }
 
   // Flatten the nested shape into ConversationView[] and apply unread counts.
@@ -1906,12 +1995,13 @@ export async function listConversations(
     const conv = row.conversation
     if (!conv) continue
 
-    const participants = (conv.participants ?? []) as ConversationWithParticipant[]
+    const participants = (conv.participants ??
+      []) as ConversationWithParticipant[]
     const me = participants.find((p) => p.user_id === userId)
 
     // View filter: active inbox vs archive vs all.
-    if (options.archived === true && conv.status !== 'archived') continue
-    if (options.archived === false && conv.status === 'archived') continue
+    if (options.archived === true && conv.status !== "archived") continue
+    if (options.archived === false && conv.status === "archived") continue
 
     out.push({
       ...conv,
@@ -1945,7 +2035,7 @@ export async function listConversations(
  */
 export async function getOrCreateDirectConversation(
   currentUserId: string,
-  otherUserId: string,
+  otherUserId: string
 ): Promise<string | null> {
   if (currentUserId === otherUserId) return null
   // Reject non-uuid args before they hit PostgREST, which would otherwise
@@ -1953,7 +2043,9 @@ export async function getOrCreateDirectConversation(
   // type uuid` deep in the query. Callers that only fetch joined rows
   // without selecting `id` are the usual source.
   const isUuid = (v: string) =>
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v)
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      v
+    )
   if (!isUuid(currentUserId) || !isUuid(otherUserId)) return null
 
   // Fast pre-check before the RPC for the common case (existing direct
@@ -1963,24 +2055,30 @@ export async function getOrCreateDirectConversation(
   // case where the conversation already exists. Falls back to the RPC if
   // no shared row exists.
   const { data: myParts, error: partsErr } = await supabase
-    .from('conversation_participants')
-    .select('conversation_id')
-    .eq('user_id', currentUserId)
+    .from("conversation_participants")
+    .select("conversation_id")
+    .eq("user_id", currentUserId)
   if (partsErr) {
-    console.error('[getOrCreateDirectConversation] participant lookup failed:', partsErr)
+    console.error(
+      "[getOrCreateDirectConversation] participant lookup failed:",
+      partsErr
+    )
     return null
   }
   const myConvIds = (myParts ?? []).map(
-    (p: { conversation_id: string }) => p.conversation_id,
+    (p: { conversation_id: string }) => p.conversation_id
   )
   if (myConvIds.length > 0) {
     const { data: shared, error: sharedErr } = await supabase
-      .from('conversation_participants')
-      .select('conversation_id')
-      .eq('user_id', otherUserId)
-      .in('conversation_id', myConvIds)
+      .from("conversation_participants")
+      .select("conversation_id")
+      .eq("user_id", otherUserId)
+      .in("conversation_id", myConvIds)
     if (sharedErr) {
-      console.error('[getOrCreateDirectConversation] shared lookup failed:', sharedErr)
+      console.error(
+        "[getOrCreateDirectConversation] shared lookup failed:",
+        sharedErr
+      )
       return null
     }
     if (shared && shared.length > 0) {
@@ -1989,19 +2087,22 @@ export async function getOrCreateDirectConversation(
   }
 
   // No existing conversation — fall back to the race-safe RPC.
-  const { data, error } = await supabase.rpc('get_or_create_direct_conversation', {
-    p_current_user_id: currentUserId,
-    p_other_user_id: otherUserId,
-  })
+  const { data, error } = await supabase.rpc(
+    "get_or_create_direct_conversation",
+    {
+      p_current_user_id: currentUserId,
+      p_other_user_id: otherUserId,
+    }
+  )
   if (error) {
-    console.error('[getOrCreateDirectConversation] rpc failed:', error)
+    console.error("[getOrCreateDirectConversation] rpc failed:", error)
     // P0002 = "unknown user" raised by the RPC for a missing other
     // party. Rethrow a tagged error so the call site can surface a
     // specific toast (profile.errorUnknownUser) instead of the generic
     // "couldn't start the chat" copy.
     const code = (error as { code?: string }).code
-    if (code === 'P0002') {
-      throw Object.assign(new Error('unknown user'), { code: 'P0002' })
+    if (code === "P0002") {
+      throw Object.assign(new Error("unknown user"), { code: "P0002" })
     }
     return null
   }
@@ -2015,17 +2116,22 @@ export async function getOrCreateDirectConversation(
  * so `created_at.lt./gt.` alone silently drops or double-counts the sibling.
  * Ties are broken by id (uuid has a total order in Postgres).
  */
-async function getMessageSortKey(messageId: string): Promise<{ created_at: string; id: string } | null> {
+async function getMessageSortKey(
+  messageId: string
+): Promise<{ created_at: string; id: string } | null> {
   const { data, error } = await supabase
-    .from('messages')
-    .select('created_at')
-    .eq('id', messageId)
+    .from("messages")
+    .select("created_at")
+    .eq("id", messageId)
     .single()
   // A missing/unreadable cursor must NOT degrade to epoch: the composite
   // `.or()` would then match nothing and page silently backward from 1970.
   // Returning null lets the caller surface/bail instead.
   if (error || !data) return null
-  return { created_at: (data as { created_at: string }).created_at, id: messageId }
+  return {
+    created_at: (data as { created_at: string }).created_at,
+    id: messageId,
+  }
 }
 
 /**
@@ -2033,8 +2139,9 @@ async function getMessageSortKey(messageId: string): Promise<{ created_at: strin
  */
 export async function getConversation(conversationId: string, userId: string) {
   const { data, error } = await supabase
-    .from('conversations')
-    .select(`
+    .from("conversations")
+    .select(
+      `
       *,
       trade:trades(
         id, trade_id, status, escrow_status, escrow_contract_addr,
@@ -2044,13 +2151,14 @@ export async function getConversation(conversationId: string, userId: string) {
         conversation_id, user_id, role, last_read_message_id, muted, joined_at,
         user:users!conversation_participants_user_id_fkey (${USER_SELECT})
       )
-    `)
-    .eq('id', conversationId)
+    `
+    )
+    .eq("id", conversationId)
     .single()
 
   if (error) {
-    if (error.code === 'PGRST116') return null
-    console.error('Error fetching conversation:', error)
+    if (error.code === "PGRST116") return null
+    console.error("Error fetching conversation:", error)
     throw error
   }
 
@@ -2073,14 +2181,14 @@ export async function listMessages(
   // share the same millisecond (timestamptz has ms resolution) never reorder
   // nondeterministically or flip pages.
   let query = supabase
-    .from('messages')
+    .from("messages")
     .select(
       `id, conversation_id, sender_id, body, kind, created_at,
        sender:users!messages_sender_id_fkey (${USER_SELECT})`
     )
-    .eq('conversation_id', conversationId)
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: false })
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(limit)
 
   if (options.before) {
@@ -2102,16 +2210,22 @@ export async function listMessages(
   const { data, error } = await query
 
   if (error) {
-    console.error('Error listing messages:', error)
+    console.error("Error listing messages:", error)
     throw error
   }
 
   // PostgREST returns nested joins as arrays; the FK guarantees a single
   // sender row, so we collapse to a single object for the UI shape.
-  const flat = ((data ?? []) as Array<
-    Omit<MessageWithSender, 'sender'> & { sender: MessageWithSender['sender'] | MessageWithSender['sender'][] }
-  >).map((row) => {
-    const sender = Array.isArray(row.sender) ? row.sender[0] ?? null : row.sender ?? null
+  const flat = (
+    (data ?? []) as Array<
+      Omit<MessageWithSender, "sender"> & {
+        sender: MessageWithSender["sender"] | MessageWithSender["sender"][]
+      }
+    >
+  ).map((row) => {
+    const sender = Array.isArray(row.sender)
+      ? (row.sender[0] ?? null)
+      : (row.sender ?? null)
     return { ...row, sender } as MessageWithSender
   })
 
@@ -2130,30 +2244,34 @@ export async function sendMessage(input: {
   kind?: MessageKind
 }) {
   const { data, error } = await supabase
-    .from('messages')
+    .from("messages")
     .insert({
       conversation_id: input.conversationId,
       sender_id: input.senderId,
       body: input.body.trim(),
-      kind: input.kind ?? 'text',
+      kind: input.kind ?? "text",
     })
-    .select(`
+    .select(
+      `
       id, conversation_id, sender_id, body, kind, created_at,
       sender:users!messages_sender_id_fkey (${USER_SELECT})
-    `)
+    `
+    )
     .single()
 
   if (error) {
-    console.error('Error sending message:', error)
+    console.error("Error sending message:", error)
     throw error
   }
 
   // PostgREST returns the joined sender as an array; collapse to a single
   // object to match the MessageWithSender shape used by the UI.
-  const raw = data as Omit<MessageWithSender, 'sender'> & {
-    sender: MessageWithSender['sender'] | MessageWithSender['sender'][]
+  const raw = data as Omit<MessageWithSender, "sender"> & {
+    sender: MessageWithSender["sender"] | MessageWithSender["sender"][]
   }
-  const sender = Array.isArray(raw.sender) ? raw.sender[0] ?? null : raw.sender ?? null
+  const sender = Array.isArray(raw.sender)
+    ? (raw.sender[0] ?? null)
+    : (raw.sender ?? null)
   return { ...raw, sender }
 }
 
@@ -2167,13 +2285,13 @@ export async function markConversationRead(input: {
   messageId: string
 }) {
   const { error } = await supabase
-    .from('conversation_participants')
+    .from("conversation_participants")
     .update({ last_read_message_id: input.messageId })
-    .eq('conversation_id', input.conversationId)
-    .eq('user_id', input.userId)
+    .eq("conversation_id", input.conversationId)
+    .eq("user_id", input.userId)
 
   if (error) {
-    console.error('Error marking conversation read:', error)
+    console.error("Error marking conversation read:", error)
     throw error
   }
 }
@@ -2193,13 +2311,13 @@ export async function setConversationViewing(input: {
   viewing: boolean
 }): Promise<void> {
   const { error } = await supabase
-    .from('conversation_participants')
+    .from("conversation_participants")
     .update({ viewing_at: input.viewing ? new Date().toISOString() : null })
-    .eq('conversation_id', input.conversationId)
-    .eq('user_id', input.userId)
+    .eq("conversation_id", input.conversationId)
+    .eq("user_id", input.userId)
 
   if (error) {
-    console.warn('[setConversationViewing] failed:', error)
+    console.warn("[setConversationViewing] failed:", error)
   }
 }
 
@@ -2214,13 +2332,13 @@ export async function setConversationMuted(input: {
   muted: boolean
 }): Promise<void> {
   const { error } = await supabase
-    .from('conversation_participants')
+    .from("conversation_participants")
     .update({ muted: input.muted })
-    .eq('conversation_id', input.conversationId)
-    .eq('user_id', input.userId)
+    .eq("conversation_id", input.conversationId)
+    .eq("user_id", input.userId)
 
   if (error) {
-    console.error('Error muting conversation:', error)
+    console.error("Error muting conversation:", error)
     throw error
   }
 }
@@ -2235,15 +2353,15 @@ export async function setConversationArchived(input: {
   archived: boolean
 }): Promise<void> {
   const { error } = await supabase
-    .from('conversations')
+    .from("conversations")
     .update({
-      status: input.archived ? 'archived' : 'open',
+      status: input.archived ? "archived" : "open",
       updated_at: new Date().toISOString(),
     })
-    .eq('id', input.conversationId)
+    .eq("id", input.conversationId)
 
   if (error) {
-    console.error('Error archiving conversation:', error)
+    console.error("Error archiving conversation:", error)
     throw error
   }
 }
@@ -2258,14 +2376,14 @@ export async function markConversationNotificationsRead(input: {
   userId: string
 }): Promise<void> {
   const { error } = await supabase
-    .from('notifications')
+    .from("notifications")
     .update({ read_at: new Date().toISOString() })
-    .eq('user_id', input.userId)
-    .eq('conversation_id', input.conversationId)
-    .is('read_at', null)
+    .eq("user_id", input.userId)
+    .eq("conversation_id", input.conversationId)
+    .is("read_at", null)
 
   if (error) {
-    console.error('Error marking conversation notifications read:', error)
+    console.error("Error marking conversation notifications read:", error)
     throw error
   }
 }
@@ -2279,14 +2397,14 @@ export async function markConversationNotificationsRead(input: {
  */
 export async function listNotifications(userId: string, limit = 50) {
   const { data, error } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
+    .from("notifications")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
     .limit(limit)
 
   if (error) {
-    console.error('Error listing notifications:', error)
+    console.error("Error listing notifications:", error)
     throw error
   }
 
@@ -2298,13 +2416,13 @@ export async function listNotifications(userId: string, limit = 50) {
  */
 export async function getUnreadNotificationCount(userId: string) {
   const { count, error } = await supabase
-    .from('notifications')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .is('read_at', null)
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .is("read_at", null)
 
   if (error) {
-    console.error('Error counting notifications:', error)
+    console.error("Error counting notifications:", error)
     throw error
   }
 
@@ -2313,37 +2431,37 @@ export async function getUnreadNotificationCount(userId: string) {
 
 export async function markNotificationRead(notificationId: string) {
   const { error } = await supabase
-    .from('notifications')
+    .from("notifications")
     .update({ read_at: new Date().toISOString() })
-    .eq('id', notificationId)
+    .eq("id", notificationId)
 
   if (error) {
-    console.error('Error marking notification read:', error)
+    console.error("Error marking notification read:", error)
     throw error
   }
 }
 
 export async function markAllNotificationsRead(userId: string) {
   const { error } = await supabase
-    .from('notifications')
+    .from("notifications")
     .update({ read_at: new Date().toISOString() })
-    .eq('user_id', userId)
-    .is('read_at', null)
+    .eq("user_id", userId)
+    .is("read_at", null)
 
   if (error) {
-    console.error('Error marking all notifications read:', error)
+    console.error("Error marking all notifications read:", error)
     throw error
   }
 }
 
 export async function getNotificationPreferences(userId: string) {
   const { data, error } = await supabase
-    .from('notification_preferences')
-    .select('*')
-    .eq('user_id', userId)
+    .from("notification_preferences")
+    .select("*")
+    .eq("user_id", userId)
 
   if (error) {
-    console.error('Error fetching notification preferences:', error)
+    console.error("Error fetching notification preferences:", error)
     throw error
   }
 
@@ -2360,21 +2478,19 @@ export async function upsertNotificationPreference(input: {
   enabled: boolean
   emailAddress?: string | null
 }) {
-  const { error } = await supabase
-    .from('notification_preferences')
-    .upsert(
-      {
-        user_id: input.userId,
-        channel: input.channel,
-        enabled: input.enabled,
-        email_address: input.emailAddress ?? null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id,channel' }
-    )
+  const { error } = await supabase.from("notification_preferences").upsert(
+    {
+      user_id: input.userId,
+      channel: input.channel,
+      enabled: input.enabled,
+      email_address: input.emailAddress ?? null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id,channel" }
+  )
 
   if (error) {
-    console.error('Error upserting notification preference:', error)
+    console.error("Error upserting notification preference:", error)
     throw error
   }
 }
@@ -2385,15 +2501,19 @@ export async function upsertNotificationPreference(input: {
  * Called from useSyncUser.
  */
 export async function ensureDefaultNotificationPreferences(userId: string) {
-  const rows: Array<{ user_id: string; channel: NotificationChannel; enabled: boolean }> = [
-    { user_id: userId, channel: 'inapp', enabled: true },
-    { user_id: userId, channel: 'email', enabled: false },
+  const rows: Array<{
+    user_id: string
+    channel: NotificationChannel
+    enabled: boolean
+  }> = [
+    { user_id: userId, channel: "inapp", enabled: true },
+    { user_id: userId, channel: "email", enabled: false },
   ]
   const { error } = await supabase
-    .from('notification_preferences')
-    .upsert(rows, { onConflict: 'user_id,channel', ignoreDuplicates: true })
+    .from("notification_preferences")
+    .upsert(rows, { onConflict: "user_id,channel", ignoreDuplicates: true })
   if (error) {
-    console.error('Error ensuring default notification preferences:', error)
+    console.error("Error ensuring default notification preferences:", error)
   }
 }
 
@@ -2407,9 +2527,9 @@ export async function ensureDefaultNotificationPreferences(userId: string) {
  * insert policy.
  */
 export async function getOrCreateReferralCode(): Promise<string | null> {
-  const { data, error } = await supabase.rpc('get_or_create_referral_code')
+  const { data, error } = await supabase.rpc("get_or_create_referral_code")
   if (error) {
-    console.error('Error fetching referral code:', error)
+    console.error("Error fetching referral code:", error)
     return null
   }
   return (data as string) ?? null
@@ -2421,11 +2541,11 @@ export async function getOrCreateReferralCode(): Promise<string | null> {
  * exceptions the caller surfaces as an error string.
  */
 export async function claimReferral(
-  code: string,
+  code: string
 ): Promise<{ ok: boolean; error?: string }> {
-  const { error } = await supabase.rpc('claim_referral', { p_code: code })
+  const { error } = await supabase.rpc("claim_referral", { p_code: code })
   if (error) {
-    console.warn('[claimReferral] rejected:', error.message)
+    console.warn("[claimReferral] rejected:", error.message)
     return { ok: false, error: error.message }
   }
   return { ok: true }
@@ -2436,28 +2556,28 @@ export async function claimReferral(
  * profile), earning events, and running totals. Reads are owner-scoped by RLS.
  */
 export async function getReferralDashboard(
-  userId: string,
+  userId: string
 ): Promise<ReferralDashboard> {
   const [codeRes, relationsRes, eventsRes] = await Promise.all([
     supabase
-      .from('referral_codes')
-      .select('code')
-      .eq('user_id', userId)
+      .from("referral_codes")
+      .select("code")
+      .eq("user_id", userId)
       .maybeSingle(),
     supabase
-      .from('referral_relations')
+      .from("referral_relations")
       .select(
         `*, referred:users!referral_relations_referred_user_id_fkey (
           wallet_address, nickname, avatar_url
-        )`,
+        )`
       )
-      .eq('referrer_id', userId)
-      .order('attributed_at', { ascending: false }),
+      .eq("referrer_id", userId)
+      .order("attributed_at", { ascending: false }),
     supabase
-      .from('referral_fee_events')
-      .select('*')
-      .eq('referrer_id', userId)
-      .order('created_at', { ascending: false }),
+      .from("referral_fee_events")
+      .select("*")
+      .eq("referrer_id", userId)
+      .order("created_at", { ascending: false }),
   ])
 
   const relations: ReferralRelationWithUser[] = relationsRes.data ?? []
@@ -2465,10 +2585,10 @@ export async function getReferralDashboard(
 
   const totalEarned = events.reduce(
     (sum, e) => sum + (Number(e.earned_amount) || 0),
-    0,
+    0
   )
   const pendingEarned = events
-    .filter((e) => e.status === 'pending')
+    .filter((e) => e.status === "pending")
     .reduce((sum, e) => sum + (Number(e.earned_amount) || 0), 0)
   const paidEarned = totalEarned - pendingEarned
 
@@ -2490,7 +2610,9 @@ export async function getReferralDashboard(
  * Check if user is authenticated
  */
 export async function isAuthenticated(): Promise<boolean> {
-  const { data: { session } } = await supabase.auth.getSession()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
   return !!session
 }
 
@@ -2523,27 +2645,29 @@ export async function signInWithWallet(
     signMessage: (args: { message: string }) => Promise<`0x${string}`>
     chainId?: number
     appName?: string
-  },
+  }
 ): Promise<User | null> {
   const { signMessage, chainId, appName } = options
   const addr = walletAddress.toLowerCase() as `0x${string}`
 
   // 1. One-shot nonce from the server.
   const { data: nonceRes, error: nonceErr } = await supabase.functions.invoke(
-    'siwe-auth',
-    { body: { action: 'nonce', address: addr } },
+    "siwe-auth",
+    { body: { action: "nonce", address: addr } }
   )
   if (nonceErr || !nonceRes?.nonce) {
     // The edge re-issues a wallet's fresh unused nonce, so a 429 here is the
     // rare remaining abuse-guard hit, not a tap-retry pile-up. Surface it as
     // something a human can act on instead of a bare FunctionsHttpError.
     if (isEdgeFunctionRateLimited(nonceErr)) {
-      throw new Error('Too many sign-in attempts. Wait a few minutes and try again.')
+      throw new Error(
+        "Too many sign-in attempts. Wait a few minutes and try again."
+      )
     }
-    throw nonceErr ?? new Error('no nonce')
+    throw nonceErr ?? new Error("no nonce")
   }
   const nonce = String(nonceRes.nonce)
-  if (!/^[a-zA-Z0-9_-]{8,64}$/.test(nonce)) throw new Error('bad nonce')
+  if (!/^[a-zA-Z0-9_-]{8,64}$/.test(nonce)) throw new Error("bad nonce")
 
   // 2. Build + sign the challenge.
   const { message, issuedAt } = buildSiweChallengeLocal(addr, {
@@ -2554,11 +2678,11 @@ export async function signInWithWallet(
   const signature = await signMessage({ message })
 
   // 3. Server verifies the signature and mints a real Supabase JWT.
-  const { data, error } = await supabase.functions.invoke('siwe-auth', {
-    body: { action: 'verify', message, signature },
+  const { data, error } = await supabase.functions.invoke("siwe-auth", {
+    body: { action: "verify", message, signature },
   })
   if (error || !data?.access_token) {
-    throw error ?? new Error('siwe-auth did not return a token')
+    throw error ?? new Error("siwe-auth did not return a token")
   }
 
   // Install the session. Use GoTrue's real refresh token when the edge
@@ -2569,26 +2693,35 @@ export async function signInWithWallet(
   const { error: sessionErr } = await supabase.auth.setSession({
     access_token: data.access_token as string,
     refresh_token:
-      typeof data.refresh_token === 'string' && data.refresh_token
+      typeof data.refresh_token === "string" && data.refresh_token
         ? data.refresh_token
-        : 'siwe-wallet-session',
+        : "siwe-wallet-session",
   })
   if (sessionErr) throw sessionErr
 
   setSiweMarker({ address: addr, issuedAt }) // never persist the signature
+
+  // Derive + persist the device-bound Coffer Identity from the signature
+  // (deterministic RFC 6979 → stable across logins, server never sees it).
+  // Best-effort: a failure must not block sign-in.
+  try {
+    await persistCofferIdentity(addr, signature)
+  } catch (err) {
+    console.warn("[coffer] failed to persist identity:", err)
+  }
 
   // The edge function upserted the row keyed by wallet; read it back.
   return await ensureUser(addr)
 }
 
 function setSiweMarker(marker: { address: string; issuedAt: string }): void {
-  if (typeof window !== 'undefined') {
-    window.localStorage.setItem('coffernode:siwe:last', JSON.stringify(marker))
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem("coffernode:siwe:last", JSON.stringify(marker))
   }
 }
 
 class SiweRejectedError extends Error {
-  override name = 'SiweRejectedError'
+  override name = "SiweRejectedError"
 }
 
 /**
@@ -2611,14 +2744,16 @@ export async function getSessionWallet(): Promise<string | null> {
   const session = await getSession()
   if (session?.access_token) {
     const payload = decodeJwtPayload(session.access_token)
-    const metadata = payload?.user_metadata as Record<string, unknown> | undefined
+    const metadata = payload?.user_metadata as
+      | Record<string, unknown>
+      | undefined
     const raw =
-      typeof payload?.wallet_address === 'string'
+      typeof payload?.wallet_address === "string"
         ? payload.wallet_address
-        : typeof metadata?.wallet_address === 'string'
+        : typeof metadata?.wallet_address === "string"
           ? metadata.wallet_address
           : null
-    if (typeof raw === 'string' && raw) return raw.toLowerCase()
+    if (typeof raw === "string" && raw) return raw.toLowerCase()
     // A present token WITHOUT the claim mints a "valid" session the RLS
     // layer still denies (current_user_id() resolves to NULL). Treat it as
     // not signed-in so callers re-run SIWE — the edge function backfills
@@ -2638,12 +2773,12 @@ export async function getSessionWallet(): Promise<string | null> {
  */
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
-    const [, payload] = token.split('.')
+    const [, payload] = token.split(".")
     if (!payload) return null
-    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/")
     const padded = normalized.padEnd(
       normalized.length + ((4 - (normalized.length % 4)) % 4),
-      '=',
+      "="
     )
     return JSON.parse(atob(padded)) as Record<string, unknown>
   } catch {
@@ -2662,17 +2797,19 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
  * rejections don't poison other wallets on the same browser.
  */
 function getSiweRejectedMarker(address: string): boolean {
-  if (typeof window === 'undefined') return false
-  return window.localStorage.getItem(`coffernode:siwe:declined:${address}`) === '1'
+  if (typeof window === "undefined") return false
+  return (
+    window.localStorage.getItem(`coffernode:siwe:declined:${address}`) === "1"
+  )
 }
 
 function setSiweRejectedMarker(address: string): void {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(`coffernode:siwe:declined:${address}`, '1')
+  if (typeof window === "undefined") return
+  window.localStorage.setItem(`coffernode:siwe:declined:${address}`, "1")
 }
 
 function clearSiweRejectedMarker(address: string): void {
-  if (typeof window === 'undefined') return
+  if (typeof window === "undefined") return
   window.localStorage.removeItem(`coffernode:siwe:declined:${address}`)
 }
 
@@ -2691,7 +2828,8 @@ export async function isSignedInAs(walletAddress: string): Promise<boolean> {
   // background refresh may not have run yet — treat it as not signed in so
   // we re-sign instead of authorizing with a dead JWT.
   const payload = decodeJwtPayload(session.access_token)
-  if (typeof payload?.exp === 'number' && payload.exp * 1000 < Date.now()) return false
+  if (typeof payload?.exp === "number" && payload.exp * 1000 < Date.now())
+    return false
 
   // getSessionWallet() falls back to the marker (when a token is present)
   // so a claim we can't parse on the client still counts as signed-in —
@@ -2715,14 +2853,16 @@ async function refreshToWalletClaim(address: string): Promise<boolean> {
   const readMemoizedClaim = (accessToken: string): string | null => {
     const payload = decodeJwtPayload(accessToken)
     if (!payload) return null
-    const metadata = payload?.user_metadata as Record<string, unknown> | undefined
+    const metadata = payload?.user_metadata as
+      | Record<string, unknown>
+      | undefined
     const raw =
-      typeof payload?.wallet_address === 'string'
+      typeof payload?.wallet_address === "string"
         ? payload.wallet_address
-        : typeof metadata?.wallet_address === 'string'
+        : typeof metadata?.wallet_address === "string"
           ? metadata.wallet_address
           : null
-    return typeof raw === 'string' && raw ? raw.toLowerCase() : null
+    return typeof raw === "string" && raw ? raw.toLowerCase() : null
   }
 
   // Claim already present and matching — nothing to do, unless the token is
@@ -2731,8 +2871,9 @@ async function refreshToWalletClaim(address: string): Promise<boolean> {
   // dead JWT as a live session.
   const payload = decodeJwtPayload(session.access_token)
   const notExpired =
-    typeof payload?.exp !== 'number' || payload.exp * 1000 > Date.now()
-  if (readMemoizedClaim(session.access_token) === addr && notExpired) return true
+    typeof payload?.exp !== "number" || payload.exp * 1000 > Date.now()
+  if (readMemoizedClaim(session.access_token) === addr && notExpired)
+    return true
 
   // Claim-less (valid) token: refresh once to pick up the backfilled metadata.
   const { data, error } = await supabase.auth.refreshSession()
@@ -2751,7 +2892,9 @@ async function refreshToWalletClaim(address: string): Promise<boolean> {
  * user isn't asked to sign again — only an explicit Disconnect clears the
  * session/marker. Returns true when a usable session exists afterwards.
  */
-export async function recoverWalletSession(walletAddress: string): Promise<boolean> {
+export async function recoverWalletSession(
+  walletAddress: string
+): Promise<boolean> {
   const addr = walletAddress.toLowerCase()
   // `isSignedInAs` also honours `exp`; supabase-js may refresh the token while
   // resolving `getSession()`, so an expired-but-refreshable session recovers.
@@ -2780,7 +2923,7 @@ export async function ensureWalletSession(
      * earlier dismissed/failed attempt.
      */
     force?: boolean
-  },
+  }
 ): Promise<{ session: boolean; user: User | null }> {
   const addr = walletAddress.toLowerCase()
 
@@ -2823,14 +2966,14 @@ export async function ensureWalletSession(
     // 'Try again' CTA so the user can opt back in explicitly.
     setSiweRejectedMarker(addr)
     if (err instanceof SiweRejectedError) {
-      console.warn('[ensureWalletSession] sign-in rejected:', err.message)
+      console.warn("[ensureWalletSession] sign-in rejected:", err.message)
     } else if (isEdgeFunctionRateLimited(err)) {
       console.warn(
-        '[ensureWalletSession] sign-in rate-limited:',
-        err instanceof Error ? err.message : err,
+        "[ensureWalletSession] sign-in rate-limited:",
+        err instanceof Error ? err.message : err
       )
     } else {
-      console.error('[ensureWalletSession] sign-in failed:', err)
+      console.error("[ensureWalletSession] sign-in failed:", err)
     }
     return { session: false, user: null }
   }
@@ -2843,13 +2986,14 @@ export async function ensureWalletSession(
  */
 function buildSiweChallengeLocal(
   address: `0x${string}`,
-  options: { chainId?: number; appName?: string; nonce?: string } = {},
+  options: { chainId?: number; appName?: string; nonce?: string } = {}
 ): { nonce: string; message: string; issuedAt: string } {
   const issuedAt = new Date().toISOString()
   // Server-issued nonce when signing in; random fallback in dev.
   const nonce = options.nonce ?? localNonce()
-  const appName = options.appName ?? 'CofferNode'
-  const chainLine = options.chainId != null ? `\nChain ID: ${options.chainId}` : ''
+  const appName = options.appName ?? "CofferNode"
+  const chainLine =
+    options.chainId != null ? `\nChain ID: ${options.chainId}` : ""
   const message =
     `${appName} wants you to sign in with your Ethereum account:\n` +
     `${address}\n\n` +
@@ -2869,14 +3013,15 @@ function buildSiweChallengeLocal(
  */
 function localNonce(bytes = 16): string {
   const arr = new Uint8Array(bytes)
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
     crypto.getRandomValues(arr)
   } else {
-    for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 256)
+    for (let i = 0; i < arr.length; i++)
+      arr[i] = Math.floor(Math.random() * 256)
   }
-  let bin = ''
+  let bin = ""
   for (let i = 0; i < arr.length; i++) bin += String.fromCharCode(arr[i])
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
 }
 
 /**
@@ -2889,14 +3034,14 @@ function localNonce(bytes = 16): string {
  * cleanup path.
  */
 export async function signOutSiweMarker(): Promise<void> {
-  if (typeof window !== 'undefined') {
-    window.localStorage.removeItem('coffernode:siwe:last')
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem("coffernode:siwe:last")
   }
 }
 
 function clearSiweMarkersFor(address: string): void {
-  if (typeof window === 'undefined') return
-  window.localStorage.removeItem('coffernode:siwe:last')
+  if (typeof window === "undefined") return
+  window.localStorage.removeItem("coffernode:siwe:last")
   clearSiweRejectedMarker(address)
 }
 
@@ -2910,15 +3055,15 @@ export async function signOut() {
   // marker too. signOut itself doesn't take an address, so we read the
   // marker to figure out the wallet (or fall back to just clearing the
   // success marker if no rejection was ever recorded).
-  if (typeof window !== 'undefined') {
-    const last = window.localStorage.getItem('coffernode:siwe:last')
+  if (typeof window !== "undefined") {
+    const last = window.localStorage.getItem("coffernode:siwe:last")
     if (last) {
       try {
         const parsed = JSON.parse(last) as { address?: string }
         if (parsed.address) clearSiweMarkersFor(parsed.address.toLowerCase())
-        else window.localStorage.removeItem('coffernode:siwe:last')
+        else window.localStorage.removeItem("coffernode:siwe:last")
       } catch {
-        window.localStorage.removeItem('coffernode:siwe:last')
+        window.localStorage.removeItem("coffernode:siwe:last")
       }
     }
     // NOTE: do NOT sweep every `coffernode:siwe:declined:*` key here. Signing
@@ -2928,7 +3073,7 @@ export async function signOut() {
   }
   const { error } = await supabase.auth.signOut()
   if (error) {
-    console.error('Error signing out:', error)
+    console.error("Error signing out:", error)
     throw error
   }
 }
@@ -2937,7 +3082,9 @@ export async function signOut() {
  * Get current user session
  */
 export async function getSession() {
-  const { data: { session } } = await supabase.auth.getSession()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
   return session
 }
 
@@ -2976,4 +3123,3 @@ await upsertTradeEscrowStatus(tradeId, 'confirmed', '0xabc123...')
 // Example: Get active offers
 const offers = await getActiveOffers(50, 0)
 */
-

@@ -15,8 +15,17 @@
 //     ever leaves the edge for them; the SPA shell gates on the session.
 //
 // Non-document requests (assets, API calls) pass straight through.
+//
+// Cookie-derived cache keys (see ./_lib/cache-key.ts): every document
+// response carries `x-cache-key: ck:v1:<route>:<sha256-ish of the request
+// cookie identity>`, so each route is stamped with a key bound to the
+// requester's session cookie. Public routes additionally declare
+// `Vary: Cookie` so the CDN stores per-cookie variants instead of one shared
+// entry; private routes stay `no-store` (user data never cached) and only
+// expose the key for observability/purge tooling.
 
 import { collectPublicData } from './_lib/public-data'
+import { routeCacheKey } from './_lib/cache-key'
 import type { EdgeEnv, PublicData } from './_lib/public-data'
 
 const SPA_SHELL = '/index.html'
@@ -107,6 +116,10 @@ export const onRequest = async ({
       html = injectEdgeData(html, { pathname, publicData })
     }
 
+    // Cookie-derived cache key — stamped on EVERY route (public or private)
+    // so each page advertises the exact key its cached entry lives under.
+    const cacheKey = await routeCacheKey(pathname, request.headers.get('cookie'))
+
     return new Response(html, {
       status: shell.status,
       headers: {
@@ -114,7 +127,12 @@ export const onRequest = async ({
         'cache-control': isPublic
           ? 'public, max-age=0, s-maxage=300, stale-while-revalidate=300'
           : 'no-store',
+        // Public pages: let the CDN keep one entry per request-cookie set
+        // (each variant keyed by the customer's own cookie mirror), instead
+        // of one shared entry that ignores identity entirely.
+        ...(isPublic ? { vary: 'Cookie' } : {}),
         'x-edge-route': isPublic ? 'public' : 'private',
+        'x-cache-key': cacheKey,
         ...securityHeaders(),
       },
     })

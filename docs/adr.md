@@ -1,7 +1,7 @@
 # ADR — Registro decisioni architetturali
 
-> Decision log for the architecture of `p2pAPP`. Each ADR records *what* was
-> chosen, *why*, and its consequences. Open decisions (`OD-*`) are tracked as
+> Decision log for the architecture of `p2pAPP`. Each ADR records _what_ was
+> chosen, _why_, and its consequences. Open decisions (`OD-*`) are tracked as
 > proposals with a target phase; status legend:
 >
 > **Accepted** = implemented and verified · **Proposed** = agreed direction, not yet built · **Deferred** = parked, revisit later
@@ -10,24 +10,27 @@
 
 ## Table
 
-| ID | Decision | Status | Date |
-|----|----------|--------|------|
-| ADR-001 | Route-level code splitting via `React.lazy` + layout-owned Suspense | Accepted | 2026-09-13 |
-| ADR-002 | Lazy i18n: only `en` bundled, other locales via `import.meta.glob` | Accepted | 2026-09-13 |
-| ADR-003 | Vendor chunk buckets via `manualChunks` + build budget | Accepted | 2026-09-13 |
-| ADR-004 | Shared skeleton fallback (`AppPageFallback`, `aria-busy`) | Accepted | 2026-09-13 |
-| ADR-005 | Offer is consumed at trade creation (one-shot marketplace rule) | Accepted | 2026-09-13 |
-| ADR-006 | Route/chunk/i18n verification baseline: Playwright (Chromium) | Accepted | 2026-09-13 |
-| ADR-007 | Edge document layer + client-side edge-data hydration | Accepted (live deploy verified) | 2026-09-13 |
-| ADR-008 | Restricted public reader: `anon` column-level projection (DB + worker + client) | Accepted | 2026-09-13 |
-| ADR-009 | Referral program ("Invite & Earn"): server-credited share of platform fees | Accepted | 2026-09-15 |
-| ADR-010 | Wallet connect is sign-in-free: SIWE is explicit opt-in, never auto-triggered on connect | Accepted | 2026-09-15 |
-| ADR-011 | Chain gate is scoped to contract-write pages; browsing/connect is chain-agnostic | Accepted | 2026-09-14 |
-| OD-01 | Defer the wallet stack off the critical path | Proposed (Fase 3) | 2026-09-13 |
-| OD-02 | Restricted reader role + minimal public projection | Accepted (Fase 1: DB column projection; anon-key removal deferred to BFF) | 2026-09-13 |
-| OD-03 | Per-route edge behaviour via `functions/_middleware.ts` + `_routes.json` (public → inject data + `s-maxage`; private → `no-store`) | Implemented in repo (deploy pending) — see ADR-007 | 2026-09-13 |
-| OD-04 | Edge-cache invalidation via Supabase write webhooks (`/api/cache-purge`) | Implemented in repo (webhook config pending) | 2026-09-13 |
-| OD-05 | Security headers (`_headers` CSP/HSTS) + drop anon key from the bundle | Partially implemented (headers live); anon-key removal deferred to BFF phase (keep OD-02 carve-out) | 2026-09-13 |
+| ID      | Decision                                                                                                                           | Status                                                                                              | Date       |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ---------- |
+| ADR-001 | Route-level code splitting via `React.lazy` + layout-owned Suspense                                                                | Accepted                                                                                            | 2026-09-13 |
+| ADR-002 | Lazy i18n: only `en` bundled, other locales via `import.meta.glob`                                                                 | Accepted                                                                                            | 2026-09-13 |
+| ADR-003 | Vendor chunk buckets via `manualChunks` + build budget                                                                             | Accepted                                                                                            | 2026-09-13 |
+| ADR-004 | Shared skeleton fallback (`AppPageFallback`, `aria-busy`)                                                                          | Accepted                                                                                            | 2026-09-13 |
+| ADR-005 | Offer is consumed at trade creation (one-shot marketplace rule)                                                                    | Accepted                                                                                            | 2026-09-13 |
+| ADR-006 | Route/chunk/i18n verification baseline: Playwright (Chromium)                                                                      | Accepted                                                                                            | 2026-09-13 |
+| ADR-007 | Edge document layer + client-side edge-data hydration                                                                              | Accepted (live deploy verified)                                                                     | 2026-09-13 |
+| ADR-008 | Restricted public reader: `anon` column-level projection (DB + worker + client)                                                    | Accepted                                                                                            | 2026-09-13 |
+| ADR-009 | Referral program ("Invite & Earn"): server-credited share of platform fees                                                         | Accepted                                                                                            | 2026-09-15 |
+| ADR-010 | Wallet connect is sign-in-free: SIWE is explicit opt-in, never auto-triggered on connect                                           | Accepted                                                                                            | 2026-09-15 |
+| ADR-011 | Chain gate is scoped to contract-write pages; browsing/connect is chain-agnostic                                                   | Accepted                                                                                            | 2026-09-14 |
+| OD-01   | Defer the wallet stack off the critical path                                                                                       | Proposed (Fase 3)                                                                                   | 2026-09-13 |
+| OD-02   | Restricted reader role + minimal public projection                                                                                 | Accepted (Fase 1: DB column projection; anon-key removal deferred to BFF)                           | 2026-09-13 |
+| OD-03   | Per-route edge behaviour via `functions/_middleware.ts` + `_routes.json` (public → inject data + `s-maxage`; private → `no-store`) | Implemented in repo (deploy pending) — see ADR-007                                                  | 2026-09-13 |
+| OD-04   | Edge-cache invalidation via Supabase write webhooks (`/api/cache-purge`)                                                           | Implemented in repo (webhook config pending)                                                        | 2026-09-13 |
+| OD-05   | Security headers (`_headers` CSP/HSTS) + drop anon key from the bundle                                                             | Partially implemented (headers live); anon-key removal deferred to BFF phase (keep OD-02 carve-out) | 2026-09-13 |
+| ADR-012 | Cookie-derived per-route cache keys at the edge (`coffernode_session` mirror + `x-cache-key` + `Vary: Cookie`)                     | Accepted                                                                                            | 2026-09-20 |
+| ADR-013 | Self-hosted client error reporting (`error_logs` + `/api/error-report` + React boundary)                                           | Accepted                                                                                            | 2026-09-20 |
+| ADR-014 | Device-bound Coffer Identity: client-derived HKDF master → per-label pseudonyms                                                    | Accepted                                                                                            | 2026-09-20 |
 
 ---
 
@@ -42,6 +45,7 @@ first paint.
 re-renders only the page slot, keeping the navbar/footer mounted.
 
 **Consequences.**
+
 - Entry chunk: **~1.9 MB → ~110 KB**; each route is a cacheable chunk loaded on first visit.
 - `AppLayout`/`DocsLayout` imported eagerly by design (they are the Suspense shell).
 - No new dependency; async boundaries are implicit — page components are already self-contained.
@@ -117,8 +121,9 @@ full shell and refetches public data client-side, so deep links flash and
 public routes are uncachable HTML.
 
 **Decision.**
+
 - `functions/_middleware.ts` (Pages Functions, `_routes.json` `/*` minus
-  `/assets/`) serves every *document* navigation. PUBLIC routes (landing, docs,
+  `/assets/`) serves every _document_ navigation. PUBLIC routes (landing, docs,
   offers, offer detail, public profile) get the built shell with a public-data
   projection injected as `<script id="__EDGE_DATA__" type="application/json">`
   and edge-cacheable `Cache-Control: public, s-maxage=300, SWR`. PRIVATE routes
@@ -131,6 +136,7 @@ public routes are uncachable HTML.
   webhooks, guarded by `PURGE_SECRET`.
 
 **Consequences.**
+
 - Deep links to public pages paint instantly with server-fresh data; verified
   by `npm run test:e2e` (`tests/e2e/edge-hydration.cjs`): seeded offer renders,
   zero Supabase fetch on first paint, and live on https://coffernode.pages.dev
@@ -153,6 +159,7 @@ Supabase REST with the same `anon` key. `select=*` returns internal columns
 `premium_multiplier`, `featured`, `updated_at`) to any anonymous visitor.
 
 **Decision.**
+
 - Do NOT create a new Postgres role nor swap `pgrst.db_anon_role` — the anon
   key is required by GoTrue auth in the browser bundle (carve-out, see OD-05 /
   BFF follow-up). Restrict what `anon` sees at the **column** level.
@@ -175,6 +182,7 @@ Supabase REST with the same `anon` key. `select=*` returns internal columns
   table-level rights preserved.
 
 **Consequences.**
+
 - Anonymous `select=*`/excluded columns → PostgREST `42501 permission denied`.
   Verified live: `users.role`, `users.website`, `users.last_active_at`,
   `offers.views`, `offers.updated_at` all rejected; projection select and the
@@ -205,17 +213,18 @@ structures that look like inducement-to-trade (MiCA/ESMA posture), and without
 any client-side trust in the earnings ledger.
 
 **Decision.**
+
 - **Attribution** is opaque-code, first-touch, zero-PII: each user gets one
   8-hex code (`referral_codes`, minted by `get_or_create_referral_code`). A
   visitor reaching `/r/<CODE>` stashes the code in localStorage
-  (`coffernode:referral:pending`); the first *authenticated* session of a NEW
+  (`coffernode:referral:pending`); the first _authenticated_ session of a NEW
   wallet claims it via `claim_referral` (`referral_relations`, UNIQUE on
   `referred_user_id`). Self-referral, bad codes and double claims are rejected
   in SQL.
 - **Credit** is server-only and idempotent: a SECURITY DEFINER trigger on
   `trades.escrow_status → released` calls `credit_referral_fee`, which writes
   one row to `referral_fee_events` (UNIQUE `trade_id`, `on conflict do
-  nothing`). The referrer earns `REFERRER_SHARE_BPS = 1500` (15%) of the
+nothing`). The referrer earns `REFERRER_SHARE_BPS = 1500` (15%) of the
   platform fee `fiat_amount × platform_fee_bps / 10000`. `credit_referral_fee`
   is **not** granted to client roles — the release path is the only way in.
 - **Maths is mirrored**: `calculate_fee_split` (SQL) and `src/lib/referral.ts`
@@ -229,6 +238,7 @@ any client-side trust in the earnings ledger.
   automatic claim wired into `useSyncUser`.
 
 **Consequences.**
+
 - No PII collected, no emails, no contact scraping — defensible under GDPR;
   the reward is a passive % of fees on completed escrow releases, not a
   deposit-volume or FOMO bonus.
@@ -242,18 +252,21 @@ any client-side trust in the earnings ledger.
 ## Open decisions
 
 ### OD-01 — Defer the wallet stack (Fase 3)
+
 wagmi/rainbowkit/walletconnect ≈ 3 MB ride the initial load because the shell
 imports them for sign-in. **Direction:** lazy-mount the Connect button and the
 wallet providers on first interaction; landing/docs/offers then ship without
 `web3`. Proved convex to ADR-001/003; verify against RLS/anon gates.
 
 ### OD-06 — Referral payout & program refinement (Proposed)
+
 In-app credit is `pending`/`paid`; there is no withdraw flow yet. **Direction:**
 `paid` events become claimable (off-chain ledger → future on-chain transfer or
 platform-token credit), add programme toggles (share %, attribution window,
 banner on the referred flow), and surface errors + a "how it works" FAQ entry.
 
 ### OD-02 — Edge data layer, "public projection" (Fase 1 — DONE)
+
 Public reads (offers, profiles, ratings) used to go straight to Supabase REST
 with the bundled anon key — open to scraping and heavy joins. **Status
 (2026-09-13):** the restricted reader is shipped and verified as ADR-008: the
@@ -267,6 +280,7 @@ bundle because GoTrue auth requires it — full removal moves to the BFF phase
 projection).
 
 ### OD-03 — Per-route edge behaviour (Fase 2 — implemented, deploy pending)
+
 Pure SPA: no per-route HTML, no SEO, every route boots the whole shell.
 **Status update (2026-09-13):** core implemented — see ADR-007. What remains:
 Cloudflare Pages project creation + `wrangler pages secret put` + first deploy;
@@ -275,6 +289,7 @@ header, `s-maxage` on public, `no-store` on private) and, as a follow-up, full
 per-route SSR HTML for SEO.
 
 ### OD-04 — Edge-cache invalidation (Fase 2 — implemented, config pending)
+
 **Direction:** Supabase write webhooks purge edge cache on offer/trade writes
 instead of fixed/swr-only freshness.
 **Status update (2026-09-13):** `functions/api/cache-purge.ts` implemented
@@ -283,6 +298,7 @@ guarded by `PURGE_SECRET` header). Remaining: configure the Supabase database
 webhooks to `POST /api/cache-purge` with the secret.
 
 ### OD-05 — Security headers + secret hygiene (Fase 1)
+
 **Direction:** `_headers` with CSP, HSTS, frame-ancestors, referrer-policy,
 COOP/COEP; move `anon`/service keys to real secret management (current tracked
 `.`env` values are placeholders); edge-issued short-TTL tokens for write paths.
@@ -306,6 +322,7 @@ now fires off the live `hasSession` state (however sign-in happened) instead
 of wall-connect.
 
 **Consequences.**
+
 - Blocking UX removed: connecting a wallet is instant, no MetaMask popup.
 - Read-only browsing for unsigned wallets remains unchanged (RLS still gates
   writes; action buttons surface "sign-in required" toasts).
@@ -324,13 +341,14 @@ surfaces (Trade, TradeDetail, Dispute, DisputeDetail) perform on-chain
 reads/writes. Browsing offers, profiles, messages and the P2P DB is
 chain-independent.
 
-**Decision.** The chain requirement applies *only* where contract interaction
+**Decision.** The chain requirement applies _only_ where contract interaction
 happens. `<ChainGuard />` moved from `AppLayout` to the four contract pages;
 everywhere else the wallet can sit on any EVM chain without prompts or
 auto-switches. Where it renders, the existing auto-switch + `wallet_addEthereumChain`
 fallback logic still applies (the escrow factory lives only on Sepolia).
 
 **Consequences.**
+
 - Connecting on mainnet/L2/anvil is fully silent outside the four escrow pages.
 - Trade/dispute pages still need the correct network because `usePublicClient`
   (wagmi) resolves against the wallet's active chain and reads (allowance,
@@ -339,7 +357,169 @@ fallback logic still applies (the escrow factory lives only on Sepolia).
 
 ---
 
+## ADR-012 — Cookie-derived per-route cache keys at the edge
+
+**Context.** The edge middleware (`functions/_middleware.ts`) caches public
+documents via `Cache-Control: s-maxage` but the cache key ignored the requester
+entirely, and there was no per-route/observable cache identity. The client also
+kept the Supabase session in localStorage, so the edge never saw an HTTP cookie
+to key on.
+
+**Decision.** A shallow, security-lean identity bridge + per-route cache key:
+
+1. **Client mirror cookie** (`src/lib/sessionCookie.ts` + `SessionCookieSync`
+   hook): the connected wallet address (already public on the user's own
+   `/app/profile/<wallet>` page) is mirrored into `coffernode_session`
+   (`Secure; SameSite=Lax; Path=/`), synced on mount and on every Supabase
+   auth event. Never a token — RLS keeps authorizing via the Supabase JWT.
+2. **Edge derivation** (`functions/_lib/cache-key.ts`): `cookieIdentity()` folds
+   missing/malformed cookies into a shared `anon` slot; `routeCacheKey()`
+   returns `ck:v1:<pathname>:<sha256(identity)[0..16]>` — route-scoped,
+   deterministic, and identity only ever stored hashed.
+3. **Middleware wiring**: every document response carries `x-cache-key`; public
+   routes additionally declare `Vary: Cookie` so the CDN stores per-cookie
+   variants; private routes stay `no-store` (user data never cached) and only
+   expose the key for observability.
+
+**Consequences.**
+
+- Every route — public and private — now has a cache identity bound to the
+  request cookie; signed-in users stop sharing anonymous marketplace/profile
+  cache entries; anonymous traffic keeps one shared slot (good hit rate).
+- `Vary: Cookie` shards the CDN per cookie-set: harmless here because the app
+  sets almost no other cookies (theme/lang/consent live in localStorage), and
+  it is gated to public routes only.
+- Security bound: the only cookie consulted is a public wallet address; the
+  CDN layer never stores recognizable identities; tokens (should the app later
+  add an edge auth'd route) remain out of JS cookies.
+- `cache-purge` (OD-04) now targets `caches.default` URL keys; per-cookie
+  variants under `Vary` are CDN-layer entries, so single-URL purge may need the
+  `Cache-Rules`-aware dashboard/API purge path for those — flagged for Fase 3.
+
+---
+
+## ADR-013 — Self-hosted client error reporting
+
+**Context.** A P2P/non-custodial app ships to real users, but there was no way
+to know a page had broken: `src/error-logger.ts` was a no-op passthrough (it
+hooked `console.error` and forwarded it), there was no React error boundary,
+and no backend ever received an error. A third-party tracker (Sentry et al.)
+would work but leaks error payloads — which routinely embed wallet addresses,
+tx hashes and amounts — to an external vendor, against the product's
+self-hosted/privacy positioning.
+
+**Decision.** A proprietary, edge-to-DB pipeline with privacy as the default:
+
+1. **Client capture** (`src/error-logger.ts` + `src/lib/errorReports.ts`):
+   `window` `error` / `unhandledrejection` listeners plus a React boundary
+   (`AppErrorBoundary`, reset on route change). Every report is scrubbed
+   (EVM addresses/64-hex, emails, URL query values) and truncated, deduped by
+   fingerprint within a flush window, batched, and POSTed to
+   `/api/error-report` with `keepalive` (or `sendBeacon`) so unload reports
+   survive. Dev builds never send; `VITE_ERROR_REPORT=0` disables in prod.
+2. **Edge gate** (`functions/api/error-report.ts`): re-scrubs defensively
+   (a compromised client must not ship PII), enforces an in-memory per-IP
+   rate limit (100/10 min), bounds batch size (20), and appends to
+   `error_logs` via the existing `SUPABASE_READ_KEY`.
+3. **Storage** (migration `20260920000001_error_logs.sql`): bare rows
+   (fingerprint, type, scrubbed message/stack/source, route, UA, count,
+   timestamps). RLS default-deny; `anon` gets INSERT-only (it can never read
+   anything back), `authenticated` gets SELECT for a future operator
+   dashboard. No anon-key client writes.
+
+**Consequences.**
+
+- Errors are now visible end-to-end (browser → edge → SQL) with zero third
+  parties and zero raw PII in Postgres. The browser never carries a write
+  credential louder than the already-public anon key.
+- Abuse is bounded but per-isolate: the IP bucket is in-memory per worker —
+  move to KV/Durable Objects if a single isolate sees sustained traffic.
+- No alerting/dashboard yet: viewing requires Supabase SQL editor or an
+  `authenticated` query. Retention cleanup (purge > N days) and operator
+  alerting are tracked in `docs/todo.md`.
+- Source maps are NOT uploaded (matches the no-externals stance); stack
+  traces stay minified — acceptable for MVP, revisit if debugging pain grows.
+
+---
+
+## ADR-014 — Device-bound Coffer Identity (client-derived per-label pseudonyms)
+
+**Context.** The product goal is trading without the _counterparty_ being able
+to correlate our trade/chat activity back to our on-chain wallet. The operator
+must still be able to read data for anti-fraud and dispute resolution — we
+chose on-chain primitives stay untouched ("layer dati" depth), and the chat
+privacy model was explicitly left undecided (see Open Decisions). The earlier
+sketch proposed server-side `pseudonym_*` columns fed by the `siwe-auth` edge
+function. Analysis killed that idea: **a server-issued pseudonym is a mapping
+the server can invert** — it disassociates nothing for the chosen threat model
+and adds DB/RLS surface for zero privacy gain.
+
+**Decision.** Identity dies on the client. The vault derives everything from
+the EIP-191 `personal_sign` signature, which is _deterministic_ (RFC 6979):
+same wallet + same EIP-4361 message → same bytes → same master, stable across
+logins with no server involvement and no stored signature.
+
+```
+master    = HKDF-SHA256(ikm = signature bytes, salt = "coffernode:coffer:v1", info = "CofferNode identity master")
+key_label = HKDF-SHA256(ikm = master, salt = domain, info = "epoch:label")
+pseudonym = "CN-" + uppercase(sha256(key_label)[0..16])
+```
+
+1. **`src/lib/crypt.ts`** — pure WebCrypto helpers (`sha256*`, `hkdfSha256`,
+   hex codecs), environment-agnostic (= testable in Node).
+2. **`src/lib/cofferIdentity.ts`** — the vault: `deriveMasterSecret(signature)`,
+   `persistCofferIdentity(address, signature)` (device-only storage),
+   `cofferPseudonym` / `tradePseudonym(tradeId)` / `conversationPseudonym(id)`,
+   `rotateIdentity` (epoch bump → all pseudonyms change) and `burnCofferIdentity`
+   (drop the device vault). Storage is injectable for tests; the browser
+   default is a single `localStorage` slot.
+3. **Sign-in integration** — `signInWithWallet` derives + persists the vault
+   right after the SIWE session installs, **best-effort** (identity failure
+   never blocks login) and without ever persisting the signature.
+4. **UI** — `CofferIdentityCard` on the own profile: identity fingerprint +
+   sample trade pseudonym + Rotate (two-step confirm) + Burn (two-step).
+
+**Consequences.**
+
+- A counterparty sees only opaque, per-trade/per-conversation `CN-…` strings
+  that hash to nothing a wallet can be recovered from. Rotating re-derives
+  every label instantly, client-side.
+- The master is app-layer only: it cannot move funds, cannot reconstruct the
+  private key, and never leaves the device — worst case theft re-derives
+  pseudonyms. Stored in `localStorage` (persistent across reloads) by design;
+  a future phase could add a passphrase-locked slot.
+- Server-side correlation for anti-fraud remains intact (operator reads raw
+  data) — this is the accepted trade-off of "anonimità dalla controparte".
+- The on-chain link (escrow contract funding) still identifies wallets at
+  settlement — unavoidable without the deferred relayer/mesh phase (OD on
+  "trasporto non correlabile"), and accepted at this layer.
+- NO schema/RLS change landed: no `pseudonym_*` columns, no `siwe-auth` edge
+  change. Follow-ups (E2E chat keys, metadata minimization) are tracked in
+  `docs/todo.md`.
+
+---
+
+## Open decisions — Anonymità (Fase 0→3)
+
+Recorded so the scope set in ADR-014 lives on:
+
+- **OD-07 — Trasporto non correlabile (relayer / mesh)** — "Fluidità prima di
+  tutto": 1-hop relay optional path so deposit/refund txs don't scan back to
+  the app-layer pseudonym; Tor/advanced indirection explicitly not in MVP.
+- **OD-08 — Minimizzazione metadati** — offer/message/session rows keep the
+  raw wallet keyed only server-side; expose `CN-…` labels in any data a
+  counterparty reads.
+- **OD-09 — Privacy chat** — UNDECIDED (user did not answer): E2E per-
+  conversation keys (derivable from the vault via `conv_key` labels),
+  server-readable-but-non-correlabile, or both toggleable. Default proposal
+  was server-readable non-correlabile (keeps MESSAGES_INSPECTOR / AML).
+- **Fase 0 delivered so far** — vault + per-label pseudonyms + rotate/burn +
+  profile card + tests + ADR-014. Schema/RLS unchanged.
+
+---
+
 ## How to use this log
+
 - **Accepted**: reference the ADR when it becomes relevant again (no re-litigating).
 - **Proposed**: promote to Accepted only after a verifying implementation.
 - **Open decisions** below map to `docs/todo.md` "Frontend — Fase 0→3".
