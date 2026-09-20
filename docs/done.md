@@ -9,6 +9,46 @@
 
 ---
 
+## Pseudo-offerta — identity-free offer surface (ADR-015) — 2026-09-20
+
+Closed the OD-08 leak found while unmasking the offer-detail flow: an anonymous
+reader of `/app/offer/:id` / `/app/offers` received the seller's `seller_id`
+and `wallet_address` (the route param is `offers.id`, a `gen_random_uuid()`,
+but the payload was the leak). Now the offer surface is identity-free —
+browsing shows nickname + a random `users.public_handle` (`CN-…`, unique per
+user, not invertible), and party identity is resolved **server-side only**:
+
+- Migration `20260920000003_offer_pseudonym.sql`: `users.public_handle`
+  (backfill + default + unique); drop-and-regrant column projection for
+  `anon` AND `authenticated` — `offers` without `seller_id`/`target_user`
+  for `anon` (authenticated keeps those two: the owner-scoped UPDATE policy
+  qualifies on `seller_id`); SECURITY DEFINER RPCs `get_offer_trade_intent`
+  (server-resolved buyer/seller + wallets, status/expiry/self-trade guards,
+  authenticated-only), `start_offer_conversation` (chat by offer id), and
+  `get_public_offers_by_seller` (anon-safe seller listing by handle).
+- Migration `20260920000004_public_offer_rpc.sql` (deploy fix): the
+  marketplace + offer-detail reads ALSO go through SECURITY DEFINER RPCs
+  (`get_public_offers(limit, offset)` / `get_public_offer_by_id(id)`) —
+  the old direct FK embed needs to SELECT `offers.seller_id`, which `anon`
+  now structurally lacks (42501 on the public page at first deploy). The
+  RPCs run as the definer and return the same identity-free projection, so
+  even fully-anonymous visitors never touch the identity columns.
+- Client: `PUBLIC_OFFER_COLUMNS`/`SELLER_JOIN`/`PUBLIC_USER_COLUMNS` +
+  `SellerProfile` type + `User.public_handle`; `TradePage` resolves parties
+  only via the intent RPC; `OpenOfferPage`/`EditOfferPage` key chat/ownership
+  off `public_handle`; `OffersPage`/`ProfilePage` render handles without
+  wallet links; `createOffer`/`updateOffer` explicit `.select(...)`;
+  `getActiveOffers`/`getOfferById` call the new RPCs;
+  `functions/_lib/public-data.ts` mirror in sync.
+- Guards: `tests/security/pseudo-offer.spec.ts` (17 pass). Docs: ADR-015 +
+  OD-08 partial in `docs/adr.md`, `docs/todo.md`.
+- Live-deploy note: pending migrations were pushed to `tauyciaavhnopeseecmz`
+  on 2026-09-20 (incl. `public_handle` backfill); `gen_random_bytes(6)` is a
+  `pgcrypto` function and the project lacks it, so the migration now uses
+  `gen_random_uuid()` (built-in).
+
+---
+
 ## Device-bound Coffer Identity (ADR-014) — 2026-09-20
 
 Fase 0 of the anonymity workstream. A client-only vault derives an HKDF-SHA256

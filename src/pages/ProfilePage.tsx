@@ -55,7 +55,7 @@ interface Offer {
   isPrivate: boolean
   seller: {
     name: string
-    address: string
+    handle?: string
     avatar?: string
     rating: number
     totalTrades: number
@@ -126,7 +126,7 @@ export function ProfilePage() {
   // the app with a wallet RIGHT NOW (not "last_active_at" was ever set).
   const onlineUsers = useGlobalPresence()
   const { data: offers, isLoading: offersLoading } = useOffersBySeller(
-    profile?.id
+    profile?.public_handle ?? undefined
   )
   // Conversation list — used to find a pre-existing thread with the viewed
   // user. Placed before the early returns below so rules-of-hooks is happy.
@@ -163,7 +163,7 @@ export function ProfilePage() {
         tags?: string[]
         payment_methods?: string[]
         seller?: {
-          wallet_address?: string
+          public_handle?: string
           nickname?: string | null
           avatar_url?: string | null
           avg_rating?: number | string
@@ -172,10 +172,11 @@ export function ProfilePage() {
       }
       const price = Number(row.price_per_unit) || 0
       const symbol = currencySymbol(row.fiat_currency)
-      const sellerAddr = row.seller?.wallet_address ?? "0x0"
+      const sellerHandle =
+        row.seller?.public_handle ?? row.seller?.nickname ?? "CN-??"
       return {
         id: row.id,
-        trader: sellerAddr,
+        trader: sellerHandle,
         trades: row.seller?.total_trades ?? 0,
         type: row.type,
         status: row.status ?? "active",
@@ -189,8 +190,8 @@ export function ProfilePage() {
         isPositive: row.type === "buy",
         isPrivate: Boolean(row.is_private),
         seller: {
-          name: row.seller?.nickname ?? sellerAddr,
-          address: sellerAddr,
+          name: row.seller?.nickname ?? sellerHandle,
+          handle: sellerHandle,
           avatar: row.seller?.avatar_url ?? undefined,
           rating: Number(row.seller?.avg_rating) || 0,
           totalTrades: row.seller?.total_trades ?? 0,

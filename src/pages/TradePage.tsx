@@ -1,22 +1,33 @@
-import { useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
-import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
-import { type Abi } from 'viem'
-import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Text } from '@/components/ui/text'
-import { Separator } from '@/components/ui/separator'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { AppPageHeader } from '@/components/custom/AppPageHeader'
-import { ChainGuard } from '@/components/custom/ChainGuard'
-import { ShieldCheck, Clock, Globe, Tag, Loader2, Star } from 'lucide-react'
-import { useOffer } from '@/hooks/useOffers'
-import { createTrade, ensureUser } from '@/lib/supabase'
+import { useState } from "react"
+import { useParams, useNavigate } from "react-router-dom"
+import { useTranslation } from "react-i18next"
+import { useAccount, usePublicClient, useWriteContract } from "wagmi"
+import { type Abi } from "viem"
+import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Text } from "@/components/ui/text"
+import { Separator } from "@/components/ui/separator"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { AppPageHeader } from "@/components/custom/AppPageHeader"
+import { ChainGuard } from "@/components/custom/ChainGuard"
+import { ShieldCheck, Clock, Globe, Tag, Loader2, Star } from "lucide-react"
+import { useOffer } from "@/hooks/useOffers"
+import {
+  createTrade,
+  ensureUser,
+  getOfferTradeIntent,
+  type OfferTradeIntent,
+} from "@/lib/supabase"
 import {
   KLEROS_ESCROW_FACTORY_ABI,
   KLEROS_ESCROW_FACTORY_ADDRESS,
@@ -24,13 +35,13 @@ import {
   DEFAULT_SECURITY_DEPOSIT_BPS,
   MAX_GRACE_PERIOD_SECONDS,
   isFactoryConfigured,
-} from '@/lib/contracts'
-import { parseUnits } from 'viem'
-import { errorMessage } from '@/lib/errorMessage'
-import { currencySymbol } from '@/lib/utils'
-import { REGION_NAMES } from '@/lib/locations'
+} from "@/lib/contracts"
+import { parseUnits } from "viem"
+import { errorMessage } from "@/lib/errorMessage"
+import { currencySymbol } from "@/lib/utils"
+import { REGION_NAMES } from "@/lib/locations"
 
-type Stage = 'idle' | 'creating-escrow' | 'mining' | 'saving'
+type Stage = "idle" | "creating-escrow" | "mining" | "saving"
 
 export function TradePage() {
   const { id } = useParams()
@@ -41,9 +52,9 @@ export function TradePage() {
   const { data: offer, isLoading, isError } = useOffer(id)
   const { t } = useTranslation()
 
-  const [amount, setAmount] = useState('')
+  const [amount, setAmount] = useState("")
   const [depositRate, setDepositRate] = useState(
-    String(Number(DEFAULT_SECURITY_DEPOSIT_BPS) / 100),
+    String(Number(DEFAULT_SECURITY_DEPOSIT_BPS) / 100)
   )
   // Grace period in HOURS (kept as a string so it can be cleared while
   // editing). Converted to seconds for `createEscrow`.
@@ -52,31 +63,42 @@ export function TradePage() {
   // override so we don't need a setState-in-effect to seed it.
   const [gracePeriodInput, setGracePeriodInput] = useState<string | null>(null)
   const gracePeriod =
-    gracePeriodInput ?? (offer?.grace_period != null ? String(offer.grace_period) : '1')
-  const [paymentMethod, setPaymentMethod] = useState<string>('')
-  const [stage, setStage] = useState<Stage>('idle')
+    gracePeriodInput ??
+    (offer?.grace_period != null ? String(offer.grace_period) : "1")
+  const [paymentMethod, setPaymentMethod] = useState<string>("")
+  const [stage, setStage] = useState<Stage>("idle")
 
-  const isSubmitting = stage !== 'idle'
+  const isSubmitting = stage !== "idle"
   const factoryReady = isFactoryConfigured()
 
   if (isLoading) {
     return (
       <section className="flex items-center justify-center py-20 text-muted-foreground">
-        <Loader2 className="w-5 h-5 animate-spin mr-2" /> {t('trade.loadingOffer')}
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" />{" "}
+        {t("trade.loadingOffer")}
       </section>
     )
   }
 
   if (isError || !offer) {
     return (
-      <section className="max-w-xl mx-auto space-y-6">
-        <AppPageHeader title={t('trade.offerNotFound')} variant="centered" onBack={() => navigate(-1)} />
+      <section className="mx-auto max-w-xl space-y-6">
+        <AppPageHeader
+          title={t("trade.offerNotFound")}
+          variant="centered"
+          onBack={() => navigate(-1)}
+        />
         <Card>
           <CardContent className="space-y-4">
             <Text variant="body" className="text-muted-foreground">
-              {t('trade.offerNotFoundDescription')}
+              {t("trade.offerNotFoundDescription")}
             </Text>
-            <Button className="rounded-full" onClick={() => navigate('/app/offers')}>{t('trade.backToOffers')}</Button>
+            <Button
+              className="rounded-full"
+              onClick={() => navigate("/app/offers")}
+            >
+              {t("trade.backToOffers")}
+            </Button>
           </CardContent>
         </Card>
       </section>
@@ -92,16 +114,19 @@ export function TradePage() {
   const networkFee = Number(offer.network_fee) || 0
 
   const seller = offer.seller
-  const sellerName = seller?.nickname ?? (seller?.wallet_address ?? 'Trader')
-  const sellerAddr = seller?.wallet_address ?? ''
-  const formatAddress = (addr: string) => (addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : '')
+  const sellerName = seller?.nickname ?? seller?.public_handle ?? "Trader"
+  const sellerHandle = seller?.public_handle ?? ""
 
   const paymentMethods: string[] = offer.payment_methods ?? []
   const regions: string[] = offer.available_regions ?? []
   const tags: string[] = offer.tags ?? []
 
   const amountNum = Number(amount)
-  const amountValid = !!amount && !Number.isNaN(amountNum) && amountNum >= minAmount && amountNum <= maxAmount
+  const amountValid =
+    !!amount &&
+    !Number.isNaN(amountNum) &&
+    amountNum >= minAmount &&
+    amountNum <= maxAmount
   const cryptoEstimate = amountValid && price > 0 ? amountNum / price : null
 
   // Deposit rate in percent (0–15). On-chain it's bps; the contract accepts
@@ -121,7 +146,7 @@ export function TradePage() {
   const maxGraceHours = Number(MAX_GRACE_PERIOD_SECONDS) / 3600
   const gracePeriodNum = Number(gracePeriod)
   const gracePeriodValid =
-    gracePeriod !== '' &&
+    gracePeriod !== "" &&
     !Number.isNaN(gracePeriodNum) &&
     gracePeriodNum > 0 &&
     gracePeriodNum <= maxGraceHours
@@ -133,77 +158,87 @@ export function TradePage() {
 
   const handleOpenTrade = async () => {
     if (!isConnected || !address) {
-      toast.error(t('trade.errorConnectWallet'))
+      toast.error(t("trade.errorConnectWallet"))
       return
     }
     if (!factoryReady) {
-      toast.error(
-        t('trade.errorFactoryNotConfigured'),
-      )
+      toast.error(t("trade.errorFactoryNotConfigured"))
       return
     }
     if (!amountValid) {
-      toast.error(t('trade.errorAmountRange', { min: `${symbol}${minAmount.toLocaleString()}`, max: `${symbol}${maxAmount.toLocaleString()}` }))
+      toast.error(
+        t("trade.errorAmountRange", {
+          min: `${symbol}${minAmount.toLocaleString()}`,
+          max: `${symbol}${maxAmount.toLocaleString()}`,
+        })
+      )
       return
     }
     if (!paymentMethod) {
-      toast.error(t('trade.errorSelectPayment'))
+      toast.error(t("trade.errorSelectPayment"))
       return
     }
     if (!depositValid) {
-      toast.error(t('trade.errorDepositRate'))
+      toast.error(t("trade.errorDepositRate"))
       return
     }
     if (!gracePeriodValid) {
-      toast.error(t('trade.gracePeriodError'))
+      toast.error(t("trade.gracePeriodError"))
       return
     }
     if (!publicClient) {
-      toast.error(t('trade.errorRpcClient'))
+      toast.error(t("trade.errorRpcClient"))
       return
     }
 
-    setStage('creating-escrow')
+    setStage("creating-escrow")
     try {
       const me = await ensureUser(address)
       if (!me) {
         // Wallet is connected but no SIWE session was established — ask the
         // user to sign back in before opening a trade.
-        toast.error(t('trade.errorConnectWallet'))
-        setStage('idle')
-        return
-      }
-      if (me.id === offer.seller_id) {
-        toast.error(t('trade.errorOwnOffer'))
-        setStage('idle')
+        toast.error(t("trade.errorConnectWallet"))
+        setStage("idle")
         return
       }
 
-      // Determine taker role + buyer/seller IDs.
-      const isMakerBuyer = offer.type === 'buy'
-      const buyerId = isMakerBuyer ? offer.seller_id : me.id
-      const sellerId = isMakerBuyer ? me.id : offer.seller_id
-
-      // Resolve buyer/seller wallet addresses for the on-chain escrow. The
-      // maker's wallet is on the offer row; the taker's wallet is the
-      // connected address.
-      const buyerWallet = isMakerBuyer ? sellerAddr : address
-      const sellerWallet = isMakerBuyer ? address : sellerAddr
+      // Resolve the real parties SERVER-SIDE (get_offer_trade_intent). The
+      // public offer payload no longer carries the seller's id/wallet
+      // (ADR-015) — the counterparty identity is revealed exclusively through
+      // this RPC, and only to a signed-in, non-seller caller. It also
+      // re-validates status/expiry and rejects self-trading.
+      let intent: OfferTradeIntent
+      try {
+        intent = await getOfferTradeIntent(offer.id)
+      } catch (err) {
+        const code = (err as { code?: string }).code
+        if (code === "P0200" || code === "P0201") {
+          toast.error(t("trade.errorOfferUnavailable"))
+        } else if (code === "P0202") {
+          toast.error(t("trade.errorOwnOffer"))
+        } else {
+          toast.error(t("trade.errorOfferUnavailable"))
+        }
+        setStage("idle")
+        return
+      }
+      const buyerId = intent.buyer_id
+      const sellerId = intent.seller_id
+      const isMakerBuyer = intent.taker_role === "seller"
+      const buyerWallet = intent.buyer_wallet
+      const sellerWallet = intent.seller_wallet
       const buyerWalletValid = /^0x[a-fA-F0-9]{40}$/.test(buyerWallet)
       const sellerWalletValid = /^0x[a-fA-F0-9]{40}$/.test(sellerWallet)
       if (!buyerWalletValid || !sellerWalletValid) {
-        toast.error(t('trade.errorInvalidWallet'))
-        setStage('idle')
+        toast.error(t("trade.errorInvalidWallet"))
+        setStage("idle")
         return
       }
       if (buyerWallet.toLowerCase() === sellerWallet.toLowerCase()) {
-        toast.error(t('trade.errorSameCounterparty'))
-        setStage('idle')
+        toast.error(t("trade.errorSameCounterparty"))
+        setStage("idle")
         return
       }
-
-      
-
 
       const cryptoAmount = amountNum / price // human-units (e.g. 1.5 ETH)
 
@@ -226,27 +261,27 @@ export function TradePage() {
         publicClient.readContract({
           address: factoryAddress,
           abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
-          functionName: 'token',
+          functionName: "token",
         }),
         publicClient.readContract({
           address: factoryAddress,
           abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
-          functionName: 'treasury',
+          functionName: "treasury",
         }),
         publicClient.readContract({
           address: factoryAddress,
           abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
-          functionName: 'klerosCourt',
+          functionName: "klerosCourt",
         }),
         publicClient.readContract({
           address: factoryAddress,
           abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
-          functionName: 'klerosExtraDataPart1',
+          functionName: "klerosExtraDataPart1",
         }),
         publicClient.readContract({
           address: factoryAddress,
           abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
-          functionName: 'klerosExtraDataPart2',
+          functionName: "klerosExtraDataPart2",
         }),
       ])) as [
         `0x${string}`,
@@ -266,7 +301,7 @@ export function TradePage() {
         const factorySymbol = (await publicClient.readContract({
           address: tokenAddress,
           abi: ERC20_ABI as Abi,
-          functionName: 'symbol',
+          functionName: "symbol",
           args: [],
         })) as string
         if (
@@ -274,14 +309,14 @@ export function TradePage() {
           String(token).toLowerCase() !== String(factorySymbol).toLowerCase()
         ) {
           toast.error(
-            t('trade.errorTokenMismatch', {
+            t("trade.errorTokenMismatch", {
               offered: token,
               escrow: factorySymbol,
               defaultValue:
-                'This offer is denominated in {{offered}}, but the escrow contract only supports {{escrow}}.',
-            }),
+                "This offer is denominated in {{offered}}, but the escrow contract only supports {{escrow}}.",
+            })
           )
-          setStage('idle')
+          setStage("idle")
           return
         }
       } catch {
@@ -292,17 +327,17 @@ export function TradePage() {
       const decimals = (await publicClient.readContract({
         address: tokenAddress,
         abi: ERC20_ABI as Abi,
-        functionName: 'decimals',
+        functionName: "decimals",
         args: [],
       })) as number
       const safeDecimals = Math.min(Math.max(decimals, 0), 18)
       const cryptoBaseUnits = parseUnits(
         cryptoAmount.toFixed(safeDecimals),
-        safeDecimals,
+        safeDecimals
       )
       if (cryptoBaseUnits === 0n) {
-        toast.error(t('trade.errorAmountTooSmall'))
-        setStage('idle')
+        toast.error(t("trade.errorAmountTooSmall"))
+        setStage("idle")
         return
       }
 
@@ -318,7 +353,7 @@ export function TradePage() {
         gas = await publicClient.estimateContractGas({
           address: factoryAddress,
           abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
-          functionName: 'createEscrow',
+          functionName: "createEscrow",
           args: [
             buyerWallet as `0x${string}`,
             sellerWallet as `0x${string}`,
@@ -331,13 +366,13 @@ export function TradePage() {
       } catch (estErr) {
         const reason =
           estErr instanceof Error
-            ? estErr.message.split('\n')[0].slice(0, 240)
+            ? estErr.message.split("\n")[0].slice(0, 240)
             : String(estErr)
-        console.error('[TradePage] createEscrow estimate reverted:', estErr)
-        toast.error(t('trade.errorCreateEscrowEstimate'), {
+        console.error("[TradePage] createEscrow estimate reverted:", estErr)
+        toast.error(t("trade.errorCreateEscrowEstimate"), {
           description: reason,
         })
-        setStage('idle')
+        setStage("idle")
         return
       }
       // 30% headroom above the true estimate, capped below Infura's 16.7M
@@ -352,11 +387,11 @@ export function TradePage() {
       // The explicit `gas: gasLimit` prevents viem's auto-estimate fallback
       // (which hits the 21M block gas limit and reverts with "transaction
       // gas limit too high" on Infura's Sepolia endpoint).
-      setStage('mining')
+      setStage("mining")
       const txHash = await writeContractAsync({
         address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
         abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
-        functionName: 'createEscrow',
+        functionName: "createEscrow",
         args: [
           buyerWallet as `0x${string}`,
           sellerWallet as `0x${string}`,
@@ -380,7 +415,7 @@ export function TradePage() {
       // `escrowCountByBuyer - 1` fallback can point at a clone that belongs to
       // a DIFFERENT trade (the other tx may have mined first). The indexed
       // buyer/seller topics are reliable identifiers, so verify them.
-      const { decodeEventLog } = await import('viem')
+      const { decodeEventLog } = await import("viem")
       let deployedAddress: `0x${string}` | null = null
       const factoryAbi = KLEROS_ESCROW_FACTORY_ABI as Abi
       const buyerWalletLc = buyerWallet.toLowerCase()
@@ -392,7 +427,7 @@ export function TradePage() {
             data: log.data,
             topics: log.topics,
           })
-          if (decoded.eventName === 'EscrowCreated') {
+          if (decoded.eventName === "EscrowCreated") {
             const args = decoded.args as {
               escrowAddress?: string
               buyer?: string
@@ -418,29 +453,29 @@ export function TradePage() {
         const cloneCount = (await publicClient.readContract({
           address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
           abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
-          functionName: 'escrowCountByBuyer',
+          functionName: "escrowCountByBuyer",
           args: [buyerWallet as `0x${string}`],
         })) as bigint
         if (cloneCount > 0n) {
           deployedAddress = (await publicClient.readContract({
             address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
             abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
-            functionName: 'escrowByBuyer',
+            functionName: "escrowByBuyer",
             args: [buyerWallet as `0x${string}`, cloneCount - 1n],
           })) as `0x${string}`
         }
       }
 
       if (!deployedAddress) {
-        throw new Error(t('trade.errorFailedToDeploy'))
+        throw new Error(t("trade.errorFailedToDeploy"))
       }
 
       // Persist the trade to Supabase with on-chain metadata. B-10: also write
       //   - treasury_address (fee recipient; was always NULL before)
-//   - creator (msg.sender of createEscrow)
-//   - kleros_court_addr + extraData parts (so the indexer / trades list can
-//     skip the on-chain multicall for these immutable per-escrow fields)
-      setStage('saving')
+      //   - creator (msg.sender of createEscrow)
+      //   - kleros_court_addr + extraData parts (so the indexer / trades list can
+      //     skip the on-chain multicall for these immutable per-escrow fields)
+      setStage("saving")
       const trade = await createTrade({
         offer_id: offer.id,
         buyer_id: buyerId,
@@ -454,7 +489,7 @@ export function TradePage() {
         payment_details: {},
         platform_fee_bps: Number(offer.platform_fee_bps) || 50,
         treasury_address: treasuryAddress,
-        taker_role: isMakerBuyer ? 'seller' : 'buyer',
+        taker_role: isMakerBuyer ? "seller" : "buyer",
         // The Trade type already has `escrow_contract_addr` (string | null).
         escrow_contract_addr: deployedAddress,
         creator: address,
@@ -463,22 +498,29 @@ export function TradePage() {
         kleros_extra_data_part2: klerosPart2,
       })
 
-      toast.success(t('trade.successDeployed'))
+      toast.success(t("trade.successDeployed"))
       navigate(`/app/trades/${trade.id}`)
     } catch (error) {
-      toast.error(errorMessage(error, 'trade', t, 'errorFailedToDeploy'))
+      toast.error(errorMessage(error, "trade", t, "errorFailedToDeploy"))
     } finally {
-      setStage('idle')
+      setStage("idle")
     }
   }
 
   return (
     <section className="space-y-8">
       <ChainGuard />
-      <div className="max-w-xl mx-auto space-y-6">
+      <div className="mx-auto max-w-xl space-y-6">
         <AppPageHeader
-          title={offer.type === 'sell' ? t('trade.buyToken', { token }) : t('trade.sellToken', { token })}
-          subtitle={t('trade.offerSubtitle', { type: offer.type, offerId: offer.offer_id ?? offer.id })}
+          title={
+            offer.type === "sell"
+              ? t("trade.buyToken", { token })
+              : t("trade.sellToken", { token })
+          }
+          subtitle={t("trade.offerSubtitle", {
+            type: offer.type,
+            offerId: offer.offer_id ?? offer.id,
+          })}
           variant="centered"
           onBack={() => navigate(-1)}
         />
@@ -489,19 +531,22 @@ export function TradePage() {
               {/* Seller header */}
               <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                 <div className="flex items-center gap-3">
-                  <Link to={`/app/profile/${sellerAddr}`}>
-                    <Avatar className="h-12 w-12 hover:opacity-80 transition-opacity">
-                      <AvatarImage src={seller?.avatar_url ?? undefined} />
-                      <AvatarFallback>{sellerName.slice(0, 2).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                  </Link>
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={seller?.avatar_url ?? undefined} />
+                    <AvatarFallback>
+                      {sellerName.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
                   <div className="min-w-0">
-                    <Link to={`/app/profile/${sellerAddr}`}>
-                      <Text variant="h4" className="truncate hover:underline">{sellerName}</Text>
-                    </Link>
-                    {sellerAddr && (
-                      <Text variant="small" className="font-mono text-muted-foreground">
-                        {formatAddress(sellerAddr)}
+                    <Text variant="h4" className="truncate">
+                      {sellerName}
+                    </Text>
+                    {sellerHandle && (
+                      <Text
+                        variant="small"
+                        className="font-mono text-muted-foreground"
+                      >
+                        {sellerHandle}
                       </Text>
                     )}
                   </div>
@@ -510,19 +555,25 @@ export function TradePage() {
                   <div className="flex items-center gap-1">
                     {Number(seller?.avg_rating) ? (
                       <>
-                        <Star className="w-4 h-4 fill-primary text-primary" />
-                        <span className="font-medium">{Number(seller?.avg_rating).toFixed(1)}</span>
+                        <Star className="h-4 w-4 fill-primary text-primary" />
+                        <span className="font-medium">
+                          {Number(seller?.avg_rating).toFixed(1)}
+                        </span>
                       </>
                     ) : (
                       <>
-                        <Star className="w-4 h-4 text-muted-foreground/60" />
-                        <span className="text-muted-foreground">{t('trade.noRating')}</span>
+                        <Star className="h-4 w-4 text-muted-foreground/60" />
+                        <span className="text-muted-foreground">
+                          {t("trade.noRating")}
+                        </span>
                       </>
                     )}
                   </div>
                   <span className="text-muted-foreground">·</span>
                   <span>
-                    <span className="font-medium">{(seller?.total_trades ?? 0).toLocaleString()}</span>{' '}
+                    <span className="font-medium">
+                      {(seller?.total_trades ?? 0).toLocaleString()}
+                    </span>{" "}
                     <span className="text-muted-foreground">trades</span>
                   </span>
                 </div>
@@ -532,54 +583,95 @@ export function TradePage() {
 
               {/* Offer details */}
               <div className="space-y-3">
-                <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground">
-                  {t('trade.offerDetails')}
+                <Text
+                  variant="small"
+                  className="font-semibold tracking-wider text-muted-foreground uppercase"
+                >
+                  {t("trade.offerDetails")}
                 </Text>
-                <div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm justify-start">
-                  <span className="text-muted-foreground">{t('trade.pricePerToken', { token })}</span>
-                  <span className="font-mono">{symbol}{price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  <span className="text-muted-foreground">{t('trade.tradeRange')}</span>
-                  <span className="font-mono">{symbol}{minAmount.toLocaleString()} – {symbol}{maxAmount.toLocaleString()}</span>
-                  <span className="text-muted-foreground flex items-center gap-1.5">
-                    <Globe className="w-4 h-4" /> {t('trade.currency')}
+                <div className="grid grid-cols-[auto_1fr] justify-start gap-x-6 gap-y-3 text-sm">
+                  <span className="text-muted-foreground">
+                    {t("trade.pricePerToken", { token })}
+                  </span>
+                  <span className="font-mono">
+                    {symbol}
+                    {price.toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {t("trade.tradeRange")}
+                  </span>
+                  <span className="font-mono">
+                    {symbol}
+                    {minAmount.toLocaleString()} – {symbol}
+                    {maxAmount.toLocaleString()}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <Globe className="h-4 w-4" /> {t("trade.currency")}
                   </span>
                   <span>{offer.fiat_currency}</span>
                   {expiresAt && (
                     <>
-                      <span className="text-muted-foreground flex items-center gap-1.5">
-                        <Clock className="w-4 h-4" /> {t('trade.expires')}
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <Clock className="h-4 w-4" /> {t("trade.expires")}
                       </span>
                       <span>{expiresAt.toLocaleDateString()}</span>
                     </>
                   )}
-                  <span className="text-muted-foreground flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4" /> {t('trade.platformFee')}
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <ShieldCheck className="h-4 w-4" /> {t("trade.platformFee")}
                   </span>
-                  <span className="font-mono">{feePercent}%{networkFee > 0 ? ` (+${networkFee} gas)` : ''}</span>
-                  <span className="text-muted-foreground">{t('trade.paymentMethods')}</span>
+                  <span className="font-mono">
+                    {feePercent}%{networkFee > 0 ? ` (+${networkFee} gas)` : ""}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {t("trade.paymentMethods")}
+                  </span>
                   <span className="flex flex-wrap gap-1.5">
                     {paymentMethods.map((m) => (
-                      <Badge key={m} variant="secondary" className="rounded-full">{m}</Badge>
+                      <Badge
+                        key={m}
+                        variant="secondary"
+                        className="rounded-full"
+                      >
+                        {m}
+                      </Badge>
                     ))}
                   </span>
                   {regions.length > 0 && (
                     <>
-                      <span className="text-muted-foreground">{t('trade.regions')}</span>
+                      <span className="text-muted-foreground">
+                        {t("trade.regions")}
+                      </span>
                       <span className="flex flex-wrap gap-1.5">
                         {regions.map((r) => (
-                          <Badge key={r} variant="outline" className="rounded-full">{REGION_NAMES[r] ?? r}</Badge>
+                          <Badge
+                            key={r}
+                            variant="outline"
+                            className="rounded-full"
+                          >
+                            {REGION_NAMES[r] ?? r}
+                          </Badge>
                         ))}
                       </span>
                     </>
                   )}
                   {tags.length > 0 && (
                     <>
-                      <span className="text-muted-foreground flex items-center gap-1.5">
-                        <Tag className="w-4 h-4" /> {t('trade.tags')}
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <Tag className="h-4 w-4" /> {t("trade.tags")}
                       </span>
                       <span className="flex flex-wrap gap-1.5">
                         {tags.map((tag) => (
-                          <Badge key={tag} variant="secondary" className="rounded-full">{tag}</Badge>
+                          <Badge
+                            key={tag}
+                            variant="secondary"
+                            className="rounded-full"
+                          >
+                            {tag}
+                          </Badge>
                         ))}
                       </span>
                     </>
@@ -594,25 +686,41 @@ export function TradePage() {
             <CardContent className="space-y-4">
               {/* Amount input */}
               <div className="space-y-2">
-                <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground">
-                  {t('trade.amountLabel', { currency: offer.fiat_currency })}
+                <Text
+                  variant="small"
+                  className="font-semibold tracking-wider text-muted-foreground uppercase"
+                >
+                  {t("trade.amountLabel", { currency: offer.fiat_currency })}
                 </Text>
                 <Input
                   type="text"
                   inputMode="decimal"
-                  placeholder={t('trade.amountPlaceholder', { min: minAmount, max: maxAmount })}
+                  placeholder={t("trade.amountPlaceholder", {
+                    min: minAmount,
+                    max: maxAmount,
+                  })}
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                  onChange={(e) =>
+                    setAmount(e.target.value.replace(/[^0-9.]/g, ""))
+                  }
                   className="rounded-full"
                 />
                 {cryptoEstimate !== null ? (
                   <Text variant="small" className="text-muted-foreground">
-                    {t('trade.cryptoEstimate', { amount: cryptoEstimate.toLocaleString('en-US', { maximumFractionDigits: 6 }), token })}
+                    {t("trade.cryptoEstimate", {
+                      amount: cryptoEstimate.toLocaleString("en-US", {
+                        maximumFractionDigits: 6,
+                      }),
+                      token,
+                    })}
                   </Text>
                 ) : (
-                  amount !== '' && (
+                  amount !== "" && (
                     <Text variant="small" className="text-destructive">
-                      {t('trade.amountError', { min: `${symbol}${minAmount.toLocaleString()}`, max: `${symbol}${maxAmount.toLocaleString()}` })}
+                      {t("trade.amountError", {
+                        min: `${symbol}${minAmount.toLocaleString()}`,
+                        max: `${symbol}${maxAmount.toLocaleString()}`,
+                      })}
                     </Text>
                   )
                 )}
@@ -620,8 +728,11 @@ export function TradePage() {
 
               {/* Deposit rate input */}
               <div className="space-y-2">
-                <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground">
-                  {t('trade.depositRate')}
+                <Text
+                  variant="small"
+                  className="font-semibold tracking-wider text-muted-foreground uppercase"
+                >
+                  {t("trade.depositRate")}
                 </Text>
                 <Input
                   type="number"
@@ -630,70 +741,85 @@ export function TradePage() {
                   max={15}
                   step={0.5}
                   value={depositRate}
-                  onChange={(e) => setDepositRate(e.target.value.replace(/[^0-9.]/g, ''))}
+                  onChange={(e) =>
+                    setDepositRate(e.target.value.replace(/[^0-9.]/g, ""))
+                  }
                   className="rounded-full"
                 />
                 <Text variant="small" className="text-muted-foreground">
-                  {t('trade.depositHint')}
+                  {t("trade.depositHint")}
                 </Text>
-                {depositRate !== '' && !depositValid && (
+                {depositRate !== "" && !depositValid && (
                   <Text variant="small" className="text-destructive">
-                    {t('trade.depositError')}
+                    {t("trade.depositError")}
                   </Text>
                 )}
               </div>
 
               {/* Grace period input */}
               <div className="space-y-2">
-                <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground">
-                  {t('trade.gracePeriod')}
+                <Text
+                  variant="small"
+                  className="font-semibold tracking-wider text-muted-foreground uppercase"
+                >
+                  {t("trade.gracePeriod")}
                 </Text>
                 <Input
                   type="number"
                   inputMode="decimal"
                   min={1}
                   value={gracePeriod}
-                  onChange={(e) => setGracePeriodInput(e.target.value.replace(/[^0-9.]/g, ''))}
+                  onChange={(e) =>
+                    setGracePeriodInput(e.target.value.replace(/[^0-9.]/g, ""))
+                  }
                   className="rounded-full"
                 />
                 <Text variant="small" className="text-muted-foreground">
-                  {t('trade.gracePeriodHint')}
+                  {t("trade.gracePeriodHint")}
                 </Text>
-                {gracePeriod !== '' && !gracePeriodValid && (
+                {gracePeriod !== "" && !gracePeriodValid && (
                   <Text variant="small" className="text-destructive">
-                    {t('trade.gracePeriodError')}
+                    {t("trade.gracePeriodError")}
                   </Text>
                 )}
               </div>
 
               {/* Payment method dropdown + action */}
               <div className="space-y-2">
-                <Text variant="small" className="font-semibold uppercase tracking-wider text-muted-foreground">
-                  {t('trade.paymentMethodLabel')}
+                <Text
+                  variant="small"
+                  className="font-semibold tracking-wider text-muted-foreground uppercase"
+                >
+                  {t("trade.paymentMethodLabel")}
                 </Text>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Select
+                    value={paymentMethod}
+                    onValueChange={setPaymentMethod}
+                  >
                     <SelectTrigger className="w-full rounded-full">
-                      <SelectValue placeholder={t('trade.selectMethod')} />
+                      <SelectValue placeholder={t("trade.selectMethod")} />
                     </SelectTrigger>
                     <SelectContent>
                       {paymentMethods.map((m) => (
-                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                        <SelectItem key={m} value={m}>
+                          {m}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   <Button
-                    className="rounded-full shadow-none px-8 flex-1 sm:flex-none"
+                    className="flex-1 rounded-full px-8 shadow-none sm:flex-none"
                     disabled={isSubmitting}
                     onClick={handleOpenTrade}
                   >
                     {isSubmitting ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        {t('trade.opening')}
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {t("trade.opening")}
                       </>
                     ) : (
-                      t('trade.openTrade')
+                      t("trade.openTrade")
                     )}
                   </Button>
                 </div>

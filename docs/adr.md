@@ -499,6 +499,80 @@ pseudonym = "CN-" + uppercase(sha256(key_label)[0..16])
 
 ---
 
+## ADR-015 — Pseudo-offerta: identity-free offer surface (server-resolved parties)
+
+**Status: Accepted — Fase 0 ("Pseudo-offerta", approved by the user).**
+
+**Problem.** `/app/offer/:id` and `/app/offers` handed anonymous readers the
+offer's `seller_id` and the seller's `wallet_address` (via the `seller:users`
+join). That let anyone correlate an offer back to its maker's uid and on-chain
+wallet — directly contradicting the "anonimità dalla controparte" threat model
+of ADR-014. The route param itself is `offers.id` (a `gen_random_uuid()`), not
+a uid, but the payload was the leak.
+
+**Decision.** Split the data surface in two:
+
+1. **Offer browsing stays identity-free.** The public `offers` projection
+   (anon **and** authenticated) no longer carries `seller_id` / `target_user`,
+   and the seller join carries only the opaque `users.public_handle` +
+   public profile fields. The counterparty sees the seller's nickname + a
+   `CN-…` handle that cannot be inverted to a wallet (a new server-side random
+   label, NOT derived from anything).
+2. **Identity is revealed only at explicit trade/chat intent**, server-side,
+   through SECURITY DEFINER RPCs:
+   - `get_offer_trade_intent(offer_id)` resolves buyer/seller ids + wallets
+     for the signed-in taker and **re-validates** status/expiry/self-trade
+     (P0002/P0200/P0201/P0202). The escrow needs the counterparty wallet as a
+     constructor arg — revealing it here is the documented "layer dati" cut.
+   - `start_offer_conversation(offer_id)` reuses the existing
+     `get_or_create_direct_conversation` RPC, so the open-offer page starts a
+     chat without ever knowing the seller uid.
+- `get_public_offers_by_seller(public_handle)` replaces the client-side
+      `offers?seller_id=eq.<uid>` listing (ProfilePage): anonymous readers can
+      still list a seller's offers by its handle, with the same identity-free
+      projection.
+
+**Revision (deploy fix, 2026-09-20, migration `20260920000004`).** The
+marketplace / offer-detail READs also move to SECURITY DEFINER RPCs
+(`get_public_offers(limit, offset)`, `get_public_offer_by_id(id)`) instead of
+the direct REST FK embed `seller:users!offers_seller_id_fkey(...)`. Reason:
+the FK embed must SELECT `offers.seller_id` to build the join, and `anon`
+structurally lacks that column after `20260920000003` — so the shown-anonymous
+marketplace 42501'd at first deploy. The RPCs run as the definer and return the
+same identity-free projection (no `seller_id`/`target_user`), so the whole
+public surface — including fully-anonymous visitors — never touches the
+identity columns. This supersedes the "direct REST reads for lists" shortcut of
+OD-02 for `offers`, now a documented exception: *list-and-detail offer reads
+go through `public.*` plan RPCs (cache-friendly GET), not edge functions*.
+
+**Implementation notes / traded risks.**
+
+- Column grants for `anon` exclude `seller_id` + `target_user`; **`authenticated`
+  keeps column-level SELECT on both**. Reason: the owner-scoped UPDATE policy
+  evaluates `seller_id = current_user_id()` (20260829000002) — without the
+  column, every offer edit would 42501. Net effect: a *signed-in* platform user
+  can still read an offer's owner uid; that is at most equal to what the
+  trade-intent RPC already reveals to a counterparty, and the wallet remains
+  gated (no `users.wallet_address` on other users' rows for `anon`/others).
+  Fully closing it needs the OD-09 chat-privacy / server-hardening phase.
+- The profile page (`/app/profile/:wallet`) still shows a person's wallet on
+  purpose — profile identity is chosen by the user; offers no longer link out
+  to it.
+- `createOffer` / `updateOffer` now `.select("id, offer_id")` (an explicit
+  projection) — a bare `select()` would 42501 under the tightened grants.
+- Client `PUBLIC_OFFER_COLUMNS`, `SELLER_JOIN`, `PUBLIC_USER_COLUMNS` mirror
+  the migration; the edge mirror in `functions/_lib/public-data.ts` is kept in
+  sync (worker runs as the anon key).
+
+**Consequences.** Browsing the marketplace/detail is safest, the client no
+longer threads `seller_id`/wallets through offer reads (`TradePage` resolves
+parties only via the intent RPC; `OpenOfferPage`/`EditOfferPage` key ownership
+and chat off `public_handle`). Regression guards live in
+`tests/security/pseudo-offer.spec.ts`. Chat key privacy (OD-09) remains the
+open phase to finish the authenticated-uid residual.
+
+---
+
 ## Open decisions — Anonymità (Fase 0→3)
 
 Recorded so the scope set in ADR-014 lives on:
@@ -506,15 +580,19 @@ Recorded so the scope set in ADR-014 lives on:
 - **OD-07 — Trasporto non correlabile (relayer / mesh)** — "Fluidità prima di
   tutto": 1-hop relay optional path so deposit/refund txs don't scan back to
   the app-layer pseudonym; Tor/advanced indirection explicitly not in MVP.
-- **OD-08 — Minimizzazione metadati** — offer/message/session rows keep the
-  raw wallet keyed only server-side; expose `CN-…` labels in any data a
-  counterparty reads.
+- **OD-08 — Minimizzazione metadati** — **PARTIALLY IMPLEMENTED via ADR-015
+  (Pseudo-offerta)**: offer browsing is identity-free (`public_handle`, no
+  `seller_id`/wallet on anon reads; parties resolved only via RPC at
+  trade/chat intent). Residual: a signed-in platform user can still read an
+  offer's owner uid (required by the owner-scoped UPDATE policy) — see
+  ADR-015 risks; message/session-row minimization stays open.
 - **OD-09 — Privacy chat** — UNDECIDED (user did not answer): E2E per-
   conversation keys (derivable from the vault via `conv_key` labels),
   server-readable-but-non-correlabile, or both toggleable. Default proposal
   was server-readable non-correlabile (keeps MESSAGES_INSPECTOR / AML).
 - **Fase 0 delivered so far** — vault + per-label pseudonyms + rotate/burn +
-  profile card + tests + ADR-014. Schema/RLS unchanged.
+  profile card + tests + ADR-014 + **Pseudo-offerta offer surface (ADR-015:
+  identity-free offers, server-resolved parties, anon-safe seller listing)**.
 
 ---
 

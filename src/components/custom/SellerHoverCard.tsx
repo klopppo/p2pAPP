@@ -1,16 +1,18 @@
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
-import { Text } from '@/components/ui/text'
-import { Button } from '@/components/ui/button'
-import { Copy, ExternalLink, User } from 'lucide-react'
-import { Link } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
-import { explorerBase } from '@/lib/explorer'
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Text } from "@/components/ui/text"
+import { useTranslation } from "react-i18next"
 
 export interface SellerPreview {
   name: string
-  address: string
+  /** Opaque public label (`CN-<hex>`) — NEVER a wallet address (ADR-015).
+   *  The wallet only surfaces at trade intent. */
+  handle?: string
   avatar?: string
   rating: number
   totalTrades: number
@@ -25,58 +27,36 @@ interface SellerHoverCardProps {
 
 export function SellerHoverCard({ seller, children }: SellerHoverCardProps) {
   const { t } = useTranslation()
-  const formatAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`
-
-  const onCopy = async (addr: string) => {
-    try {
-      await navigator.clipboard.writeText(addr)
-    } catch {
-      // fallback
-      const ta = document.createElement('textarea')
-      ta.value = addr
-      document.body.appendChild(ta)
-      ta.select()
-      document.execCommand('copy')
-      ta.remove()
-    }
-  }
-
-  const onOpen = (addr: string) => {
-    window.open(`${explorerBase.address}${addr}`, '_blank', 'noopener')
-  }
 
   return (
     <HoverCard openDelay={200} closeDelay={100}>
-      <HoverCardTrigger asChild>
-        {children}
-      </HoverCardTrigger>
+      <HoverCardTrigger asChild>{children}</HoverCardTrigger>
       <HoverCardContent
         side="right"
         align="start"
-        className="w-80 max-w-[calc(100vw-1.5rem)] p-0 shadow-none rounded-2xl"
+        className="w-80 max-w-[calc(100vw-1.5rem)] rounded-2xl p-0 shadow-none"
       >
-        <div className="px-5 py-4 space-y-4">
+        <div className="space-y-4 px-5 py-4">
           {/* Seller header */}
           <div className="flex items-center gap-3">
             <Avatar className="h-11 w-11">
               <AvatarImage src={seller.avatar} />
-              <AvatarFallback>{seller.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+              <AvatarFallback>
+                {seller.name.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
             </Avatar>
             <div className="min-w-0">
-              <Text variant="h4" className="truncate">{seller.name}</Text>
-              <div className="flex items-center gap-2">
-                <Text variant="small" className="font-mono text-muted-foreground">
-                  {formatAddress(seller.address)}
+              <Text variant="h4" className="truncate">
+                {seller.name}
+              </Text>
+              {seller.handle && (
+                <Text
+                  variant="small"
+                  className="font-mono text-muted-foreground"
+                >
+                  {seller.handle}
                 </Text>
-                <div className="ml-auto flex items-center gap-1">
-                  <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); onCopy(seller.address) }} title={t('sellerHoverCard.copyAddress')}>
-                    <Copy className="w-4 h-4" />
-                  </Button>
-                  <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); onOpen(seller.address) }} title={t('sellerHoverCard.openOnBlockscan')}>
-                    <ExternalLink className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -87,32 +67,37 @@ export function SellerHoverCard({ seller, children }: SellerHoverCardProps) {
               <span className="font-medium">{seller.rating}</span>
             </div>
             <span className="text-muted-foreground">·</span>
-            <span><span className="font-medium">{seller.totalTrades.toLocaleString()}</span> <span className="text-muted-foreground">{t('sellerHoverCard.trades')}</span></span>
+            <span>
+              <span className="font-medium">
+                {seller.totalTrades.toLocaleString()}
+              </span>{" "}
+              <span className="text-muted-foreground">
+                {t("sellerHoverCard.trades")}
+              </span>
+            </span>
             <span className="text-muted-foreground">·</span>
-            <span><span className="font-medium">{seller.completionRate}</span> <span className="text-muted-foreground">{t('sellerHoverCard.completion')}</span></span>
+            <span>
+              <span className="font-medium">{seller.completionRate}</span>{" "}
+              <span className="text-muted-foreground">
+                {t("sellerHoverCard.completion")}
+              </span>
+            </span>
           </div>
 
           {/* Tags */}
           {seller.tags && seller.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {seller.tags.map((t) => (
-                <Badge key={t} variant="secondary" className="rounded-full text-xs">{t}</Badge>
+                <Badge
+                  key={t}
+                  variant="secondary"
+                  className="rounded-full text-xs"
+                >
+                  {t}
+                </Badge>
               ))}
             </div>
           )}
-
-          {/* View Profile link */}
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="rounded-full w-full justify-center"
-          >
-            <Link to={`/app/profile/${seller.address}`}>
-              <User className="w-3.5 h-3.5 mr-1.5" />
-              {t('sellerHoverCard.viewProfile')}
-            </Link>
-          </Button>
         </div>
       </HoverCardContent>
     </HoverCard>

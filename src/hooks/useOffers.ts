@@ -1,10 +1,10 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery } from "@tanstack/react-query"
 import {
   ensureUser,
   getActiveOffers,
   getOfferById,
-  getOffersBySeller,
-} from '@/lib/supabase'
+  getPublicOffersBySeller,
+} from "@/lib/supabase"
 
 /**
  * Active offers list (first page). react-query is already mounted in App.tsx
@@ -13,7 +13,7 @@ import {
  */
 export function useOffers() {
   return useQuery({
-    queryKey: ['offers'],
+    queryKey: ["offers"],
     queryFn: () => getActiveOffers(50),
   })
 }
@@ -24,20 +24,21 @@ export function useOffers() {
  */
 export function useOffer(id: string | undefined) {
   return useQuery({
-    queryKey: ['offer', id],
+    queryKey: ["offer", id],
     queryFn: () => getOfferById(id as string),
     enabled: !!id,
   })
 }
 
 /**
- * Offers by a specific seller (wallet address).
+ * Offers by a specific seller (opaque `public_handle` — ADR-015). Resolved
+ * server-side so anonymous readers never receive the seller's uid.
  */
-export function useOffersBySeller(sellerId: string | undefined) {
+export function useOffersBySeller(publicHandle: string | undefined) {
   return useQuery({
-    queryKey: ['offers', 'seller', sellerId],
-    queryFn: () => getOffersBySeller(sellerId!),
-    enabled: !!sellerId,
+    queryKey: ["offers", "seller", publicHandle],
+    queryFn: () => getPublicOffersBySeller(publicHandle!),
+    enabled: !!publicHandle,
   })
 }
 
@@ -47,9 +48,9 @@ export function useOffersBySeller(sellerId: string | undefined) {
  */
 export function useUserProfile(walletAddress: string | undefined) {
   return useQuery({
-    queryKey: ['user-profile', walletAddress],
+    queryKey: ["user-profile", walletAddress],
     queryFn: async () => {
-      if (!walletAddress) throw new Error('No wallet address')
+      if (!walletAddress) throw new Error("No wallet address")
       return ensureUser(walletAddress)
     },
     enabled: !!walletAddress,

@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { useAccount, useChainId } from 'wagmi'
+import { useEffect, useRef } from "react"
+import { useQueryClient } from "@tanstack/react-query"
+import { useAccount, useChainId } from "wagmi"
 import {
   ensureUser,
   getActiveOffers,
@@ -10,15 +10,15 @@ import {
   getTradesByUser,
   getUnreadNotificationCount,
   getUserByWallet,
-  getOffersBySeller,
+  getPublicOffersBySeller,
   listConversations,
   listMessages,
   listNotifications,
   ensureDefaultNotificationPreferences,
   getNotificationPreferences,
-} from '@/lib/supabase'
-import { useWalletSession } from './useWalletSession'
-import { useCurrentUser } from './useCurrentUser'
+} from "@/lib/supabase"
+import { useWalletSession } from "./useWalletSession"
+import { useCurrentUser } from "./useCurrentUser"
 
 /**
  * Warms the React Query cache for every main app surface as soon as a live
@@ -50,36 +50,45 @@ export function usePrefetchAppData() {
     // next mount.
     const staleTime = 60_000
 
-    const warm = (queryKey: readonly unknown[], queryFn: () => Promise<unknown>) => {
+    const warm = (
+      queryKey: readonly unknown[],
+      queryFn: () => Promise<unknown>
+    ) => {
       void qc.prefetchQuery({ queryKey, queryFn, staleTime })
     }
 
     // Identity / profile.
-    warm(['current-user', address], () => ensureUser(address))
-    warm(['user-profile', address], () => ensureUser(address))
-    warm(['user-reviews', userId], () => getRatingsByUser(userId))
-    warm(['user-reputation', userId], () => getReputationScores(userId))
-    warm(['offers', 'seller', userId], () => getOffersBySeller(userId))
+    warm(["current-user", address], () => ensureUser(address))
+    warm(["user-profile", address], () => ensureUser(address))
+    warm(["user-reviews", userId], () => getRatingsByUser(userId))
+    warm(["user-reputation", userId], () => getReputationScores(userId))
+    warm(["offers", "seller", user?.public_handle ?? "no-handle"], () =>
+      getPublicOffersBySeller(user?.public_handle ?? "")
+    )
 
     // Public marketplace.
-    warm(['offers'], () => getActiveOffers(50))
+    warm(["offers"], () => getActiveOffers(50))
 
     // Private, wallet-scoped surfaces (all require the RLS session).
-    warm(['conversations', userId, sessionWallet, 'active'], () =>
-      listConversations(userId, { archived: false }),
+    warm(["conversations", userId, sessionWallet, "active"], () =>
+      listConversations(userId, { archived: false })
     )
-    warm(['notifications', userId, sessionWallet], () => listNotifications(userId))
-    warm(['notifications:unread', userId, sessionWallet], () => getUnreadNotificationCount(userId))
-    warm(['notification-prefs', userId, sessionWallet], async () => {
+    warm(["notifications", userId, sessionWallet], () =>
+      listNotifications(userId)
+    )
+    warm(["notifications:unread", userId, sessionWallet], () =>
+      getUnreadNotificationCount(userId)
+    )
+    warm(["notification-prefs", userId, sessionWallet], async () => {
       await ensureDefaultNotificationPreferences(userId)
       return getNotificationPreferences(userId)
     })
-    warm(['trades', 'by-wallet', address, sessionWallet, chainId], async () => {
+    warm(["trades", "by-wallet", address, sessionWallet, chainId], async () => {
       const u = await getUserByWallet(address)
       if (!u) return []
       return getTradesByUser(u.id)
     })
-    warm(['disputes', 'by-wallet', address, sessionWallet], async () => {
+    warm(["disputes", "by-wallet", address, sessionWallet], async () => {
       const u = await getUserByWallet(address)
       if (!u) return []
       return getDisputesByUser(u.id)
@@ -97,14 +106,14 @@ export function usePrefetchAppData() {
         ])
         for (const conv of [...active, ...archived]) {
           void qc.prefetchQuery({
-            queryKey: ['messages', conv.id, sessionWallet],
+            queryKey: ["messages", conv.id, sessionWallet],
             queryFn: () => listMessages(conv.id, { limit: 50 }),
             staleTime,
           })
         }
       } catch (err) {
-        console.warn('[usePrefetchAppData] message warm-up failed:', err)
+        console.warn("[usePrefetchAppData] message warm-up failed:", err)
       }
     })()
-  }, [hasSession, sessionWallet, address, chainId, userId, qc])
+  }, [hasSession, sessionWallet, address, chainId, userId, user?.public_handle, qc])
 }

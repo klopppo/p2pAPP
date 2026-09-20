@@ -9,25 +9,25 @@
 // =================================================================
 
 export const EscrowStatus = {
-  AWAITING_DEPOSIT: 'awaiting_deposit',
-  BUYER_DEPOSITED: 'buyer_deposited',
-  SELLER_DEPOSITED: 'seller_deposited',
+  AWAITING_DEPOSIT: "awaiting_deposit",
+  BUYER_DEPOSITED: "buyer_deposited",
+  SELLER_DEPOSITED: "seller_deposited",
   /** KlerosEsc.State.FUNDED — buyer + seller deposits in and seller has
    *  locked tradeAmount. Distinct from SELLER_DEPOSITED which only captures
    *  one of those transitions. */
-  FUNDED: 'funded',
-  CONFIRMED: 'confirmed',
-  DEPOSITED: 'deposited',
-  PENDING_RELEASE: 'pending_release',
-  DISPUTED: 'disputed',
-  RELEASED: 'released',
-  REFUNDED: 'refunded',
+  FUNDED: "funded",
+  CONFIRMED: "confirmed",
+  DEPOSITED: "deposited",
+  PENDING_RELEASE: "pending_release",
+  DISPUTED: "disputed",
+  RELEASED: "released",
+  REFUNDED: "refunded",
   /** KlerosEsc.State.CANCELLED — funding-phase mutual cancel via
    *  `cancelTrade()`. Distinct from REFUNDED (which is the buyer-favorable
    *  dispute payout). See contract-execution-status.md §B-3. */
-  CANCELLED: 'cancelled',
+  CANCELLED: "cancelled",
 } as const
-export type EscrowStatus = typeof EscrowStatus[keyof typeof EscrowStatus]
+export type EscrowStatus = (typeof EscrowStatus)[keyof typeof EscrowStatus]
 
 /**
  * Kleros-specific event types that power the trade_events audit log. These
@@ -36,91 +36,93 @@ export type EscrowStatus = typeof EscrowStatus[keyof typeof EscrowStatus]
  * (planned in docs/todo.md).
  */
 export const TradeEventType = {
-  OFFER_CREATED: 'offer_created',
-  OFFER_ACCEPTED: 'offer_accepted',
-  OFFER_COMPLETED: 'offer_completed',
-  OFFER_CANCELLED: 'offer_cancelled',
-  OFFER_EXPIRED: 'offer_expired',
-  PAYMENT_SENT: 'payment_sent',
-  CRYPTO_SENT: 'crypto_sent',
-  ESCROW_DEPOSITED: 'escrow_deposited',
-  ESCROW_CONFIRMED: 'escrow_confirmed',
-  ESCROW_RELEASED: 'escrow_released',
-  ESCROW_REFUNDED: 'escrow_refunded',
-  ESCROW_DISPUTED: 'escrow_disputed',
-  ESCROW_RESOLVED: 'escrow_resolved',
-  ESCROW_CANCELLED: 'escrow_cancelled',
-  ESCROW_FUNDED: 'escrow_funded',
-  RATING_SUBMITTED: 'rating_submitted',
-  DISPUTE_OPENED: 'dispute_opened',
-  DISPUTE_RAISED: 'dispute_raised',
-  DISPUTE_RESOLVED: 'dispute_resolved',
-  DISPUTE_TIMED_OUT: 'dispute_timed_out',
-  DISPUTE_FINALIZED: 'dispute_finalized',
-  EVIDENCE_SUBMITTED: 'evidence_submitted',
-  APPEAL_FUNDED: 'appeal_funded',
-  RULING_RECEIVED: 'ruling_received',
-  RULING_EXECUTED: 'ruling_executed',
-  FUNDS_RETURNED: 'funds_returned',
-  CANCELLATION: 'cancellation',
-  REFUND_ISSUED: 'refund_issued',
+  OFFER_CREATED: "offer_created",
+  OFFER_ACCEPTED: "offer_accepted",
+  OFFER_COMPLETED: "offer_completed",
+  OFFER_CANCELLED: "offer_cancelled",
+  OFFER_EXPIRED: "offer_expired",
+  PAYMENT_SENT: "payment_sent",
+  CRYPTO_SENT: "crypto_sent",
+  ESCROW_DEPOSITED: "escrow_deposited",
+  ESCROW_CONFIRMED: "escrow_confirmed",
+  ESCROW_RELEASED: "escrow_released",
+  ESCROW_REFUNDED: "escrow_refunded",
+  ESCROW_DISPUTED: "escrow_disputed",
+  ESCROW_RESOLVED: "escrow_resolved",
+  ESCROW_CANCELLED: "escrow_cancelled",
+  ESCROW_FUNDED: "escrow_funded",
+  RATING_SUBMITTED: "rating_submitted",
+  DISPUTE_OPENED: "dispute_opened",
+  DISPUTE_RAISED: "dispute_raised",
+  DISPUTE_RESOLVED: "dispute_resolved",
+  DISPUTE_TIMED_OUT: "dispute_timed_out",
+  DISPUTE_FINALIZED: "dispute_finalized",
+  EVIDENCE_SUBMITTED: "evidence_submitted",
+  APPEAL_FUNDED: "appeal_funded",
+  RULING_RECEIVED: "ruling_received",
+  RULING_EXECUTED: "ruling_executed",
+  FUNDS_RETURNED: "funds_returned",
+  CANCELLATION: "cancellation",
+  REFUND_ISSUED: "refund_issued",
   /** Generic fallback for transitions that don't have a dedicated value above. */
-  ESCROW_STATUS_UPDATED: 'escrow_status_updated',
-  TRADE_STATUS_UPDATED: 'trade_status_updated',
+  ESCROW_STATUS_UPDATED: "escrow_status_updated",
+  TRADE_STATUS_UPDATED: "trade_status_updated",
 } as const
-export type TradeEventType = typeof TradeEventType[keyof typeof TradeEventType]
+export type TradeEventType =
+  (typeof TradeEventType)[keyof typeof TradeEventType]
 
 export const OfferStatus = {
-  ACTIVE: 'active',
-  PAUSED: 'paused',
-  COMPLETED: 'completed',
-  CANCELLED: 'cancelled',
-  EXPIRED: 'expired',
+  ACTIVE: "active",
+  PAUSED: "paused",
+  COMPLETED: "completed",
+  CANCELLED: "cancelled",
+  EXPIRED: "expired",
 } as const
-export type OfferStatus = typeof OfferStatus[keyof typeof OfferStatus]
+export type OfferStatus = (typeof OfferStatus)[keyof typeof OfferStatus]
 
 export const KYCStatus = {
-  PENDING: 'pending',
-  APPROVED: 'approved',
-  REJECTED: 'rejected',
-  EXPIRED: 'expired',
+  PENDING: "pending",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+  EXPIRED: "expired",
 } as const
-export type KYCStatus = typeof KYCStatus[keyof typeof KYCStatus]
+export type KYCStatus = (typeof KYCStatus)[keyof typeof KYCStatus]
 
 export const VerificationLevel = {
-  UNVERIFIED: 'unverified',
-  VERIFIED: 'verified',
-  TRUSTED: 'trusted',
-  SUSPICIOUS: 'suspicious',
+  UNVERIFIED: "unverified",
+  VERIFIED: "verified",
+  TRUSTED: "trusted",
+  SUSPICIOUS: "suspicious",
 } as const
-export type VerificationLevel = typeof VerificationLevel[keyof typeof VerificationLevel]
+export type VerificationLevel =
+  (typeof VerificationLevel)[keyof typeof VerificationLevel]
 
 export const UserRole = {
-  USER: 'user',
-  ADMIN: 'admin',
-  MEDIATOR: 'mediator',
-  SUPPORT: 'support',
+  USER: "user",
+  ADMIN: "admin",
+  MEDIATOR: "mediator",
+  SUPPORT: "support",
 } as const
-export type UserRole = typeof UserRole[keyof typeof UserRole]
+export type UserRole = (typeof UserRole)[keyof typeof UserRole]
 
 export const TradeStatus = {
-  PENDING: 'pending',
-  ACTIVE: 'active',
-  COMPLETED: 'completed',
-  CANCELLED: 'cancelled',
-  DISPUTED: 'disputed',
-  REFUNDED: 'refunded',
+  PENDING: "pending",
+  ACTIVE: "active",
+  COMPLETED: "completed",
+  CANCELLED: "cancelled",
+  DISPUTED: "disputed",
+  REFUNDED: "refunded",
 } as const
-export type TradeStatus = typeof TradeStatus[keyof typeof TradeStatus]
+export type TradeStatus = (typeof TradeStatus)[keyof typeof TradeStatus]
 
 export const DisputeStatus = {
-  OPEN: 'open',
-  IN_REVIEW: 'in_review',
-  RESOLVED: 'resolved',
-  ESCALATED: 'escalated',
-  CLOSED: 'closed',
+  OPEN: "open",
+  IN_REVIEW: "in_review",
+  RESOLVED: "resolved",
+  ESCALATED: "escalated",
+  CLOSED: "closed",
 } as const
-export type DisputeStatus = typeof DisputeStatus[keyof typeof DisputeStatus]
+export type DisputeStatus = (typeof DisputeStatus)[keyof typeof DisputeStatus]
 
 // =================================================================
 // USER TYPES
@@ -129,6 +131,9 @@ export type DisputeStatus = typeof DisputeStatus[keyof typeof DisputeStatus]
 export interface User {
   id: string
   wallet_address: string
+  /** Opaque public label (`CN-<hex>`), unique per user (ADR-015). Safe to
+   *  show on public surfaces: cannot be inverted to a wallet or uid. */
+  public_handle: string | null
   role: UserRole
   created_at: string
   updated_at: string
@@ -166,12 +171,12 @@ export interface UserPrivate {
   user_id: string
   email: string | null
   email_verified_at: string | null
-  phone_encrypted: string | null  // Base64 encoded
-  wallet_privkey_enc: string | null  // Base64 encrypted
+  phone_encrypted: string | null // Base64 encoded
+  wallet_privkey_enc: string | null // Base64 encrypted
   kyc_id: string | null
   twofa_enabled: boolean
-  twofa_secret_enc: string | null  // Base64 encrypted
-  backup_codes_enc: string | null  // Base64 encrypted
+  twofa_secret_enc: string | null // Base64 encrypted
+  backup_codes_enc: string | null // Base64 encrypted
   daily_limit: number | null
   weekly_limit: number | null
   daily_used: number
@@ -187,12 +192,12 @@ export interface UserPrivate {
 // =================================================================
 
 export const KYCDocType = {
-  PASSPORT: 'passport',
-  ID_CARD: 'id_card',
-  DRIVING_LICENSE: 'driving_license',
-  NATIONAL_ID: 'national_id',
+  PASSPORT: "passport",
+  ID_CARD: "id_card",
+  DRIVING_LICENSE: "driving_license",
+  NATIONAL_ID: "national_id",
 } as const
-export type KYCDocType = typeof KYCDocType[keyof typeof KYCDocType]
+export type KYCDocType = (typeof KYCDocType)[keyof typeof KYCDocType]
 
 export interface KYCApplication {
   id: string
@@ -211,9 +216,9 @@ export interface KYCApplication {
 export interface KYCDocument {
   id: string
   kyc_id: string
-  doc_kind: 'selfie' | 'front' | 'back'
-  file_hash: string  // SHA-256 hex
-  file_encrypted: string  // Base64 encrypted
+  doc_kind: "selfie" | "front" | "back"
+  file_hash: string // SHA-256 hex
+  file_encrypted: string // Base64 encrypted
   uploaded_at: string
 }
 
@@ -236,7 +241,7 @@ export interface Offer {
   offer_id: string
   seller_id: string
   status: OfferStatus
-  type: 'buy' | 'sell'
+  type: "buy" | "sell"
 
   crypto_token: string
   crypto_amount: number
@@ -376,7 +381,7 @@ export interface CreateTradeInput {
    *  KlerosEscrowFactory.createEscrow(). See src/lib/contracts.ts. */
   escrow_contract_addr?: string | null
   /** Role of the user opening the trade — used for the offer_accepted event. */
-  taker_role: 'buyer' | 'seller'
+  taker_role: "buyer" | "seller"
   /** msg.sender of KlerosEscrowFactory.createEscrow() (the taker in the
    *  typical flow). Optional but useful for audits / indexer joins. */
   creator?: string | null
@@ -393,7 +398,7 @@ export interface TradeRating {
   trade_id: string
   rater_id: string
   rated_id: string
-  direction: 'buyer' | 'seller'
+  direction: "buyer" | "seller"
   score: number
   comment: string | null
   anonymous: boolean
@@ -470,11 +475,11 @@ export interface Dispute {
   /** Number of appeal rounds completed against this Kleros dispute. */
   appeal_count?: number | null
   /** Which party raised the dispute ('buyer' | 'seller'). */
-  raiser?: 'buyer' | 'seller' | null
+  raiser?: "buyer" | "seller" | null
   /** ETH wei forwarded to KlerosCourt.createDispute() (stored as text). */
   fee_paid_wei?: string | null
   /** 'buyer' | 'seller' — populated by DisputeTimedOut event. */
-  winner?: 'buyer' | 'seller' | null
+  winner?: "buyer" | "seller" | null
   /** KlerosEsc.disputeTimestamp (unix seconds). */
   dispute_timestamp?: string | null
   /** KlerosEsc.rulingReceivedTime (unix seconds). */
@@ -484,7 +489,7 @@ export interface Dispute {
 export interface DisputeEvidence {
   id: string
   dispute_id: string
-  submitted_by: 'buyer' | 'seller' | 'neutral'
+  submitted_by: "buyer" | "seller" | "neutral"
   evidence_kind: string
   /** IPFS CID of the off-chain evidence bundle. (Originally named
    *  `file_hash`; renamed for clarity in migration 20260824*.) */
@@ -524,7 +529,7 @@ export interface ReputationPoint {
   category: string
   delta: number
   reason: string
-  source: 'trade' | 'rating' | 'dispute' | 'flag' | 'system'
+  source: "trade" | "rating" | "dispute" | "flag" | "system"
   created_at: string
 }
 
@@ -554,26 +559,28 @@ export interface LoginSession {
 // =================================================================
 
 export const ConversationStatus = {
-  OPEN: 'open',
-  ARCHIVED: 'archived',
-  LOCKED: 'locked',
+  OPEN: "open",
+  ARCHIVED: "archived",
+  LOCKED: "locked",
 } as const
-export type ConversationStatus = typeof ConversationStatus[keyof typeof ConversationStatus]
+export type ConversationStatus =
+  (typeof ConversationStatus)[keyof typeof ConversationStatus]
 
 export const ParticipantRole = {
-  BUYER: 'buyer',
-  SELLER: 'seller',
-  MEDIATOR: 'mediator',
-  OBSERVER: 'observer',
+  BUYER: "buyer",
+  SELLER: "seller",
+  MEDIATOR: "mediator",
+  OBSERVER: "observer",
 } as const
-export type ParticipantRole = typeof ParticipantRole[keyof typeof ParticipantRole]
+export type ParticipantRole =
+  (typeof ParticipantRole)[keyof typeof ParticipantRole]
 
 export const MessageKind = {
-  TEXT: 'text',
-  SYSTEM: 'system',
-  PAYMENT_HINT: 'payment_hint',
+  TEXT: "text",
+  SYSTEM: "system",
+  PAYMENT_HINT: "payment_hint",
 } as const
-export type MessageKind = typeof MessageKind[keyof typeof MessageKind]
+export type MessageKind = (typeof MessageKind)[keyof typeof MessageKind]
 
 export interface Conversation {
   id: string
@@ -629,14 +636,19 @@ export interface ConversationView extends Conversation {
 export interface ConversationWithParticipant extends ConversationParticipant {
   user: Pick<
     User,
-    'id' | 'wallet_address' | 'nickname' | 'avatar_url' | 'verification_level' | 'last_active_at'
+    | "id"
+    | "wallet_address"
+    | "nickname"
+    | "avatar_url"
+    | "verification_level"
+    | "last_active_at"
   >
 }
 
 export interface MessageWithSender extends Message {
   sender: Pick<
     User,
-    'id' | 'wallet_address' | 'nickname' | 'avatar_url' | 'verification_level'
+    "id" | "wallet_address" | "nickname" | "avatar_url" | "verification_level"
   >
 }
 
@@ -645,18 +657,20 @@ export interface MessageWithSender extends Message {
 // =================================================================
 
 export const NotificationKind = {
-  MESSAGE: 'message',
-  TRADE_UPDATE: 'trade_update',
-  DISPUTE_UPDATE: 'dispute_update',
-  SYSTEM: 'system',
+  MESSAGE: "message",
+  TRADE_UPDATE: "trade_update",
+  DISPUTE_UPDATE: "dispute_update",
+  SYSTEM: "system",
 } as const
-export type NotificationKind = typeof NotificationKind[keyof typeof NotificationKind]
+export type NotificationKind =
+  (typeof NotificationKind)[keyof typeof NotificationKind]
 
 export const NotificationChannel = {
-  INAPP: 'inapp',
-  EMAIL: 'email',
+  INAPP: "inapp",
+  EMAIL: "email",
 } as const
-export type NotificationChannel = typeof NotificationChannel[keyof typeof NotificationChannel]
+export type NotificationChannel =
+  (typeof NotificationChannel)[keyof typeof NotificationChannel]
 
 export interface Notification {
   id: string
@@ -685,17 +699,18 @@ export interface NotificationPreferences {
 // =================================================================
 
 export const ReferralStatus = {
-  PENDING: 'pending',
-  ACTIVE: 'active',
+  PENDING: "pending",
+  ACTIVE: "active",
 } as const
-export type ReferralStatus = typeof ReferralStatus[keyof typeof ReferralStatus]
+export type ReferralStatus =
+  (typeof ReferralStatus)[keyof typeof ReferralStatus]
 
 export const ReferralRewardStatus = {
-  PENDING: 'pending',
-  PAID: 'paid',
+  PENDING: "pending",
+  PAID: "paid",
 } as const
 export type ReferralRewardStatus =
-  typeof ReferralRewardStatus[keyof typeof ReferralRewardStatus]
+  (typeof ReferralRewardStatus)[keyof typeof ReferralRewardStatus]
 
 export interface ReferralCode {
   id: string
@@ -751,7 +766,7 @@ export interface MockOffer {
   id: number
   trader: string
   trades: number
-  type: 'buy' | 'sell'
+  type: "buy" | "sell"
   token: string
   amount: string
   price: number
@@ -762,5 +777,4 @@ export interface MockOffer {
 }
 
 // Re-export RBAC and Audit types
-export * from './rbac'
-
+export * from "./rbac"

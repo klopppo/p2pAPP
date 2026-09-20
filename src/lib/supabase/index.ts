@@ -69,6 +69,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 export const PUBLIC_USER_COLUMNS = [
   "id",
   "wallet_address",
+  "public_handle",
   "nickname",
   "avatar_url",
   "verification_level",
@@ -85,7 +86,6 @@ export const PUBLIC_USER_COLUMNS = [
 export const PUBLIC_OFFER_COLUMNS = [
   "id",
   "offer_id",
-  "seller_id",
   "status",
   "type",
   "crypto_token",
@@ -102,18 +102,20 @@ export const PUBLIC_OFFER_COLUMNS = [
   "tags",
   "description",
   "is_private",
-  "target_user",
   "grace_period",
   "published_at",
   "expires_at",
   "created_at",
 ].join(",")
 
-/** Seller join used by the marketplace/detail queries. All inside the users
- *  projection so anonymous reads keep working under OD-02. */
+/** Seller join used by the marketplace/detail queries. Identity-free zone:
+ *  NO `id`, NO `wallet_address` — only the opaque `public_handle` label plus
+ *  public profile fields (ADR-015). The real seller identity is resolved
+ *  server-side at trade/chat intent via the `get_offer_trade_intent` and
+ *  `start_offer_conversation` RPCs. All inside the users projection so anon
+ *  reads keep working under OD-02. */
 export const SELLER_JOIN = [
-  "id",
-  "wallet_address",
+  "public_handle",
   "nickname",
   "avatar_url",
   "verification_level",
@@ -123,11 +125,11 @@ export const SELLER_JOIN = [
 
 /**
  * Public seller profile as joined onto offer reads (OD-02 projection subset).
- * `id` is required so consumers can key off it (OpenOfferPage chat RPC).
+ * Identity-free: carries the opaque `public_handle` label only — never the
+ * user uid or wallet (ADR-015).
  */
 export type SellerProfile = {
-  id: string
-  wallet_address: string
+  public_handle: string | null
   nickname: string | null
   avatar_url: string | null
   verification_level: VerificationLevel
@@ -663,51 +665,39 @@ export async function getActiveOffers(
   limit = 50,
   offset = 0
 ): Promise<OfferWithSeller[] | null> {
-  const { data, error } = await supabase
-    .from("offers")
-    .select(
-      `${PUBLIC_OFFER_COLUMNS},seller:users!offers_seller_id_fkey(${SELLER_JOIN})`
-    )
-    .eq("status", OfferStatus.ACTIVE)
-    .gte("expires_at", new Date().toISOString())
-    .order("published_at", { ascending: false })
-    .range(offset, offset + limit - 1)
+  const { data, error } = await supabase.rpc("get_public_offers", {
+    p_limit: limit,
+    p_offset: offset,
+  })
 
   if (error) {
     console.error("Error fetching offers:", error)
     throw error
   }
 
-  return data as unknown as OfferWithSeller[]
+  return (data ?? []) as unknown as OfferWithSeller[]
 }
 
 /**
- * Get offers by seller
+ * Offers by a seller, keyed on the opaque `public_handle` (ADR-015). Runs the
+ * SECURITY DEFINER `get_public_offers_by_seller` RPC: the seller is resolved
+ * server-side from the handle so anonymous readers never touch (or receive)
+ * `offers.seller_id`, and the rows come back in the same identity-free
+ * projection as the marketplace. Returns `[]` for an unknown handle.
  */
-export async function getOffersBySeller(
-  sellerId: string,
-  status?: OfferStatus
-): Promise<OfferWithSeller[] | null> {
-  const query = supabase
-    .from("offers")
-    .select(
-      `${PUBLIC_OFFER_COLUMNS},seller:users!offers_seller_id_fkey(${SELLER_JOIN})`
-    )
-    .eq("seller_id", sellerId)
-    .order("created_at", { ascending: false })
-
-  if (status) {
-    query.eq("status", status)
-  }
-
-  const { data, error } = await query
+export async function getPublicOffersBySeller(
+  publicHandle: string
+): Promise<OfferWithSeller[]> {
+  const { data, error } = await supabase.rpc("get_public_offers_by_seller", {
+    p_public_handle: publicHandle,
+  })
 
   if (error) {
     console.error("Error fetching seller offers:", error)
     throw error
   }
 
-  return data as unknown as OfferWithSeller[]
+  return (data ?? []) as unknown as OfferWithSeller[]
 }
 
 /**
@@ -739,27 +729,96 @@ export function generateOfferId(): string {
 /**
  * Get a single offer by its primary key (the `:id` route param), with the
  * seller profile joined so TradePage / OpenOfferPage can render trader info.
+ * Runs the identity-free SECURITY DEFINER RPC: the direct FK embed would need
+ * `offers.seller_id`, which `anon` lacks (Pseudo-offerta, ADR-015).
  */
 export async function getOfferById(
   id: string
 ): Promise<OfferWithSeller | null> {
-  const { data, error } = await supabase
-    .from("offers")
-    .select(
-      `${PUBLIC_OFFER_COLUMNS},seller:users!offers_seller_id_fkey(${SELLER_JOIN})`
-    )
-    .eq("id", id)
-    .single()
+  const { data, error } = await supabase.rpc("get_public_offer_by_id", {
+    p_offer_id: id,
+  })
 
   if (error) {
-    if (error.code === "PGRST116") {
-      return null
-    }
     console.error("Error fetching offer:", error)
     throw error
   }
 
-  return data as unknown as OfferWithSeller
+  return (data ?? null) as unknown as OfferWithSeller | null
+}
+
+/**
+ * Server-resolved trade parties for an offer, returned ONLY at explicit trade
+ * intent and ONLY to a signed-in, non-seller caller (`get_offer_trade_intent`
+ * RPC — SECURITY DEFINER). This is the single point where the buyer learns the
+ * seller's uid + wallet ("rivelato solo allo scambio"); the public offer
+ * payload never carries them (ADR-015).
+ */
+export interface OfferTradeIntent {
+  offer_id: string
+  status: string
+  type: "buy" | "sell"
+  buyer_id: string
+  seller_id: string
+  buyer_wallet: string
+  seller_wallet: string
+  taker_role: "buyer" | "seller"
+}
+
+/** Business-code mapping for the trade-intent RPC. */
+export const TRADE_INTENT_ERRORS = {
+  OFFER_UNAVAILABLE: "P0200",
+  OFFER_EXPIRED: "P0201",
+  SELF_TRADE: "P0202",
+} as const
+
+export async function getOfferTradeIntent(
+  offerId: string
+): Promise<OfferTradeIntent> {
+  const { data, error } = await supabase.rpc("get_offer_trade_intent", {
+    p_offer_id: offerId,
+  })
+  if (error) {
+    const code = (error as { code?: string }).code
+    if (
+      typeof code === "string" &&
+      Object.values(TRADE_INTENT_ERRORS).includes(code as never)
+    ) {
+      throw Object.assign(new Error(`trade intent rejected (${code})`), {
+        code,
+      })
+    }
+    if (code === "P0002") {
+      throw Object.assign(new Error("sign in required"), { code: "P0002" })
+    }
+    console.error("Error resolving trade intent:", error)
+    throw error
+  }
+  return data as OfferTradeIntent
+}
+
+/**
+ * Start (or reuse) the buyer↔seller direct conversation keyed to an offer.
+ * The seller is resolved server-side from the offer (`start_offer_conversation`
+ * RPC), so the public page never learns — or sends — the seller uid. Returns
+ * the conversation id, or null when the viewer is the offer's own seller.
+ */
+export async function startOfferConversation(
+  offerId: string
+): Promise<string | null> {
+  const { data, error } = await supabase.rpc("start_offer_conversation", {
+    p_offer_id: offerId,
+  })
+  if (error) {
+    // P0002 = "unknown user" — viewer has no users row yet.
+    const code = (error as { code?: string }).code
+    if (code === "P0002") {
+      throw Object.assign(new Error("unknown user"), { code: "P0002" })
+    }
+    console.error("Error starting offer conversation:", error)
+    throw error
+  }
+  return (data as string | null) ?? null
 }
 
 /**
@@ -774,7 +833,7 @@ export async function createOffer(offerData: Partial<Offer>) {
       status: OfferStatus.ACTIVE,
       published_at: new Date().toISOString(),
     })
-    .select()
+    .select("id, offer_id")
     .single()
 
   if (error) {
@@ -805,7 +864,7 @@ export async function updateOffer(id: string, patch: Partial<Offer>) {
     .from("offers")
     .update({ ...sanitized, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .select()
+    .select("id, offer_id")
     .single()
 
   if (error) {

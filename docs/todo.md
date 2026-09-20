@@ -30,9 +30,20 @@
       default proposal stays server-readable-non-correlabile (keeps
       MESSAGES_INSPECTOR/AML). The vault already exposes `conversationPseudonym`
       for the corr-free handle layer.
-- [ ] **Metadata minimization (OD-08)** — expose `CN-…` labels instead of raw
-      wallets in any reader data (offers/messages/snippets) while keeping the
-      raw wallet server-side only.
+- [x] **Metadata minimization — offer surface (OD-08, ADR-015 "Pseudo-offerta")** —
+      offers browse identity-free: `users.public_handle` (random `CN-…`
+      label, not derivable), `seller_id`/`target_user` out of the anon offer
+      projection, parties resolved only via SECURITY DEFINER RPCs
+      (`get_offer_trade_intent` / `start_offer_conversation` /
+      `get_public_offers_by_seller` / `get_public_offers` /
+      `get_public_offer_by_id`). Client + edge-mirror constants,
+      `OffersPage`/`OpenOfferPage`/`TradePage`/`EditOfferPage`/`ProfilePage`
+      handle-based; `tests/security/pseudo-offer.spec.ts` (13 pass).
+      _(2026-09-20)_
+- [ ] **Metadata minimization — residual (OD-08)** — a signed-in platform user
+      can still read an offer's owner uid (required by the owner-scoped offer
+      UPDATE policy). Close via the OD-09 chat/server-hardening phase; message
+      rows still keyed to raw wallets server-side.
 - [ ] **Non-correlabile transport (OD-07)** — 1-hop relay path for escrow
       funding so deposit txs don't scan back to the pseudonym; deferred by the
       "layer dati" depth choice.
