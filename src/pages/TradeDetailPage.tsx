@@ -834,7 +834,7 @@ export function TradeDetailPage() {
                     {t('tradeDetail.fee')}
                   </Text>
                   <p className="font-mono">
-                    {(Number(escrowState.feeBps) / 100).toFixed(2)}%
+                    {(Number(escrowState.securityDepositPct) / 100).toFixed(2)}%
                   </p>
                 </div>
                 <div>

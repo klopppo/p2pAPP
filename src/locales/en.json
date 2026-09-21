@@ -582,7 +582,7 @@
     "seller": "Seller",
     "tradeAmount": "Trade amount",
     "securityDeposit": "Security deposit",
-    "fee": "Fee",
+    "fee": "Deposit fee",
     "gracePeriod": "Grace period",
     "gracePeriodBody": "The grace period is a per-escrow delay, that starts when the buyer confirms the off-chain payment. During this window either party may raise a dispute; once it elapses without one, anyone can call release() to finalize the trade and pay out.",
     "gracePeriodEnded": "Grace period ended — release is now available.",

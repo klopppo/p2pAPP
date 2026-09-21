@@ -557,7 +557,7 @@
     "seller": "Satıcı",
     "tradeAmount": "İşlem tutarı",
     "securityDeposit": "Güvence depozitosu",
-    "fee": "Ücret",
+    "fee": "Depozito ücreti",
     "gracePeriod": "Süre",
     "funding": "Finansman",
     "buyerDeposit": "Alıcı depozitosu {{amount}}",

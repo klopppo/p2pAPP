@@ -557,7 +557,7 @@
     "seller": "Vendeur",
     "tradeAmount": "Montant de l'échange",
     "securityDeposit": "Caution de sécurité",
-    "fee": "Frais",
+    "fee": "Frais de dépôt",
     "gracePeriod": "Délai de grâce",
     "funding": "Financement",
     "buyerDeposit": "Dépôt de l'acheteur {{amount}}",

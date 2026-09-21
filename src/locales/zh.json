@@ -557,7 +557,7 @@
     "seller": "卖家",
     "tradeAmount": "交易金额",
     "securityDeposit": "保证金",
-    "fee": "手续费",
+    "fee": "保证金手续费",
     "gracePeriod": "宽限期",
     "funding": "资金注入",
     "buyerDeposit": "买家保证金 {{amount}}",

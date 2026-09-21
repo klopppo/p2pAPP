@@ -557,7 +557,7 @@
     "seller": "Vendedor",
     "tradeAmount": "Cantidad de la operación",
     "securityDeposit": "Depósito de seguridad",
-    "fee": "Comisión",
+    "fee": "Comisión del depósito",
     "gracePeriod": "Período de gracia",
     "funding": "Financiamiento",
     "buyerDeposit": "Depósito del comprador {{amount}}",
