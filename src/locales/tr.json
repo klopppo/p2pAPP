@@ -529,6 +529,7 @@
     "errorRpcClient": "Genel RPC istemcisi hazır değil. Tekrar deneyin.",
     "errorOwnOffer": "Kendi teklifinizle ticaret yapamazsınız.",
     "errorSameCounterparty": "Alıcı ve satıcı farklı cüzdanlar olmalıdır.",
+    "errorTreasuryParty": "Bu cüzdan işlem tarafı olamaz: escrow komisyon hazinesidir.",
     "errorAmountTooSmall": "Tutar bu emanet için çok küçük.",
     "errorCreateEscrowEstimate": "Emanet sözleşmesi bu işlemi reddetti",
     "errorFailedToDeploy": "Konuşlandırılan emanet adresi çözümlenemedi.",

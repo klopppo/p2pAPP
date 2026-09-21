@@ -529,6 +529,7 @@
     "errorRpcClient": "Le client RPC public n'est pas prêt. Veuillez réessayer.",
     "errorOwnOffer": "Vous ne pouvez pas échanger avec votre propre offre.",
     "errorSameCounterparty": "L'acheteur et le vendeur doivent être des portefeuilles distincts.",
+    "errorTreasuryParty": "Ce portefeuille ne peut pas être partie à la transaction : c'est la trésorerie des frais de l'escrow.",
     "errorAmountTooSmall": "Le montant est trop faible pour ce séquestre.",
     "errorCreateEscrowEstimate": "Le contrat de séquestre a rejeté cet échange",
     "errorFailedToDeploy": "Impossible de résoudre l'adresse du séquestre déployé.",

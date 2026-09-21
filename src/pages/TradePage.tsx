@@ -291,6 +291,18 @@ export function TradePage() {
         `0x${string}`,
       ]
 
+      // The factory reverts `InvalidTreasury()` (0x14bcf5c8) when a party IS
+      // the treasury — its fee recipient must never be a trade counterparty.
+      // Surface that clearly instead of the opaque estimate revert below.
+      if (
+        buyerWallet.toLowerCase() === treasuryAddress.toLowerCase() ||
+        sellerWallet.toLowerCase() === treasuryAddress.toLowerCase()
+      ) {
+        toast.error(t("trade.errorTreasuryParty"))
+        setStage("idle")
+        return
+      }
+
       // The factory pins ONE token (immutable at construction). The offer's
       // `crypto_token` is a free-text symbol, so an offer denominated in
       // anything else (USDT/ETH/…) would otherwise deploy an escrow in the
