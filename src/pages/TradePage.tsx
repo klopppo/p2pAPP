@@ -291,6 +291,7 @@ export function TradePage() {
         `0x${string}`,
       ]
 
+<<<<<<< HEAD
       // The factory refuses its treasury wallet as a trade party
       // (`InvalidTreasury()` — the role is reserved for fees). Early deploys
       // pin the deployer as treasury, so testing with that account reverts
@@ -299,6 +300,14 @@ export function TradePage() {
       if (
         treasuryLc === buyerWallet.toLowerCase() ||
         treasuryLc === sellerWallet.toLowerCase()
+=======
+      // The factory reverts `InvalidTreasury()` (0x14bcf5c8) when a party IS
+      // the treasury — its fee recipient must never be a trade counterparty.
+      // Surface that clearly instead of the opaque estimate revert below.
+      if (
+        buyerWallet.toLowerCase() === treasuryAddress.toLowerCase() ||
+        sellerWallet.toLowerCase() === treasuryAddress.toLowerCase()
+>>>>>>> 65dd5a098e7b9cb521fb8d5e91b98d1f0ced0832
       ) {
         toast.error(t("trade.errorTreasuryParty"))
         setStage("idle")

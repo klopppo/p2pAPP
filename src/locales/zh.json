@@ -529,7 +529,11 @@
     "errorRpcClient": "公共 RPC 客户端未就绪，请重试。",
     "errorOwnOffer": "不能交易自己的报价。",
     "errorSameCounterparty": "买方和卖方必须使用不同的钱包。",
+<<<<<<< HEAD
     "errorTreasuryParty": "该钱包是托管金库，不能作为交易方。",
+=======
+    "errorTreasuryParty": "此钱包不能作为交易方：它是托管费用的财库。",
+>>>>>>> 65dd5a098e7b9cb521fb8d5e91b98d1f0ced0832
     "errorAmountTooSmall": "金额太小，无法放入此托管合约。",
     "errorCreateEscrowEstimate": "托管合约拒绝了此交易",
     "errorFailedToDeploy": "无法解析已部署的托管合约地址。",

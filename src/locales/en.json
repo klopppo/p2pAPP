@@ -554,7 +554,11 @@
     "errorOwnOffer": "You can't trade your own offer.",
     "errorOfferUnavailable": "This offer is no longer available for trading.",
     "errorSameCounterparty": "Buyer and seller must be different wallets.",
+<<<<<<< HEAD
     "errorTreasuryParty": "This wallet is the escrow treasury and can't be a trade party.",
+=======
+    "errorTreasuryParty": "This wallet can't be a trade party: it's the escrow fee treasury.",
+>>>>>>> 65dd5a098e7b9cb521fb8d5e91b98d1f0ced0832
     "errorAmountTooSmall": "The amount is too small to hold in this escrow.",
     "errorCreateEscrowEstimate": "The escrow contract rejected this trade",
     "errorFailedToDeploy": "Failed to resolve the deployed escrow address.",
