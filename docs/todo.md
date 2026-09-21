@@ -93,7 +93,11 @@
 - [ ] **Treasury == deployer blocks escrows with that address** — `createEscrow`
       reverts `InvalidTreasury()` when `buyer`/`seller` equals `treasury`
       (`0xcaDF076…`). Either change the treasury to a dedicated address, or only
-      trade with buyer/seller addresses that differ from it.
+      trade with buyer/seller addresses that differ from it. Client-side UX
+      guard landed (2026-09-20): `InvalidTreasury()` added to
+      `KLEROS_ESCROW_FACTORY_ABI` (decodes instead of "signature not found") +
+      pre-flight popup in `TradePage`; ops resolution (dedicated treasury /
+      avoid the address) still open.
 
 ---
 

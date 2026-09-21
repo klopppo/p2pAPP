@@ -191,6 +191,11 @@ export const KLEROS_ESC_ABI = parseAbi([
  */
 export const KLEROS_ESCROW_FACTORY_ABI = parseAbi([
   'function createEscrow(address buyer, address seller, uint256 gracePeriod, uint256 tradeAmount, uint256 securityDepositPct) external returns (address)',
+  // Custom errors the factory reverts with (see KlerosEscrowFactory.sol).
+  // In the ABI so viem decodes the reason instead of "signature not found". The
+  // treasury wallet can never be a trade party — early deploys pin the
+  // deployer as treasury, so this fires when testing with that account.
+  'error InvalidTreasury()',
   'function escrowCountByBuyer(address _party) external view returns (uint256)',
   'function escrowByBuyer(address _party, uint256 _index) external view returns (address)',
   'function escrowCountBySeller(address _party) external view returns (uint256)',

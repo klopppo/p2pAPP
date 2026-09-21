@@ -31,6 +31,7 @@
 | ADR-012 | Cookie-derived per-route cache keys at the edge (`coffernode_session` mirror + `x-cache-key` + `Vary: Cookie`)                     | Accepted                                                                                            | 2026-09-20 |
 | ADR-013 | Self-hosted client error reporting (`error_logs` + `/api/error-report` + React boundary)                                           | Accepted                                                                                            | 2026-09-20 |
 | ADR-014 | Device-bound Coffer Identity: client-derived HKDF master → per-label pseudonyms                                                    | Accepted                                                                                            | 2026-09-20 |
+| ADR-016 | RBAC/audit/reports cluster RLS: operator-context gating (wallet-claim bound), anon excluded                                            | Accepted                                                                                            | 2026-09-21 |
 
 ---
 
@@ -608,6 +609,45 @@ Recorded so the scope set in ADR-014 lives on:
 - **Fase 0 delivered so far** — vault + per-label pseudonyms + rotate/burn +
   profile card + tests + ADR-014 + **Pseudo-offerta offer surface (ADR-015:
   identity-free offers, server-resolved parties, anon-safe seller listing)**.
+
+---
+
+## ADR-016 — RBAC / audit / reports cluster RLS (operator-context gating)
+
+**Status: Accepted** (migrazione `20260921000001_rbac_rls.sql`, applicata e
+verificata su `tauyciaavhnopeseecmz`).
+
+**Problem.** Le tabelle della migration `002-rbac-audit-logger-operator-dashboard.sql`
+(`sys_programs`, `sys_roles`, `sys_permissions`,
+`sys_program_role_permissions`, `sys_operators`, `sys_operator_roles`,
+`user_activity_logs`, `user_reports`) erano state create **senza RLS** e con i
+grant di default Supabase (DML pieno a `anon`). Probe live anon-key: lettura di
+tutti gli operatori (email), dell'intero catalogo RBAC e di tutte le
+segnalazioni/audit-log con IP e user-agent — fuga d'identità P0.
+
+**Decisione.** La cluster segue il modello identity del SIWE RLS rewrite
+(20260829000002): il wallet del JWT di sessione (`auth.jwt() ->> 'wallet_address'`)
+risolve il contesto operatore via `sys_operators.wallet_address` / `.user_id`.
+
+- Tre helper SECURITY DEFINER new con `search_path` pinned —
+  `current_operator_id()`, `is_operator()`, `operator_has_permission(program, perm)`
+  (con short-circuit `SUPER_ADMIN`).
+- **`anon` → REVOKE ALL** sulla cluster (nessun read/write).
+- Cataloghi RBAC (`sys_programs/roles/permissions/matrix`): SELECT solo
+  operatori attivi; write solo `RBAC_MANAGEMENT` (CREATE/EDIT/DELETE).
+- `sys_operators` / `sys_operator_roles`: SELECT `RBAC_MANAGEMENT:VIEW` o
+  self-only; write nel solo `RBAC_MANAGEMENT`.
+- `user_activity_logs` (append-only): INSERT = operatore attivo oppure claim
+  del wallet di sessione (mai righe attribuite a operatori da non-operatori);
+  SELECT solo `AUDIT_LOGGER:AUDIT_READ`; nessun UPDATE/DELETE.
+- `user_reports`: INSERT bound al wallet del JWT; SELECT own-reporter o
+  `USER_REPORTS:VIEW`; UPDATE `RESOLVE_REPORT`; DELETE `USER_REPORTS:DELETE`.
+
+**Conseguenze.** Demo del dashboard invariato (fallback in-memory quando RLS
+nega); servizi edge `service_role` non toccati (bypass RLS). Un operatore reale
+deve avere una riga `sys_operators` legata al proprio wallet (o `user_id`) per
+accedere — la UI backoffice con lo switcher resta client-side e va sostituita
+dall'auth operatore server-side nella fase BFF (OD-02).
 
 ---
 

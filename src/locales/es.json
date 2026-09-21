@@ -529,6 +529,7 @@
     "errorRpcClient": "El cliente RPC público no está listo. Inténtelo de nuevo.",
     "errorOwnOffer": "No puede operar con su propia oferta.",
     "errorSameCounterparty": "El comprador y el vendedor deben ser carteras distintas.",
+    "errorTreasuryParty": "Esta billetera es la tesorería de la custodia y no puede ser una de las partes de la operación.",
     "errorAmountTooSmall": "El importe es demasiado pequeño para este depósito de garantía.",
     "errorCreateEscrowEstimate": "El contrato de depósito de garantía rechazó esta operación",
     "errorFailedToDeploy": "Error al resolver la dirección de custodia desplegada.",

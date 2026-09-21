@@ -291,6 +291,20 @@ export function TradePage() {
         `0x${string}`,
       ]
 
+      // The factory refuses its treasury wallet as a trade party
+      // (`InvalidTreasury()` — the role is reserved for fees). Early deploys
+      // pin the deployer as treasury, so testing with that account reverts
+      // on-chain; catch it here with a clear message instead.
+      const treasuryLc = treasuryAddress.toLowerCase()
+      if (
+        treasuryLc === buyerWallet.toLowerCase() ||
+        treasuryLc === sellerWallet.toLowerCase()
+      ) {
+        toast.error(t("trade.errorTreasuryParty"))
+        setStage("idle")
+        return
+      }
+
       // The factory pins ONE token (immutable at construction). The offer's
       // `crypto_token` is a free-text symbol, so an offer denominated in
       // anything else (USDT/ETH/…) would otherwise deploy an escrow in the

@@ -198,9 +198,9 @@ describe("protocol constants match the documented contract (contract-execution-s
     expect(MAX_SECURITY_DEPOSIT_BPS).toBe(1500n)
     expect(DEFAULT_SECURITY_DEPOSIT_BPS).toBe(1000n)
   })
-  it("timing: grace ≤ 365d, default 7d, cancel timelock 1d, dispute timeout 30d", () => {
+  it("timing: grace ≤ 365d, default 1h, cancel timelock 1d, dispute timeout 30d", () => {
     expect(MAX_GRACE_PERIOD_SECONDS).toBe(365n * 24n * 3600n)
-    expect(DEFAULT_GRACE_PERIOD_SECONDS).toBe(7n * 24n * 3600n)
+    expect(DEFAULT_GRACE_PERIOD_SECONDS).toBe(1n * 60n * 60n)
     expect(CANCEL_TIMELOCK_SECONDS).toBe(1n * 24n * 3600n)
     expect(DISPUTE_TIMEOUT_SECONDS).toBe(30n * 24n * 3600n)
   })

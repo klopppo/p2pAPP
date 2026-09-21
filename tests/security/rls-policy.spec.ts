@@ -266,6 +266,151 @@ describe("final RLS posture: allow/deny per table × role × command", () => {
   })
 })
 
+describe("RBAC / audit / reports cluster RLS (20260921000001)", () => {
+  // Tables created by docs/migrations/002-… were shippable with RLS OFF and
+  // full anon DML grants — a live open-read leak (operator emails, user
+  // reports, audit logs with IPs/user-agents). Their RLS now mirrors the
+  // deny-by-default posture of the SIWE rewrite: operator-only reads,
+  // wallet-claim-bound writes, anon excluded entirely.
+  const RBAC_TABLES = [
+    "sys_programs",
+    "sys_roles",
+    "sys_permissions",
+    "sys_program_role_permissions",
+    "sys_operators",
+    "sys_operator_roles",
+    "user_activity_logs",
+    "user_reports",
+  ]
+
+  it("every RBAC/audit/report table has RLS enabled", () => {
+    for (const t of RBAC_TABLES) {
+      expect(snapshot.rlsEnabled.get(t), `${t} should enable RLS`).toBe(true)
+    }
+  })
+
+  it("anon holds zero write policies on the RBAC cluster", () => {
+    const anonWrites: string[] = []
+    for (const t of RBAC_TABLES) {
+      for (const w of WRITE_COMMANDS) {
+        describeRoleAllowed(t, w, "anon", anonWrites)
+      }
+    }
+    expect(anonWrites).toEqual([])
+  })
+
+  it("anon has no leakable SELECT on sys_* and logs (user_reports is claim-bound)", () => {
+    for (const t of RBAC_TABLES.filter((x) => x !== "user_reports")) {
+      const anonSelect = policiesFor(t).filter(
+        (p) =>
+          (p.cmd === "all" || p.cmd === "select") && p.roles.includes("anon")
+      )
+      expect(anonSelect, `${t} must NOT be anon-readable`).toEqual([])
+    }
+    // user_reports declares an anon SELECT policy, but it must be identity-bound
+    // (own report only) — never a bare `true`.
+    const rep = policiesFor("user_reports").find(
+      (p) => p.cmd === "select" && p.roles.includes("anon")
+    )
+    expect(rep, "user_reports anon SELECT policy").toBeDefined()
+    expect(rep!.using).toContain("current_user_id()")
+  })
+
+  it("every write policy on the RBAC cluster is operator- or wallet-claim-bound", () => {
+    const unscoped: string[] = []
+    for (const t of RBAC_TABLES) {
+      for (const p of policiesFor(t)) {
+        const isWrite =
+          p.cmd === "all" || (WRITE_COMMANDS as string[]).includes(p.cmd)
+        if (!isWrite) continue
+        const expr = `${p.using} ${p.check}`.trim()
+        if (
+          expr === "true" ||
+          expr === "" ||
+          !/operator_has_permission\(|is_operator\(|current_user_id\(|auth\.jwt\(|auth\.uid\(/.test(
+            expr
+          )
+        ) {
+          unscoped.push(`${t}.${p.name} :: ${expr}`)
+        }
+      }
+    }
+    expect(unscoped).toEqual([])
+  })
+
+  it("sys_operators: SELECT is RBAC_VIEW-admin or self, never open", () => {
+    const sel = policiesFor("sys_operators").find((p) => p.cmd === "select")
+    expect(sel).toBeDefined()
+    expect(sel!.roles).toEqual(["authenticated"])
+    expect(sel!.using).toContain("RBAC_MANAGEMENT")
+    expect(sel!.using).toContain("current_operator_id()")
+  })
+
+  it("sys_operator_roles: SELECT is RBAC_VIEW-admin or self", () => {
+    const sel = policiesFor("sys_operator_roles").find(
+      (p) => p.cmd === "select"
+    )
+    expect(sel).toBeDefined()
+    expect(sel!.using).toContain("RBAC_MANAGEMENT")
+    expect(sel!.using).toContain("current_operator_id()")
+  })
+
+  it("user_activity_logs: INSERT is self/operator-bound, SELECT only AUDIT_READ, no UPDATE/DELETE", () => {
+    const cmds = policiesFor("user_activity_logs").map((p) => p.cmd)
+    expect(cmds).not.toContain("update")
+    expect(cmds).not.toContain("delete")
+
+    const ins = policiesFor("user_activity_logs").find((p) => p.cmd === "insert")
+    expect(ins).toBeDefined()
+    expect(ins!.check).toContain("is_operator()")
+    expect(ins!.check).toContain("current_user_id()")
+    expect(ins!.check).toContain("auth.jwt()")
+
+    const sel = policiesFor("user_activity_logs").find((p) => p.cmd === "select")
+    expect(sel).toBeDefined()
+    expect(sel!.using).toContain("AUDIT_LOGGER")
+    expect(sel!.using).toContain("AUDIT_READ")
+  })
+
+  it("user_reports: reporter wallet is JWT-bound on INSERT; resolve/delete are operator-permission-gated", () => {
+    const ins = policiesFor("user_reports").find((p) => p.cmd === "insert")
+    expect(ins).toBeDefined()
+    expect(ins!.check).toContain("reporter_wallet")
+    expect(ins!.check).toContain("auth.jwt()")
+
+    const upd = policiesFor("user_reports").find((p) => p.cmd === "update")
+    expect(upd).toBeDefined()
+    expect(upd!.using).toContain("RESOLVE_REPORT")
+
+    const del = policiesFor("user_reports").find((p) => p.cmd === "delete")
+    expect(del).toBeDefined()
+    expect(del!.using).toContain("DELETE")
+  })
+
+  it("RBAC catalogues: SELECT is operator-only, writes are RBAC_MANAGEMENT-gated", () => {
+    for (const t of ["sys_programs", "sys_roles", "sys_permissions", "sys_program_role_permissions"]) {
+      const sel = policiesFor(t).find((p) => p.cmd === "select")
+      expect(sel, `${t} select policy`).toBeDefined()
+      expect(sel!.roles).toEqual(["authenticated"])
+      expect(sel!.using).toContain("is_operator()")
+      for (const w of WRITE_COMMANDS) {
+        const p = policiesFor(t).find((x) => x.cmd === w)
+        expect(p, `${t} ${w} policy`).toBeDefined()
+        expect(p!.using || p!.check).toContain("RBAC_MANAGEMENT")
+      }
+    }
+  })
+
+  it("RBAC cluster helper functions are SECURITY DEFINER with pinned search_path", () => {
+    for (const fn of ["current_operator_id", "is_operator", "operator_has_permission"]) {
+      const def = snapshot.functions.get(fn)
+      expect(def, `function ${fn}`).toBeDefined()
+      expect(def!.securityDefiner).toBe(true)
+      expect(def!.searchPath).toBe(true)
+    }
+  })
+})
+
 describe("pre-cutover reality check (what an attacker can do BEFORE the deploy)", () => {
   it("documents that the permissive policies exist in the source set and are only removed by the cutover migration", () => {
     // Not an assertion of safety — a coded statement of the deployment gate.

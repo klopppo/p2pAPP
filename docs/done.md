@@ -9,6 +9,42 @@
 
 ---
 
+## RBAC/audit/reports RLS chiuso — no open read per `anon` — 2026-09-21
+
+Migrations `002-rbac-…` shipped the eight backoffice tables
+(`sys_programs`, `sys_roles`, `sys_permissions`,
+`sys_program_role_permissions`, `sys_operators`, `sys_operator_roles`,
+`user_activity_logs`, `user_reports`) with **RLS disabled** and stock Supabase
+grants (full DML per `anon`). Probe live con anon key: operatori con email,
+catalogo RBAC, tutte le segnalazioni e gli audit-log (IP/user-agent) leggibili
+senza sessione. Migrazione `20260921000001_rbac_rls.sql`: RLS enable su tutte
+le 8 tabelle, `REVOKE ALL` da `anon`, grants `authenticated` ridotti alle sole
+command che le policy gate-ano, e tre helper SECURITY DEFINER
+(`current_operator_id`, `is_operator`, `operator_has_permission`) che risolvono
+il contesto operatore dal wallet del JWT SIWE. Verificato live: anon → 42501
+su ogni lettura/scrittura; SUPER_ADMIN → tutto; SUPPORT_OPERATOR → catalogo +
+report + self only (niente AUDIT_READ); utente regolare → 0 rows e INSERT
+report bound al proprio wallet. Aggiornati ADR-016 e
+`tests/security/rls-policy.spec.ts` (nuovo describe cluster RBAC, 10 assert).
+
+---
+
+Test trade on Ethereum mainnet reverted with an undecodable
+`0x14bcf5c8` (`createEscrow` at `0x6f0fDB32…E7`, buyer
+`0xcaDF076f…`, treasury/deployer). Root cause: the buyer wallet **is** the
+factory treasury — `KlerosEscrowFactory.createEscrow` reverts
+`InvalidTreasury()`, and the client ABI didn't declare the error so viem
+reported "signature not found". Fix: `error InvalidTreasury()` added to
+`KLEROS_ESCROW_FACTORY_ABI` (`src/lib/contracts.ts`) so the revert decodes;
+`TradePage` pre-flights a treasury check (it already reads `treasury()` in the
+factory bundle) and shows `trade.errorTreasuryParty` instead of a cryptic
+revert; i18n key added in all 5 locales. Also fixed a stale
+`DEFAULT_GRACE_PERIOD_SECONDS` expectation in
+`tests/security/escrow-access-control.spec.ts` (7d → 1h, matches the shipped
+per-trade default that the failing call used: 3600s).
+
+---
+
 ## ADR-015 deploy hotfix — restore `authenticated` full reads (users/offers) — 2026-09-20
 
 Migration `20260920000003`'s drop-and-regrant column projection was applied to
