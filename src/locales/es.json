@@ -570,7 +570,7 @@
     "done": "Listo",
     "waitingForBuyer": "Esperando al comprador",
     "waitingForSeller": "Esperando al vendedor",
-    "you": "(usted)",
+    "you": "usted",
     "approveAndPostDeposit": "Aprobar + registrar depósito de seguridad",
     "approveAndLock": "Aprobar + bloquear criptomonedas en custodia",
     "confirmPayment": "Envié el fiat — confirmar pago",

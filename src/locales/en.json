@@ -598,7 +598,7 @@
     "done": "Done",
     "waitingForBuyer": "Waiting for buyer",
     "waitingForSeller": "Waiting for seller",
-    "you": "(you)",
+    "you": "you",
     "approveAndPostDeposit": "Approve + post security deposit",
     "approveAndLock": "Approve + lock crypto in escrow",
     "confirmPayment": "I sent the fiat — confirm payment",
