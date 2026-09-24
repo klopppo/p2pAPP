@@ -208,7 +208,15 @@ async function handleVerify(
     )
   }
 
-  if (!ALLOWED_URI_HOSTS.has(parsed.uriHost)) {
+  // Phishing guard: the wallet renders BOTH the header domain and the URI, so
+  // both must be an allowed host and agree with each other. Checking only the
+  // URI let a crafted message show `evil.com` in the header while signing a
+  // legitimate URI.
+  if (
+    !ALLOWED_URI_HOSTS.has(parsed.uriHost) ||
+    !ALLOWED_URI_HOSTS.has(parsed.domain) ||
+    parsed.domain !== parsed.uriHost
+  ) {
     return json({ error: INCORRECT_HOST_ERROR }, 400)
   }
   if (parsed.version !== "1")
@@ -351,7 +359,7 @@ async function getOrCreateAuthUser(
     email,
     password: crypto.randomUUID(),
     email_confirm: true,
-    user_metadata: { wallet_address: addr },
+    app_metadata: { wallet_address: addr },
   })
 
   if (error) {
@@ -386,11 +394,12 @@ async function getOrCreateAuthUser(
 }
 
 /**
- * Make sure the GoTrue auth user's `user_metadata.wallet_address` matches
- * `addr`. GoTrue signs it into every subsequent session JWT, and the SIWE RLS
- * layer (see migrations/20260908000001) reads it from there — so an auth user
- * without the claim would mint "valid" sessions that every wallet-scoped RLS
- * policy silently denies. Idempotent: no-op when the claim already matches.
+ * Make sure the GoTrue auth user's `app_metadata.wallet_address` matches
+ * `addr`. `app_metadata` is admin-only (users cannot rewrite it), so GoTrue can
+ * sign it into every session JWT without turning the claim into a
+ * self-asserted, forgeable value — the SIWE RLS layer (see migrations/
+ * 20260924000001) reads it from there. Idempotent: no-op when it already
+ * matches.
  */
 async function ensureWalletMetadata(
   admin: ReturnType<typeof createClient>,
@@ -398,10 +407,10 @@ async function ensureWalletMetadata(
   addr: string
 ): Promise<void> {
   const { data: u } = await admin.auth.admin.getUserById(authUid)
-  const meta = (u?.user?.user_metadata ?? {}) as Record<string, unknown>
+  const meta = (u?.user?.app_metadata ?? {}) as Record<string, unknown>
   if (meta.wallet_address === addr) return
   await admin.auth.admin.updateUserById(authUid, {
-    user_metadata: { ...meta, wallet_address: addr },
+    app_metadata: { ...meta, wallet_address: addr },
   })
 }
 

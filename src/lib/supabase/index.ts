@@ -2798,26 +2798,27 @@ function isEdgeFunctionRateLimited(err: unknown): boolean {
  * or null when there is no session (or the claim is missing).
  */
 export async function getSessionWallet(): Promise<string | null> {
-  // The real source of truth is the active Supabase session. Prefer the
-  // actual JWT claim (top-level or GoTrue's nested `user_metadata` bag).
+  // The real source of truth is the active Supabase session. Read the
+  // admin-only `app_metadata.wallet_address` claim (matches the RLS layer);
+  // `wallet_address` top-level is the legacy custom-token fallback.
   const session = await getSession()
   if (session?.access_token) {
     const payload = decodeJwtPayload(session.access_token)
-    const metadata = payload?.user_metadata as
+    const appMeta = payload?.app_metadata as
       | Record<string, unknown>
       | undefined
     const raw =
       typeof payload?.wallet_address === "string"
         ? payload.wallet_address
-        : typeof metadata?.wallet_address === "string"
-          ? metadata.wallet_address
+        : typeof appMeta?.wallet_address === "string"
+          ? appMeta.wallet_address
           : null
     if (typeof raw === "string" && raw) return raw.toLowerCase()
     // A present token WITHOUT the claim mints a "valid" session the RLS
     // layer still denies (current_user_id() resolves to NULL). Treat it as
-    // not signed-in so callers re-run SIWE — the edge function backfills
-    // user_metadata.wallet_address on every verify, so the retry fixes the
-    // claim instead of looping on silent denials.
+    // not signed-in so callers re-run SIWE / refresh — the edge function
+    // writes app_metadata.wallet_address on every verify, so the retry fixes
+    // the claim instead of looping on silent denials.
     return null
   }
 
@@ -2898,11 +2899,11 @@ export async function isSignedInAs(walletAddress: string): Promise<boolean> {
 
 /**
  * Self-heal for sessions minted BEFORE the wallet-claim backfill shipped.
- * GoTrue issues fresh tokens with the CURRENT user_metadata, so exchanging
- * the stored refresh_token silently rewrites a claim-less JWT into one that
- * carries `user_metadata.wallet_address` — no wallet signature needed.
- * Returns true when the active token already does (or now does) carry the
- * claim for `address`. Callers fall through to the normal SIWE re-sign path.
+ * GoTrue issues fresh tokens with the CURRENT app_metadata, so exchanging the
+ * stored refresh_token silently rewrites a claim-less JWT into one that carries
+ * `app_metadata.wallet_address` — no wallet signature needed. Returns true when
+ * the active token already does (or now does) carry the claim for `address`.
+ * Callers fall through to the normal SIWE re-sign path.
  */
 async function refreshToWalletClaim(address: string): Promise<boolean> {
   const addr = address.toLowerCase()
@@ -2912,14 +2913,14 @@ async function refreshToWalletClaim(address: string): Promise<boolean> {
   const readMemoizedClaim = (accessToken: string): string | null => {
     const payload = decodeJwtPayload(accessToken)
     if (!payload) return null
-    const metadata = payload?.user_metadata as
+    const appMeta = payload?.app_metadata as
       | Record<string, unknown>
       | undefined
     const raw =
       typeof payload?.wallet_address === "string"
         ? payload.wallet_address
-        : typeof metadata?.wallet_address === "string"
-          ? metadata.wallet_address
+        : typeof appMeta?.wallet_address === "string"
+          ? appMeta.wallet_address
           : null
     return typeof raw === "string" && raw ? raw.toLowerCase() : null
   }

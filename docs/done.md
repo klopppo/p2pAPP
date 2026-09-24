@@ -9,6 +9,42 @@
 
 ---
 
+## Security — app_metadata wallet claim, SIWE domain check, operator gate — 2026-09-24
+
+Fixes for the 3 critical findings of the full-codebase audit. **Requires a DB
+migration + `siwe-auth` redeploy** (see below); existing sessions must all
+re-sign once.
+
+- **Wallet-claim forgery (CRITICAL)** — RLS authorized off the user-writable
+  `user_metadata.wallet_address`, so any signed-in user could set it to a victim
+  (via `supabase.auth.updateUser`) and mint a JWT the whole app trusted. The
+  claim now lives in admin-only `app_metadata`:
+  - `siwe-auth` writes `app_metadata.wallet_address` (create + backfill).
+  - New migration `20260924000001_wallet_claim_app_metadata.sql` recreates
+    `current_user_id()`, the `users` self policies, the private-offer + avatar
+    storage policies, and the RBAC helpers (`current_operator_id`,
+    `is_operator`, `operator_has_permission`) to read `app_metadata` only.
+  - Client claim readers (`getSessionWallet`, `refreshToWalletClaim`) read
+    `app_metadata` (falling back to the legacy top-level claim, never
+    `user_metadata`).
+- **SIWE domain (HIGH)** — `parseSiweMessage` now parses the header domain;
+  `siwe-auth` rejects unless both the header domain and the URI host are
+  allowlisted and equal (previously only the URI was checked, so a message could
+  display `evil.com` while signing the real host).
+- **Operator portal (CRITICAL)** — `/app/operator` is wrapped in a new
+  `RequireOperator` gate that checks `is_operator()` server-side; any
+  non-operator is redirected to the marketplace. `operatorService` no longer
+  defaults to `SUPER_ADMIN` (`getCurrentOperator` → least privilege) and now
+  resolves the signed-in operator from `sys_operators` via
+  `resolveCurrentOperator()`.
+
+Files: `supabase/migrations/20260924000001_wallet_claim_app_metadata.sql`,
+`supabase/functions/siwe-auth/index.ts`, `supabase/functions/_shared/siwe-core.ts`,
+`src/lib/supabase/index.ts`, `src/components/auth/RequireOperator.tsx`,
+`src/App.tsx`, `src/lib/operatorService.ts`, `src/pages/OperatorDashboardPage.tsx`.
+
+---
+
 ## Full-codebase bug sweep — client correctness + edge hardening — 2026-09-24
 
 Parallel audit (on-chain flows, data/session layer, chat, auth/edge, pages/i18n)

@@ -11,6 +11,7 @@
 
 export interface ParsedSiweMessage {
   address: string
+  domain: string
   uriHost: string
   version: string
   nonce: string
@@ -39,9 +40,15 @@ export function parseSiweMessage(message: string): ParsedSiweMessage {
   const lines = message.split("\n").map((l) => l.replace(/\r$/, ""))
   // Line 0: "<domain> wants you to sign in with your Ethereum account:"
   const header = lines[0] ?? ""
-  if (!header.endsWith(" wants you to sign in with your Ethereum account:")) {
+  const HEADER_SUFFIX = " wants you to sign in with your Ethereum account:"
+  if (!header.endsWith(HEADER_SUFFIX)) {
     throw new Error("Not a SIWE message")
   }
+  // The domain is the human-visible line the wallet shows the user. It must be
+  // validated too — checking only URI lets a phisher put `evil.com` in the
+  // header while pointing URI at the real host.
+  const domain = header.slice(0, -HEADER_SUFFIX.length).trim().toLowerCase()
+  if (!domain) throw new Error("Missing domain")
 
   const address = (lines[1] ?? "").trim().toLowerCase()
   if (!/^0x[0-9a-f]{40}$/.test(address)) throw new Error("Missing address")
@@ -65,7 +72,7 @@ export function parseSiweMessage(message: string): ParsedSiweMessage {
     throw new Error("Malformed URI")
   }
 
-  return { address, uriHost, version, nonce, issuedAt }
+  return { address, domain, uriHost, version, nonce, issuedAt }
 }
 
 /** Canonical wallet form — lower-cased, checksummed length (0x + 40 hex). NULL on junk. */

@@ -15,6 +15,7 @@ import { useTheme } from "@/components/theme-provider"
 import "@rainbow-me/rainbowkit/styles.css"
 import { config } from "./wagmi"
 import { AppLayout } from "./components/layout/AppLayout"
+import { RequireOperator } from "./components/auth/RequireOperator"
 import { AppPageFallback } from "./components/custom/AppPageFallback"
 import { AppErrorBoundary } from "./components/ErrorBoundary"
 
@@ -217,7 +218,14 @@ function RoutesWithinBoundary() {
             <Route path="dispute" element={<DisputePage />} />
             <Route path="disputes" element={<DisputesListPage />} />
             <Route path="disputes/:id" element={<DisputeDetailPage />} />
-            <Route path="operator" element={<OperatorDashboardPage />} />
+            <Route
+              path="operator"
+              element={
+                <RequireOperator>
+                  <OperatorDashboardPage />
+                </RequireOperator>
+              }
+            />
           </Route>
 
           <Route path="/docs" element={<DocsLayout />}>
