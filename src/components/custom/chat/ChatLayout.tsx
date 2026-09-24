@@ -325,6 +325,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
           ) : (
     <div className="flex-1 bg-background/20 px-6 pt-6 pb-3 flex flex-col min-h-0 overflow-hidden">
               <ChatHeader
+                key={convQuery.data.id}
                 conversation={convQuery.data}
                 currentUserId={user.id}
                 online={partnerOnline}

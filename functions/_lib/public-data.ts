@@ -85,7 +85,15 @@ export async function collectPublicData(
   // to the public projection columns (OD-02).
   const profile = pathname.match(/^\/app\/profile\/([^/]+)$/)
   if (profile) {
-    const addr = decodeURIComponent(profile[1]).toLowerCase()
+    // A malformed percent-encoding (`/app/profile/%`) makes decodeURIComponent
+    // throw; this runs outside edgeFetch's try/catch, so an unguarded throw
+    // would 500 every document response for that URL.
+    let addr: string
+    try {
+      addr = decodeURIComponent(profile[1]).toLowerCase()
+    } catch {
+      return { profile: null }
+    }
     const rows = await edgeFetch(
       env,
       `/rest/v1/users?wallet_address=eq.${encodeURIComponent(addr)}&select=${encodeURIComponent(PUBLIC_USER_COLUMNS)}`

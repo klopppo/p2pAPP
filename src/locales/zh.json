@@ -173,7 +173,20 @@
     "messageTitle": "打开与该用户的聊天",
     "errorStartChat": "无法开始聊天 — 请重试。",
     "messageStarting": "打开中…",
-    "errorUnknownUser": "该用户尚未完成登录 — 请稍后再试。"
+    "errorUnknownUser": "该用户尚未完成登录 — 请稍后再试。",
+    "cofferTitle": "Coffer 身份",
+    "cofferUnavailable": "使用钱包登录以派生与此设备绑定的 Coffer 身份。",
+    "cofferFingerprint": "身份指纹",
+    "cofferSampleTrade": "交易假名示例",
+    "cofferUses": "每笔交易和聊天都在本设备上派生各自独立的不透明假名。服务器只能看到无法追溯到您钱包的字符串。",
+    "cofferRotate": "轮换",
+    "cofferRotateConfirm": "确认轮换",
+    "cofferRotated": "Coffer 身份已轮换——新假名已生效。",
+    "cofferRotateFailed": "无法轮换身份——请重试。",
+    "cofferBurn": "销毁身份",
+    "cofferBurnConfirm": "确认销毁",
+    "cofferBurned": "Coffer 身份已销毁——本设备的假名历史已清除。",
+    "cofferBurnNote": "销毁只会清除本设备的身份——绝不会影响您的钱包或资金。"
   },
   "trades": {
     "title": "交易",
@@ -540,7 +553,8 @@
     "errorTokenMismatch": "此报价以 {{offered}} 计价，但托管合约仅支持 {{escrow}}。",
     "gracePeriod": "宽限期（小时）",
     "gracePeriodHint": "对方在允许释放之前确认付款的时间。",
-    "gracePeriodError": "宽限期必须在 1 小时到 365 天之间。"
+    "gracePeriodError": "宽限期必须在 1 小时到 365 天之间。",
+    "errorOfferUnavailable": "该报价已不可用于交易。"
   },
   "tradeDetail": {
     "loadingTrade": "正在加载交易…",
@@ -862,5 +876,19 @@
     "catImpersonation": "冒充身份",
     "catTerms": "违反服务条款",
     "catOther": "其他"
+  },
+  "referral": {
+    "title": "邀请赚取",
+    "loading": "正在加载您的邀请链接…",
+    "getMyLink": "获取我的邀请链接",
+    "revealFailed": "无法创建您的邀请链接——请重试。",
+    "copy": "复制",
+    "copied": "已复制",
+    "linkCopied": "邀请链接已复制",
+    "copyFailed": "无法复制链接——请手动复制。",
+    "pending": "待处理",
+    "totalEarned": "总收益",
+    "friends": "已邀请好友",
+    "trades": "产生收益的交易"
   }
 }

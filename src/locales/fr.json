@@ -173,7 +173,20 @@
     "messageTitle": "Ouvrir le chat avec cet utilisateur",
     "errorStartChat": "Impossible de démarrer la conversation — réessayez.",
     "messageStarting": "Ouverture…",
-    "errorUnknownUser": "Cet utilisateur n'a pas encore terminé la connexion — réessayez dans quelques secondes."
+    "errorUnknownUser": "Cet utilisateur n'a pas encore terminé la connexion — réessayez dans quelques secondes.",
+    "cofferTitle": "Identité Coffer",
+    "cofferUnavailable": "Connectez-vous avec votre portefeuille pour dériver votre identité Coffer liée à cet appareil.",
+    "cofferFingerprint": "Empreinte d'identité",
+    "cofferSampleTrade": "Pseudonyme d'échange (exemple)",
+    "cofferUses": "Chaque échange et discussion reçoit son propre pseudonyme opaque dérivé sur cet appareil. Le serveur ne voit que des chaînes impossibles à relier à votre portefeuille.",
+    "cofferRotate": "Pivoter",
+    "cofferRotateConfirm": "Confirmer la rotation",
+    "cofferRotated": "Identité Coffer pivotée — nouveaux pseudonymes actifs.",
+    "cofferRotateFailed": "Impossible de pivoter l'identité — réessayez.",
+    "cofferBurn": "Détruire l'identité",
+    "cofferBurnConfirm": "Confirmer la destruction",
+    "cofferBurned": "Identité Coffer détruite — l'historique des pseudonymes de cet appareil est effacé.",
+    "cofferBurnNote": "La destruction n'efface que l'identité de cet appareil — elle ne touche jamais votre portefeuille ni vos fonds."
   },
   "trades": {
     "title": "Échanges",
@@ -540,7 +553,8 @@
     "errorTokenMismatch": "Cette offre est libellée en {{offered}}, mais le contrat de dépôt ne prend en charge que {{escrow}}.",
     "gracePeriod": "Période de grâce (heures)",
     "gracePeriodHint": "Durée dont dispose la contrepartie pour confirmer le paiement avant que la libération soit autorisée.",
-    "gracePeriodError": "La période de grâce doit être comprise entre 1 heure et 365 jours."
+    "gracePeriodError": "La période de grâce doit être comprise entre 1 heure et 365 jours.",
+    "errorOfferUnavailable": "Cette offre n'est plus disponible pour l'échange."
   },
   "tradeDetail": {
     "loadingTrade": "Chargement de l'échange…",
@@ -862,5 +876,19 @@
     "catImpersonation": "Usurpation d’identité",
     "catTerms": "Violation des conditions d’utilisation",
     "catOther": "Autre"
+  },
+  "referral": {
+    "title": "Invitez et gagnez",
+    "loading": "Chargement de votre lien d'invitation…",
+    "getMyLink": "Obtenir mon lien d'invitation",
+    "revealFailed": "Impossible de créer votre lien d'invitation — réessayez.",
+    "copy": "Copier",
+    "copied": "Copié",
+    "linkCopied": "Lien d'invitation copié",
+    "copyFailed": "Impossible de copier le lien — copiez-le manuellement.",
+    "pending": "En attente",
+    "totalEarned": "Total gagné",
+    "friends": "Amis parrainés",
+    "trades": "Échanges rémunérateurs"
   }
 }

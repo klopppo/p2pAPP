@@ -173,7 +173,20 @@
     "messageTitle": "Abrir el chat con este usuario",
     "errorStartChat": "No se pudo iniciar el chat — inténtalo de nuevo.",
     "messageStarting": "Abriendo…",
-    "errorUnknownUser": "Este usuario aún no ha iniciado sesión — vuelve a intentarlo en unos segundos."
+    "errorUnknownUser": "Este usuario aún no ha iniciado sesión — vuelve a intentarlo en unos segundos.",
+    "cofferTitle": "Identidad Coffer",
+    "cofferUnavailable": "Inicia sesión con tu cartera para derivar tu Identidad Coffer vinculada al dispositivo.",
+    "cofferFingerprint": "Huella de identidad",
+    "cofferSampleTrade": "Pseudónimo de operación de ejemplo",
+    "cofferUses": "Cada operación y chat obtiene su propio pseudónimo opaco derivado en este dispositivo. El servidor solo ve cadenas que no pueden rastrearse hasta tu cartera.",
+    "cofferRotate": "Rotar",
+    "cofferRotateConfirm": "Confirmar rotación",
+    "cofferRotated": "Identidad Coffer rotada — nuevos pseudónimos activos.",
+    "cofferRotateFailed": "No se pudo rotar la identidad — inténtalo de nuevo.",
+    "cofferBurn": "Destruir identidad",
+    "cofferBurnConfirm": "Confirmar destrucción",
+    "cofferBurned": "Identidad Coffer destruida — el historial de pseudónimos de este dispositivo se ha eliminado.",
+    "cofferBurnNote": "Destruir solo borra la identidad de este dispositivo — nunca toca tu cartera ni tus fondos."
   },
   "trades": {
     "title": "Operaciones",
@@ -540,7 +553,8 @@
     "errorTokenMismatch": "Esta oferta está denominada en {{offered}}, pero el contrato de depósito solo admite {{escrow}}.",
     "gracePeriod": "Periodo de gracia (horas)",
     "gracePeriodHint": "Cuánto tiempo tiene la contraparte para confirmar el pago antes de permitir la liberación.",
-    "gracePeriodError": "El periodo de gracia debe estar entre 1 hora y 365 días."
+    "gracePeriodError": "El periodo de gracia debe estar entre 1 hora y 365 días.",
+    "errorOfferUnavailable": "Esta oferta ya no está disponible para operar."
   },
   "tradeDetail": {
     "loadingTrade": "Cargando operación…",
@@ -862,5 +876,19 @@
     "catImpersonation": "Suplantación de identidad",
     "catTerms": "Violación de los términos de servicio",
     "catOther": "Otro"
+  },
+  "referral": {
+    "title": "Invita y gana",
+    "loading": "Cargando tu enlace de invitación…",
+    "getMyLink": "Obtener mi enlace de invitación",
+    "revealFailed": "No se pudo crear tu enlace de invitación — inténtalo de nuevo.",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "linkCopied": "Enlace de invitación copiado",
+    "copyFailed": "No se pudo copiar el enlace — cópialo manualmente.",
+    "pending": "Pendiente",
+    "totalEarned": "Total ganado",
+    "friends": "Amigos invitados",
+    "trades": "Operaciones que generan ingresos"
   }
 }

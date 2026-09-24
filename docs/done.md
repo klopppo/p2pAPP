@@ -9,7 +9,48 @@
 
 ---
 
-## RBAC/audit/reports RLS chiuso — no open read per `anon` — 2026-09-21
+## Full-codebase bug sweep — client correctness + edge hardening — 2026-09-24
+
+Parallel audit (on-chain flows, data/session layer, chat, auth/edge, pages/i18n)
+followed by targeted fixes:
+
+- **Escrow status** (`src/hooks/useTrades.ts`): `deriveEscrowStatus` now mirrors
+  `KlerosEsc._checkFullyFunded` — at `securityDepositPct > 0` it requires
+  `fundsLocked && both deposits` before reporting `funded` (previously two bare
+  deposits showed "Funded" while the escrow was still unfunded). Added the
+  `securityDepositPct` multicall read; updated `TradeSummaryPill` caller.
+- **Query persister** (`src/lib/queryPersister.ts`): bigint-bearing namespaces
+  (`escrow-state`/`appeal-info`/`arbitration-cost`) are no longer persisted, and
+  any query whose data fails `JSON.stringify` is skipped — a single bigint used
+  to abort the whole snapshot write and permanently break hydration.
+- **Wallet switch** (`src/hooks/useSyncUser.ts`): an address change without a
+  disconnect now cancels/clears the in-memory + persisted caches so wallet-scoped
+  keys that don't embed the address can't leak across identities.
+- **EditOfferPage**: hydration is tracked by offer id, not a boolean, so
+  navigating `/offer/A/edit → /offer/B/edit` no longer submits A's values under
+  B's id.
+- **ReviewsModal**: removed the temporary `MOCK_REVIEWS` injected into every
+  profile's review list.
+- **ChatHeader** (`ChatLayout`): keyed by conversation id so muted/blocked/
+  archived local state can't persist across cached conversation switches.
+- **ReportUserModal**: the category dropdown is now labelled "Category" (was
+  mislabelled "Report reason").
+- **error-logger**: window `error`/`unhandledrejection` listeners are prod-only
+  now (`ENABLED`), matching the "nothing leaves the browser in dev" contract.
+- **Edge hardening** (`functions/`): escape `<` in the injected `__EDGE_DATA__`
+  JSON; guard `decodeURIComponent` on public-profile paths (malformed `%`);
+  evict expired rate-limit buckets in `error-report`.
+- **i18n**: added the 26 `profile.coffer*`, `referral.*`, `trade.errorOfferUnavailable`
+  keys missing from es/fr/tr/zh. `.env.example` now documents the factory/token/
+  publishable-key/RPC vars.
+
+Files: `src/hooks/{useTrades,useSyncUser}.ts`, `src/lib/queryPersister.ts`,
+`src/pages/EditOfferPage.tsx`, `src/components/custom/{ReviewsModal,ReportUserModal}.tsx`,
+`src/components/custom/chat/{ChatLayout,TradeSummaryPill}.tsx`, `src/error-logger.ts`,
+`src/locales/*.json`, `functions/_middleware.ts`, `functions/_lib/public-data.ts`,
+`functions/api/error-report.ts`, `.env.example`.
+
+
 
 Migrations `002-rbac-…` shipped the eight backoffice tables
 (`sys_programs`, `sys_roles`, `sys_permissions`,

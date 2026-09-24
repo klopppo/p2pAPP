@@ -84,7 +84,13 @@ function injectEdgeData(
   html: string,
   payload: { pathname: string; publicData: PublicData },
 ): string {
-  const json = JSON.stringify(payload).replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029')
+  // `<` is escaped too: the payload carries user-controlled offer fields and
+  // is embedded in a <script type="application/json"> block, so an unescaped
+  // "</script>" would break out of the element.
+  const json = JSON.stringify(payload)
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029')
+    .replace(/</g, '\\u003c')
   return html.replace(
     '</head>',
     `<script id="${EDGE_DATA_ID}" type="application/json">${json}</script></head>`,

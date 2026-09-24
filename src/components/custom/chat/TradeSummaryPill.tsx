@@ -25,6 +25,7 @@ export function TradeSummaryPill({ trade }: { trade: NonNullable<ConversationVie
         escrowState.buyerSecurityDeposited,
         escrowState.sellerSecurityDeposited,
         escrowState.fundsLocked,
+        escrowState.securityDepositPct,
       )
     : null
 

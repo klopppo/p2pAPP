@@ -173,7 +173,20 @@
     "messageTitle": "Bu kullanıcıyla sohbeti aç",
     "errorStartChat": "Sohbet başlatılamadı — lütfen tekrar deneyin.",
     "messageStarting": "Açılıyor…",
-    "errorUnknownUser": "Bu kullanıcı henüz oturum açmadı — birkaç saniye sonra tekrar deneyin."
+    "errorUnknownUser": "Bu kullanıcı henüz oturum açmadı — birkaç saniye sonra tekrar deneyin.",
+    "cofferTitle": "Coffer Kimliği",
+    "cofferUnavailable": "Cihazınıza bağlı Coffer Kimliğinizi türetmek için cüzdanınızla giriş yapın.",
+    "cofferFingerprint": "Kimlik parmak izi",
+    "cofferSampleTrade": "Örnek işlem takma adı",
+    "cofferUses": "Her işlem ve sohbet, bu cihazda türetilen kendine ait opak bir takma ad alır. Sunucu yalnızca cüzdanınızla ilişkilendirilemeyen dizeler görür.",
+    "cofferRotate": "Döndür",
+    "cofferRotateConfirm": "Döndürmeyi onayla",
+    "cofferRotated": "Coffer Kimliği döndürüldü — yeni takma adlar etkin.",
+    "cofferRotateFailed": "Kimlik döndürülemedi — lütfen tekrar deneyin.",
+    "cofferBurn": "Kimliği yak",
+    "cofferBurnConfirm": "Yakmayı onayla",
+    "cofferBurned": "Coffer Kimliği yakıldı — bu cihazın takma ad geçmişi silindi.",
+    "cofferBurnNote": "Yakma yalnızca bu cihazın kimliğini temizler — cüzdanınıza veya fonlarınıza asla dokunmaz."
   },
   "trades": {
     "title": "İşlemler",
@@ -540,7 +553,8 @@
     "errorTokenMismatch": "Bu teklif {{offered}} cinsinden, ancak emanet sözleşmesi yalnızca {{escrow}} destekliyor.",
     "gracePeriod": "Ek süre (saat)",
     "gracePeriodHint": "Karşı tarafın, serbest bırakmaya izin verilmeden önce ödemeyi onaylaması için geçen süre.",
-    "gracePeriodError": "Ek süre 1 saat ile 365 gün arasında olmalıdır."
+    "gracePeriodError": "Ek süre 1 saat ile 365 gün arasında olmalıdır.",
+    "errorOfferUnavailable": "Bu teklif artık işlem için müsait değil."
   },
   "tradeDetail": {
     "loadingTrade": "İşlem yükleniyor…",
@@ -862,5 +876,19 @@
     "catImpersonation": "Kimlik taklidi",
     "catTerms": "Kullanım koşulları ihlali",
     "catOther": "Diğer"
+  },
+  "referral": {
+    "title": "Davet et ve kazan",
+    "loading": "Davet bağlantınız yükleniyor…",
+    "getMyLink": "Davet bağlantımı al",
+    "revealFailed": "Davet bağlantınız oluşturulamadı — tekrar deneyin.",
+    "copy": "Kopyala",
+    "copied": "Kopyalandı",
+    "linkCopied": "Davet bağlantısı kopyalandı",
+    "copyFailed": "Bağlantı kopyalanamadı — lütfen elle kopyalayın.",
+    "pending": "Beklemede",
+    "totalEarned": "Toplam kazanç",
+    "friends": "Davet edilen arkadaşlar",
+    "trades": "Kazanç sağlayan işlemler"
   }
 }

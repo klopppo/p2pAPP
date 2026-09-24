@@ -133,7 +133,7 @@ export function ReportUserModal({
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold">{t('report.reason')}</Label>
+                  <Label className="text-sm font-semibold">{t('report.categoryLabel')}</Label>
                   <FullDropdown
                     label={t('report.categoryLabel')}
                     value={category}

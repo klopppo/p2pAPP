@@ -66,7 +66,7 @@ function safeWrite(payload: PersistedClient): void {
   const namespaceOf = (q: PersistedQuery) =>
     typeof q.queryKey?.[0] === 'string' ? (q.queryKey[0] as string) : ''
   const dropped = new Set<string>()
-  for (const drop of ['messages', 'conversation', 'conversations', 'notifications', 'trades']) {
+  for (const drop of ['messages', 'conversation', 'conversations', 'notifications', 'trades', 'escrow-state', 'appeal-info', 'arbitration-cost']) {
     dropped.add(drop)
     const reduced: PersistedClient = {
       ...payload,
@@ -167,6 +167,13 @@ export function hydrateQueryCache(
 const NON_PERSISTABLE_NAMESPACES: ReadonlySet<string> = new Set([
   'wallet-session',
   'trades',
+  // These carry `bigint` fields (on-chain reads). JSON.stringify throws on
+  // bigint, which would abort the entire snapshot write (and the namespace
+  // wasn't in the quota-drop fallback, so persistence stayed broken until a
+  // manual cache clear). Never persist them.
+  'escrow-state',
+  'appeal-info',
+  'arbitration-cost',
 ])
 
 /**
@@ -194,6 +201,14 @@ export function attachQueryPersister(
         const firstKey = q.queryKey[0]
         if (typeof firstKey !== 'string') continue
         if (NON_PERSISTABLE_NAMESPACES.has(firstKey)) continue
+        // Belt-and-braces: a namespace we didn't anticipate may still hold a
+        // bigint (JSON.stringify throws). Skip just that query instead of
+        // failing the whole snapshot.
+        try {
+          JSON.stringify(q.state.data)
+        } catch {
+          continue
+        }
         queries.push({
           queryKey: q.queryKey,
           queryHash: q.queryHash,
