@@ -5,7 +5,7 @@ function storageKey(currentUserId: string): string {
 }
 
 /** User ids the current user has blocked on this device. */
-export function getBlockedUserIds(currentUserId: string): string[] {
+function getBlockedUserIds(currentUserId: string): string[] {
   if (typeof window === 'undefined' || !currentUserId) return []
   try {
     const raw = window.localStorage.getItem(storageKey(currentUserId))

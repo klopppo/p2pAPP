@@ -2,13 +2,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getRatingsForTrade,
   getRatingsByUser,
-  getReputationScores,
   getRatedTradeIdsByUser,
   hasUserRatedTrade,
   submitTradeRating,
   updateUserReputation,
 } from '@/lib/supabase'
-import type { ReputationScore, TradeRating } from '@/types/database'
+import type { TradeRating } from '@/types/database'
 
 /** Map a 1-5 star rating to a bounded reputation delta (-2..+2). The
  *  `increment_reputation_score` RPC clamps the overall score to [0,100], so
@@ -35,18 +34,6 @@ export function useUserReviews(userId: string | undefined) {
   return useQuery({
     queryKey: ['user-reviews', userId],
     queryFn: () => getRatingsByUser(userId!),
-    enabled: !!userId,
-  })
-}
-
-/**
- * Fetch the cached reputation_scores row for a user. Null if the row doesn't
- * exist yet (the seed happens lazily via the increment_reputation_score RPC).
- */
-export function useUserReputation(userId: string | undefined) {
-  return useQuery<ReputationScore | null>({
-    queryKey: ['user-reputation', userId],
-    queryFn: () => getReputationScores(userId!),
     enabled: !!userId,
   })
 }

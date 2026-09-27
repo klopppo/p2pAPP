@@ -5,8 +5,6 @@
  */
 import { extractWriteError } from './errors'
 
-export { extractWriteError } from './errors'
-
 /**
  * Convert a thrown wallet/write error into a localized message.
  *
@@ -53,21 +51,4 @@ export function errorMessage(
     default:
       return t(`${page}.${fallbackKey}`, { message: extracted.message })
   }
-}
-
-/**
- * Field-name only — extract the raw reason (cleaned) for display in
- * detail sections / inline error chips where a localized wrapper would
- * hide the contract-level detail. Pair with `extractWriteError().kind` if
- * you also need to know "was it a user reject".
- */
-export function errorReason(err: unknown): string | null {
-  const extracted = extractWriteError(err)
-  if (extracted.kind === 'reverted') {
-    return extracted.message.replace(/^Reverted: /, '')
-  }
-  if (extracted.kind === 'cancelled' || extracted.kind === 'network') {
-    return null
-  }
-  return extracted.message
 }

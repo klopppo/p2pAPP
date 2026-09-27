@@ -35,7 +35,7 @@ export const LOCATIONS = [
 ]
 
 /** Human picker label → region code, as persisted on the offer. */
-export const REGION_CODES: Record<string, string> = {
+const REGION_CODES: Record<string, string> = {
   'United States': 'US',
   'European Union': 'EU',
   'United Kingdom': 'GB',

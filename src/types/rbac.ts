@@ -3,12 +3,7 @@
  * CofferNode Platform
  */
 
-export const OperatorStatus = {
-  ACTIVE: 'ACTIVE',
-  SUSPENDED: 'SUSPENDED',
-  REVOKED: 'REVOKED',
-} as const
-export type OperatorStatus = typeof OperatorStatus[keyof typeof OperatorStatus]
+type OperatorStatus = 'ACTIVE' | 'SUSPENDED' | 'REVOKED'
 
 export const ReportStatus = {
   PENDING: 'PENDING',
@@ -50,14 +45,6 @@ export interface SysPermission {
   id: string // e.g. 'VIEW', 'CREATE', 'EDIT', 'DELETE', 'EXECUTE', 'VIEW_PRIVATE_MESSAGES', 'RESOLVE_REPORT', 'MANAGE_OPERATORS', 'AUDIT_READ'
   name: string
   description?: string | null
-  created_at: string
-}
-
-export interface SysProgramRolePermission {
-  id: string
-  program_id: string
-  role_id: string
-  permission_id: string
   created_at: string
 }
 

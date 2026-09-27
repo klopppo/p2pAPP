@@ -1,7 +1,7 @@
 import { logUserActivity } from '@/lib/auditLogger'
 import type { SysOperator } from '@/types/rbac'
 
-export type SupportSenderType = 'user' | 'operator' | 'system'
+type SupportSenderType = 'user' | 'operator' | 'system'
 export type SupportThreadStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED'
 
 export interface SupportMessage {
@@ -181,16 +181,20 @@ function getStoredThreads(): SupportThread[] {
   return IN_MEMORY_THREADS
 }
 
-function setStoredThreads(threads: SupportThread[]): void {
-  IN_MEMORY_THREADS = threads
+function persist(key: string, value: unknown): void {
   if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
     try {
-      localStorage.setItem(STORAGE_THREADS_KEY, JSON.stringify(threads))
+      localStorage.setItem(key, JSON.stringify(value))
     } catch {
       // ignore
     }
   }
   notifyUpdate()
+}
+
+function setStoredThreads(threads: SupportThread[]): void {
+  IN_MEMORY_THREADS = threads
+  persist(STORAGE_THREADS_KEY, threads)
 }
 
 function getStoredMessages(): SupportMessage[] {
@@ -200,14 +204,24 @@ function getStoredMessages(): SupportMessage[] {
 
 function setStoredMessages(messages: SupportMessage[]): void {
   IN_MEMORY_MESSAGES = messages
-  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-    try {
-      localStorage.setItem(STORAGE_MESSAGES_KEY, JSON.stringify(messages))
-    } catch {
-      // ignore
-    }
+  persist(STORAGE_MESSAGES_KEY, messages)
+}
+
+function makeWelcomeMessage(
+  user: { id: string; wallet_address?: string | null },
+  thread: { id: string; created_at: string },
+): SupportMessage {
+  return {
+    id: `msg-${thread.id}-welcome`,
+    thread_id: thread.id,
+    user_id: user.id,
+    user_wallet: user.wallet_address || '0x...',
+    sender_type: 'system',
+    sender_id: '00000000-0000-0000-0000-000000000000',
+    sender_name: 'ourTeam',
+    body: OUR_TEAM_WELCOME_TEXT,
+    created_at: thread.created_at || new Date().toISOString(),
   }
-  notifyUpdate()
 }
 
 function notifyUpdate() {
@@ -226,14 +240,14 @@ function notifyUpdate() {
 /**
  * Normalise thread id for a given user.
  */
-export function getUserThreadId(userId: string): string {
+function getUserThreadId(userId: string): string {
   return `thread-user-${userId}`
 }
 
 /**
  * Get or create the support thread for the active user.
  */
-export function getOrCreateUserThread(user: {
+function getOrCreateUserThread(user: {
   id: string
   wallet_address?: string | null
   nickname?: string | null
@@ -264,18 +278,7 @@ export function getOrCreateUserThread(user: {
     // Also seed the initial welcome message for this thread if absent
     const messages = getStoredMessages()
     if (!messages.some((m) => m.thread_id === found!.id)) {
-      const welcomeMsg: SupportMessage = {
-        id: `msg-${found.id}-welcome`,
-        thread_id: found.id,
-        user_id: user.id,
-        user_wallet: user.wallet_address || '0x...',
-        sender_type: 'system',
-        sender_id: '00000000-0000-0000-0000-000000000000',
-        sender_name: 'ourTeam',
-        body: OUR_TEAM_WELCOME_TEXT,
-        created_at: now,
-      }
-      setStoredMessages([...messages, welcomeMsg])
+      setStoredMessages([...messages, makeWelcomeMessage(user, { id: found.id, created_at: now })])
     }
   }
 
@@ -298,17 +301,7 @@ export function getOurTeamMessagesForUser(user: {
 
   // Ensure at least welcome message exists
   if (threadMessages.length === 0) {
-    const welcomeMsg: SupportMessage = {
-      id: `msg-${thread.id}-welcome`,
-      thread_id: thread.id,
-      user_id: user.id,
-      user_wallet: user.wallet_address || '0x...',
-      sender_type: 'system',
-      sender_id: '00000000-0000-0000-0000-000000000000',
-      sender_name: 'ourTeam',
-      body: OUR_TEAM_WELCOME_TEXT,
-      created_at: thread.created_at || new Date().toISOString(),
-    }
+    const welcomeMsg = makeWelcomeMessage(user, thread)
     setStoredMessages([...allMessages, welcomeMsg])
     return [welcomeMsg]
   }

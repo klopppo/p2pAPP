@@ -19,9 +19,9 @@
  * fails. The i18n helpers live next to each catch block so per-page copy
  * can be tuned without changing this helper.
  */
-export type WriteErrorKind = 'cancelled' | 'reverted' | 'network' | 'unknown'
+type WriteErrorKind = 'cancelled' | 'reverted' | 'network' | 'unknown'
 
-export interface ExtractedWriteError {
+interface ExtractedWriteError {
   kind: WriteErrorKind
   message: string
   original: unknown

@@ -45,12 +45,12 @@ export function hexToBytes(hex: string): Uint8Array {
   return out
 }
 
-export function toBytes(data: Uint8Array | string): BufferSource {
+function toBytes(data: Uint8Array | string): BufferSource {
   if (data instanceof Uint8Array) return data as BufferSource
   return encoder.encode(data) as BufferSource
 }
 
-export async function sha256Bytes(
+async function sha256Bytes(
   data: Uint8Array | string
 ): Promise<Uint8Array> {
   const digest = await subtleCrypto().digest("SHA-256", toBytes(data))
@@ -61,7 +61,7 @@ export async function sha256Hex(data: Uint8Array | string): Promise<string> {
   return bytesToHex(await sha256Bytes(data))
 }
 
-export interface HkdfOptions {
+interface HkdfOptions {
   ikm: Uint8Array | string
   salt?: Uint8Array | string
   info?: Uint8Array | string

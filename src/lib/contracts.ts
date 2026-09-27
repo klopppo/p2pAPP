@@ -34,7 +34,7 @@
  * row is a mirror for fast querying and to store IPFS CIDs / on-chain metadata
  * that doesn't fit on-chain (free-text descriptions, multi-image attachments).
  */
-import { parseAbi, keccak256, toBytes, type Abi } from 'viem'
+import { parseAbi, type Abi } from 'viem'
 
 // ─── Kleros Court address ────────────────────────────────────────────────────
 // ERC-792 / Kleros v1 mainnet court. Disputes from every escrow deployed by
@@ -53,8 +53,6 @@ export const KLEROS_ESCROW_FACTORY_ADDRESS = (
 // ─── Protocol constants from contracts/Constants.sol ─────────────────────────
 /** KlerosEsc.NUMBER_OF_CHOICES — any ruling > this reverts with InvalidRuling. */
 export const NUMBER_OF_CHOICES = 4n
-/** KlerosEsc.DISPUTE_STATUS_SOLVED — Kleros v1 DisputeStatus.Solved. */
-export const DISPUTE_STATUS_SOLVED = 2n
 /** KlerosEsc.DISPUTE_TIMEOUT = 30 days — anyone can timeoutDispute() after. */
 export const DISPUTE_TIMEOUT_SECONDS = 30n * 24n * 60n * 60n
 /** KlerosEsc.cancelTrade() TIMELOCK = 1 day — depositor can cancel if counterparty stalls. */
@@ -106,15 +104,6 @@ export const Ruling = {
   AWARD_BUYER_RETURN_DEPOSITS: 3,
   AWARD_SELLER_RETURN_DEPOSITS: 4,
 } as const
-export type RulingValue = (typeof Ruling)[keyof typeof Ruling]
-
-export const RULING_LABEL: Record<RulingValue, string> = {
-  [Ruling.REFUSED]: 'Refused (auto-cancel)',
-  [Ruling.AWARD_BUYER_PENALTY_SELLER]: 'Buyer wins, seller deposit slashed',
-  [Ruling.AWARD_SELLER_PENALTY_BUYER]: 'Seller wins, buyer deposit slashed',
-  [Ruling.AWARD_BUYER_RETURN_DEPOSITS]: 'Buyer wins, deposits returned',
-  [Ruling.AWARD_SELLER_RETURN_DEPOSITS]: 'Seller wins, deposits returned',
-}
 
 /** App-level severity (NOT on-chain). Maps to the form's Low/Medium/High/Critical
  *  dropdown. Stored in Supabase for filtering; Kleros doesn't have severity. */
@@ -292,17 +281,6 @@ export function isFactoryConfigured(): boolean {
 }
 
 /**
- * Pack a trade key (UUID / VARCHAR) into the 32-byte representation Kleros
- * expects in extraData. Mirrors the keccak-based packing we used for the
- * placeholder contract; Kleros itself doesn't care about the content (it
- * only stores the bytes and threads them back via `rule(_disputeID, _ruling)`),
- * but we need a deterministic, in-bounds value.
- */
-export function tradeKeyToBytes32(tradeKey: string): `0x${string}` {
-  return keccak256(toBytes(tradeKey))
-}
-
-/**
  * Encode the two Kleros extraData parts into the single `bytes` the court
  * expects (per ERC-792: bytes 0..32 subcourtId, bytes 32..64 minJurors).
  * The factory stores them as two bytes32 already-packed fields; this helper
@@ -316,18 +294,6 @@ export function encodeKlerosExtraData(
   const p1 = part1.startsWith('0x') ? part1.slice(2) : part1
   const p2 = part2.startsWith('0x') ? part2.slice(2) : part2
   return `0x${p1}${p2}` as `0x${string}`
-}
-
-/** Map an on-chain `state` uint8 → human label. */
-export const KlerosEscStateLabel: Record<KlerosEscStateValue, string> = {
-  [KlerosEscState.AWAITING_FUNDING]: 'Awaiting funding',
-  [KlerosEscState.FUNDED]: 'Funded',
-  [KlerosEscState.CONFIRMED_PENDING]: 'Confirmed (release pending)',
-  [KlerosEscState.AWAITING_RULING]: 'Awaiting Kleros ruling',
-  [KlerosEscState.RULING_RECEIVED]: 'Ruling received',
-  [KlerosEscState.RULING_EXECUTED]: 'Ruling executed',
-  [KlerosEscState.COMPLETED]: 'Completed',
-  [KlerosEscState.CANCELLED]: 'Cancelled',
 }
 
 // ─── ERC-20 helpers (minimal ABI subset for the funding flow) ────────────────

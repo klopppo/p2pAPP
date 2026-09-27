@@ -12,7 +12,7 @@ import type { QueryClient } from '@tanstack/react-query'
 
 const EDGE_DATA_ID = '__EDGE_DATA__'
 
-export interface EdgeDataEnvelope {
+interface EdgeDataEnvelope {
   pathname: string
   publicData: {
     offers?: unknown[]

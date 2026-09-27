@@ -7,25 +7,7 @@ import { clearPersistedQueryCache } from '@/lib/queryPersister'
 import { ensureWalletSession, recoverWalletSession, signOut, claimReferral } from '@/lib/supabase'
 import { signWalletMessage } from '@/lib/walletSigner'
 import { consumePendingReferral, isValidReferralCode } from '@/lib/referral'
-
-const SUCCESS_KEY = 'coffernode:siwe:last'
-
-/**
- * Whether this device already completed SIWE for `addr` (remember-me marker).
- * A marker means we must NOT auto-prompt MetaMask on reload — only an explicit
- * Disconnect clears it.
- */
-function hasSignedInMarker(addr: string): boolean {
-  if (typeof window === 'undefined') return false
-  try {
-    const raw = window.localStorage.getItem(SUCCESS_KEY)
-    if (!raw) return false
-    const parsed = JSON.parse(raw) as { address?: string }
-    return parsed?.address?.toLowerCase() === addr.toLowerCase()
-  } catch {
-    return false
-  }
-}
+import { hasSignedInMarker } from './siweMarker'
 
 /**
  * Keeps the Supabase `users` row in sync with the connected wallet.

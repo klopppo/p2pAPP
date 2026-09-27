@@ -7,7 +7,6 @@ import { createClient } from "@supabase/supabase-js"
 import type {
   User,
   Offer,
-  KYCApplication,
   Dispute,
   TradeRating,
   CreateTradeInput,
@@ -166,10 +165,10 @@ async function userColumnsForRead(walletAddress: string): Promise<string> {
  * uuid-typed DB column — plugging a human id into one yields Postgres
  * `22P02 invalid input syntax for type uuid`.
  */
-export const UUID_RE =
+const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export function isUuid(value: string): boolean {
+function isUuid(value: string): boolean {
   return UUID_RE.test(value)
 }
 
@@ -227,41 +226,25 @@ export const TradeEventType = {
 export type TradeEventType =
   (typeof TradeEventType)[keyof typeof TradeEventType]
 
-export const OfferStatus = {
+const OfferStatus = {
   ACTIVE: "active",
   PAUSED: "paused",
   COMPLETED: "completed",
   CANCELLED: "cancelled",
   EXPIRED: "expired",
 } as const
-export type OfferStatus = (typeof OfferStatus)[keyof typeof OfferStatus]
+type OfferStatus = (typeof OfferStatus)[keyof typeof OfferStatus]
 
-export const KYCStatus = {
-  PENDING: "pending",
-  APPROVED: "approved",
-  REJECTED: "rejected",
-  EXPIRED: "expired",
-} as const
-export type KYCStatus = (typeof KYCStatus)[keyof typeof KYCStatus]
-
-export const VerificationLevel = {
+const VerificationLevel = {
   UNVERIFIED: "unverified",
   VERIFIED: "verified",
   TRUSTED: "trusted",
   SUSPICIOUS: "suspicious",
 } as const
-export type VerificationLevel =
+type VerificationLevel =
   (typeof VerificationLevel)[keyof typeof VerificationLevel]
 
-export const UserRole = {
-  USER: "user",
-  ADMIN: "admin",
-  MEDIATOR: "mediator",
-  SUPPORT: "support",
-} as const
-export type UserRole = (typeof UserRole)[keyof typeof UserRole]
-
-export const TradeStatus = {
+const TradeStatus = {
   PENDING: "pending",
   ACTIVE: "active",
   COMPLETED: "completed",
@@ -269,16 +252,16 @@ export const TradeStatus = {
   DISPUTED: "disputed",
   REFUNDED: "refunded",
 } as const
-export type TradeStatus = (typeof TradeStatus)[keyof typeof TradeStatus]
+type TradeStatus = (typeof TradeStatus)[keyof typeof TradeStatus]
 
-export const DisputeStatus = {
+const DisputeStatus = {
   OPEN: "open",
   IN_REVIEW: "in_review",
   RESOLVED: "resolved",
   ESCALATED: "escalated",
   CLOSED: "closed",
 } as const
-export type DisputeStatus = (typeof DisputeStatus)[keyof typeof DisputeStatus]
+type DisputeStatus = (typeof DisputeStatus)[keyof typeof DisputeStatus]
 
 // =================================================================
 // USER QUERIES
@@ -493,7 +476,7 @@ export async function uploadAvatar(
  * `public.storage_object_dispute_id(name)`); a missing or malformed
  * prefix will cause the insert to be rejected by RLS.
  */
-export interface DisputeEvidenceUpload {
+interface DisputeEvidenceUpload {
   /** Storage path (also what we store in `dispute_evidence.ipfs_cid`). */
   path: string
   /**
@@ -615,31 +598,6 @@ export async function getDisputeEvidenceSignedUrl(
 }
 
 /**
- * @deprecated Use `ensureUser` (sync) or `updateUserProfile` (edit).
- */
-export async function upsertUser(
-  walletAddress: string,
-  profile?: {
-    nickname?: string | null
-    avatarUrl?: string | null
-    bio?: string | null
-    location?: string | null
-    website?: string | null
-    twitterHandle?: string | null
-    telegramHandle?: string | null
-    githubHandle?: string | null
-  }
-) {
-  if (
-    profile &&
-    Object.values(profile).some((v) => v !== undefined && v !== null)
-  ) {
-    return updateUserProfile(walletAddress, profile)
-  }
-  return ensureUser(walletAddress)
-}
-
-/**
  * Update user reputation score
  */
 export async function updateUserReputation(userId: string, delta: number) {
@@ -716,14 +674,11 @@ function randomIdSuffix(): string {
 }
 
 /**
- * Generate a client-side unique `offer_id`.
- *
- * offers.offer_id is VARCHAR(40) NOT NULL UNIQUE with no DB default, and the
- * planned generate_offer_id() SQL function isn't deployed, so we mint one here.
- * Format: OFF-<base36 timestamp><random> (~18 chars, well within 40).
+ * Client-minted id: `PREFIX-<base36 timestamp><random>` (~18 chars, well
+ * within the 40-char `offer_id` / `trade_id` / `dispute_id` columns).
  */
-export function generateOfferId(): string {
-  return `OFF-${Date.now().toString(36)}${randomIdSuffix()}`.toUpperCase()
+function generateId(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}${randomIdSuffix()}`.toUpperCase()
 }
 
 /**
@@ -766,7 +721,7 @@ export interface OfferTradeIntent {
 }
 
 /** Business-code mapping for the trade-intent RPC. */
-export const TRADE_INTENT_ERRORS = {
+const TRADE_INTENT_ERRORS = {
   OFFER_UNAVAILABLE: "P0200",
   OFFER_EXPIRED: "P0201",
   SELF_TRADE: "P0202",
@@ -829,7 +784,7 @@ export async function createOffer(offerData: Partial<Offer>) {
     .from("offers")
     .insert({
       ...offerData,
-      offer_id: offerData.offer_id ?? generateOfferId(),
+      offer_id: offerData.offer_id ?? generateId("OFF"),
       status: OfferStatus.ACTIVE,
       published_at: new Date().toISOString(),
     })
@@ -880,105 +835,11 @@ export async function updateOffer(id: string, patch: Partial<Offer>) {
 // =================================================================
 
 /**
- * Generate a client-side unique `trade_id`.
- *
- * trades.trade_id is VARCHAR(40) NOT NULL UNIQUE with no DB default (same
- * situation as offers.offer_id), so we mint one here.
- * Format: TRD-<base36 timestamp><random> (~18 chars, well within 40).
- */
-export function generateTradeId(): string {
-  return `TRD-${Date.now().toString(36)}${randomIdSuffix()}`.toUpperCase()
-}
-
-/**
  * Generate a client-side unique `dispute_id` for the `disputes.dispute_id`
- * varchar column. Same shape as `generateOfferId`/`generateTradeId`:
- * 3-letter prefix + base36 timestamp + 6 random chars (~18 chars, fits the
- * 40-char varchar).
+ * varchar column.
  */
 export function generateDisputeId(): string {
-  return `DSP-${Date.now().toString(36)}${randomIdSuffix()}`.toUpperCase()
-}
-
-/**
- * Get active trades by buyer
- */
-export async function getActiveTradesByBuyer(buyerId: string) {
-  const { data, error } = await supabase
-    .from("trades")
-    .select(
-      `
-      *,
-      offer:offers(*),
-      buyer:users!trades_buyer_id_fkey (nickname, avatar_url, verification_level),
-      seller:users!trades_seller_id_fkey (nickname, avatar_url, verification_level)
-    `
-    )
-    .eq("buyer_id", buyerId)
-    .eq("status", TradeStatus.ACTIVE)
-    .order("created_at", { ascending: false })
-
-  if (error) {
-    console.error("Error fetching trades:", error)
-    throw error
-  }
-
-  return data
-}
-
-/**
- * Get active trades by seller
- */
-export async function getActiveTradesBySeller(sellerId: string) {
-  const { data, error } = await supabase
-    .from("trades")
-    .select(
-      `
-      *,
-      offer:offers(*),
-      buyer:users!trades_buyer_id_fkey (nickname, avatar_url, verification_level),
-      seller:users!trades_seller_id_fkey (nickname, avatar_url, verification_level)
-    `
-    )
-    .eq("seller_id", sellerId)
-    .eq("status", TradeStatus.ACTIVE)
-    .order("created_at", { ascending: false })
-
-  if (error) {
-    console.error("Error fetching trades:", error)
-    throw error
-  }
-
-  return data
-}
-
-/**
- * Get trade by trade ID
- */
-export async function getTradeByTradeId(tradeId: string) {
-  const { data, error } = await supabase
-    .from("trades")
-    .select(
-      `
-      *,
-      offer:offers(*),
-      buyer:users!trades_buyer_id_fkey (nickname, avatar_url, verification_level),
-      seller:users!trades_seller_id_fkey (nickname, avatar_url, verification_level),
-      ratings:trade_ratings(*)
-    `
-    )
-    .eq("trade_id", tradeId)
-    .single()
-
-  if (error) {
-    if (error.code === "PGRST116") {
-      return null
-    }
-    console.error("Error fetching trade:", error)
-    throw error
-  }
-
-  return data
+  return generateId("DSP")
 }
 
 /**
@@ -1017,9 +878,9 @@ export async function getTradeById(id: string) {
  * varchar column first. `trade_ratings` keys off `trades.id` (a uuid FK), so
  * every rating query funnels an id through here.
  */
-export async function resolveTradeUuid(tradeId: string): Promise<string> {
+async function resolveTradeUuid(tradeId: string): Promise<string> {
   if (isUuid(tradeId)) return tradeId
-  const trade = await getTradeByTradeId(tradeId)
+  const trade = await getTradeById(tradeId)
   if (!trade) {
     throw new Error(
       `Cannot resolve trade "${tradeId}" to a uuid: no trade found. Pass the trade's uuid id instead.`
@@ -1198,7 +1059,7 @@ export async function setTradeEscrowStatus(
  */
 export async function createTrade(input: CreateTradeInput) {
   const insertRow: Record<string, unknown> = {
-    trade_id: generateTradeId(),
+    trade_id: generateId("TRD"),
     offer_id: input.offer_id,
     status: TradeStatus.ACTIVE,
     buyer_id: input.buyer_id,
@@ -1299,7 +1160,7 @@ export async function getTradeByEscrowAddress(escrowAddress: string) {
 /**
  * Log trade event
  */
-export async function logTradeEvent(
+async function logTradeEvent(
   tradeId: string,
   eventType: string,
   actor: string,
@@ -1318,57 +1179,6 @@ export async function logTradeEvent(
     console.error("Error logging trade event:", error)
     throw error
   }
-}
-
-// =================================================================
-// KYC QUERIES
-// =================================================================
-
-/**
- * Create KYC application
- */
-export async function createKYCApplication(
-  userId: string,
-  kycData: Partial<KYCApplication>
-) {
-  const { data, error } = await supabase
-    .from("kyc_applications")
-    .insert({
-      user_id: userId,
-      ...kycData,
-      status: KYCStatus.PENDING,
-      created_at: new Date().toISOString(),
-    })
-    .select()
-    .single()
-
-  if (error) {
-    console.error("Error creating KYC application:", error)
-    throw error
-  }
-
-  return data
-}
-
-/**
- * Get KYC application by user
- */
-export async function getKYCApplicationByUser(userId: string) {
-  const { data, error } = await supabase
-    .from("kyc_applications")
-    .select("*")
-    .eq("user_id", userId)
-    .single()
-
-  if (error) {
-    if (error.code === "PGRST116") {
-      return null
-    }
-    console.error("Error fetching KYC application:", error)
-    throw error
-  }
-
-  return data
 }
 
 // =================================================================
@@ -2666,16 +2476,6 @@ export async function getReferralDashboard(
 // =================================================================
 
 /**
- * Check if user is authenticated
- */
-export async function isAuthenticated(): Promise<boolean> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  return !!session
-}
-
-/**
  * Sign in with wallet (SIWE — Sign-In With Ethereum).
  *
  * Server-backed flow: the `siwe-auth` edge function issues a one-shot nonce,
@@ -2698,7 +2498,7 @@ export async function isAuthenticated(): Promise<boolean> {
 // clears those and re-prompts. The hour cap added noise without solving
 // a real problem since the rejection marker already blocks the loop.
 
-export async function signInWithWallet(
+async function signInWithWallet(
   walletAddress: string,
   options: {
     signMessage: (args: { message: string }) => Promise<`0x${string}`>
@@ -2779,10 +2579,6 @@ function setSiweMarker(marker: { address: string; issuedAt: string }): void {
   }
 }
 
-class SiweRejectedError extends Error {
-  override name = "SiweRejectedError"
-}
-
 /**
  * True when the error was thrown by our own `siwe-auth` edge function with a
  * 429 (its MAX_ACTIVE_NONCES guard). supabase-js wraps non-2xx invoked
@@ -2796,35 +2592,15 @@ function isEdgeFunctionRateLimited(err: unknown): boolean {
 /**
  * Returns the lowercased wallet address claimed in the active Supabase JWT,
  * or null when there is no session (or the claim is missing).
+ *
+ * A present token WITHOUT the claim mints a "valid" session the RLS layer
+ * still denies, so callers treat it as not signed-in and re-run SIWE / refresh.
  */
 export async function getSessionWallet(): Promise<string | null> {
-  // The real source of truth is the active Supabase session. Read the
-  // admin-only `app_metadata.wallet_address` claim (matches the RLS layer);
-  // `wallet_address` top-level is the legacy custom-token fallback.
   const session = await getSession()
-  if (session?.access_token) {
-    const payload = decodeJwtPayload(session.access_token)
-    const appMeta = payload?.app_metadata as
-      | Record<string, unknown>
-      | undefined
-    const raw =
-      typeof payload?.wallet_address === "string"
-        ? payload.wallet_address
-        : typeof appMeta?.wallet_address === "string"
-          ? appMeta.wallet_address
-          : null
-    if (typeof raw === "string" && raw) return raw.toLowerCase()
-    // A present token WITHOUT the claim mints a "valid" session the RLS
-    // layer still denies (current_user_id() resolves to NULL). Treat it as
-    // not signed-in so callers re-run SIWE / refresh — the edge function
-    // writes app_metadata.wallet_address on every verify, so the retry fixes
-    // the claim instead of looping on silent denials.
-    return null
-  }
-
-  // No token at all -> definitely not signed in. The `coffernode:siwe:last`
-  // marker is a remember-me hint only; it is NOT proof of a live session.
-  return null
+  return session?.access_token
+    ? walletClaimFromToken(session.access_token)
+    : null
 }
 
 /**
@@ -2844,6 +2620,23 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   } catch {
     return null
   }
+}
+
+/**
+ * Read the `wallet_address` claim from a JWT — `app_metadata.wallet_address`
+ * is the RLS source of truth; the top-level claim is the legacy fallback.
+ */
+function walletClaimFromToken(token: string): string | null {
+  const payload = decodeJwtPayload(token)
+  if (!payload) return null
+  const appMeta = payload.app_metadata as Record<string, unknown> | undefined
+  const raw =
+    typeof payload.wallet_address === "string"
+      ? payload.wallet_address
+      : typeof appMeta?.wallet_address === "string"
+        ? appMeta.wallet_address
+        : null
+  return typeof raw === "string" && raw ? raw.toLowerCase() : null
 }
 
 /**
@@ -2873,7 +2666,7 @@ function clearSiweRejectedMarker(address: string): void {
   window.localStorage.removeItem(`coffernode:siwe:declined:${address}`)
 }
 
-export async function isSignedInAs(walletAddress: string): Promise<boolean> {
+async function isSignedInAs(walletAddress: string): Promise<boolean> {
   const addr = walletAddress.toLowerCase()
 
   // Hard requirement: an actual Supabase session token must exist. The
@@ -2910,21 +2703,6 @@ async function refreshToWalletClaim(address: string): Promise<boolean> {
   const session = await getSession()
   if (!session?.access_token || !session.refresh_token) return false
 
-  const readMemoizedClaim = (accessToken: string): string | null => {
-    const payload = decodeJwtPayload(accessToken)
-    if (!payload) return null
-    const appMeta = payload?.app_metadata as
-      | Record<string, unknown>
-      | undefined
-    const raw =
-      typeof payload?.wallet_address === "string"
-        ? payload.wallet_address
-        : typeof appMeta?.wallet_address === "string"
-          ? appMeta.wallet_address
-          : null
-    return typeof raw === "string" && raw ? raw.toLowerCase() : null
-  }
-
   // Claim already present and matching — nothing to do, unless the token is
   // already past `exp` (supabase's background refresh may not have run yet).
   // In that case fall through so the caller re-signs instead of treating a
@@ -2932,7 +2710,7 @@ async function refreshToWalletClaim(address: string): Promise<boolean> {
   const payload = decodeJwtPayload(session.access_token)
   const notExpired =
     typeof payload?.exp !== "number" || payload.exp * 1000 > Date.now()
-  if (readMemoizedClaim(session.access_token) === addr && notExpired)
+  if (walletClaimFromToken(session.access_token) === addr && notExpired)
     return true
 
   // Claim-less (valid) token: refresh once to pick up the backfilled metadata.
@@ -2940,7 +2718,7 @@ async function refreshToWalletClaim(address: string): Promise<boolean> {
   if (error) return false
   const accessToken = data?.session?.access_token
   if (!accessToken) return false
-  return readMemoizedClaim(accessToken) === addr
+  return walletClaimFromToken(accessToken) === addr
 }
 
 /**
@@ -3016,18 +2794,11 @@ export async function ensureWalletSession(
   } catch (err) {
     // ANY failure path marks the wallet as "declined for now" so we don't
     // pester the user with a fresh MetaMask popup on every page mount.
-    // The previous code only set the marker when `err instanceof
-    // SiweRejectedError`, but `SiweRejectedError` was never actually thrown
-    // — every failure (user dismissed the popup, RPC timeout, backend
-    // rejection) fell through to the generic branch and the marker never
-    // got written, so the user got re-prompted indefinitely. Treating every
-    // sign-in failure as a soft decline matches the intended UX: "if they
-    // didn't sign once, don't keep asking". The SiweGate modal shows a
-    // 'Try again' CTA so the user can opt back in explicitly.
+    // Treating every sign-in failure as a soft decline matches the intended
+    // UX: "if they didn't sign once, don't keep asking". The SiweGate modal
+    // shows a 'Try again' CTA so the user can opt back in explicitly.
     setSiweRejectedMarker(addr)
-    if (err instanceof SiweRejectedError) {
-      console.warn("[ensureWalletSession] sign-in rejected:", err.message)
-    } else if (isEdgeFunctionRateLimited(err)) {
+    if (isEdgeFunctionRateLimited(err)) {
       console.warn(
         "[ensureWalletSession] sign-in rate-limited:",
         err instanceof Error ? err.message : err
@@ -3084,21 +2855,6 @@ function localNonce(bytes = 16): string {
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
 }
 
-/**
- * Drop the SIWE session marker (if any). Kept for the profile menu; a real
- * sign-out should use `signOut` which also clears the Supabase session.
- */
-/**
- * Legacy entry point — clears only the success marker. Use `signOut`
- * (which calls this AND the per-wallet rejection marker) for the full
- * cleanup path.
- */
-export async function signOutSiweMarker(): Promise<void> {
-  if (typeof window !== "undefined") {
-    window.localStorage.removeItem("coffernode:siwe:last")
-  }
-}
-
 function clearSiweMarkersFor(address: string): void {
   if (typeof window === "undefined") return
   window.localStorage.removeItem("coffernode:siwe:last")
@@ -3141,45 +2897,9 @@ export async function signOut() {
 /**
  * Get current user session
  */
-export async function getSession() {
+async function getSession() {
   const {
     data: { session },
   } = await supabase.auth.getSession()
   return session
 }
-
-/**
- * Get user ID from session
- */
-export async function getUserIdFromSession() {
-  const session = await getSession()
-  return session?.user?.id
-}
-
-// =================================================================
-// USAGE EXAMPLES
-// =================================================================
-
-/*
-// Example: Create offer
-const offer = await createOffer({
-  seller_id: userId,
-  type: 'sell',
-  crypto_token: 'ETH',
-  crypto_amount: 1.5,
-  fiat_currency: 'EUR',
-  fiat_amount: 3000,
-  price_per_unit: 2000,
-  min_amount: 1000,
-  max_amount: 50000,
-  payment_methods: ['SEPA', 'PayPal'],
-  available_regions: ['IT', 'DE', 'FR'],
-  platform_fee_bps: 50,
-})
-
-// Example: Update escrow status
-await upsertTradeEscrowStatus(tradeId, 'confirmed', '0xabc123...')
-
-// Example: Get active offers
-const offers = await getActiveOffers(50, 0)
-*/

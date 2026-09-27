@@ -10,7 +10,7 @@
  * scrubbed HERE (client) and AGAIN at the edge before it touches Postgres.
  */
 
-export type ErrorType =
+type ErrorType =
   | "error"
   | "unhandledrejection"
   | "react_render"
@@ -41,9 +41,9 @@ export interface RawReportInput {
   col?: number
 }
 
-export const MAX_MESSAGE_LEN = 500
-export const MAX_STACK_LEN = 4000
-export const MAX_FINGERPRINT_LEN = 160
+const MAX_MESSAGE_LEN = 500
+const MAX_STACK_LEN = 4000
+const MAX_FINGERPRINT_LEN = 160
 
 /** Mask identifiable values that routinely leak into error strings. */
 export function scrubText(text: string): string {

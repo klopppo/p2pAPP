@@ -3,10 +3,9 @@ import type {
   NotificationChannel,
   NotificationKind,
 } from '@/types/database'
-import { sendInApp } from './channels/inapp'
 import { sendEmail } from './channels/email'
 
-export interface DispatchInput {
+interface DispatchInput {
   notification: Notification
   /** Map of which channels are enabled for this user. */
   prefs: Partial<Record<NotificationChannel, boolean>>
@@ -14,7 +13,7 @@ export interface DispatchInput {
   contacts: Partial<Record<NotificationChannel, string | null>>
 }
 
-export interface DispatchResult {
+interface DispatchResult {
   channel: NotificationChannel
   delivered: boolean
   error?: string
@@ -98,6 +97,3 @@ function labelForKind(kind: NotificationKind): string {
       return 'System'
   }
 }
-
-export { sendInApp }
-export { sendEmail }

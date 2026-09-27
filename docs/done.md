@@ -9,6 +9,26 @@
 
 ---
 
+## Deletion-first refactor of the data layer (`src/lib`, `src/hooks`, `src/types`) — 2026-09-27
+
+Three parallel review workers, one verifier. Scope: UX/web3/Supabase layers only —
+no UI (`src/components`, `src/pages`), no SQL/migrations, no edge/server code touched.
+
+- `src/` total **31,761 → 30,805 lines** (−956):
+  - `lib/supabase/index.ts` 3,185 → 2,905; `types/database.ts` 780 → 450;
+    remaining `src/lib` 4,104 → 3,803; `src/hooks` 2,388 → 2,356.
+- Removed zero-reference exports and dead modules (`lib/siwe.ts`,
+  `lib/useExpectedChain.ts`, dead in-app notification channel), dead types/enums
+  (KYC, reputation, login-session, `Trade`, mock-offer…), and duplicated internals
+  (ID generators, JWT-claim decode, SIWE marker parsing, storage writer).
+  Internal-only symbols were un-exported, not deleted.
+- Verified: `npm run build` ✓, `eslint` 0 errors, no dangling refs, no conflict
+  markers, every `tests/` import still resolves (vitest not installed locally).
+
+Files: `src/lib/**`, `src/hooks/**`, `src/types/**`, `.env.example`.
+
+---
+
 ## Security — app_metadata wallet claim, SIWE domain check, operator gate — 2026-09-24
 
 Fixes for the 3 critical findings of the full-codebase audit. **Requires a DB
