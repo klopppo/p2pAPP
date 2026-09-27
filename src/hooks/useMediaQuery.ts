@@ -3,7 +3,7 @@ import { useCallback, useSyncExternalStore } from 'react'
 /**
  * Subscribe to a CSS media query. SSR-safe (returns `false` on the server).
  */
-export function useMediaQuery(query: string): boolean {
+function useMediaQuery(query: string): boolean {
   const subscribe = useCallback(
     (onStoreChange: () => void) => {
       const mql = window.matchMedia(query)

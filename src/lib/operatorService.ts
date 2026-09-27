@@ -126,8 +126,37 @@ export function getCurrentOperator(): SysOperator {
   const current = op || OPERATORS_LIST[0]
   return {
     ...current,
-    roles: Array.isArray(current.roles) && current.roles.length > 0 ? current.roles : ['SUPER_ADMIN'],
+    // Least privilege: an operator with no roles gets NO permissions. The old
+    // `['SUPER_ADMIN']` default let any visitor who reached the portal
+    // self-elevate.
+    roles: Array.isArray(current.roles) ? current.roles : [],
   }
+}
+
+/**
+ * Resolve the signed-in operator from the SERVER. RLS returns only the caller's
+ * own ACTIVE `sys_operators` row, so the portal can no longer be driven by a
+ * client-chosen operator id. Falls back to the (role-less) local seed.
+ */
+export async function resolveCurrentOperator(): Promise<SysOperator> {
+  try {
+    const { data: id } = await supabase.rpc('current_operator_id')
+    if (id) {
+      const { data, error } = await supabase
+        .from('sys_operators')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle()
+      if (!error && data) {
+        const op = data as SysOperator
+        if (op.id) CURRENT_OPERATOR_ID = op.id
+        return { ...op, roles: Array.isArray(op.roles) ? op.roles : [] }
+      }
+    }
+  } catch {
+    // fall through to the local least-privilege seed
+  }
+  return getCurrentOperator()
 }
 
 export function setCurrentOperator(operatorId: string): SysOperator {

@@ -8,26 +8,18 @@
 // CORE ENUMS
 // =================================================================
 
-export const EscrowStatus = {
-  AWAITING_DEPOSIT: "awaiting_deposit",
-  BUYER_DEPOSITED: "buyer_deposited",
-  SELLER_DEPOSITED: "seller_deposited",
-  /** KlerosEsc.State.FUNDED — buyer + seller deposits in and seller has
-   *  locked tradeAmount. Distinct from SELLER_DEPOSITED which only captures
-   *  one of those transitions. */
-  FUNDED: "funded",
-  CONFIRMED: "confirmed",
-  DEPOSITED: "deposited",
-  PENDING_RELEASE: "pending_release",
-  DISPUTED: "disputed",
-  RELEASED: "released",
-  REFUNDED: "refunded",
-  /** KlerosEsc.State.CANCELLED — funding-phase mutual cancel via
-   *  `cancelTrade()`. Distinct from REFUNDED (which is the buyer-favorable
-   *  dispute payout). See contract-execution-status.md §B-3. */
-  CANCELLED: "cancelled",
-} as const
-export type EscrowStatus = (typeof EscrowStatus)[keyof typeof EscrowStatus]
+type EscrowStatus =
+  | "awaiting_deposit"
+  | "buyer_deposited"
+  | "seller_deposited"
+  | "funded"
+  | "confirmed"
+  | "deposited"
+  | "pending_release"
+  | "disputed"
+  | "released"
+  | "refunded"
+  | "cancelled"
 
 /**
  * Kleros-specific event types that power the trade_events audit log. These
@@ -71,39 +63,11 @@ export const TradeEventType = {
 export type TradeEventType =
   (typeof TradeEventType)[keyof typeof TradeEventType]
 
-export const OfferStatus = {
-  ACTIVE: "active",
-  PAUSED: "paused",
-  COMPLETED: "completed",
-  CANCELLED: "cancelled",
-  EXPIRED: "expired",
-} as const
-export type OfferStatus = (typeof OfferStatus)[keyof typeof OfferStatus]
+type OfferStatus = "active" | "paused" | "completed" | "cancelled" | "expired"
 
-export const KYCStatus = {
-  PENDING: "pending",
-  APPROVED: "approved",
-  REJECTED: "rejected",
-  EXPIRED: "expired",
-} as const
-export type KYCStatus = (typeof KYCStatus)[keyof typeof KYCStatus]
+type VerificationLevel = "unverified" | "verified" | "trusted" | "suspicious"
 
-export const VerificationLevel = {
-  UNVERIFIED: "unverified",
-  VERIFIED: "verified",
-  TRUSTED: "trusted",
-  SUSPICIOUS: "suspicious",
-} as const
-export type VerificationLevel =
-  (typeof VerificationLevel)[keyof typeof VerificationLevel]
-
-export const UserRole = {
-  USER: "user",
-  ADMIN: "admin",
-  MEDIATOR: "mediator",
-  SUPPORT: "support",
-} as const
-export type UserRole = (typeof UserRole)[keyof typeof UserRole]
+type UserRole = "user" | "admin" | "mediator" | "support"
 
 export const TradeStatus = {
   PENDING: "pending",
@@ -167,71 +131,6 @@ export interface User {
   last_30d_volume?: number | null
 }
 
-export interface UserPrivate {
-  user_id: string
-  email: string | null
-  email_verified_at: string | null
-  phone_encrypted: string | null // Base64 encoded
-  wallet_privkey_enc: string | null // Base64 encrypted
-  kyc_id: string | null
-  twofa_enabled: boolean
-  twofa_secret_enc: string | null // Base64 encrypted
-  backup_codes_enc: string | null // Base64 encrypted
-  daily_limit: number | null
-  weekly_limit: number | null
-  daily_used: number
-  weekly_used: number
-  wallet_lock_enabled: boolean
-  wallet_lock_threshold: number
-  wallet_lock_last_unlock: string | null
-  last_password_change: string
-}
-
-// =================================================================
-// KYC TYPES
-// =================================================================
-
-export const KYCDocType = {
-  PASSPORT: "passport",
-  ID_CARD: "id_card",
-  DRIVING_LICENSE: "driving_license",
-  NATIONAL_ID: "national_id",
-} as const
-export type KYCDocType = (typeof KYCDocType)[keyof typeof KYCDocType]
-
-export interface KYCApplication {
-  id: string
-  user_id: string
-  status: KYCStatus
-  doc_type: KYCDocType
-  document_number: string
-  issuing_country: string
-  issue_date: string | null
-  expiry_date: string | null
-  created_at: string
-  updated_at: string
-  expires_at: string | null
-}
-
-export interface KYCDocument {
-  id: string
-  kyc_id: string
-  doc_kind: "selfie" | "front" | "back"
-  file_hash: string // SHA-256 hex
-  file_encrypted: string // Base64 encrypted
-  uploaded_at: string
-}
-
-export interface KYCProvider {
-  id: string
-  kyc_id: string
-  provider_name: string
-  status: KYCStatus
-  provider_ref: string | null
-  metadata: Record<string, unknown>
-  verified_at: string | null
-}
-
 // =================================================================
 // OFFER TYPES
 // =================================================================
@@ -287,78 +186,6 @@ export interface Offer {
 // TRADE TYPES
 // =================================================================
 
-export interface Trade {
-  id: string
-  trade_id: string
-  offer_id: string | null
-  status: TradeStatus
-
-  buyer_id: string
-  seller_id: string
-
-  // Trading details
-  crypto_token: string
-  crypto_amount: number
-  crypto_price_per_unit: number
-  crypto_total: number
-
-  fiat_currency: string
-  fiat_amount: number
-  fiat_received: number
-
-  payment_method: string
-  payment_details: Record<string, unknown>
-
-  // Escrow contract details
-  escrow_contract_addr: string | null
-  escrow_tx_hash: string | null
-  escrow_status: EscrowStatus
-
-  // Unlock configuration
-  escrow_timeout: string
-  escrow_release_after: string
-
-  // Platform fee tracking
-  platform_fee_bps: number
-  treasury_address: string | null
-
-  // Kleros / on-chain mirrors (cache of immutable escrow configuration
-  // + per-trade timestamps so the server-side indexer can write these without
-  // re-reading the chain per row). Optional because the columns may not exist
-  // in older deployments.
-  /** msg.sender of KlerosEscrowFactory.createEscrow(). Distinct from
-   *  buyer/seller — equals the taker in the typical flow. */
-  creator: string | null
-  /** The pinned Kleros Court address (factory-owned). */
-  kleros_court_addr: string | null
-  /** subcourtId (uint96 right-aligned bytes32) — Kleros extraData part 1. */
-  kleros_extra_data_part1: string | null
-  /** minJurors (bytes32) — Kleros extraData part 2. */
-  kleros_extra_data_part2: string | null
-  /** Block-timestamp of buyer/deposit (unix seconds, 0 if no deposit). */
-  buyer_deposit_time: string | null
-  /** Block-timestamp of seller/deposit (unix seconds, 0 if no deposit). */
-  seller_deposit_time: string | null
-  /** Block-timestamp of confirm() (unix seconds, null if not confirmed). */
-  confirmation_time: string | null
-
-  // Dispute tracking
-  has_dispute: boolean
-
-  // Rating aggregated
-  avg_rating: number | null
-  rating_speed: number | null
-  rating_communication: number | null
-  rating_reliability: number | null
-
-  // Timestamps
-  created_at: string
-  updated_at: string
-  completed_at: string | null
-  cancelled_at: string | null
-  disputed_at: string | null
-}
-
 /**
  * Input for creating a trade from an offer. `crypto_amount` is derived from the
  * entered `fiat_amount` and the offer's `price_per_unit`; the DB recomputes
@@ -403,31 +230,6 @@ export interface TradeRating {
   comment: string | null
   anonymous: boolean
   submitted_at: string
-}
-
-export interface TradeEvent {
-  id: string
-  trade_id: string
-  type: string
-  actor: string
-  description: string | null
-  metadata: Record<string, unknown>
-  created_at: string
-}
-
-/**
- * Subset of the trades row the UI persists when a dispute completes via
- * executeRuling / timeoutDispute / finalize. The actual `updateTradeStatus`
- * helper accepts a partial of this (Partial<TradeTerminalMirror>) so callers
- * can pass only the fields they want to flip.
- */
-export interface TradeTerminalMirror {
-  /** High-level trade status. */
-  status: TradeStatus
-  /** Matching escrow_status (e.g. 'released' / 'refunded' / 'disputed'). */
-  escrow_status: EscrowStatus
-  /** Tx hash of the on-chain settlement call. */
-  escrow_tx_hash?: string
 }
 
 // =================================================================
@@ -486,103 +288,17 @@ export interface Dispute {
   ruling_received_time?: string | null
 }
 
-export interface DisputeEvidence {
-  id: string
-  dispute_id: string
-  submitted_by: "buyer" | "seller" | "neutral"
-  evidence_kind: string
-  /** IPFS CID of the off-chain evidence bundle. (Originally named
-   *  `file_hash`; renamed for clarity in migration 20260824*.) */
-  ipfs_cid: string
-  /** Gateway URL resolvable in browsers (`https://ipfs.io/ipfs/<cid>`). */
-  ipfs_url: string
-  /** bytes32 actually submitted on-chain via submitEvidence() — keccak256(cid). */
-  keccak_bytes32: string | null
-  /** Tx hash of the corresponding submitEvidence() call, if executed. */
-  tx_hash: string | null
-  /** On-chain `evidenceGroupID` at the time of submission (0 = first round). */
-  evidence_group_id: number | null
-  submitted_at: string | null
-}
-
-// =================================================================
-// REPUTATION TYPES
-// =================================================================
-
-export interface ReputationScore {
-  user_id: string
-  overall: number
-  trustworthiness: number
-  reliability: number
-  communication: number
-  speed: number
-  professionalism: number
-  points_total: number
-  points_earned: number
-  points_lost: number
-  updated_at: string
-}
-
-export interface ReputationPoint {
-  id: string
-  user_id: string
-  category: string
-  delta: number
-  reason: string
-  source: "trade" | "rating" | "dispute" | "flag" | "system"
-  created_at: string
-}
-
-export interface ReputationBadge {
-  user_id: string
-  badge: string
-  awarded_at: string
-}
-
-// =================================================================
-// LOGIN SESSION TYPES
-// =================================================================
-
-export interface LoginSession {
-  id: string
-  user_id: string
-  ip: string | null
-  user_agent: string | null
-  fingerprint: string | null
-  created_at: string
-  last_used_at: string
-  revoked_at: string | null
-}
-
 // =================================================================
 // CHAT TYPES (conversations + messages, see migration 20260724000004)
 // =================================================================
 
-export const ConversationStatus = {
-  OPEN: "open",
-  ARCHIVED: "archived",
-  LOCKED: "locked",
-} as const
-export type ConversationStatus =
-  (typeof ConversationStatus)[keyof typeof ConversationStatus]
+type ConversationStatus = "open" | "archived" | "locked"
 
-export const ParticipantRole = {
-  BUYER: "buyer",
-  SELLER: "seller",
-  MEDIATOR: "mediator",
-  OBSERVER: "observer",
-} as const
-export type ParticipantRole =
-  (typeof ParticipantRole)[keyof typeof ParticipantRole]
+type ParticipantRole = "buyer" | "seller" | "mediator" | "observer"
 
-export const MessageKind = {
-  TEXT: "text",
-  SYSTEM: "system",
-  PAYMENT_HINT: "payment_hint",
-} as const
-export type MessageKind = (typeof MessageKind)[keyof typeof MessageKind]
+export type MessageKind = "text" | "system" | "payment_hint"
 
-export interface Conversation {
+interface Conversation {
   id: string
   trade_id: string | null
   status: ConversationStatus
@@ -592,7 +308,7 @@ export interface Conversation {
   updated_at: string
 }
 
-export interface ConversationParticipant {
+interface ConversationParticipant {
   conversation_id: string
   user_id: string
   role: ParticipantRole
@@ -601,7 +317,7 @@ export interface ConversationParticipant {
   joined_at: string
 }
 
-export interface Message {
+interface Message {
   id: string
   conversation_id: string
   sender_id: string
@@ -656,21 +372,13 @@ export interface MessageWithSender extends Message {
 // NOTIFICATION TYPES (see migration 20260724000005)
 // =================================================================
 
-export const NotificationKind = {
-  MESSAGE: "message",
-  TRADE_UPDATE: "trade_update",
-  DISPUTE_UPDATE: "dispute_update",
-  SYSTEM: "system",
-} as const
 export type NotificationKind =
-  (typeof NotificationKind)[keyof typeof NotificationKind]
+  | "message"
+  | "trade_update"
+  | "dispute_update"
+  | "system"
 
-export const NotificationChannel = {
-  INAPP: "inapp",
-  EMAIL: "email",
-} as const
-export type NotificationChannel =
-  (typeof NotificationChannel)[keyof typeof NotificationChannel]
+export type NotificationChannel = "inapp" | "email"
 
 export interface Notification {
   id: string
@@ -698,28 +406,11 @@ export interface NotificationPreferences {
 // REFERRAL PROGRAM
 // =================================================================
 
-export const ReferralStatus = {
-  PENDING: "pending",
-  ACTIVE: "active",
-} as const
-export type ReferralStatus =
-  (typeof ReferralStatus)[keyof typeof ReferralStatus]
+type ReferralStatus = "pending" | "active"
 
-export const ReferralRewardStatus = {
-  PENDING: "pending",
-  PAID: "paid",
-} as const
-export type ReferralRewardStatus =
-  (typeof ReferralRewardStatus)[keyof typeof ReferralRewardStatus]
+type ReferralRewardStatus = "pending" | "paid"
 
-export interface ReferralCode {
-  id: string
-  user_id: string
-  code: string
-  created_at: string
-}
-
-export interface ReferralRelation {
+interface ReferralRelation {
   id: string
   referrer_id: string
   referred_user_id: string
@@ -757,24 +448,3 @@ export interface ReferralDashboard {
   pendingEarned: number
   paidEarned: number
 }
-
-// =================================================================
-// STUDIO-SAFE MOCKS (for development)
-// =================================================================
-
-export interface MockOffer {
-  id: number
-  trader: string
-  trades: number
-  type: "buy" | "sell"
-  token: string
-  amount: string
-  price: number
-  priceDisplay: string
-  minAmount: number
-  maxAmount: number
-  isPositive: boolean
-}
-
-// Re-export RBAC and Audit types
-export * from "./rbac"

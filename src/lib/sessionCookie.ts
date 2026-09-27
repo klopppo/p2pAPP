@@ -19,7 +19,7 @@
 export const SESSION_COOKIE_NAME = 'coffernode_session'
 /** 7 days — long enough to survive a tab close, short enough to self-heal
  *  stale mirrors (the hook re-syncs on every auth change anyway). */
-export const SESSION_COOKIE_MAX_AGE_S = 7 * 24 * 60 * 60
+const SESSION_COOKIE_MAX_AGE_S = 7 * 24 * 60 * 60
 
 /** Wallet addresses rendered on public profiles; the only accepted shape. */
 const WALLET_RE = /^0x[0-9a-f]{40}$/
@@ -41,19 +41,4 @@ export function writeSessionCookie(walletAddress: string | null): void {
     ? `${encodeURIComponent(walletAddress.toLowerCase())}; Max-Age=${SESSION_COOKIE_MAX_AGE_S}`
     : '; Max-Age=0'
   document.cookie = `${base}${value}; Path=/${secure}; SameSite=Lax`
-}
-
-/** Read the current mirror cookie value (lowercased wallet, or null). */
-export function readSessionCookie(): string | null {
-  if (typeof document === 'undefined') return null
-  const match = document.cookie.match(
-    new RegExp(`(?:^|;\\s*)${SESSION_COOKIE_NAME}=([^;]*)`),
-  )
-  if (!match || !match[1]) return null
-  try {
-    const raw = decodeURIComponent(match[1]).toLowerCase()
-    return WALLET_RE.test(raw) ? raw : null
-  } catch {
-    return null
-  }
 }

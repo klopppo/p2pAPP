@@ -2,7 +2,6 @@ import {
   createContext,
   useContext,
   useEffect,
-  useMemo,
   useState,
   type ReactNode,
 } from 'react'
@@ -98,6 +97,5 @@ function GlobalPresenceInner({
     }
   }, [user?.id, user?.nickname])
 
-  const value = useMemo(() => online, [online])
-  return <OnlineUsersContext.Provider value={value}>{children}</OnlineUsersContext.Provider>
+  return <OnlineUsersContext.Provider value={online}>{children}</OnlineUsersContext.Provider>
 }

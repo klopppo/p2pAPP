@@ -9,7 +9,104 @@
 
 ---
 
-## RBAC/audit/reports RLS chiuso — no open read per `anon` — 2026-09-21
+## Deletion-first refactor of the data layer (`src/lib`, `src/hooks`, `src/types`) — 2026-09-27
+
+Three parallel review workers, one verifier. Scope: UX/web3/Supabase layers only —
+no UI (`src/components`, `src/pages`), no SQL/migrations, no edge/server code touched.
+
+- `src/` total **31,761 → 30,805 lines** (−956):
+  - `lib/supabase/index.ts` 3,185 → 2,905; `types/database.ts` 780 → 450;
+    remaining `src/lib` 4,104 → 3,803; `src/hooks` 2,388 → 2,356.
+- Removed zero-reference exports and dead modules (`lib/siwe.ts`,
+  `lib/useExpectedChain.ts`, dead in-app notification channel), dead types/enums
+  (KYC, reputation, login-session, `Trade`, mock-offer…), and duplicated internals
+  (ID generators, JWT-claim decode, SIWE marker parsing, storage writer).
+  Internal-only symbols were un-exported, not deleted.
+- Verified: `npm run build` ✓, `eslint` 0 errors, no dangling refs, no conflict
+  markers, every `tests/` import still resolves (vitest not installed locally).
+
+Files: `src/lib/**`, `src/hooks/**`, `src/types/**`, `.env.example`.
+
+---
+
+## Security — app_metadata wallet claim, SIWE domain check, operator gate — 2026-09-24
+
+Fixes for the 3 critical findings of the full-codebase audit. **Requires a DB
+migration + `siwe-auth` redeploy** (see below); existing sessions must all
+re-sign once.
+
+- **Wallet-claim forgery (CRITICAL)** — RLS authorized off the user-writable
+  `user_metadata.wallet_address`, so any signed-in user could set it to a victim
+  (via `supabase.auth.updateUser`) and mint a JWT the whole app trusted. The
+  claim now lives in admin-only `app_metadata`:
+  - `siwe-auth` writes `app_metadata.wallet_address` (create + backfill).
+  - New migration `20260924000001_wallet_claim_app_metadata.sql` recreates
+    `current_user_id()`, the `users` self policies, the private-offer + avatar
+    storage policies, and the RBAC helpers (`current_operator_id`,
+    `is_operator`, `operator_has_permission`) to read `app_metadata` only.
+  - Client claim readers (`getSessionWallet`, `refreshToWalletClaim`) read
+    `app_metadata` (falling back to the legacy top-level claim, never
+    `user_metadata`).
+- **SIWE domain (HIGH)** — `parseSiweMessage` now parses the header domain;
+  `siwe-auth` rejects unless both the header domain and the URI host are
+  allowlisted and equal (previously only the URI was checked, so a message could
+  display `evil.com` while signing the real host).
+- **Operator portal (CRITICAL)** — `/app/operator` is wrapped in a new
+  `RequireOperator` gate that checks `is_operator()` server-side; any
+  non-operator is redirected to the marketplace. `operatorService` no longer
+  defaults to `SUPER_ADMIN` (`getCurrentOperator` → least privilege) and now
+  resolves the signed-in operator from `sys_operators` via
+  `resolveCurrentOperator()`.
+
+Files: `supabase/migrations/20260924000001_wallet_claim_app_metadata.sql`,
+`supabase/functions/siwe-auth/index.ts`, `supabase/functions/_shared/siwe-core.ts`,
+`src/lib/supabase/index.ts`, `src/components/auth/RequireOperator.tsx`,
+`src/App.tsx`, `src/lib/operatorService.ts`, `src/pages/OperatorDashboardPage.tsx`.
+
+---
+
+## Full-codebase bug sweep — client correctness + edge hardening — 2026-09-24
+
+Parallel audit (on-chain flows, data/session layer, chat, auth/edge, pages/i18n)
+followed by targeted fixes:
+
+- **Escrow status** (`src/hooks/useTrades.ts`): `deriveEscrowStatus` now mirrors
+  `KlerosEsc._checkFullyFunded` — at `securityDepositPct > 0` it requires
+  `fundsLocked && both deposits` before reporting `funded` (previously two bare
+  deposits showed "Funded" while the escrow was still unfunded). Added the
+  `securityDepositPct` multicall read; updated `TradeSummaryPill` caller.
+- **Query persister** (`src/lib/queryPersister.ts`): bigint-bearing namespaces
+  (`escrow-state`/`appeal-info`/`arbitration-cost`) are no longer persisted, and
+  any query whose data fails `JSON.stringify` is skipped — a single bigint used
+  to abort the whole snapshot write and permanently break hydration.
+- **Wallet switch** (`src/hooks/useSyncUser.ts`): an address change without a
+  disconnect now cancels/clears the in-memory + persisted caches so wallet-scoped
+  keys that don't embed the address can't leak across identities.
+- **EditOfferPage**: hydration is tracked by offer id, not a boolean, so
+  navigating `/offer/A/edit → /offer/B/edit` no longer submits A's values under
+  B's id.
+- **ReviewsModal**: removed the temporary `MOCK_REVIEWS` injected into every
+  profile's review list.
+- **ChatHeader** (`ChatLayout`): keyed by conversation id so muted/blocked/
+  archived local state can't persist across cached conversation switches.
+- **ReportUserModal**: the category dropdown is now labelled "Category" (was
+  mislabelled "Report reason").
+- **error-logger**: window `error`/`unhandledrejection` listeners are prod-only
+  now (`ENABLED`), matching the "nothing leaves the browser in dev" contract.
+- **Edge hardening** (`functions/`): escape `<` in the injected `__EDGE_DATA__`
+  JSON; guard `decodeURIComponent` on public-profile paths (malformed `%`);
+  evict expired rate-limit buckets in `error-report`.
+- **i18n**: added the 26 `profile.coffer*`, `referral.*`, `trade.errorOfferUnavailable`
+  keys missing from es/fr/tr/zh. `.env.example` now documents the factory/token/
+  publishable-key/RPC vars.
+
+Files: `src/hooks/{useTrades,useSyncUser}.ts`, `src/lib/queryPersister.ts`,
+`src/pages/EditOfferPage.tsx`, `src/components/custom/{ReviewsModal,ReportUserModal}.tsx`,
+`src/components/custom/chat/{ChatLayout,TradeSummaryPill}.tsx`, `src/error-logger.ts`,
+`src/locales/*.json`, `functions/_middleware.ts`, `functions/_lib/public-data.ts`,
+`functions/api/error-report.ts`, `.env.example`.
+
+
 
 Migrations `002-rbac-…` shipped the eight backoffice tables
 (`sys_programs`, `sys_roles`, `sys_permissions`,

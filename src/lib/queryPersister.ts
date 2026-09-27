@@ -23,6 +23,10 @@ import type { QueryClient } from '@tanstack/react-query'
 const STORAGE_KEY = 'coffernode:react-query:v2'
 const MAX_AGE_MS = 1000 * 60 * 60 * 24 // 24h
 
+const debugEnabled = (): boolean =>
+  typeof window !== 'undefined' &&
+  !!(window as { __coffernodeDebug?: boolean }).__coffernodeDebug
+
 interface PersistedQuery {
   queryKey: readonly unknown[]
   queryHash: string
@@ -66,7 +70,7 @@ function safeWrite(payload: PersistedClient): void {
   const namespaceOf = (q: PersistedQuery) =>
     typeof q.queryKey?.[0] === 'string' ? (q.queryKey[0] as string) : ''
   const dropped = new Set<string>()
-  for (const drop of ['messages', 'conversation', 'conversations', 'notifications', 'trades']) {
+  for (const drop of ['messages', 'conversation', 'conversations', 'notifications', 'trades', 'escrow-state', 'appeal-info', 'arbitration-cost']) {
     dropped.add(drop)
     const reduced: PersistedClient = {
       ...payload,
@@ -100,13 +104,13 @@ export function hydrateQueryCache(
 ): void {
   const payload = safeRead()
   if (!payload) {
-    if (typeof window !== 'undefined' && (window as { __coffernodeDebug?: boolean }).__coffernodeDebug) {
+    if (debugEnabled()) {
       console.log('[queryPersister] no persisted cache found')
     }
     return
   }
   if (payload.buster !== getBuster()) {
-    if (typeof window !== 'undefined' && (window as { __coffernodeDebug?: boolean }).__coffernodeDebug) {
+    if (debugEnabled()) {
       console.log(
         `[queryPersister] cache buster mismatch (cached=${payload.buster}, current=${getBuster()}) — discarding`,
       )
@@ -114,7 +118,7 @@ export function hydrateQueryCache(
     return
   }
   if (Date.now() - payload.savedAt > MAX_AGE_MS) {
-    if (typeof window !== 'undefined' && (window as { __coffernodeDebug?: boolean }).__coffernodeDebug) {
+    if (debugEnabled()) {
       console.log(
         `[queryPersister] cache expired (age=${Math.round((Date.now() - payload.savedAt) / 1000)}s > ${MAX_AGE_MS / 1000}s)`,
       )
@@ -140,18 +144,13 @@ export function hydrateQueryCache(
     })
     hydrated++
   }
-  if (typeof window !== 'undefined' && (window as { __coffernodeDebug?: boolean }).__coffernodeDebug) {
+  if (debugEnabled()) {
     console.log(
       `[queryPersister] hydrated ${hydrated} queries (buster=${getBuster()}, age=${Math.round((Date.now() - payload.savedAt) / 1000)}s)`,
     )
   }
 }
 
-/**
- * Mount the write-side subscription. Call this in a useEffect after the
- * QueryClientProvider mounts. The buster is read fresh on every write so
- * it stays in sync with wallet changes.
- */
 /**
  * Namespaces that must NEVER be served from a stale snapshot.
  *
@@ -167,6 +166,13 @@ export function hydrateQueryCache(
 const NON_PERSISTABLE_NAMESPACES: ReadonlySet<string> = new Set([
   'wallet-session',
   'trades',
+  // These carry `bigint` fields (on-chain reads). JSON.stringify throws on
+  // bigint, which would abort the entire snapshot write (and the namespace
+  // wasn't in the quota-drop fallback, so persistence stayed broken until a
+  // manual cache clear). Never persist them.
+  'escrow-state',
+  'appeal-info',
+  'arbitration-cost',
 ])
 
 /**
@@ -194,6 +200,14 @@ export function attachQueryPersister(
         const firstKey = q.queryKey[0]
         if (typeof firstKey !== 'string') continue
         if (NON_PERSISTABLE_NAMESPACES.has(firstKey)) continue
+        // Belt-and-braces: a namespace we didn't anticipate may still hold a
+        // bigint (JSON.stringify throws). Skip just that query instead of
+        // failing the whole snapshot.
+        try {
+          JSON.stringify(q.state.data)
+        } catch {
+          continue
+        }
         queries.push({
           queryKey: q.queryKey,
           queryHash: q.queryHash,
@@ -207,7 +221,7 @@ export function attachQueryPersister(
         savedAt: Date.now(),
         queries,
       })
-      if (typeof window !== 'undefined' && (window as { __coffernodeDebug?: boolean }).__coffernodeDebug) {
+      if (debugEnabled()) {
         console.log(
           `[queryPersister] wrote ${queries.length}/${all.length} queries (buster=${getBuster()}) — wallet-session/trades filtered`,
         )
@@ -238,18 +252,6 @@ export function attachQueryPersister(
     window.removeEventListener('pagehide', onHide)
     window.removeEventListener('beforeunload', onHide)
   }
-}
-
-/**
- * Convenience helper for the common case: hydrate + attach in one call.
- * Hydration runs synchronously; the write subscription is scheduled.
- */
-export function persistQueryClient(
-  client: QueryClient,
-  getBuster: () => string,
-): () => void {
-  hydrateQueryCache(client, getBuster)
-  return attachQueryPersister(client, getBuster)
 }
 
 /**

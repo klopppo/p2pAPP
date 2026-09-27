@@ -47,6 +47,13 @@ const rateBuckets = new Map<string, Bucket>()
 
 function allow(ip: string): boolean {
   const now = Date.now()
+  // Opportunistically evict expired buckets: without this a long-lived isolate
+  // accumulates one entry per unique IP forever (unbounded memory).
+  if (rateBuckets.size > 1000) {
+    for (const [key, b] of rateBuckets) {
+      if (now >= b.resetAt) rateBuckets.delete(key)
+    }
+  }
   const bucket = rateBuckets.get(ip)
   if (!bucket || now >= bucket.resetAt) {
     rateBuckets.set(ip, { resetAt: now + RATE_WINDOW_MS, count: 1 })

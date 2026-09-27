@@ -26,6 +26,7 @@ import {
   getCurrentOperator,
   setCurrentOperator,
   listOperators,
+  resolveCurrentOperator,
   hasPermission,
   isPermissionEnabled,
   toggleRolePermission,
@@ -206,7 +207,7 @@ export function OperatorDashboardPage() {
   const loadInitial = async () => {
     const ops = await listOperators()
     setOperators(ops)
-    setCurOp(getCurrentOperator())
+    setCurOp(await resolveCurrentOperator())
     fetchSupport()
     fetchReports()
     fetchLogs()

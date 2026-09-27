@@ -65,9 +65,6 @@ export function warmUpIpns(): Promise<void> {
   return warmPromise
 }
 
-/** Back-compat alias — older call sites used the old name. */
-export const warmUpIpfs = warmUpIpns
-
 /**
  * Shape returned from `uploadToIpfs`. Mirrors the legacy Helia shape so the
  * DisputePage / DisputeDetailPage call sites don't need to change their
@@ -75,7 +72,7 @@ export const warmUpIpfs = warmUpIpns
  * `cid` is the storage path; signed URLs are minted at render time via
  * `getDisputeEvidenceSignedUrl(cid)` in `src/lib/supabase`.
  */
-export interface IpfsUploadResult {
+interface IpfsUploadResult {
   /** Storage path (`dispute-evidence/<disputeId>/<basename>-<ts>-<rand>.<ext>`).
    *  Stored in `dispute_evidence.ipfs_cid` — the column was originally for
    *  an IPFS CID; the name is kept for back-compat with existing rows. */
@@ -91,7 +88,7 @@ export interface IpfsUploadResult {
 
 /** Thrown when the upload times out (cold or warm). Callers should map this
  *  to a localized toast via `errorMessage`. */
-export class IpfsUploadTimeoutError extends Error {
+class IpfsUploadTimeoutError extends Error {
   override name = 'IpfsUploadTimeoutError'
   readonly timeoutMs: number
   constructor(timeoutMs: number) {
@@ -220,14 +217,4 @@ export function cidToBytes32(cid: string): `0x${string}` {
     )
   }
   return keccak256(toBytes(`ipfs://${trimmed}`))
-}
-
-/**
- * Tear-down hook kept for the logout flow. With Supabase Storage there is
- * nothing to stop, but the signature is preserved so `Navbar` / sign-out
- * handlers don't break.
- */
-export async function teardownIpfs(): Promise<void> {
-  isWarm = false
-  warmPromise = null
 }

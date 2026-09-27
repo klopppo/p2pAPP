@@ -43,7 +43,7 @@ const IN_MEMORY_REPORTS: UserReport[] = [
   },
 ]
 
-export interface CreateReportParams {
+interface CreateReportParams {
   reporter_user_id?: string | null
   reporter_wallet: string
   reported_user_id?: string | null

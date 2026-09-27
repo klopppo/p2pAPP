@@ -25,8 +25,8 @@
 
 import { hkdfSha256, sha256Hex, bytesToHex, hexToBytes } from "@/lib/crypt"
 
-export const COFFER_DOMAIN = "coffernode:coffer:v1"
-export const STORAGE_KEY = "coffernode:coffer:identity:v1"
+const COFFER_DOMAIN = "coffernode:coffer:v1"
+const STORAGE_KEY = "coffernode:coffer:identity:v1"
 export const PSEUDONYM_PREFIX = "CN-"
 export const PSEUDONYM_HEX_CHARS = 16
 
@@ -137,12 +137,8 @@ export function loadCofferIdentity(
   return cachedIdentity
 }
 
-export function hasCofferIdentity(): boolean {
-  return loadCofferIdentity() !== null
-}
-
 /** Expand a per-label key from the master (client-only, deterministic). */
-export async function deriveCofferKey(
+async function deriveCofferKey(
   identity: CofferIdentity,
   label: string
 ): Promise<string> {

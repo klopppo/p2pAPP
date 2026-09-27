@@ -77,7 +77,7 @@ function scheduleFlush(): void {
   flushTimer = setTimeout(flush, FLUSH_MS)
 }
 
-if (typeof window !== "undefined") {
+if (ENABLED && typeof window !== "undefined") {
   window.addEventListener("error", (event: ErrorEvent) => {
     // Skip resource-load errors (missing img/script) — they're browser
     // noise, not application failures, and would flood the log.

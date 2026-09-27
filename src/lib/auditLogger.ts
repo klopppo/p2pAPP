@@ -58,7 +58,7 @@ const IN_MEMORY_LOGS: UserActivityLog[] = [
   },
 ]
 
-export interface LogActivityParams {
+interface LogActivityParams {
   user_id?: string | null
   operator_id?: string | null
   wallet_address?: string | null

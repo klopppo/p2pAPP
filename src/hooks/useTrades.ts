@@ -19,10 +19,20 @@ export function deriveEscrowStatus(
   buyerDeposited: boolean,
   sellerDeposited: boolean,
   fundsLocked: boolean,
+  securityDepositPct: bigint,
 ): string {
   switch (state as EscrowStateValue) {
     case KlerosEscState.AWAITING_FUNDING:
-      if (fundsLocked || (buyerDeposited && sellerDeposited)) return 'funded'
+      // Mirror KlerosEsc._checkFullyFunded: at pct == 0 a lock alone funds the
+      // escrow; at pct > 0 the buyer AND seller must have deposited, then the
+      // seller locks. Reporting 'funded' on two bare deposits (without the
+      // lock) would misstate a still-unfunded escrow.
+      if (securityDepositPct === 0n) {
+        if (fundsLocked) return 'funded'
+        if (sellerDeposited) return 'seller_deposited'
+        return 'awaiting_deposit'
+      }
+      if (fundsLocked && buyerDeposited && sellerDeposited) return 'funded'
       if (buyerDeposited) return 'buyer_deposited'
       if (sellerDeposited) return 'seller_deposited'
       return 'awaiting_deposit'
@@ -85,6 +95,7 @@ export function useTrades() {
             { address: addr, abi: KLEROS_ESC_ABI as Abi, functionName: 'buyerSecurityDeposited' },
             { address: addr, abi: KLEROS_ESC_ABI as Abi, functionName: 'sellerSecurityDeposited' },
             { address: addr, abi: KLEROS_ESC_ABI as Abi, functionName: 'fundsLocked' },
+            { address: addr, abi: KLEROS_ESC_ABI as Abi, functionName: 'securityDepositPct' },
           ]
         })
         const results = (await publicClient.multicall({
@@ -94,17 +105,19 @@ export function useTrades() {
 
         const liveByTradeId = new Map<string, string>()
         withEscrow.forEach((t, i) => {
-          const base = i * 4
+          const base = i * 5
           const stateRes = results[base]
           if (!stateRes || stateRes.status !== 'success') return
           const buyerDep = results[base + 1]?.result as boolean | undefined
           const sellerDep = results[base + 2]?.result as boolean | undefined
           const locked = results[base + 3]?.result as boolean | undefined
+          const pct = results[base + 4]?.result as bigint | undefined
           const derived = deriveEscrowStatus(
             Number(stateRes.result),
             !!buyerDep,
             !!sellerDep,
             !!locked,
+            pct ?? 0n,
           )
           liveByTradeId.set(t.id, derived)
           // Persist the last-known phase per escrow so reloads can show it

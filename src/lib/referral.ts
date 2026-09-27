@@ -12,10 +12,10 @@
 export const REFERRER_SHARE_BPS = 1500 // 15%
 
 /** Trade fees are quoted in basis points per the `platform_fee_bps` column. */
-export const FEE_BASIS = 10_000
+const FEE_BASIS = 10_000
 
 /** Referral codes are 8 uppercase hex chars, e.g. `3F2A9C1B`. */
-export const REFERRAL_CODE_RE = /^[A-Fa-f0-9]{8}$/
+const REFERRAL_CODE_RE = /^[A-Fa-f0-9]{8}$/
 
 export function isValidReferralCode(code: string): boolean {
   return REFERRAL_CODE_RE.test(code.trim())

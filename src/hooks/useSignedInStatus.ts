@@ -18,47 +18,14 @@
  */
 import { useAccount } from 'wagmi'
 import { useWalletSession } from './useWalletSession'
-
-const SUCCESS_KEY = 'coffernode:siwe:last'
-const REJECTED_KEY_PREFIX = 'coffernode:siwe:declined:'
-
-function readStored(): {
-  signedAddress: string | null
-} {
-  if (typeof window === 'undefined') {
-    return { signedAddress: null }
-  }
-  let signedAddress: string | null = null
-  try {
-    const raw = window.localStorage.getItem(SUCCESS_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as { address?: string }
-      if (typeof parsed.address === 'string') {
-        signedAddress = parsed.address.toLowerCase()
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return { signedAddress }
-}
-
-/** Whether the given wallet has a persisted "declined sign-in" marker. */
-function hasRejectedMarker(addr: string | null): boolean {
-  if (typeof window === 'undefined' || !addr) return false
-  return window.localStorage.getItem(`${REJECTED_KEY_PREFIX}${addr.toLowerCase()}`) === '1'
-}
+import { hasRejectedMarker, hasSignedInMarker } from './siweMarker'
 
 export function useSignedInStatus() {
   const { address, isConnected } = useAccount()
   const { sessionWallet, hasSession, isLoading: userLoading } = useWalletSession()
 
-  // Read the persisted marker once per render. Cheap (a couple of
-  // localStorage gets) — no need to memoise.
-  const { signedAddress } = readStored()
-
   const lowerAddr = address?.toLowerCase() ?? null
-  const hasSuccessMarker = signedAddress != null && signedAddress === lowerAddr
+  const hasSuccessMarker = lowerAddr != null && hasSignedInMarker(lowerAddr)
   // Check the ACTIVE wallet's key directly — scanning for the first
   // `declined:` key returns an unrelated wallet when several were rejected.
   const hasRejectionMarker = hasRejectedMarker(lowerAddr)

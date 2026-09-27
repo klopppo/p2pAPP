@@ -80,13 +80,16 @@ export function EditOfferPage() {
     isError: offerError,
   } = useOffer(id)
   const [formData, setFormData] = useState<OfferForm | null>(null)
-  const [hydrated, setHydrated] = useState(false)
+  // Track WHICH offer id we hydrated from, not just a boolean: React Router
+  // reuses this component across `/offer/:id/edit` param changes, so a boolean
+  // would keep offer A's values while displaying/submitting offer B.
+  const [hydratedOfferId, setHydratedOfferId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Map the loaded offer row into the form shape. Fires once per offer load.
   // Keeps the rest of the form code identical to CreateOfferPage.
   useEffect(() => {
-    if (!offer || hydrated) return
+    if (!offer || hydratedOfferId === offer.id) return
     // Reverse the region code → human label map so the dropdown opens with
     // the same label the seller picked at create time. Empty array means
     // "Global" (the default in the picker).
@@ -112,8 +115,8 @@ export function EditOfferPage() {
       isPrivate: offer.is_private,
       targetUser: offer.target_user ?? "",
     })
-    setHydrated(true)
-  }, [offer, hydrated])
+    setHydratedOfferId(offer.id)
+  }, [offer, hydratedOfferId])
 
   // Ownership check: only the seller may edit. The `useOffer` query no longer
   // returns the seller's uid (ADR-015) — ownership is asserted via the opaque
@@ -130,7 +133,7 @@ export function EditOfferPage() {
   // `|| !hydrated` guard never released when the query errored/returned null
   // (the hydration effect bails at `!offer`), so a bad offer id spun forever
   // and the not-found branch below was unreachable.
-  if (offerLoading || (!!offer && !hydrated)) {
+  if (offerLoading || (!!offer && hydratedOfferId !== offer.id)) {
     return (
       <section className="flex items-center justify-center py-20 text-muted-foreground">
         <Loader2 className="mr-2 h-5 w-5 animate-spin" />{" "}
