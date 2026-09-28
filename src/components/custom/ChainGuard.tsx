@@ -1,18 +1,6 @@
 /**
- * Banner shown at the top of the app when the connected wallet is on the
- * wrong EVM chain. Clicking the CTA calls `wallet_switchEthereumChain`
- * (handled by RainbowKit/wagmi).
- *
- * Behaviour mirrors checklist item §2 "Network/Chain ID Mismatch":
- * without this guard every `writeContractAsync` against the deployed
- * factory silently reverts with no useful copy. Mounted once at the top
- * of the route tree via AppLayout so all in-app pages are covered,
- * including the detailed trade/dispute views.
- *
- * On wallet connect the guard ALSO attempts the switch automatically
- * (silent for well-known chains like Sepolia; `wallet_addEthereumChain`
- * fallback for wallets that don't know it). The banner is shown only if
- * that auto-switch is rejected or unavailable.
+ * Wrong-chain banner: auto-attempts a switch on connect and offers a manual
+ * retry (with `wallet_addEthereumChain` fallback) when that fails.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -43,9 +31,7 @@ export function ChainGuard() {
     try {
       await switchChainAsync({ chainId: expectedChainId })
     } catch (err) {
-      // 4902 = chain not added to the wallet yet. Add it (using the chain's
-      // RPC, which the wallet itself dials — CORS is irrelevant here) then
-      // retry the switch so MetaMask users don't hit a dead end.
+      // 4902/-32603 = chain unknown to the wallet; add it, then retry the switch.
       const code = (err as { code?: number })?.code
       if ((code === 4902 || code === -32603) && expectedChain && connectorClient) {
         try {

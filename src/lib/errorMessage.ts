@@ -1,28 +1,9 @@
 /**
- * Friendly wallet / write error messages. Catch blocks should use these
- * helpers instead of `(err as Error).message` so users see a friendly toast
- * on MetaMask rejections / contract reverts / RPC failures.
+ * Localized, user-facing message for a thrown wallet/write error. Pages that
+ * need full control should call `extractWriteError()` and pick their own key.
  */
 import { extractWriteError } from './errors'
 
-/**
- * Convert a thrown wallet/write error into a localized message.
- *
- * - 'cancelled' (user closed the wallet popup) → `errors.cancelledByUser`
- * - 'network' (RPC failure / wrong chain)      → `errors.networkError`
- * - 'reverted' (contract revert)               → `errors.reverted` with
- *   `{{reason}}` containing the clean shortMessage (e.g. `InvalidKlerosSubcourt()`).
- * - 'unknown'                                  → `${page}.${fallbackKey}`
- *   (defaults to `${page}.errorGeneric`). The existing per-action
- *   `confirmFailed` / `releaseFailed` / etc. keys can be passed as
- *   `fallbackKey` so the message reads "Failed to confirm: ..." instead
- *   of a generic "Something went wrong".
- *
- *   toast.error(errorMessage(err, 'tradeDetail', t, 'confirmFailed'))
- *
- * Pages that want full control should call `extractWriteError()` directly
- * and pick their own i18n key by `kind`.
- */
 export function errorMessage(
   err: unknown,
   page: string,
@@ -30,9 +11,7 @@ export function errorMessage(
   fallbackKey: string = 'errorGeneric',
 ): string {
   const extracted = extractWriteError(err)
-  // IPFS upload timeout has its own localized copy in disputePage (audit
-  // M5) — fall through to the page-specific key when the extract was
-  // thrown by `IpfsUploadTimeoutError`.
+  // IPFS upload timeout has its own page-specific copy (audit M5).
   if (
     extracted.kind === 'network' &&
     extracted.original instanceof Error &&

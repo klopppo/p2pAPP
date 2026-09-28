@@ -1,23 +1,6 @@
 /**
- * Non-blocking sign-in prompt.
- *
- * Mounts a centered card with a semi-transparent backdrop. The user can
- * still browse the rest of the app underneath — the prompt just nudges
- * them to finish the SIWE flow when they take an action that needs the
- * Supabase session.
- *
- * Triggers ONLY when:
- *   - wagmi reports a connected wallet
- *   - the SIWE success marker for that wallet is missing (or there's a
- *     pending rejection marker)
- *
- * Both gates off → no prompt. No wallet, no signature, no modal.
- *
- * Backdrop click / close button → set `dismissedForAddr(addr)` in
- * sessionStorage. Dismissed per (wallet, browser-session) so reloading
- * the page brings the prompt back if the user still hasn't signed.
- * The wallet itself is also key in the storage so a different wallet
- * doesn't inherit another wallet's dismiss.
+ * Non-blocking SIWE sign-in card; visible only for a connected wallet with no
+ * session and no success/rejection/dismissal marker for that wallet.
  */
 import { useCallback, useState } from 'react'
 import { useAccount, useSignMessage } from 'wagmi'
@@ -75,21 +58,12 @@ export function SignInPrompt() {
 
   const [signing, setSigning] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  // Bumped after every sign-in attempt (success or failure) and after a
-  // dismissal. Forces a re-render so the derived `visible` below re-reads the
-  // freshly-written marker / dismissal flags — deps like [address,
-  // isConnected] alone don't change on success. The value itself is unused.
+  // Bumped after each attempt/dismissal so the derived `visible` re-reads the
+  // freshly-written storage markers. The value itself is unused.
   const [, setSignAttempts] = useState(0)
 
-  // Single source of truth for visibility, derived during render (no effect,
-  // so no cascading setState). Re-evaluated on:
-  //   - address / isConnected change (wallet connect/disconnect)
-  //   - hasSession change (a live JWT hides the prompt outright)
-  //   - signAttempts change (every attempt / dismissal)
-  // The rejection + dismissal flags are read from storage every render.
-  // A success marker means this device already signed in before — recovering
-  // the session (or, failing that, the navbar "Sign in" button) is the path;
-  // we never auto-prompt MetaMask on reload.
+  // Visibility is derived during render from address, session, and storage
+  // markers — never auto-prompt MetaMask on reload.
   const lowerAddress = address?.toLowerCase() ?? null
   const visible =
     isConnected &&
@@ -108,10 +82,8 @@ export function SignInPrompt() {
         signMessage: signMessageAsync,
         force: true,
       })
-      // `ensureWalletSession` never throws — it returns `session: false` on
-      // any failure. Only clear the durable rejection marker on an actual
-      // success, otherwise a failed attempt would wipe the marker that the
-      // service just wrote (and the caller couldn't tell it failed).
+      // `ensureWalletSession` returns `session: false` instead of throwing;
+      // only a real success may clear the durable rejection marker.
       if (!session) {
         setErrorMessage(t('signInPrompt.failed', {
           defaultValue: 'Sign-in was not completed. Please try again.',
@@ -144,8 +116,7 @@ export function SignInPrompt() {
     <div
       role="presentation"
       onClick={(e) => {
-        // Backdrop click: dismiss. Clicks bubbling up from the card
-        // itself are stopped at the card level.
+        // Backdrop click dismisses; card clicks are stopped below.
         if (e.target === e.currentTarget) handleDismiss()
       }}
       className="fixed inset-0 z-40 flex items-center justify-center bg-background/40 backdrop-blur-sm p-4"

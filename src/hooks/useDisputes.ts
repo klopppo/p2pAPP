@@ -2,11 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAccount, useChainId, usePublicClient } from 'wagmi'
 import type { Log } from 'viem'
-import {
-  getDisputeById,
-  getDisputesByUser,
-  getUserByWallet,
-} from '@/lib/supabase'
+import { getDisputeById, getDisputesByUser, getUserByWallet } from '@/lib/supabase'
 import {
   KLEROS_COURT_ABI,
   KLEROS_ESC_ABI,
@@ -19,12 +15,8 @@ import {
 import type { Abi } from 'viem'
 import { useWalletSession } from './useWalletSession'
 
-/**
- * All disputes where the connected wallet is buyer or seller (Supabase).
- * Gated on a live session — `disputes_select_parties` denies unauthenticated
- * reads, which would otherwise return an empty (error-free) list. The session
- * wallet is in the key so completing SIWE / switching wallets refetches.
- */
+// All disputes for the wallet. Gated on a live session — RLS denies
+// unauthenticated reads and would silently return [].
 export function useDisputes() {
   const { address } = useAccount()
   const { sessionWallet, hasSession } = useWalletSession()
@@ -32,21 +24,15 @@ export function useDisputes() {
     queryKey: ['disputes', 'by-wallet', address, sessionWallet],
     queryFn: async () => {
       const user = address ? await getUserByWallet(address) : null
-      if (!user) return []
-      return getDisputesByUser(user.id)
+      return user ? getDisputesByUser(user.id) : []
     },
     enabled: !!address && hasSession,
-    // Surface status flips (in_review → escalated → resolved) without forcing
-    // a manual refresh. Cheap because the table is small and the query is
-    // filtered by user_id via PostgREST.
     refetchInterval: 30_000,
     staleTime: 15_000,
   })
 }
 
-/**
- * Single dispute by primary UUID, used by the detail viewer.
- */
+/** Single dispute by primary UUID, used by the detail viewer. */
 export function useDispute(id: string | undefined) {
   const { sessionWallet, hasSession } = useWalletSession()
   return useQuery({
@@ -60,53 +46,34 @@ export function useDispute(id: string | undefined) {
 export function useUserEscrows() {
   const { address } = useAccount()
   const publicClient = usePublicClient()
+  const chainId = useChainId()
   const factoryReady = !!KLEROS_ESCROW_FACTORY_ADDRESS
 
   return useQuery({
-    queryKey: ['user-escrows', address, KLEROS_ESCROW_FACTORY_ADDRESS],
+    queryKey: ['user-escrows', address, chainId, KLEROS_ESCROW_FACTORY_ADDRESS],
     enabled: !!address && !!publicClient && factoryReady,
     queryFn: async (): Promise<`0x${string}`[]> => {
       if (!address || !publicClient || !factoryReady) return []
       const c = publicClient
-      // Two reads for the counts (one multicall round-trip instead of two
-      // serialized calls), then a second multicall for every clone address.
-      // The previous loop issued one RPC per escrow — sequential waterfall
-      // that grew with trade history.
+      const factory = {
+        address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
+        abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
+      }
+      // Two counts in one multicall, then one multicall for the addresses.
       const [buyerCount, sellerCount] = (await c.multicall({
         contracts: [
-          {
-            address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
-            abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
-            functionName: 'escrowCountByBuyer',
-            args: [address],
-          },
-          {
-            address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
-            abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
-            functionName: 'escrowCountBySeller',
-            args: [address],
-          },
+          { ...factory, functionName: 'escrowCountByBuyer', args: [address] },
+          { ...factory, functionName: 'escrowCountBySeller', args: [address] },
         ],
         allowFailure: false,
       })) as [bigint, bigint]
 
-      const indexCalls: Array<{
-        functionName: 'escrowByBuyer' | 'escrowBySeller'
-        index: bigint
-      }> = []
-      for (let i = 0n; i < buyerCount; i++) {
-        indexCalls.push({ functionName: 'escrowByBuyer', index: i })
-      }
-      for (let i = 0n; i < sellerCount; i++) {
-        indexCalls.push({ functionName: 'escrowBySeller', index: i })
-      }
+      const indexCalls: Array<{ functionName: 'escrowByBuyer' | 'escrowBySeller'; index: bigint }> = []
+      for (let i = 0n; i < buyerCount; i++) indexCalls.push({ functionName: 'escrowByBuyer', index: i })
+      for (let i = 0n; i < sellerCount; i++) indexCalls.push({ functionName: 'escrowBySeller', index: i })
+
       const addresses = (await c.multicall({
-        contracts: indexCalls.map((call) => ({
-          address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
-          abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
-          functionName: call.functionName,
-          args: [address, call.index],
-        })),
+        contracts: indexCalls.map((call) => ({ ...factory, functionName: call.functionName, args: [address, call.index] })),
         allowFailure: false,
       })) as readonly `0x${string}`[]
 
@@ -116,130 +83,56 @@ export function useUserEscrows() {
   })
 }
 
-/**
- * Read the live state of a single KlerosEsc clone (state machine + identity +
- * dispute metadata). One viem multicall round-trip regardless of how many
- * fields the page consumes.
- */
+interface EscrowState {
+  token: `0x${string}`; buyer: `0x${string}`; seller: `0x${string}`; treasury: `0x${string}`
+  klerosCourt: `0x${string}`; klerosExtraDataPart1: `0x${string}`; klerosExtraDataPart2: `0x${string}`
+  gracePeriod: bigint; feeBps: bigint; tradeAmount: bigint
+  securityDepositPct: bigint; securityDepositAmount: bigint
+  state: KlerosEscStateValue
+  buyerSecurityDeposited: boolean; sellerSecurityDeposited: boolean
+  fundsLocked: boolean; disputeCreated: boolean
+  klerosDisputeID: bigint; currentRuling: bigint; rulingReceivedTime: bigint; disputeTimestamp: bigint
+  disputer: `0x${string}`
+  evidenceGroupID: bigint; confirmationTime: bigint; buyerDepositTime: bigint; sellerDepositTime: bigint
+}
+
+const ESCROW_FIELDS = [
+  'token', 'buyer', 'seller', 'treasury', 'klerosCourt', 'klerosExtraDataPart1', 'klerosExtraDataPart2',
+  'gracePeriod', 'feeBps', 'tradeAmount', 'securityDepositPct', 'securityDepositAmount', 'state',
+  'buyerSecurityDeposited', 'sellerSecurityDeposited', 'fundsLocked', 'disputeCreated', 'klerosDisputeID',
+  'currentRuling', 'rulingReceivedTime', 'disputeTimestamp', 'disputer', 'evidenceGroupID',
+  'confirmationTime', 'buyerDepositTime', 'sellerDepositTime',
+] as const
+
+type PublicClient = NonNullable<ReturnType<typeof usePublicClient>>
+
+const readEsc = <T,>(c: PublicClient, address: `0x${string}`, functionName: string) =>
+  c.readContract({ address, abi: KLEROS_ESC_ABI as Abi, functionName }) as Promise<T>
+
+const readCourt = <T,>(c: PublicClient, address: `0x${string}`, functionName: string, args: readonly unknown[]) =>
+  c.readContract({ address, abi: KLEROS_COURT_ABI as Abi, functionName, args }) as Promise<T>
+
+/** Live state of one KlerosEsc clone in a single multicall (polls every 15s). */
 export function useEscrowState(escrowAddress: `0x${string}` | undefined) {
   const publicClient = usePublicClient()
   const chainId = useChainId()
   return useQuery({
     queryKey: ['escrow-state', escrowAddress, chainId],
     enabled: !!publicClient && !!escrowAddress,
-    // Poll so a Kleros ruling that lands while the user is sitting on the
-    // trade page surfaces the executeRuling/finalize action without a reload.
     refetchInterval: 15_000,
     staleTime: 5_000,
-    queryFn: async () => {
+    queryFn: async (): Promise<EscrowState | null> => {
       if (!publicClient || !escrowAddress) return null
-      const c = publicClient
-      const contracts = [
-        { functionName: 'token', args: [] as const },
-        { functionName: 'buyer', args: [] as const },
-        { functionName: 'seller', args: [] as const },
-        { functionName: 'treasury', args: [] as const },
-        { functionName: 'klerosCourt', args: [] as const },
-        { functionName: 'klerosExtraDataPart1', args: [] as const },
-        { functionName: 'klerosExtraDataPart2', args: [] as const },
-        { functionName: 'gracePeriod', args: [] as const },
-        { functionName: 'feeBps', args: [] as const },
-        { functionName: 'tradeAmount', args: [] as const },
-        { functionName: 'securityDepositPct', args: [] as const },
-        { functionName: 'securityDepositAmount', args: [] as const },
-        { functionName: 'state', args: [] as const },
-        { functionName: 'buyerSecurityDeposited', args: [] as const },
-        { functionName: 'sellerSecurityDeposited', args: [] as const },
-        { functionName: 'fundsLocked', args: [] as const },
-        { functionName: 'disputeCreated', args: [] as const },
-        { functionName: 'klerosDisputeID', args: [] as const },
-        { functionName: 'currentRuling', args: [] as const },
-        { functionName: 'rulingReceivedTime', args: [] as const },
-        { functionName: 'disputeTimestamp', args: [] as const },
-        { functionName: 'disputer', args: [] as const },
-        { functionName: 'evidenceGroupID', args: [] as const },
-        { functionName: 'confirmationTime', args: [] as const },
-        { functionName: 'buyerDepositTime', args: [] as const },
-        { functionName: 'sellerDepositTime', args: [] as const },
-      ] as const
-
-      type Tuple = readonly unknown[]
-      const results = (await c.multicall({
-        contracts: contracts.map((x) => ({
-          address: escrowAddress,
-          abi: KLEROS_ESC_ABI as Abi,
-          functionName: x.functionName,
-          args: x.args as Tuple,
-        })),
+      const results = (await publicClient.multicall({
+        contracts: ESCROW_FIELDS.map((functionName) => ({ address: escrowAddress, abi: KLEROS_ESC_ABI as Abi, functionName })),
         allowFailure: false,
       })) as readonly unknown[]
-
-      const [
-        token,
-        buyer,
-        seller,
-        treasury,
-        klerosCourt,
-        klerosExtraDataPart1,
-        klerosExtraDataPart2,
-        gracePeriod,
-        feeBps,
-        tradeAmount,
-        securityDepositPct,
-        securityDepositAmount,
-        state,
-        buyerSecurityDeposited,
-        sellerSecurityDeposited,
-        fundsLocked,
-        disputeCreated,
-        klerosDisputeID,
-        currentRuling,
-        rulingReceivedTime,
-        disputeTimestamp,
-        disputer,
-        evidenceGroupID,
-        confirmationTime,
-        buyerDepositTime,
-        sellerDepositTime,
-      ] = results
-
-      return {
-        token: token as `0x${string}`,
-        buyer: buyer as `0x${string}`,
-        seller: seller as `0x${string}`,
-        treasury: treasury as `0x${string}`,
-        klerosCourt: klerosCourt as `0x${string}`,
-        klerosExtraDataPart1: klerosExtraDataPart1 as `0x${string}`,
-        klerosExtraDataPart2: klerosExtraDataPart2 as `0x${string}`,
-        gracePeriod: gracePeriod as bigint,
-        feeBps: feeBps as bigint,
-        tradeAmount: tradeAmount as bigint,
-        securityDepositPct: securityDepositPct as bigint,
-        securityDepositAmount: securityDepositAmount as bigint,
-        state: state as KlerosEscStateValue,
-        buyerSecurityDeposited: buyerSecurityDeposited as boolean,
-        sellerSecurityDeposited: sellerSecurityDeposited as boolean,
-        fundsLocked: fundsLocked as boolean,
-        disputeCreated: disputeCreated as boolean,
-        klerosDisputeID: klerosDisputeID as bigint,
-        currentRuling: currentRuling as bigint,
-        rulingReceivedTime: rulingReceivedTime as bigint,
-        disputeTimestamp: disputeTimestamp as bigint,
-        disputer: disputer as `0x${string}`,
-        evidenceGroupID: evidenceGroupID as bigint,
-        confirmationTime: confirmationTime as bigint,
-        buyerDepositTime: buyerDepositTime as bigint,
-        sellerDepositTime: sellerDepositTime as bigint,
-      }
+      return Object.fromEntries(ESCROW_FIELDS.map((field, i) => [field, results[i]])) as unknown as EscrowState
     },
   })
 }
 
-/**
- * Read the live KlerosCourt arbitration cost for raising a dispute on a given
- * escrow. Returns wei (bigint). Returns null if the call fails or the court
- * isn't reachable.
- */
+/** Live KlerosCourt arbitration cost for raising a dispute (wei, or null). */
 export function useArbitrationCost(escrowAddress: `0x${string}` | undefined) {
   const publicClient = usePublicClient()
   const chainId = useChainId()
@@ -251,42 +144,20 @@ export function useArbitrationCost(escrowAddress: `0x${string}` | undefined) {
       const c = publicClient
       try {
         const [part1, part2] = await Promise.all([
-          c.readContract({
-            address: escrowAddress,
-            abi: KLEROS_ESC_ABI as Abi,
-            functionName: 'klerosExtraDataPart1',
-          }) as Promise<`0x${string}`>,
-          c.readContract({
-            address: escrowAddress,
-            abi: KLEROS_ESC_ABI as Abi,
-            functionName: 'klerosExtraDataPart2',
-          }) as Promise<`0x${string}`>,
+          readEsc<`0x${string}`>(c, escrowAddress, 'klerosExtraDataPart1'),
+          readEsc<`0x${string}`>(c, escrowAddress, 'klerosExtraDataPart2'),
         ])
-        const extraData = encodeKlerosExtraData(part1, part2)
-        const cost = (await c.readContract({
-          address: escrowAddress,
-          abi: KLEROS_ESC_ABI as Abi,
-          functionName: 'klerosCourt',
-        })) as `0x${string}`
-        return (await c.readContract({
-          address: cost,
-          abi: KLEROS_COURT_ABI as Abi,
-          functionName: 'arbitrationCost',
-          args: [extraData],
-        })) as bigint
-      } catch (_err) {
+        const court = await readEsc<`0x${string}`>(c, escrowAddress, 'klerosCourt')
+        return await readCourt<bigint>(c, court, 'arbitrationCost', [encodeKlerosExtraData(part1, part2)])
+      } catch {
         return null
       }
     },
   })
 }
 
-/**
- * Appeal data for a single dispute: ETH cost to fund an appeal, current
- * KlerosCourt.DisputeStatus (0 Waiting, 1 Appealable, 2 Solved), and the
- * appeal window (start/end unix seconds). Returns nulls on read failure so
- * the UI can disable the appeal button gracefully.
- */
+// Appeal data (cost, status 0 Waiting/1 Appealable/2 Solved, appeal window).
+// Polls; nulls on failure so the UI can disable the appeal button.
 export function useAppealInfo(
   escrowAddress: `0x${string}` | undefined,
   klerosDisputeId: bigint | null | undefined,
@@ -296,122 +167,70 @@ export function useAppealInfo(
   return useQuery({
     queryKey: ['appeal-info', escrowAddress, klerosDisputeId?.toString() ?? null, chainId],
     enabled: !!publicClient && !!escrowAddress && klerosDisputeId != null && klerosDisputeId > 0n,
-    // Poll the appeal window + status while the dispute is in flight so the
-    // countdown updates without a manual refresh; Kleros status transitions
-    // (Waiting → Appealable → Solved) are otherwise missed.
     refetchInterval: 15_000,
     staleTime: 5_000,
     queryFn: async () => {
-      if (!publicClient || !escrowAddress || klerosDisputeId == null || klerosDisputeId <= 0n) {
-        return null
-      }
+      if (!publicClient || !escrowAddress || klerosDisputeId == null || klerosDisputeId <= 0n) return null
       const c = publicClient
       try {
-        const [courtAddr, part1, part2] = await Promise.all([
-          c.readContract({
-            address: escrowAddress,
-            abi: KLEROS_ESC_ABI as Abi,
-            functionName: 'klerosCourt',
-          }) as Promise<`0x${string}`>,
-          c.readContract({
-            address: escrowAddress,
-            abi: KLEROS_ESC_ABI as Abi,
-            functionName: 'klerosExtraDataPart1',
-          }) as Promise<`0x${string}`>,
-          c.readContract({
-            address: escrowAddress,
-            abi: KLEROS_ESC_ABI as Abi,
-            functionName: 'klerosExtraDataPart2',
-          }) as Promise<`0x${string}`>,
+        const [court, part1, part2] = await Promise.all([
+          readEsc<`0x${string}`>(c, escrowAddress, 'klerosCourt'),
+          readEsc<`0x${string}`>(c, escrowAddress, 'klerosExtraDataPart1'),
+          readEsc<`0x${string}`>(c, escrowAddress, 'klerosExtraDataPart2'),
         ])
         const extraData = encodeKlerosExtraData(part1, part2)
         const [appealCost, disputeStatus, [periodStart, periodEnd]] = await Promise.all([
-          c.readContract({
-            address: courtAddr,
-            abi: KLEROS_COURT_ABI as Abi,
-            functionName: 'appealCost',
-            args: [klerosDisputeId, extraData],
-          }) as Promise<bigint>,
-          c.readContract({
-            address: courtAddr,
-            abi: KLEROS_COURT_ABI as Abi,
-            functionName: 'disputeStatus',
-            args: [klerosDisputeId],
-          }) as Promise<bigint>,
-          c.readContract({
-            address: courtAddr,
-            abi: KLEROS_COURT_ABI as Abi,
-            functionName: 'appealPeriod',
-            args: [klerosDisputeId],
-          }) as Promise<readonly [bigint, bigint]>,
+          readCourt<bigint>(c, court, 'appealCost', [klerosDisputeId, extraData]),
+          readCourt<bigint>(c, court, 'disputeStatus', [klerosDisputeId]),
+          readCourt<readonly [bigint, bigint]>(c, court, 'appealPeriod', [klerosDisputeId]),
         ])
         const now = BigInt(Math.floor(Date.now() / 1000))
-        const inWindow = now >= periodStart && now < periodEnd
         return {
           appealCostWei: appealCost,
           klerosDisputeStatus: disputeStatus,
           periodStart,
           periodEnd,
-          appealable: disputeStatus === 1n && inWindow,
+          appealable: disputeStatus === 1n && now >= periodStart && now < periodEnd,
         }
-      } catch (_err) {
+      } catch {
         return null
       }
     },
   })
 }
 
-/**
- * Subscribe to a KlerosEsc clone's relevant dispute events. Used by the
- * detail viewer to refresh when a new ruling lands.
- */
+/** Subscribe to a KlerosEsc clone's events (used to refresh on rulings). */
 export function useEscrowEventWatcher(
   escrowAddress: `0x${string}` | undefined,
   onEvent?: (name: string, args: Record<string, unknown>) => void,
 ) {
   const publicClient = usePublicClient()
-  // Hold the latest callback in a ref so changes to `onEvent` (e.g. an inline
-  // arrow or a `useCallback` whose deps rotate on every render) don't tear down
-  // and rebuild the watcher subscription on every render. That resubscribe
-  // storm would otherwise miss any events fired during the brief gap and
-  // thrash the RPC provider. We re-read the ref inside the handler, so the
-  // latest consumer always sees the event.
+  // Hold the callback in a ref so inline/changing callbacks don't resubscribe
+  // the watcher on every render (which would miss events in the gap).
   const onEventRef = useRef(onEvent)
   useEffect(() => {
     onEventRef.current = onEvent
-  }, [onEvent])
+  })
   useEffect(() => {
     if (!publicClient || !escrowAddress) return
     const c = publicClient
     let cancelled = false
-    // wagmi v2 types `onLogs` strictly per declared `events`; for our union
-    // of event names we widen with a runtime duck-type check.
+    // wagmi v2 types `onLogs` strictly per declared `events`; widen at runtime
+    // and dispatch by event name (a union `eventName` filter can't be typed).
     const handler = (logs: Log[]) => {
       if (cancelled) return
       const cb = onEventRef.current
       if (!cb) return
       for (const log of logs) {
         const eventName = (log as unknown as { eventName?: string }).eventName
-        if (eventName) {
-          const args = (log as unknown as { args?: Record<string, unknown> })
-            .args ?? {}
-          cb(eventName, args)
-        }
+        if (eventName) cb(eventName, (log as unknown as { args?: Record<string, unknown> }).args ?? {})
       }
     }
     const unwatch = c.watchContractEvent({
       address: escrowAddress,
-      // Use the events-only ABI: the watcher only consumes logs, and including
-      // the full read+write ABI here bloats the filter set without exposing
-      // any new events. KLEROS_ESC_EVENTS_ABI is a strict subset typed for
-      // viem's decodeEventLog / parseEventLogs.
+      // Events-only ABI avoids bloating the filter set with read/write entries.
       abi: KLEROS_ESC_EVENTS_ABI as Abi,
-      onLogs: handler as unknown as Parameters<
-        typeof c.watchContractEvent
-      >[0]['onLogs'],
-      // No `eventName` filter — wagmi v2's strict types don't accept a union
-      // here, so we subscribe to every event on the contract and dispatch
-      // by name in the handler.
+      onLogs: handler as unknown as Parameters<typeof c.watchContractEvent>[0]['onLogs'],
     })
     return () => {
       cancelled = true

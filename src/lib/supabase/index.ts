@@ -1,33 +1,17 @@
-/**
- * Supabase Integration for CofferNode P2P Crypto Platform
- * @packageDocumentation
- */
-
 import { createClient } from "@supabase/supabase-js"
 import type {
-  User,
-  Offer,
-  Dispute,
-  TradeRating,
-  CreateTradeInput,
-  ConversationView,
-  ConversationWithParticipant,
-  MessageKind,
-  MessageWithSender,
-  Notification,
-  NotificationChannel,
-  NotificationPreferences,
-  ReferralDashboard,
-  ReferralRelationWithUser,
-  ReferralFeeEvent,
+  User, Offer, Dispute, DisputeStatus, TradeRating, CreateTradeInput,
+  ConversationView, ConversationWithParticipant, MessageKind, MessageWithSender,
+  Notification, NotificationChannel, NotificationPreferences, ReferralDashboard,
+  ReferralRelationWithUser, ReferralFeeEvent,
 } from "@/types/database"
+import {
+  getCachedUser, setCachedUser, invalidateUserCache, clearAllUserCache,
+} from "@/lib/userCache"
+import { persistCofferIdentity } from "@/lib/cofferIdentity"
 
-// Environment variables (these should be set in .env.local)
-const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
-// Prefer the new publishable key format (sb_publishable_*) when present;
-// fall back to the legacy anon JWT (VITE_SUPABASE_ANON_KEY) for older
-// projects. Both are safe to ship to the browser.
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
+// Publishable key preferred; legacy anon JWT fallback. Both are browser-safe.
 const SUPABASE_ANON_KEY =
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
   import.meta.env.VITE_SUPABASE_ANON_KEY ||
@@ -40,93 +24,37 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   )
 }
 
-/**
- * Main Supabase Client
- * Initialized with RLS policies for security
- */
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
   },
-  db: {
-    schema: "public",
-  },
+  db: { schema: "public" },
 })
 
-// =================================================================
-// OD-02 — Restricted reader: public column projections.
-//
-// The `anon` role can SELECT only these columns on `offers` / `users` (see
-// migration 20260915000002_od02_public_reader_projection.sql). Every anonymous
-// query MUST stay inside this list, or PostgREST returns 42501 for a column
-// outside the projection. These must mirror `functions/_lib/public-data.ts`.
-// Signed-in (`authenticated`) reads keep full table access.
-// =================================================================
-
+// OD-02: `anon` may SELECT only these columns on users/offers (42501 outside
+// the projection). Mirror of functions/_lib/public-data.ts.
 export const PUBLIC_USER_COLUMNS = [
-  "id",
-  "wallet_address",
-  "public_handle",
-  "nickname",
-  "avatar_url",
-  "verification_level",
-  "bio",
-  "avg_rating",
-  "reputation_score",
-  "total_trades",
-  "completed_trades",
-  "cancelled_trades",
-  "dispute_count",
-  "created_at",
+  "id", "wallet_address", "public_handle", "nickname", "avatar_url",
+  "verification_level", "bio", "avg_rating", "reputation_score", "total_trades",
+  "completed_trades", "cancelled_trades", "dispute_count", "created_at",
 ].join(",")
 
 export const PUBLIC_OFFER_COLUMNS = [
-  "id",
-  "offer_id",
-  "status",
-  "type",
-  "crypto_token",
-  "crypto_amount",
-  "fiat_currency",
-  "fiat_amount",
-  "price_per_unit",
-  "min_amount",
-  "max_amount",
-  "payment_methods",
-  "available_regions",
-  "platform_fee_bps",
-  "network_fee",
-  "tags",
-  "description",
-  "is_private",
-  "grace_period",
-  "published_at",
-  "expires_at",
-  "created_at",
+  "id", "offer_id", "status", "type", "crypto_token", "crypto_amount",
+  "fiat_currency", "fiat_amount", "price_per_unit", "min_amount", "max_amount",
+  "payment_methods", "available_regions", "platform_fee_bps", "network_fee",
+  "tags", "description", "is_private", "grace_period", "published_at",
+  "expires_at", "created_at",
 ].join(",")
 
-/** Seller join used by the marketplace/detail queries. Identity-free zone:
- *  NO `id`, NO `wallet_address` — only the opaque `public_handle` label plus
- *  public profile fields (ADR-015). The real seller identity is resolved
- *  server-side at trade/chat intent via the `get_offer_trade_intent` and
- *  `start_offer_conversation` RPCs. All inside the users projection so anon
- *  reads keep working under OD-02. */
+// Identity-free seller join (ADR-015): opaque public_handle only, never uid/wallet.
 export const SELLER_JOIN = [
-  "public_handle",
-  "nickname",
-  "avatar_url",
-  "verification_level",
-  "total_trades",
-  "avg_rating",
+  "public_handle", "nickname", "avatar_url", "verification_level",
+  "total_trades", "avg_rating",
 ].join(",")
 
-/**
- * Public seller profile as joined onto offer reads (OD-02 projection subset).
- * Identity-free: carries the opaque `public_handle` label only — never the
- * user uid or wallet (ADR-015).
- */
 export type SellerProfile = {
   public_handle: string | null
   nickname: string | null
@@ -136,21 +64,89 @@ export type SellerProfile = {
   avg_rating: number
 }
 
-/**
- * Offer row + the seller profile join (subset) as rendered by the public
- * marketplace / offer detail. Explicit type so pages don't depend on the
- * supabase-js query-string parser (the selects are built from the OD-02
- * projection constants, not from a literal string).
- */
 export type OfferWithSeller = Offer & { seller?: SellerProfile | null }
 
-/**
- * Column list for a `users` read. Returns `'*'` when the caller is reading
- * their OWN row while signed in (EditProfilePage needs the writable fields,
- * e.g. social handles, which are outside the public projection), otherwise the
- * public projection. Anonymous reads are limited to PUBLIC_USER_COLUMNS by the
- * DB anyway (OD-02) — asking for `'*'` anonymously would 42501.
- */
+type VerificationLevel = "unverified" | "verified" | "trusted" | "suspicious"
+
+export const EscrowStatus = {
+  AWAITING_DEPOSIT: "awaiting_deposit", BUYER_DEPOSITED: "buyer_deposited",
+  SELLER_DEPOSITED: "seller_deposited", FUNDED: "funded", CONFIRMED: "confirmed",
+  DEPOSITED: "deposited", PENDING_RELEASE: "pending_release", DISPUTED: "disputed",
+  RELEASED: "released", REFUNDED: "refunded", CANCELLED: "cancelled",
+} as const
+export type EscrowStatus = (typeof EscrowStatus)[keyof typeof EscrowStatus]
+
+export const TradeEventType = {
+  OFFER_ACCEPTED: "offer_accepted", ESCROW_FUNDED: "escrow_funded",
+  ESCROW_CONFIRMED: "escrow_confirmed", ESCROW_RELEASED: "escrow_released",
+  ESCROW_REFUNDED: "escrow_refunded", ESCROW_DISPUTED: "escrow_disputed",
+  ESCROW_RESOLVED: "escrow_resolved", ESCROW_CANCELLED: "escrow_cancelled",
+  DISPUTE_RAISED: "dispute_raised", EVIDENCE_SUBMITTED: "evidence_submitted",
+  APPEAL_FUNDED: "appeal_funded", RULING_RECEIVED: "ruling_received",
+  RULING_EXECUTED: "ruling_executed", DISPUTE_FINALIZED: "dispute_finalized",
+  DISPUTE_TIMED_OUT: "dispute_timed_out", FUNDS_RETURNED: "funds_returned",
+  ESCROW_STATUS_UPDATED: "escrow_status_updated",
+  TRADE_STATUS_UPDATED: "trade_status_updated",
+} as const
+export type TradeEventType = (typeof TradeEventType)[keyof typeof TradeEventType]
+
+type DbError = { code?: string; message?: string }
+type Res<T> = { data: T; error: DbError | null }
+
+function fail(label: string, error: unknown): never {
+  console.error(`${label}:`, error)
+  throw error
+}
+
+// `.single()` wrapper: PGRST116 (no rows) → null when `nullOnMissing`.
+async function one<T>(
+  q: PromiseLike<Res<T>>,
+  label: string,
+  nullOnMissing = false
+): Promise<T> {
+  const { data, error } = await q
+  if (error) {
+    if (nullOnMissing && error.code === "PGRST116") return null as unknown as T
+    fail(label, error)
+  }
+  return data
+}
+
+async function many<T>(
+  q: PromiseLike<Res<T[] | null>>,
+  label: string
+): Promise<T[]> {
+  const { data, error } = await q
+  if (error) fail(label, error)
+  return (data ?? []) as T[]
+}
+
+async function ok(
+  q: PromiseLike<{ error: DbError | null }>,
+  label: string
+): Promise<void> {
+  const { error } = await q
+  if (error) fail(label, error)
+}
+
+async function rpcCall<T = unknown>(
+  name: string,
+  args: Record<string, unknown>,
+  label: string
+): Promise<T> {
+  const { data, error } = await supabase.rpc(name, args)
+  if (error) fail(label, error)
+  return data as T
+}
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const UUID_STRICT_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const isUuid = (value: string): boolean => UUID_RE.test(value)
+
+// Own row needs writable-only fields (EditProfilePage); anon must stick to the
+// OD-02 projection.
 async function userColumnsForRead(walletAddress: string): Promise<string> {
   const sessionWallet = await getSessionWallet()
   return sessionWallet === walletAddress.toLowerCase()
@@ -158,188 +154,37 @@ async function userColumnsForRead(walletAddress: string): Promise<string> {
     : PUBLIC_USER_COLUMNS
 }
 
-/**
- * Matches a canonical (v5/v4) UUID string. Used to decide whether a trade
- * identifier is the primary-key `trades.id` (uuid) or the human-readable
- * `trades.trade_id` (varchar like `TEST-001`, `TRD-…`) before hitting a
- * uuid-typed DB column — plugging a human id into one yields Postgres
- * `22P02 invalid input syntax for type uuid`.
- */
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-function isUuid(value: string): boolean {
-  return UUID_RE.test(value)
-}
-
-// =================================================================
-// TYPES
-// =================================================================
-
-export const EscrowStatus = {
-  AWAITING_DEPOSIT: "awaiting_deposit",
-  BUYER_DEPOSITED: "buyer_deposited",
-  SELLER_DEPOSITED: "seller_deposited",
-  /** KlerosEsc.State.FUNDED — buyer + seller deposits in and seller has
-   *  locked tradeAmount. Distinct from SELLER_DEPOSITED which only captures
-   *  one of those transitions. */
-  FUNDED: "funded",
-  CONFIRMED: "confirmed",
-  DEPOSITED: "deposited",
-  PENDING_RELEASE: "pending_release",
-  DISPUTED: "disputed",
-  RELEASED: "released",
-  REFUNDED: "refunded",
-  /** KlerosEsc.State.CANCELLED — funding-phase mutual cancel via
-   *  `cancelTrade()`. Distinct from REFUNDED (which is the buyer-favorable
-   *  dispute payout). See contract-execution-status.md §B-3. */
-  CANCELLED: "cancelled",
-} as const
-export type EscrowStatus = (typeof EscrowStatus)[keyof typeof EscrowStatus]
-
-/**
- * Subset of the KlerosEsc event names that the trade_events audit log uses.
- * Granular per-event trails are written by the future server-side indexer so
- * the UI can distinguish, for example, `RulingReceived` from `RulingExecuted`.
- */
-export const TradeEventType = {
-  OFFER_ACCEPTED: "offer_accepted",
-  ESCROW_FUNDED: "escrow_funded",
-  ESCROW_CONFIRMED: "escrow_confirmed",
-  ESCROW_RELEASED: "escrow_released",
-  ESCROW_REFUNDED: "escrow_refunded",
-  ESCROW_DISPUTED: "escrow_disputed",
-  ESCROW_RESOLVED: "escrow_resolved",
-  ESCROW_CANCELLED: "escrow_cancelled",
-  DISPUTE_RAISED: "dispute_raised",
-  EVIDENCE_SUBMITTED: "evidence_submitted",
-  APPEAL_FUNDED: "appeal_funded",
-  RULING_RECEIVED: "ruling_received",
-  RULING_EXECUTED: "ruling_executed",
-  DISPUTE_FINALIZED: "dispute_finalized",
-  DISPUTE_TIMED_OUT: "dispute_timed_out",
-  FUNDS_RETURNED: "funds_returned",
-  /** Generic fallback. */
-  ESCROW_STATUS_UPDATED: "escrow_status_updated",
-  TRADE_STATUS_UPDATED: "trade_status_updated",
-} as const
-export type TradeEventType =
-  (typeof TradeEventType)[keyof typeof TradeEventType]
-
-const OfferStatus = {
-  ACTIVE: "active",
-  PAUSED: "paused",
-  COMPLETED: "completed",
-  CANCELLED: "cancelled",
-  EXPIRED: "expired",
-} as const
-type OfferStatus = (typeof OfferStatus)[keyof typeof OfferStatus]
-
-const VerificationLevel = {
-  UNVERIFIED: "unverified",
-  VERIFIED: "verified",
-  TRUSTED: "trusted",
-  SUSPICIOUS: "suspicious",
-} as const
-type VerificationLevel =
-  (typeof VerificationLevel)[keyof typeof VerificationLevel]
-
-const TradeStatus = {
-  PENDING: "pending",
-  ACTIVE: "active",
-  COMPLETED: "completed",
-  CANCELLED: "cancelled",
-  DISPUTED: "disputed",
-  REFUNDED: "refunded",
-} as const
-type TradeStatus = (typeof TradeStatus)[keyof typeof TradeStatus]
-
-const DisputeStatus = {
-  OPEN: "open",
-  IN_REVIEW: "in_review",
-  RESOLVED: "resolved",
-  ESCALATED: "escalated",
-  CLOSED: "closed",
-} as const
-type DisputeStatus = (typeof DisputeStatus)[keyof typeof DisputeStatus]
-
-// =================================================================
-// USER QUERIES
-// =================================================================
-
-/**
- * Get user by wallet address
- */
 export async function getUserByWallet(walletAddress: string) {
   const cols = await userColumnsForRead(walletAddress)
-  const { data, error } = await supabase
-    .from("users")
-    .select(cols)
-    .eq("wallet_address", walletAddress.toLowerCase())
-    .single()
-
-  if (error) {
-    if (error.code === "PGRST116") {
-      // No rows found - this is expected for new users
-      return null
-    }
-    console.error("Error fetching user:", error)
-    throw error
-  }
-
-  return data as unknown as User
+  const data = await one(
+    supabase
+      .from("users")
+      .select(cols)
+      .eq("wallet_address", walletAddress.toLowerCase())
+      .single(),
+    "Error fetching user",
+    true
+  )
+  return data as User | null
 }
 
-import {
-  getCachedUser,
-  setCachedUser,
-  invalidateUserCache,
-  clearAllUserCache,
-} from "@/lib/userCache"
-import { persistCofferIdentity } from "@/lib/cofferIdentity"
-
-/**
- * Ensure a user row exists for the given wallet address.
- *
- * This is the "sync" path — called on every wallet connect. It only inserts
- * a new row if one doesn't exist (post-SIWE, the `siwe-auth` edge function
- * creates new rows at sign-in time, so this read usually just hits), and
- * updates `last_active_at`. It does NOT touch profile fields (nickname, bio,
- * etc.) so existing profiles are never overwritten.
- *
- * RLS note: after the SIWE RLS rewrite, the `users` INSERT is only allowed for
- * a row whose `wallet_address` equals the signed-in session's wallet claim.
- * If no session exists yet for this wallet we return null instead of throwing
- * (sign-in happens via `ensureWalletSession`, triggered on connect).
- *
- * Reads from cache first; writes cache after DB read.
- */
 export async function ensureUser(walletAddress: string): Promise<User | null> {
   const addr = walletAddress.toLowerCase()
   const sessionWallet = await getSessionWallet()
-  const isSelf = sessionWallet === addr
-
-  // 1. Check cache first
   const cached = getCachedUser(addr)
   if (cached) return cached
 
-  // 2. Try to read existing row. Anonymous reads use the public projection
-  //    (OD-02); the signed-in owner can read the full row (EditProfilePage).
-  const cols = isSelf ? "*" : PUBLIC_USER_COLUMNS
-  const { data: existing, error: readErr } = await supabase
-    .from("users")
-    .select(cols)
-    .eq("wallet_address", addr)
-    .maybeSingle()
-
-  if (readErr) {
-    console.error("[ensureUser] read error:", readErr)
-    throw readErr
-  }
+  const existing = await one(
+    supabase
+      .from("users")
+      .select(sessionWallet === addr ? "*" : PUBLIC_USER_COLUMNS)
+      .eq("wallet_address", addr)
+      .maybeSingle(),
+    "[ensureUser] read error"
+  )
 
   if (existing) {
-    // 3a. Row exists — just touch last_active_at (fire-and-forget, don't block).
-    //     Only meaningful once signed in (RLS requires a session to UPDATE).
+    // Touch last_active_at fire-and-forget; RLS requires a session to UPDATE.
     supabase
       .from("users")
       .update({ last_active_at: new Date().toISOString() })
@@ -348,37 +193,26 @@ export async function ensureUser(walletAddress: string): Promise<User | null> {
         if (error)
           console.warn("[ensureUser] last_active_at update failed:", error)
       })
-
     const user = existing as unknown as User
     setCachedUser(user)
     return user
   }
 
-  // 3b. New user — insert with defaults, but only when the signed-in wallet
-  //     matches (RLS will reject anything else). Missing row + no matching
-  //     session = user hasn't completed SIWE yet; return null quietly.
+  // New user: insert only for the signed-in wallet (RLS rejects otherwise).
   if (sessionWallet !== addr) return null
-
-  const { data: inserted, error: insertErr } = await supabase
-    .from("users")
-    .insert({ wallet_address: addr, last_active_at: new Date().toISOString() })
-    .select()
-    .single()
-
-  if (insertErr) {
-    console.error("[ensureUser] insert error:", insertErr)
-    throw insertErr
-  }
-
+  const inserted = await one(
+    supabase
+      .from("users")
+      .insert({ wallet_address: addr, last_active_at: new Date().toISOString() })
+      .select()
+      .single(),
+    "[ensureUser] insert error"
+  )
   const user = inserted as unknown as User
   setCachedUser(user)
   return user
 }
 
-/**
- * Update profile fields on the user row. Called ONLY from EditProfilePage.
- * Writes through to DB, then invalidates + refreshes the cache.
- */
 export async function updateUserProfile(
   walletAddress: string,
   profile: {
@@ -393,46 +227,34 @@ export async function updateUserProfile(
   }
 ): Promise<User> {
   const addr = walletAddress.toLowerCase()
-
-  const { data, error } = await supabase
-    .from("users")
-    .upsert(
-      {
-        wallet_address: addr,
-        nickname: profile.nickname ?? null,
-        avatar_url: profile.avatarUrl ?? null,
-        bio: profile.bio ?? null,
-        location: profile.location ?? null,
-        website: profile.website ?? null,
-        twitter_handle: profile.twitterHandle ?? null,
-        telegram_handle: profile.telegramHandle ?? null,
-        github_handle: profile.githubHandle ?? null,
-      },
-      { onConflict: "wallet_address" }
-    )
-    .select()
-    .single()
-
-  if (error) {
-    console.error("[updateUserProfile] error:", error)
-    throw error
-  }
-
-  const user = data as User
+  const user = await one(
+    supabase
+      .from("users")
+      .upsert(
+        {
+          wallet_address: addr,
+          nickname: profile.nickname ?? null,
+          avatar_url: profile.avatarUrl ?? null,
+          bio: profile.bio ?? null,
+          location: profile.location ?? null,
+          website: profile.website ?? null,
+          twitter_handle: profile.twitterHandle ?? null,
+          telegram_handle: profile.telegramHandle ?? null,
+          github_handle: profile.githubHandle ?? null,
+        },
+        { onConflict: "wallet_address" }
+      )
+      .select()
+      .single(),
+    "[updateUserProfile] error"
+  )
   invalidateUserCache(addr)
-  setCachedUser(user)
-  return user
+  setCachedUser(user as User)
+  return user as User
 }
 
 const AVATAR_BUCKET = "avatars"
 
-/**
- * Upload a user's avatar image to Supabase Storage and return a public URL.
- *
- * Replaces the old IPFS/Helia path: a browser Helia node never pins the CID to
- * the public network, so `https://ipfs.io/ipfs/<cid>` returned 404 and avatars
- * never rendered on /profile. Storage object URLs are always retrievable.
- */
 export async function uploadAvatar(
   file: File,
   walletAddress: string
@@ -441,148 +263,66 @@ export async function uploadAvatar(
   const ext = file.name.split(".").pop()?.toLowerCase() || "png"
   const path = `${addr}-${Date.now()}.${ext}`
 
-  const { error: uploadErr } = await supabase.storage
-    .from(AVATAR_BUCKET)
-    .upload(path, file, { upsert: true, cacheControl: "3600" })
-
-  if (uploadErr) {
-    console.error("[uploadAvatar] upload error:", uploadErr)
-    throw uploadErr
-  }
-
+  await ok(
+    supabase.storage
+      .from(AVATAR_BUCKET)
+      .upload(path, file, { upsert: true, cacheControl: "3600" }),
+    "[uploadAvatar] upload error"
+  )
   const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path)
-
   return { url: data.publicUrl, path }
 }
 
-/**
- * Upload a dispute-evidence file to Supabase Storage and return both the
- * storage metadata and the per-file keccak256 hash used for the DB row.
- *
- * The browser Helia node never pinned CIDs to the public network, so we
- * replaced the IPFS path with Supabase Storage (audit #4). The bucket is
- * PRIVATE — the returned `url` is a short-lived signed URL the dispute
- * detail page passes to <img src>; the storage RLS policies in
- * `migrations/20260824000007_storage_buckets.sql` ensure only the
- * buyer/seller on the underlying dispute can mint one.
- *
- * `keccakBytes32` is `keccak256(fileBytes)` (NOT the on-chain URI hash).
- * It lands in `dispute_evidence.keccak_bytes32` for off-chain integrity
- * checks. The on-chain `submitEvidence(bytes32)` value is computed
- * separately by `cidToBytes32(cid)` in `src/lib/ipfs.ts`.
- *
- * Storage path convention: `<disputeId>/<basename>-<timestamp>.<ext>`. The
- * leading dispute UUID is what the Storage RLS predicate keys on (see
- * `public.storage_object_dispute_id(name)`); a missing or malformed
- * prefix will cause the insert to be rejected by RLS.
- */
+const DISPUTE_EVIDENCE_BUCKET = "dispute-evidence"
+const DISPUTE_EVIDENCE_SIGNED_URL_TTL_SECONDS = 600
+
 interface DisputeEvidenceUpload {
-  /** Storage path (also what we store in `dispute_evidence.ipfs_cid`). */
   path: string
-  /**
-   * Signed URL resolvable in the browser for the configured TTL. We no
-   * longer mint one here — the page mints a fresh signed URL on every
-   * render via `getDisputeEvidenceSignedUrl(path)`. The field is kept on
-   * the return type for backward compat with call sites that destructure
-   * `url`; treat the value as undefined for any new code.
-   * @deprecated
-   */
+  /** @deprecated minted on render via `getDisputeEvidenceSignedUrl`. */
   url?: string
-  /** Display name (passes through the File's name when present). */
   name: string
-  /** Raw file size in bytes. */
   size: number
-  /** `keccak256(fileBytes)` as 0x-prefixed bytes32 — the file_hash for
-   *  `dispute_evidence.keccak_bytes32`. Distinct from the on-chain URI
-   *  bytes32 (`keccak256("ipfs://" + path)`). */
   keccakBytes32: `0x${string}`
 }
-
-const DISPUTE_EVIDENCE_BUCKET = "dispute-evidence"
-/** Signed-URL TTL: 10 minutes — long enough for the detail page to render
- *  the image, short enough to limit exposure if the URL leaks. */
-const DISPUTE_EVIDENCE_SIGNED_URL_TTL_SECONDS = 600
 
 export async function uploadDisputeEvidenceFile(
   disputeId: string,
   file: File
 ): Promise<DisputeEvidenceUpload> {
-  // Storage path: <dispute_id>/<basename>-<ts>.<ext>. The dispute UUID
-  // prefix is what the RLS predicate (`storage_object_dispute_id(name)`)
-  // matches against, so a missing prefix causes the row insert to be
-  // rejected. Strip any directory components from the user-supplied name
-  // so a malicious filename can't escape the prefix.
-  // Strip path separators and ASCII control / DEL chars from the
-  // user-supplied filename so it can't escape the <dispute_id>/ prefix
-  // (a leading '.', '/', '\\', or NUL would change the resolved path).
+  // Path: <dispute_id>/<basename>-<ts>-<rand>.<ext>. The leading UUID is what
+  // the Storage RLS predicate keys on; strip separators/control chars from the
+  // user-supplied name so it can't escape that prefix.
   const safeBase =
     (file.name || "evidence")
-      .split("")
-      .map((ch) => {
-        const code = ch.charCodeAt(0)
-        if (ch === "/" || ch === "\\") return "_"
-        if (code <= 0x1f || code === 0x7f) return "_"
-        return ch
-      })
-      .join("")
-      .replace(/^[.]+/, "")
+      // eslint-disable-next-line no-control-regex
+      .replace(/[/\\\u0000-\u001f\u007f]/g, "_")
+      .replace(/^\.+/, "")
       .slice(0, 80) || "evidence"
   const ext = safeBase.includes(".")
     ? safeBase.slice(safeBase.lastIndexOf(".")).toLowerCase()
     : ""
   const stamp = Date.now().toString(36)
   const rand = Math.random().toString(36).slice(2, 8)
-  const stem = safeBase.replace(new RegExp(`${ext}$`), "")
+  // Never build a RegExp from the user-supplied extension (metacharacters).
+  const stem = ext ? safeBase.slice(0, -ext.length) : safeBase
   const path = `${disputeId}/${stem}-${stamp}-${rand}${ext}`
 
   const bytes = new Uint8Array(await file.arrayBuffer())
-
-  const { error: uploadErr } = await supabase.storage
-    .from(DISPUTE_EVIDENCE_BUCKET)
-    .upload(path, file, {
+  await ok(
+    supabase.storage.from(DISPUTE_EVIDENCE_BUCKET).upload(path, file, {
       upsert: false,
       cacheControl: "3600",
       contentType: file.type || undefined,
-    })
+    }),
+    "[uploadDisputeEvidenceFile] upload error"
+  )
 
-  if (uploadErr) {
-    console.error("[uploadDisputeEvidenceFile] upload error:", uploadErr)
-    throw uploadErr
-  }
-
-  // We deliberately DO NOT mint a signed URL here. Signed URLs expire
-  // (10 min by default), so persisting one would mean every image 404s
-  // after the first session. The browser asks for a fresh signed URL on
-  // each render via `getDisputeEvidenceSignedUrl(path)`.
-
-  // File-content hash. Use viem's keccak256 so the result matches the
-  // Solidity / contract-test encoding used elsewhere (EVM-keccak, NOT
-  // SHA3-256). Imported dynamically to keep startup cold-cost low — same
-  // pattern as `cidToBytes32` in src/lib/ipfs.ts.
+  // EVM keccak (viem), not SHA3; dynamic import keeps cold start cheap.
   const { keccak256 } = await import("viem")
   const keccakBytes32 = keccak256(bytes) as `0x${string}`
-
-  return {
-    path,
-    name: file.name || path,
-    size: bytes.byteLength,
-    keccakBytes32,
-    // url omitted — see the deprecation note on DisputeEvidenceUpload.url.
-  }
+  return { path, name: file.name || path, size: bytes.byteLength, keccakBytes32 }
 }
 
-/**
- * Mint a short-lived signed URL for an evidence file the browser already
- * knows the storage path of. The signed URL expires after
- * `DISPUTE_EVIDENCE_SIGNED_URL_TTL_SECONDS` (10 min by default) — long
- * enough for an evidence review session, short enough that a leaked URL
- * doesn't expose dispute material long-term.
- *
- * Used by DisputeDetailPage's evidence gallery so the row's `ipfs_url`
- * column only needs to store the durable storage path (not a signed URL
- * that expires). Re-minting on every render keeps the gallery working
- * indefinitely.
- */
 export async function getDisputeEvidenceSignedUrl(
   path: string,
   ttlSeconds: number = DISPUTE_EVIDENCE_SIGNED_URL_TTL_SECONDS
@@ -597,74 +337,37 @@ export async function getDisputeEvidenceSignedUrl(
   return data.signedUrl
 }
 
-/**
- * Update user reputation score
- */
 export async function updateUserReputation(userId: string, delta: number) {
-  const { error } = await supabase.rpc("increment_reputation_score", {
-    user_id: userId,
-    delta: delta,
-  })
-
-  if (error) {
-    console.error("Error updating reputation:", error)
-    throw error
-  }
+  await rpcCall(
+    "increment_reputation_score",
+    { user_id: userId, delta },
+    "Error updating reputation"
+  )
 }
 
-// =================================================================
-// OFFER QUERIES
-// =================================================================
-
-/**
- * Get active offers
- */
 export async function getActiveOffers(
   limit = 50,
   offset = 0
-): Promise<OfferWithSeller[] | null> {
+): Promise<OfferWithSeller[]> {
   const { data, error } = await supabase.rpc("get_public_offers", {
     p_limit: limit,
     p_offset: offset,
   })
-
-  if (error) {
-    console.error("Error fetching offers:", error)
-    throw error
-  }
-
+  if (error) fail("Error fetching offers", error)
   return (data ?? []) as unknown as OfferWithSeller[]
 }
 
-/**
- * Offers by a seller, keyed on the opaque `public_handle` (ADR-015). Runs the
- * SECURITY DEFINER `get_public_offers_by_seller` RPC: the seller is resolved
- * server-side from the handle so anonymous readers never touch (or receive)
- * `offers.seller_id`, and the rows come back in the same identity-free
- * projection as the marketplace. Returns `[]` for an unknown handle.
- */
 export async function getPublicOffersBySeller(
   publicHandle: string
 ): Promise<OfferWithSeller[]> {
-  const { data, error } = await supabase.rpc("get_public_offers_by_seller", {
-    p_public_handle: publicHandle,
-  })
-
-  if (error) {
-    console.error("Error fetching seller offers:", error)
-    throw error
-  }
-
+  const data = await rpcCall(
+    "get_public_offers_by_seller",
+    { p_public_handle: publicHandle },
+    "Error fetching seller offers"
+  )
   return (data ?? []) as unknown as OfferWithSeller[]
 }
 
-/**
- * Crypto-safe base36 suffix for client-minted unique ids.
- *
- * Math.random()-based suffixes are predictable enough to collide or be
- * enumerated by other parties; the Web Crypto RNG is the right tool here.
- * Returns ~13 chars of base36 entropy (≈ 6 bytes).
- */
 function randomIdSuffix(): string {
   const buf = new Uint8Array(6)
   crypto.getRandomValues(buf)
@@ -673,42 +376,20 @@ function randomIdSuffix(): string {
   return n.toString(36).toUpperCase()
 }
 
-/**
- * Client-minted id: `PREFIX-<base36 timestamp><random>` (~18 chars, well
- * within the 40-char `offer_id` / `trade_id` / `dispute_id` columns).
- */
 function generateId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}${randomIdSuffix()}`.toUpperCase()
 }
 
-/**
- * Get a single offer by its primary key (the `:id` route param), with the
- * seller profile joined so TradePage / OpenOfferPage can render trader info.
- * Runs the identity-free SECURITY DEFINER RPC: the direct FK embed would need
- * `offers.seller_id`, which `anon` lacks (Pseudo-offerta, ADR-015).
- */
 export async function getOfferById(
   id: string
 ): Promise<OfferWithSeller | null> {
   const { data, error } = await supabase.rpc("get_public_offer_by_id", {
     p_offer_id: id,
   })
-
-  if (error) {
-    console.error("Error fetching offer:", error)
-    throw error
-  }
-
+  if (error) fail("Error fetching offer", error)
   return (data ?? null) as unknown as OfferWithSeller | null
 }
 
-/**
- * Server-resolved trade parties for an offer, returned ONLY at explicit trade
- * intent and ONLY to a signed-in, non-seller caller (`get_offer_trade_intent`
- * RPC — SECURITY DEFINER). This is the single point where the buyer learns the
- * seller's uid + wallet ("rivelato solo allo scambio"); the public offer
- * payload never carries them (ADR-015).
- */
 export interface OfferTradeIntent {
   offer_id: string
   status: string
@@ -720,12 +401,7 @@ export interface OfferTradeIntent {
   taker_role: "buyer" | "seller"
 }
 
-/** Business-code mapping for the trade-intent RPC. */
-const TRADE_INTENT_ERRORS = {
-  OFFER_UNAVAILABLE: "P0200",
-  OFFER_EXPIRED: "P0201",
-  SELF_TRADE: "P0202",
-} as const
+const TRADE_INTENT_ERRORS: readonly string[] = ["P0200", "P0201", "P0202"]
 
 export async function getOfferTradeIntent(
   offerId: string
@@ -735,10 +411,7 @@ export async function getOfferTradeIntent(
   })
   if (error) {
     const code = (error as { code?: string }).code
-    if (
-      typeof code === "string" &&
-      Object.values(TRADE_INTENT_ERRORS).includes(code as never)
-    ) {
+    if (typeof code === "string" && TRADE_INTENT_ERRORS.includes(code)) {
       throw Object.assign(new Error(`trade intent rejected (${code})`), {
         code,
       })
@@ -746,18 +419,11 @@ export async function getOfferTradeIntent(
     if (code === "P0002") {
       throw Object.assign(new Error("sign in required"), { code: "P0002" })
     }
-    console.error("Error resolving trade intent:", error)
-    throw error
+    fail("Error resolving trade intent", error)
   }
   return data as OfferTradeIntent
 }
 
-/**
- * Start (or reuse) the buyer↔seller direct conversation keyed to an offer.
- * The seller is resolved server-side from the offer (`start_offer_conversation`
- * RPC), so the public page never learns — or sends — the seller uid. Returns
- * the conversation id, or null when the viewer is the offer's own seller.
- */
 export async function startOfferConversation(
   offerId: string
 ): Promise<string | null> {
@@ -765,50 +431,33 @@ export async function startOfferConversation(
     p_offer_id: offerId,
   })
   if (error) {
-    // P0002 = "unknown user" — viewer has no users row yet.
     const code = (error as { code?: string }).code
     if (code === "P0002") {
       throw Object.assign(new Error("unknown user"), { code: "P0002" })
     }
-    console.error("Error starting offer conversation:", error)
-    throw error
+    fail("Error starting offer conversation", error)
   }
   return (data as string | null) ?? null
 }
 
-/**
- * Create new offer
- */
 export async function createOffer(offerData: Partial<Offer>) {
   const { data, error } = await supabase
     .from("offers")
     .insert({
       ...offerData,
       offer_id: offerData.offer_id ?? generateId("OFF"),
-      status: OfferStatus.ACTIVE,
+      status: "active",
       published_at: new Date().toISOString(),
     })
     .select("id, offer_id")
     .single()
-
-  if (error) {
-    console.error("Error creating offer:", error)
-    throw error
-  }
-
+  if (error) fail("Error creating offer", error)
   return data
 }
 
-/**
- * Update an existing offer. Caller is responsible for authorization — RLS
- * lets any anon update any row, so `EditOfferPage` must verify the connected
- * wallet owns the row before calling. We don't change `seller_id`,
- * `offer_id`, `published_at`, or `status` here; those are immutable for an
- * ACTIVE offer. Pausing/cancelling/expiring is a separate concern.
- */
 export async function updateOffer(id: string, patch: Partial<Offer>) {
+  // RLS allows any anon UPDATE; callers must verify wallet ownership first.
   const sanitized: Record<string, unknown> = { ...patch }
-  // Defensive: strip fields the seller must never change via this endpoint.
   delete sanitized.id
   delete sanitized.offer_id
   delete sanitized.seller_id
@@ -821,63 +470,30 @@ export async function updateOffer(id: string, patch: Partial<Offer>) {
     .eq("id", id)
     .select("id, offer_id")
     .single()
-
-  if (error) {
-    console.error("Error updating offer:", error)
-    throw error
-  }
-
+  if (error) fail("Error updating offer", error)
   return data
 }
 
-// =================================================================
-// TRADE QUERIES
-// =================================================================
-
-/**
- * Generate a client-side unique `dispute_id` for the `disputes.dispute_id`
- * varchar column.
- */
 export function generateDisputeId(): string {
   return generateId("DSP")
 }
 
-/**
- * Get a trade by either identifier: its primary UUID `id` (the `:id` route
- * param used by the trade detail viewer) or its human-readable `trade_id`
- * (`TEST-001`, `TRD-…`). Human ids would otherwise crash the uuid-typed `id`
- * lookup with a `22P02` cast error, so the varchar column is targeted instead.
- * Joins the offer + both parties so the page can render without N+1 follow-ups.
- */
+const TRADE_JOIN = `*, offer:offers(*), buyer:users!trades_buyer_id_fkey (wallet_address, nickname, avatar_url, verification_level), seller:users!trades_seller_id_fkey (wallet_address, nickname, avatar_url, verification_level)`
+
 export async function getTradeById(id: string) {
+  // Human-readable trade ids must hit the varchar column, not the uuid pk.
   const { data, error } = await supabase
     .from("trades")
-    .select(
-      `
-      *,
-      offer:offers(*),
-      buyer:users!trades_buyer_id_fkey (wallet_address, nickname, avatar_url, verification_level),
-      seller:users!trades_seller_id_fkey (wallet_address, nickname, avatar_url, verification_level)
-    `
-    )
+    .select(TRADE_JOIN)
     .eq(isUuid(id) ? "id" : "trade_id", id)
     .single()
-
   if (error) {
     if (error.code === "PGRST116") return null
-    console.error("Error fetching trade by id:", error)
-    throw error
+    fail("Error fetching trade by id", error)
   }
-
   return data
 }
 
-/**
- * Resolve a trade identifier to the row's primary uuid `id`. UUIDs pass
- * through unchanged; human-readable `trade_id` values are looked up on the
- * varchar column first. `trade_ratings` keys off `trades.id` (a uuid FK), so
- * every rating query funnels an id through here.
- */
 async function resolveTradeUuid(tradeId: string): Promise<string> {
   if (isUuid(tradeId)) return tradeId
   const trade = await getTradeById(tradeId)
@@ -889,58 +505,31 @@ async function resolveTradeUuid(tradeId: string): Promise<string> {
   return trade.id
 }
 
-/**
- * Update a trade's `escrow_status` + last-action tx hash. Mirror of the
- * on-chain state for fast listing without an RPC round-trip. Caller passes the
- * status string from the local enum (`EscrowStatus`); this function does NOT
- * validate against the enum (it's a passthrough).
- */
 export async function upsertTradeEscrowStatus(
   tradeId: string,
   escrowStatus: string,
   txHash?: string
 ) {
-  // Route through the SECURITY DEFINER RPC `set_trade_escrow_status`
-  // (migration 20260911000000). The row-level RLS policy
-  // `trades_update_parties` (20260824000006) intentionally freezes
-  // `escrow_status` for direct UPDATEs — the RPC bypasses RLS with the
-  // same internal authorization (caller must be buyer or seller) so we
-  // don't open the door to arbitrary writes.
-  const { error } = await supabase.rpc("set_trade_escrow_status", {
-    p_trade_id: tradeId,
-    p_new_status: escrowStatus,
-    p_tx_hash: txHash ?? null,
-    p_event_type: "escrow_status_updated",
-  })
-  if (error) {
-    console.error("Error updating trade escrow status:", error)
-    throw error
-  }
-
-  const { data } = await supabase
-    .from("trades")
-    .select()
-    .eq("id", tradeId)
-    .single()
-
-  if (!data) return null
-
-  // No explicit `logTradeEvent` here: `set_trade_escrow_status` already
-  // inserts a `trade_events` row (with the real caller as actor) when
-  // `p_event_type` is supplied. Logging again would double every transition.
-  return data
+  // Direct escrow_status UPDATE is frozen by RLS; only the definer RPC writes.
+  await rpcCall(
+    "set_trade_escrow_status",
+    {
+      p_trade_id: tradeId,
+      p_new_status: escrowStatus,
+      p_tx_hash: txHash ?? null,
+      p_event_type: "escrow_status_updated",
+    },
+    "Error updating trade escrow status"
+  )
+  // Re-read so callers get the persisted row; a read failure is a real error
+  // (a silent null would look like "row missing").
+  return one(
+    supabase.from("trades").select().eq("id", tradeId).single(),
+    "Error reloading trade after escrow status update",
+    true
+  )
 }
 
-/**
- * Update a trade's high-level lifecycle `status` (pending/active/completed/
- * cancelled/disputed/refunded) plus the matching timestamp column. Mirrors the
- * terminal on-chain outcome into Supabase so listing pages can filter without
- * an RPC round-trip. Logs a `trade_status_updated` event.
- *
- * Pass `escrowEventType` to override the generic trade_status_updated entry
- * with a granular Kleros-specific value (e.g. ESCROW_RELEASED when calling
- * this from `handleRelease`).
- */
 export async function updateTradeStatus(
   tradeId: string,
   status: string,
@@ -950,151 +539,96 @@ export async function updateTradeStatus(
     escrowEventType?: TradeEventType
   }
 ) {
-  // The `status` / `has_dispute` / `completed_at` columns are revoked from
-  // `authenticated` (20260824000006), so a direct UPDATE always fails with
-  // 42501 and every caller's `.catch()` silently swallowed it — the trade row
-  // never moved to completed/cancelled/disputed. Route through the SECURITY
-  // DEFINER `set_trade_status` RPC (extended in 20260912000000 to also stamp
-  // completed_at/cancelled_at/disputed_at/has_dispute) which re-checks that
-  // the caller is a party.
-  const { error } = await supabase.rpc("set_trade_status", {
-    p_trade_id: tradeId,
-    p_new_status: status,
-    p_tx_hash: options?.txHash ?? null,
-  })
-  if (error) {
-    console.error("Error updating trade status:", error)
-    throw error
-  }
-
-  // Mirror the escrow column via its own RPC (also revoked for direct writes).
-  // Its optional `p_event_type` writes the audit row.
-  if (options?.escrowStatus) {
-    const { error: escrowErr } = await supabase.rpc("set_trade_escrow_status", {
+  // status/has_dispute/timestamps are revoked from `authenticated`; use the RPC.
+  await rpcCall(
+    "set_trade_status",
+    {
       p_trade_id: tradeId,
-      p_new_status: options.escrowStatus,
+      p_new_status: status,
       p_tx_hash: options?.txHash ?? null,
-      p_event_type:
-        options.escrowEventType ?? TradeEventType.ESCROW_STATUS_UPDATED,
-    })
-    if (escrowErr) {
-      console.error("Error updating trade escrow status:", escrowErr)
-      throw escrowErr
-    }
+    },
+    "Error updating trade status"
+  )
+  if (options?.escrowStatus) {
+    await rpcCall(
+      "set_trade_escrow_status",
+      {
+        p_trade_id: tradeId,
+        p_new_status: options.escrowStatus,
+        p_tx_hash: options?.txHash ?? null,
+        p_event_type:
+          options.escrowEventType ?? TradeEventType.ESCROW_STATUS_UPDATED,
+      },
+      "Error updating trade escrow status"
+    )
   } else if (options?.escrowEventType) {
-    // Lifecycle-only flip that still deserves a granular audit entry.
     await logTradeEvent(
       tradeId,
       options.escrowEventType,
       "system",
       `Trade status → ${status}`,
       { status, tx_hash: options.txHash ?? null }
-    ).catch(() => {
-      /* non-fatal — the status mirror already landed */
-    })
+    ).catch(() => {})
   }
-
-  const { data } = await supabase
-    .from("trades")
-    .select()
-    .eq("id", tradeId)
-    .single()
-
-  return data
+  return one(
+    supabase.from("trades").select().eq("id", tradeId).single(),
+    "Error reloading trade after status update",
+    true
+  )
 }
 
-/**
- * Update a trade's `escrow_status` only (no high-level status flip).
- * Used when an on-chain transition doesn't move the trade to a terminal
- * state — e.g. SellerFundsLocked → FUNDED, BuyerSecurityDeposited, etc.
- * Logs a granular Kleros event so the audit trail shows the exact transition.
- */
 export async function setTradeEscrowStatus(
   tradeId: string,
   escrowStatus: EscrowStatus,
   options?: { txHash?: string; escrowEventType?: TradeEventType }
 ) {
-  // Route through the SECURITY DEFINER RPC `set_trade_escrow_status`
-  // (migration 20260911000000). The row-level RLS policy
-  // `trades_update_parties` (20260824000006) intentionally freezes
-  // `escrow_status` for direct UPDATEs — the RPC bypasses RLS with the
-  // same internal authorization (caller must be buyer or seller) so we
-  // don't open the door to arbitrary writes.
-  const { error } = await supabase.rpc("set_trade_escrow_status", {
-    p_trade_id: tradeId,
-    p_new_status: escrowStatus,
-    p_tx_hash: options?.txHash ?? null,
-    p_event_type:
-      options?.escrowEventType ?? TradeEventType.ESCROW_STATUS_UPDATED,
-  })
-  if (error) {
-    console.error("Error setting trade escrow status:", error)
-    throw error
-  }
-
-  const { data } = await supabase
-    .from("trades")
-    .select()
-    .eq("id", tradeId)
-    .single()
-
-  if (!data) return null
-
-  // No explicit `logTradeEvent` here: `set_trade_escrow_status` already
-  // inserts a `trade_events` row when `p_event_type` is supplied. Logging
-  // again would double every escrow transition.
-  return data
+  // Direct escrow_status UPDATE is frozen by RLS; only the definer RPC writes.
+  await rpcCall(
+    "set_trade_escrow_status",
+    {
+      p_trade_id: tradeId,
+      p_new_status: escrowStatus,
+      p_tx_hash: options?.txHash ?? null,
+      p_event_type:
+        options?.escrowEventType ?? TradeEventType.ESCROW_STATUS_UPDATED,
+    },
+    "Error setting trade escrow status"
+  )
+  return one(
+    supabase.from("trades").select().eq("id", tradeId).single(),
+    "Error reloading trade after setting escrow status",
+    true
+  )
 }
 
-/**
- * Create a new trade from an offer.
- *
- * Persists both the offer-side metadata and (if `escrowAddress` is supplied)
- * the Kleros/Escrow configuration snapshot so the server-side indexer doesn't
- * have to re-read the chain per row. The buyer/seller roles are resolved by
- * the caller based on offer.type (the taker is the opposite party).
- *
- * Logs an `offer_accepted` event using the inserted row's UUID `id`
- * (trade_events.trade_id is the UUID primary key, NOT the varchar trade_id).
- */
 export async function createTrade(input: CreateTradeInput) {
-  const insertRow: Record<string, unknown> = {
-    trade_id: generateId("TRD"),
-    offer_id: input.offer_id,
-    status: TradeStatus.ACTIVE,
-    buyer_id: input.buyer_id,
-    seller_id: input.seller_id,
-    crypto_token: input.crypto_token,
-    crypto_amount: input.crypto_amount,
-    crypto_price_per_unit: input.crypto_price_per_unit,
-    fiat_currency: input.fiat_currency,
-    fiat_amount: input.fiat_amount,
-    payment_method: input.payment_method,
-    payment_details: input.payment_details ?? {},
-    platform_fee_bps: input.platform_fee_bps,
-    treasury_address: input.treasury_address ?? null,
-    creator: input.creator ?? null,
-    kleros_court_addr: input.kleros_court_addr ?? null,
-    kleros_extra_data_part1: input.kleros_extra_data_part1 ?? null,
-    kleros_extra_data_part2: input.kleros_extra_data_part2 ?? null,
-  }
-  if (input.escrow_contract_addr) {
-    insertRow.escrow_contract_addr = input.escrow_contract_addr
-    insertRow.escrow_status = EscrowStatus.AWAITING_DEPOSIT
-  } else {
-    insertRow.escrow_contract_addr = null
-    insertRow.escrow_status = EscrowStatus.AWAITING_DEPOSIT
-  }
   const { data, error } = await supabase
     .from("trades")
-    .insert(insertRow)
+    .insert({
+      trade_id: generateId("TRD"),
+      offer_id: input.offer_id,
+      status: "active",
+      buyer_id: input.buyer_id,
+      seller_id: input.seller_id,
+      crypto_token: input.crypto_token,
+      crypto_amount: input.crypto_amount,
+      crypto_price_per_unit: input.crypto_price_per_unit,
+      fiat_currency: input.fiat_currency,
+      fiat_amount: input.fiat_amount,
+      payment_method: input.payment_method,
+      payment_details: input.payment_details ?? {},
+      platform_fee_bps: input.platform_fee_bps,
+      treasury_address: input.treasury_address ?? null,
+      creator: input.creator ?? null,
+      kleros_court_addr: input.kleros_court_addr ?? null,
+      kleros_extra_data_part1: input.kleros_extra_data_part1 ?? null,
+      kleros_extra_data_part2: input.kleros_extra_data_part2 ?? null,
+      escrow_contract_addr: input.escrow_contract_addr || null,
+      escrow_status: EscrowStatus.AWAITING_DEPOSIT,
+    })
     .select()
     .single()
-
-  if (error) {
-    console.error("Error creating trade:", error)
-    throw error
-  }
+  if (error) fail("Error creating trade", error)
 
   await logTradeEvent(
     data.id,
@@ -1107,59 +641,31 @@ export async function createTrade(input: CreateTradeInput) {
       kleros_court: input.kleros_court_addr ?? null,
     }
   )
-
   return data
 }
 
-/**
- * All trades where the user is buyer OR seller, newest first, with the
- * counterparty + offer joined so the trades list page renders without N+1.
- */
 export async function getTradesByUser(userId: string) {
   const { data, error } = await supabase
     .from("trades")
-    .select(
-      `
-      *,
-      offer:offers(*),
-      buyer:users!trades_buyer_id_fkey (wallet_address, nickname, avatar_url, verification_level),
-      seller:users!trades_seller_id_fkey (wallet_address, nickname, avatar_url, verification_level)
-    `
-    )
+    .select(TRADE_JOIN)
     .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
     .order("created_at", { ascending: false })
-
-  if (error) {
-    console.error("Error fetching user trades:", error)
-    throw error
-  }
-
+  if (error) fail("Error fetching user trades", error)
   return data
 }
 
-/**
- * Find a trade by its deployed escrow contract address. Used when wiring a
- * dispute to its trade: the dispute row needs the uuid `trade_id` plus both
- * parties' user ids, but the app only has the escrow address to go on.
- */
 export async function getTradeByEscrowAddress(escrowAddress: string) {
-  const { data, error } = await supabase
-    .from("trades")
-    .select("id, buyer_id, seller_id")
-    .eq("escrow_contract_addr", escrowAddress)
-    .maybeSingle()
-
-  if (error) {
-    console.error("Error fetching trade by escrow:", error)
-    throw error
-  }
-
+  const data = await one(
+    supabase
+      .from("trades")
+      .select("id, buyer_id, seller_id")
+      .eq("escrow_contract_addr", escrowAddress)
+      .maybeSingle(),
+    "Error fetching trade by escrow"
+  )
   return data as { id: string; buyer_id: string; seller_id: string } | null
 }
 
-/**
- * Log trade event
- */
 async function logTradeEvent(
   tradeId: string,
   eventType: string,
@@ -1167,34 +673,18 @@ async function logTradeEvent(
   description?: string,
   metadata?: Record<string, unknown>
 ) {
-  const { error } = await supabase.from("trade_events").insert({
-    trade_id: tradeId,
-    type: eventType,
-    actor: actor,
-    description: description || null,
-    metadata: metadata || {},
-  })
-
-  if (error) {
-    console.error("Error logging trade event:", error)
-    throw error
-  }
+  await ok(
+    supabase.from("trade_events").insert({
+      trade_id: tradeId,
+      type: eventType,
+      actor,
+      description: description || null,
+      metadata: metadata || {},
+    }),
+    "Error logging trade event"
+  )
 }
 
-// =================================================================
-// DISPUTE QUERIES
-// =================================================================
-
-/**
- * Mirror the on-chain state of a dispute's escrow back into the Supabase row.
- * Called by `DisputeDetailPage` after each on-chain action
- * (executeRuling / finalize / timeoutDispute / appeal) AND by the
- * `useEscrowEventWatcher` callback when the underlying events fire so the
- * cache stays current when nobody has the page open.
- *
- * Pass only the fields that changed; undefined keys are left untouched.
- * `resolvedAt` should be set when the dispute reaches a terminal state.
- */
 export async function updateDisputeOnChain(
   id: string,
   update: {
@@ -1210,26 +700,18 @@ export async function updateDisputeOnChain(
     winner?: "buyer" | "seller" | null
     disputeTimestamp?: string | null
     rulingReceivedTime?: string | null
-    /** Kleros Court-assigned dispute ID (from DisputeRaised event). */
     klerosDisputeId?: string | null
-    /** raiseDispute() tx hash. */
     txHash?: string | null
-    /** submitEvidence() tx hash for the primary evidence upload. */
     txHashEvidence?: string | null
-    /** Path of the primary evidence file in dispute-evidence storage. */
     evidenceCid?: string | null
-    /** Description blob (user text + on-chain metadata). */
     description?: string | null
   }
 ) {
   const dbUpdate: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
   }
-  // `status`, `winner`, `on_chain_ruling`, `kleros_dispute_status`, and
-  // `resolved_at` are revoked from `authenticated` (20260824000006) — writing
-  // any of them in a direct UPDATE fails the whole statement with 42501, so
-  // the non-sensitive mirrors below would silently never persist either.
-  // Collect them for the SECURITY DEFINER RPC instead.
+  // status/winner/on_chain_ruling/kleros_dispute_status/resolved_at are revoked
+  // from `authenticated`; they go through the SECURITY DEFINER RPC instead.
   const sensitive: {
     p_status?: DisputeStatus
     p_winner?: "buyer" | "seller" | null
@@ -1242,45 +724,32 @@ export async function updateDisputeOnChain(
   if (update.winner !== undefined) sensitive.p_winner = update.winner
   if (update.onChainRuling !== undefined)
     sensitive.p_on_chain_ruling = update.onChainRuling
-  if (update.klerosDisputeStatus !== undefined) {
+  if (update.klerosDisputeStatus !== undefined)
     sensitive.p_kleros_dispute_status = update.klerosDisputeStatus
-  }
-  // resolvedAt is explicitly nullable — callers pass null to clear it (e.g.
-  // when a reopened dispute has no resolution). `!== undefined` preserves that
-  // intent, while `if (update.resolvedAt)` would silently drop null resets.
+  // resolvedAt is explicitly nullable: `!== undefined` preserves null resets.
   if (update.resolvedAt !== undefined) {
     sensitive.p_resolved_at = update.resolvedAt
     sensitive.p_clear_resolved_at = update.resolvedAt === null
   }
 
-  if (update.escrowState !== undefined)
-    dbUpdate.escrow_state = update.escrowState
-  if (update.evidenceGroupId !== undefined) {
-    dbUpdate.evidence_group_id = update.evidenceGroupId
+  const scalarMap = [
+    ["escrowState", "escrow_state"],
+    ["evidenceGroupId", "evidence_group_id"],
+    ["appealCount", "appeal_count"],
+    ["raiser", "raiser"],
+    ["feePaidWei", "fee_paid_wei"],
+    ["disputeTimestamp", "dispute_timestamp"],
+    ["rulingReceivedTime", "ruling_received_time"],
+    ["klerosDisputeId", "kleros_dispute_id"],
+    ["txHash", "tx_hash"],
+    ["txHashEvidence", "tx_hash_evidence"],
+    ["evidenceCid", "evidence_cid"],
+    ["description", "description"],
+  ] as const
+  for (const [key, col] of scalarMap) {
+    const value = update[key]
+    if (value !== undefined) dbUpdate[col] = value
   }
-  if (update.appealCount !== undefined) {
-    dbUpdate.appeal_count = update.appealCount
-  }
-  if (update.raiser !== undefined) dbUpdate.raiser = update.raiser
-  if (update.feePaidWei !== undefined) dbUpdate.fee_paid_wei = update.feePaidWei
-  if (update.disputeTimestamp !== undefined) {
-    dbUpdate.dispute_timestamp = update.disputeTimestamp
-  }
-  if (update.rulingReceivedTime !== undefined) {
-    dbUpdate.ruling_received_time = update.rulingReceivedTime
-  }
-  if (update.klerosDisputeId !== undefined) {
-    dbUpdate.kleros_dispute_id = update.klerosDisputeId
-  }
-  if (update.txHash !== undefined) dbUpdate.tx_hash = update.txHash
-  if (update.txHashEvidence !== undefined) {
-    dbUpdate.tx_hash_evidence = update.txHashEvidence
-  }
-  if (update.evidenceCid !== undefined) {
-    dbUpdate.evidence_cid = update.evidenceCid
-  }
-  if (update.description !== undefined)
-    dbUpdate.description = update.description
 
   const hasSensitive =
     sensitive.p_status !== undefined ||
@@ -1288,78 +757,45 @@ export async function updateDisputeOnChain(
     sensitive.p_on_chain_ruling !== undefined ||
     sensitive.p_kleros_dispute_status !== undefined ||
     sensitive.p_resolved_at !== undefined
-
   if (hasSensitive) {
     const { error: rpcErr } = await supabase.rpc("set_dispute_on_chain", {
       p_dispute_id: id,
       ...sensitive,
     })
-    if (rpcErr) {
-      console.error("Error setting dispute on-chain fields:", rpcErr)
-      throw rpcErr
-    }
+    if (rpcErr) fail("Error setting dispute on-chain fields", rpcErr)
   }
 
-  // Only the `updated_at` seed left → nothing else to persist directly.
-  if (Object.keys(dbUpdate).length <= 1 && !hasSensitive) {
-    return null
-  }
-
-  const { data, error } = await supabase
+  if (Object.keys(dbUpdate).length <= 1 && !hasSensitive) return null
+  const { data, error: updateErr } = await supabase
     .from("disputes")
     .update(dbUpdate)
     .eq("id", id)
     .select()
     .single()
-
-  if (error) {
-    console.error("Error updating dispute on-chain state:", error)
-    throw error
-  }
+  if (updateErr) fail("Error updating dispute on-chain state", updateErr)
   return data
 }
 
-/**
- * Create dispute. `status` defaults to `DisputeStatus.OPEN` (the Supabase row
- * lifecycle starts there); the page should bump to `'in_review'` right after
- * `raiseDispute` lands via `updateDisputeOnChain` (B-9).
- */
 export async function createDispute(disputeData: Partial<Dispute>) {
   const { data, error } = await supabase
     .from("disputes")
     .insert({
       ...disputeData,
-      status: disputeData.status ?? DisputeStatus.OPEN,
+      status: disputeData.status ?? "open",
       created_at: new Date().toISOString(),
     })
     .select()
     .single()
-
-  if (error) {
-    console.error("Error creating dispute:", error)
-    throw error
-  }
-
+  if (error) fail("Error creating dispute", error)
   return data
 }
 
-/**
- * Mirror the terminal outcome of a dispute into the linked `trades` row.
- * Called from `DisputeDetailPage` on `executeRuling` / `finalize` /
- * `timeoutDispute` so the trades list reflects the settlement even when
- * nobody has the dispute page open. Best-effort — caller should `.catch(noop)`
- * if it doesn't want to block the tx flow.
- */
 export async function mirrorDisputeToTrade(
   tradeId: string,
   outcome: {
-    /** Resulting trade status. */
     tradeStatus: "completed" | "refunded" | "disputed"
-    /** Matching escrow_status (released / refunded / disputed). */
     escrowStatus: EscrowStatus
-    /** Tx hash of the settlement call. */
     txHash: string
-    /** Per-event type for the trade_events row. */
     escrowEventType: TradeEventType
   }
 ) {
@@ -1370,41 +806,15 @@ export async function mirrorDisputeToTrade(
   })
 }
 
-/**
- * Insert one row per uploaded evidence file. Called from `DisputePage`
- * (one tx per file via `submitEvidence(bytes32)`) and from
- * `DisputeDetailPage` ("Submit additional evidence" loop).
- *
- * Each row carries:
- *   - the IPFS CID + gateway URL (off-chain display)
- *   - the keccak256 bytes32 actually posted on-chain
- *   - the tx hash of the corresponding `submitEvidence` call (best-effort
- *     populated by the page; NULL when only the off-chain row landed)
- *   - the on-chain `evidenceGroupID` at submission time
- *   - the filer's role (buyer/seller). Caller MUST pass this explicitly;
- *     we don't default anymore because a seller-raised dispute was being
- *     tagged `'buyer'` (B-4).
- */
 export interface DisputeEvidenceFile {
   cid: string
-  /**
-   * @deprecated No longer populated — signed URLs are minted on render
-   * via `getDisputeEvidenceSignedUrl(cid)`. Kept on the type only for
-   * backward compat with call sites that destructure it.
-   */
+  /** @deprecated minted on render via `getDisputeEvidenceSignedUrl(cid)`. */
   url?: string
-  /** Display name. May be undefined when the IPFS upload didn't surface a
-   *  filename, in which case the caller should fall back to the local
-   *  File object's `name`. */
   name?: string
   size?: number
   kind?: string
-  /** keccak256(cid) as 0x-prefixed bytes32 — the value sent to
-   *  `KlerosEsc.submitEvidence(bytes32)`. */
   keccakBytes32?: `0x${string}` | null
-  /** Tx hash of the on-chain submitEvidence call, if it succeeded. */
   txHash?: `0x${string}` | null
-  /** KlerosEsc.evidenceGroupID at submission time (0 = first round). */
   evidenceGroupId?: number | null
 }
 
@@ -1426,10 +836,7 @@ export async function insertDisputeEvidence(
     submitted_by: submittedBy,
     evidence_kind: f.kind ?? "image",
     ipfs_cid: f.cid,
-    // Store the durable storage PATH (not a signed URL) — signed URLs
-    // expire in 10 min and would 404 every image after the first session.
-    // The browser asks for a fresh signed URL via
-    // getDisputeEvidenceSignedUrl(cid) on each render.
+    // Durable storage path (not an expiring signed URL).
     ipfs_url: f.cid,
     keccak_bytes32: f.keccakBytes32 ?? null,
     tx_hash: f.txHash ?? null,
@@ -1440,85 +847,41 @@ export async function insertDisputeEvidence(
     .from("dispute_evidence")
     .insert(rows)
     .select()
-  if (error) {
-    console.error("Error inserting dispute evidence:", error)
-    throw error
-  }
+  if (error) fail("Error inserting dispute evidence", error)
   return data ?? []
 }
 
-/**
- * Get disputes by trade
- */
 export async function getDisputesByTrade(tradeId: string) {
   const { data, error } = await supabase
     .from("disputes")
     .select("*")
     .eq("trade_id", tradeId)
-
-  if (error) {
-    console.error("Error fetching disputes:", error)
-    throw error
-  }
-
+  if (error) fail("Error fetching disputes", error)
   return data
 }
 
-/**
- * Get disputes where the user is either buyer or seller (via the
- * joined trade.buyer_id / trade.seller_id columns on `disputes`). Uses
- * PostgREST `.or()` so a single round-trip returns both sides.
- */
 export async function getDisputesByUser(userId: string) {
   const { data, error } = await supabase
     .from("disputes")
     .select(
-      `
-      *,
-      trade:trades(trade_id, crypto_token, crypto_amount),
-      buyer:users!disputes_buyer_id_fkey (nickname, avatar_url),
-      seller:users!disputes_seller_id_fkey (nickname, avatar_url)
-    `
+      `*, trade:trades(trade_id, crypto_token, crypto_amount), buyer:users!disputes_buyer_id_fkey (nickname, avatar_url), seller:users!disputes_seller_id_fkey (nickname, avatar_url)`
     )
     .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
     .order("created_at", { ascending: false })
-
-  if (error) {
-    console.error("Error fetching user disputes:", error)
-    throw error
-  }
-
+  if (error) fail("Error fetching user disputes", error)
   return data
 }
 
-/**
- * Get a single dispute by its primary UUID `id` (the `:id` route param on
- * the dispute detail viewer). Joins the trade, both parties, and all evidence
- * rows so the detail page can render without N+1 follow-ups.
- */
-
-/**
- * Delete a placeholder `disputes` row. Used by the dispute form when the
- * on-chain `raiseDispute` call fails (rejected / reverted / RPC stall) —
- * the placeholder row was created so the Supabase Storage RLS predicate
- * (which keys on `disputes.id` for the upload bucket) would let evidence
- * files in. Without this cleanup, the row would persist with
- * `status='open'`, `tx_hash=null` and the per-trade preflight would block
- * every retry — leaving the user permanently unable to file.
- *
- * Also tears down the matching objects in the dispute-evidence Storage
- * bucket so they don't orphan forever. List+remove run before the
- * disputes-row delete so the bucket RLS predicate (which joins on the
- * disputes.id in the object path) still resolves for the caller's JWT.
- */
 export async function deleteDisputePlaceholder(id: string): Promise<void> {
-  // 1) Clean up the bucket objects. We do this even if the row delete
-  //    fails — orphaned Storage objects silently grow the bucket forever.
+  // Storage first: the bucket RLS predicate joins on the still-present
+  // disputes.id for the caller's JWT. Then evidence rows, then the row itself.
   try {
     const { data: objects, error: listErr } = await supabase.storage
       .from(DISPUTE_EVIDENCE_BUCKET)
       .list(id, { limit: 1000 })
-    if (!listErr && objects && objects.length > 0) {
+    if (listErr) {
+      console.warn("[deleteDisputePlaceholder] storage list failed:", listErr)
+    } else if (objects && objects.length > 0) {
       const paths = objects
         .map((o) => `${id}/${o.name}`)
         .filter((p) => !p.includes(".."))
@@ -1537,16 +900,14 @@ export async function deleteDisputePlaceholder(id: string): Promise<void> {
   } catch (err) {
     console.warn("[deleteDisputePlaceholder] storage list failed:", err)
   }
-
-  // 2) Clean up the dispute_evidence rows (FK cascade would also handle
-  //    this, but explicit is clearer in audit logs).
-  try {
-    await supabase.from("dispute_evidence").delete().eq("dispute_id", id)
-  } catch (err) {
-    console.warn("[deleteDisputePlaceholder] evidence delete failed:", err)
-  }
-
-  // 3) Drop the placeholder dispute row itself.
+  // PostgREST returns (not throws) errors, so read `error` — a bare
+  // try/catch around a builder never fires.
+  const { error: evidenceErr } = await supabase
+    .from("dispute_evidence")
+    .delete()
+    .eq("dispute_id", id)
+  if (evidenceErr)
+    console.warn("[deleteDisputePlaceholder] evidence delete failed:", evidenceErr)
   const { error } = await supabase.from("disputes").delete().eq("id", id)
   if (error) {
     console.warn("[deleteDisputePlaceholder] dispute delete failed:", error)
@@ -1557,8 +918,7 @@ export async function getDisputeById(id: string) {
   const { data, error } = await supabase
     .from("disputes")
     .select(
-      `
-      *,
+      `*,
       trade:trades(
         trade_id, crypto_token, crypto_amount, fiat_currency, fiat_amount,
         status, payment_method, escrow_status, escrow_contract_addr,
@@ -1567,45 +927,23 @@ export async function getDisputeById(id: string) {
       ),
       buyer:users!disputes_buyer_id_fkey (wallet_address, nickname, avatar_url, verification_level),
       seller:users!disputes_seller_id_fkey (wallet_address, nickname, avatar_url, verification_level),
-      evidence:dispute_evidence(*)
-    `
+      evidence:dispute_evidence(*)`
     )
     .eq("id", id)
     .single()
-
   if (error) {
     if (error.code === "PGRST116") return null
-    console.error("Error fetching dispute:", error)
-    throw error
+    fail("Error fetching dispute", error)
   }
-
   return data
 }
 
-// =================================================================
-// RATING QUERIES
-// =================================================================
-
-/**
- * Submit trade rating.
- *
- * `trade_id` may be either the trade's PRIMARY KEY `id` (uuid, preferred) or
- * its HUMAN-READABLE `trade_id` (a varchar like `TEST-001` / `TRD-…`).
- * `trade_ratings.trade_id` is a uuid FK to `trades.id`, so a human id is
- * resolved to the row's uuid via `resolveTradeUuid` before the insert —
- * otherwise Postgres rejects it with a `22P02 invalid input syntax for type
- * uuid` error.
- *
- * Non-uuid `rater_id` / `rated_id` are rejected up front with a clear message
- * (they are always uuids referencing `users.id`).
- */
 export async function submitTradeRating(ratingData: Partial<TradeRating>) {
   const payload: Partial<TradeRating> = { ...ratingData }
 
   if (payload.trade_id) {
     payload.trade_id = await resolveTradeUuid(payload.trade_id)
   }
-  console.log("[rating] trade_id", ratingData.trade_id, "->", payload.trade_id)
 
   for (const field of ["rater_id", "rated_id"] as const) {
     const val = payload[field]
@@ -1620,224 +958,116 @@ export async function submitTradeRating(ratingData: Partial<TradeRating>) {
 
   const { data, error } = await supabase
     .from("trade_ratings")
-    .insert({
-      ...payload,
-      submitted_at: new Date().toISOString(),
-    })
+    .insert({ ...payload, submitted_at: new Date().toISOString() })
     .select()
     .single()
-
   if (error) {
     console.error("Error submitting rating:", error, "sent payload:", payload)
     throw error
   }
-
   return data
 }
 
-/**
- * Get ratings for trade. Accepts the trade's uuid `id` or its human-readable
- * `trade_id` (both resolve through `resolveTradeUuid`).
- */
+const RATING_JOIN = `*, rater:users!trade_ratings_rater_id_fkey (nickname, avatar_url), rated:users!trade_ratings_rated_id_fkey (nickname, avatar_url)`
+
 export async function getRatingsForTrade(tradeId: string) {
   const { data, error } = await supabase
     .from("trade_ratings")
-    .select(
-      `
-      *,
-      rater:users!trade_ratings_rater_id_fkey (nickname, avatar_url),
-      rated:users!trade_ratings_rated_id_fkey (nickname, avatar_url)
-    `
-    )
+    .select(RATING_JOIN)
     .eq("trade_id", await resolveTradeUuid(tradeId))
     .order("submitted_at", { ascending: false })
-
-  if (error) {
-    console.error("Error fetching ratings:", error)
-    throw error
-  }
-
+  if (error) fail("Error fetching ratings", error)
   return data
 }
 
-/**
- * Get all ratings where a specific user was the rated party (for profile page).
- */
 export async function getRatingsByUser(userId: string) {
   const { data, error } = await supabase
     .from("trade_ratings")
     .select(
-      `
-      *,
-      rater:users!trade_ratings_rater_id_fkey (nickname, avatar_url),
-      trade:trades (trade_id, crypto_token, fiat_amount, fiat_currency)
-    `
+      `*, rater:users!trade_ratings_rater_id_fkey (nickname, avatar_url), trade:trades (trade_id, crypto_token, fiat_amount, fiat_currency)`
     )
     .eq("rated_id", userId)
     .order("submitted_at", { ascending: false })
-
-  if (error) {
-    console.error("Error fetching user ratings:", error)
-    throw error
-  }
-
+  if (error) fail("Error fetching user ratings", error)
   return data
 }
 
-/**
- * Read the cached `reputation_scores` row for a user. Returns null if the row
- * doesn't exist (older accounts that haven't earned / lost reputation yet).
- */
 export async function getReputationScores(userId: string) {
   const { data, error } = await supabase
     .from("reputation_scores")
     .select("*")
     .eq("user_id", userId)
     .maybeSingle()
-
-  if (error) {
-    console.error("Error fetching reputation scores:", error)
-    throw error
-  }
+  if (error) fail("Error fetching reputation scores", error)
   return data
 }
 
-/**
- * Check if a user has already rated a specific trade. Accepts the trade's
- * uuid `id` or its human-readable `trade_id`.
- */
 export async function hasUserRatedTrade(tradeId: string, userId: string) {
-  const { data, error } = await supabase
-    .from("trade_ratings")
-    .select("id")
-    .eq("trade_id", await resolveTradeUuid(tradeId))
-    .eq("rater_id", userId)
-    .maybeSingle()
-
-  if (error) {
-    console.error("Error checking rating:", error)
-    throw error
-  }
-
+  const data = await one(
+    supabase
+      .from("trade_ratings")
+      .select("id")
+      .eq("trade_id", await resolveTradeUuid(tradeId))
+      .eq("rater_id", userId)
+      .maybeSingle(),
+    "Error checking rating"
+  )
   return !!data
 }
 
-/**
- * Trade ids (uuids) the given user has already rated (as the rater). Used to
- * hide the "Rate this trade" CTA on the trades list without an N+1 of
- * `hasUserRatedTrade` per card.
- */
 export async function getRatedTradeIdsByUser(
   userId: string
 ): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("trade_ratings")
-    .select("trade_id")
-    .eq("rater_id", userId)
-
-  if (error) {
-    console.error("Error listing rated trade ids:", error)
-    throw error
-  }
-
-  return (data ?? []).map((r: { trade_id: string }) => r.trade_id)
+  const rows = await many<{ trade_id: string }>(
+    supabase
+      .from("trade_ratings")
+      .select("trade_id")
+      .eq("rater_id", userId),
+    "Error listing rated trade ids"
+  )
+  return rows.map((r) => r.trade_id)
 }
-
-// =================================================================
-// CHAT QUERIES (see migration 20260724000004)
-// =================================================================
 
 const USER_SELECT =
   "id, wallet_address, nickname, avatar_url, verification_level, last_active_at"
+const CONV_TRADE_SELECT =
+  "id, trade_id, status, escrow_status, escrow_contract_addr, crypto_token, crypto_amount, fiat_currency, fiat_amount"
+const CONV_PARTICIPANTS_SELECT = `conversation_id, user_id, role, last_read_message_id, muted, joined_at, user:users!conversation_participants_user_id_fkey (${USER_SELECT})`
+const CONV_SELECT = `*, trade:trades(${CONV_TRADE_SELECT}), participants:conversation_participants(${CONV_PARTICIPANTS_SELECT})`
 
-/**
- * Find a conversation by the linked trade's primary UUID. Trades get a
- * conversation auto-created by the `create_conversation_for_trade` trigger,
- * so this is the canonical entry point after `createTrade()` returns.
- */
 export async function getConversationByTradeId(tradeId: string) {
-  const { data, error } = await supabase
-    .from("conversations")
-    .select(
-      `
-      *,
-      trade:trades(
-        id, trade_id, status, escrow_status, escrow_contract_addr,
-        crypto_token, crypto_amount, fiat_currency, fiat_amount
-      ),
-      participants:conversation_participants(
-        conversation_id, user_id, role, last_read_message_id, muted, joined_at,
-        user:users!conversation_participants_user_id_fkey (${USER_SELECT})
-      )
-    `
-    )
-    .eq("trade_id", tradeId)
-    .single()
-
-  if (error) {
-    if (error.code === "PGRST116") return null
-    console.error("Error fetching conversation by trade:", error)
-    throw error
-  }
-
-  return data as ConversationView & {
-    participants: Array<ConversationWithParticipant>
-  }
+  const data = await one(
+    supabase
+      .from("conversations")
+      .select(CONV_SELECT)
+      .eq("trade_id", tradeId)
+      .single(),
+    "Error fetching conversation by trade",
+    true
+  )
+  return data as
+    | (ConversationView & {
+        participants: Array<ConversationWithParticipant>
+      })
+    | null
 }
 
-/**
- * List the current user's conversations (those they're a participant in),
- * sorted newest-first by last_message_at.
- *
- * Each row carries the other party's profile and the linked trade summary
- * so the chat sidebar can render without extra round-trips.
- *
- * `options.archived`:
- *   - `undefined` → all conversations (default; used by profile/offer lookups)
- *   - `false`     → active inbox (status != 'archived')
- *   - `true`      → archived only (terminal trades)
- */
 export async function listConversations(
   userId: string,
   options: { archived?: boolean } = {}
 ) {
-  // First get the user's conversation ids (cheap). The result has nested
-  // arrays from PostgREST joins; we flatten + shape them below.
   const { data: rows, error } = await supabase
     .from("conversation_participants")
     .select(
-      `conversation_id, role, last_read_message_id, muted,
-       conversation:conversations(
-         id, trade_id, status, last_message_at, last_message_preview,
-         created_at, updated_at,
-         trade:trades(
-           id, trade_id, status, escrow_status, escrow_contract_addr,
-           crypto_token, crypto_amount, fiat_currency, fiat_amount
-         ),
-         participants:conversation_participants(
-           conversation_id, user_id, role, last_read_message_id, muted, joined_at,
-           user:users!conversation_participants_user_id_fkey (${USER_SELECT})
-         )
-       )`
+      `conversation_id, role, last_read_message_id, muted, conversation:conversations(id, trade_id, status, last_message_at, last_message_preview, created_at, updated_at, trade:trades(${CONV_TRADE_SELECT}), participants:conversation_participants(${CONV_PARTICIPANTS_SELECT}))`
     )
     .eq("user_id", userId)
     .order("joined_at", { ascending: false })
+  if (error) fail("Error listing conversations", error)
 
-  if (error) {
-    console.error("Error listing conversations:", error)
-    throw error
-  }
-
-  // Compute unread counts for the user's conversations in ONE round-trip via a
-  // DB function (see <timestamp>_unread_conversation_counts.sql). The prior
-  // implementation issued a `count` query per conversation — N+1 waterfall
-  // that grew linearly with open threads and showed up as slow chat loads.
+  // One DB round-trip for all unread counts (vs per-conversation N+1).
   const unreadMap = new Map<string, number>()
   try {
-    // supabase-js RESOLVES with `{ data: null, error }` on RPC failure — it
-    // does not throw. Destructuring only `data` (the old code) meant the
-    // catch below never fired and every conversation silently got
-    // `unread_count: 0`.
     const { data: counts, error: countsErr } = await supabase.rpc(
       "get_unread_conversation_counts",
       { p_user_id: userId }
@@ -1856,22 +1086,17 @@ export async function listConversations(
     )
   }
 
-  // Flatten the nested shape into ConversationView[] and apply unread counts.
   const out: ConversationView[] = []
   for (const row of (rows ?? []) as unknown as Array<{
     conversation: ConversationView | null
   }>) {
     const conv = row.conversation
     if (!conv) continue
-
+    if (options.archived === true && conv.status !== "archived") continue
+    if (options.archived === false && conv.status === "archived") continue
     const participants = (conv.participants ??
       []) as ConversationWithParticipant[]
     const me = participants.find((p) => p.user_id === userId)
-
-    // View filter: active inbox vs archive vs all.
-    if (options.archived === true && conv.status !== "archived") continue
-    if (options.archived === false && conv.status === "archived") continue
-
     out.push({
       ...conv,
       participants,
@@ -1880,60 +1105,33 @@ export async function listConversations(
       last_read_message_id: me?.last_read_message_id ?? null,
     })
   }
-
-  // Sort newest-activity first.
   out.sort((a, b) => {
     const at = a.last_message_at ? new Date(a.last_message_at).getTime() : 0
     const bt = b.last_message_at ? new Date(b.last_message_at).getTime() : 0
     return bt - at
   })
-
   return out
 }
 
-/**
- * Create a direct (non-trade) conversation between the current user and
- * `otherUserId`, returning the new conversation id. Idempotent: if a
- * conversation already exists between the two users (any trade-anchored
- * thread counts), its id is returned without creating a new row.
- *
- * v1's `create_conversation_for_trade` trigger only fires on trade
- * insert, so two users who've never traded have no conversation row
- * between them. This helper lets the ProfilePage 'Message' button spin
- * one up on demand so the chat route resolves to a real conversation.
- */
 export async function getOrCreateDirectConversation(
   currentUserId: string,
   otherUserId: string
 ): Promise<string | null> {
   if (currentUserId === otherUserId) return null
-  // Reject non-uuid args before they hit PostgREST, which would otherwise
-  // cast a `undefined`/garbage value and throw `invalid input syntax for
-  // type uuid` deep in the query. Callers that only fetch joined rows
-  // without selecting `id` are the usual source.
-  const isUuid = (v: string) =>
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      v
-    )
-  if (!isUuid(currentUserId) || !isUuid(otherUserId)) return null
+  if (
+    !UUID_STRICT_RE.test(currentUserId) ||
+    !UUID_STRICT_RE.test(otherUserId)
+  ) {
+    return null
+  }
 
-  // Fast pre-check before the RPC for the common case (existing direct
-  // conversation between the two users): query the current user's
-  // participant rows first and intersect with the other user's. That
-  // avoids paying the RPC round-trip + advisory-lock cost for the 99%
-  // case where the conversation already exists. Falls back to the RPC if
-  // no shared row exists.
+  // Fast pre-check for the common existing-conversation case (avoids the RPC
+  // round-trip + advisory lock); fall back to the race-safe RPC if none.
   const { data: myParts, error: partsErr } = await supabase
     .from("conversation_participants")
     .select("conversation_id")
     .eq("user_id", currentUserId)
-  if (partsErr) {
-    console.error(
-      "[getOrCreateDirectConversation] participant lookup failed:",
-      partsErr
-    )
-    return null
-  }
+  if (partsErr) fail("[getOrCreateDirectConversation] participant lookup", partsErr)
   const myConvIds = (myParts ?? []).map(
     (p: { conversation_id: string }) => p.conversation_id
   )
@@ -1943,19 +1141,12 @@ export async function getOrCreateDirectConversation(
       .select("conversation_id")
       .eq("user_id", otherUserId)
       .in("conversation_id", myConvIds)
-    if (sharedErr) {
-      console.error(
-        "[getOrCreateDirectConversation] shared lookup failed:",
-        sharedErr
-      )
-      return null
-    }
+    if (sharedErr) fail("[getOrCreateDirectConversation] shared lookup", sharedErr)
     if (shared && shared.length > 0) {
       return shared[0].conversation_id as string
     }
   }
 
-  // No existing conversation — fall back to the race-safe RPC.
   const { data, error } = await supabase.rpc(
     "get_or_create_direct_conversation",
     {
@@ -1964,27 +1155,17 @@ export async function getOrCreateDirectConversation(
     }
   )
   if (error) {
-    console.error("[getOrCreateDirectConversation] rpc failed:", error)
-    // P0002 = "unknown user" raised by the RPC for a missing other
-    // party. Rethrow a tagged error so the call site can surface a
-    // specific toast (profile.errorUnknownUser) instead of the generic
-    // "couldn't start the chat" copy.
     const code = (error as { code?: string }).code
     if (code === "P0002") {
       throw Object.assign(new Error("unknown user"), { code: "P0002" })
     }
-    return null
+    fail("[getOrCreateDirectConversation] rpc", error)
   }
   return (data as string | null) ?? null
 }
 
-/**
- * Helper: (created_at, id) sort key of a message. Used as a composite cursor
- * for pagination and unread counts. A bare-timestamp cursor is lossy: two
- * messages can share the same millisecond (timestamptz has ms resolution),
- * so `created_at.lt./gt.` alone silently drops or double-counts the sibling.
- * Ties are broken by id (uuid has a total order in Postgres).
- */
+// Composite (created_at, id) cursor: a bare timestamp is lossy because
+// timestamptz has ms resolution and siblings can tie.
 async function getMessageSortKey(
   messageId: string
 ): Promise<{ created_at: string; id: string } | null> {
@@ -1993,67 +1174,49 @@ async function getMessageSortKey(
     .select("created_at")
     .eq("id", messageId)
     .single()
-  // A missing/unreadable cursor must NOT degrade to epoch: the composite
-  // `.or()` would then match nothing and page silently backward from 1970.
-  // Returning null lets the caller surface/bail instead.
-  if (error || !data) return null
+  if (error) {
+    // Missing row (PGRST116) is expected; anything else hides a broken page.
+    if (error.code !== "PGRST116")
+      console.warn("[getMessageSortKey] cursor read failed:", error)
+    return null
+  }
+  if (!data) return null
   return {
     created_at: (data as { created_at: string }).created_at,
     id: messageId,
   }
 }
 
-/**
- * Fetch a single conversation with everything the right pane needs.
- */
-export async function getConversation(conversationId: string, userId: string) {
-  const { data, error } = await supabase
-    .from("conversations")
-    .select(
-      `
-      *,
-      trade:trades(
-        id, trade_id, status, escrow_status, escrow_contract_addr,
-        crypto_token, crypto_amount, fiat_currency, fiat_amount
-      ),
-      participants:conversation_participants(
-        conversation_id, user_id, role, last_read_message_id, muted, joined_at,
-        user:users!conversation_participants_user_id_fkey (${USER_SELECT})
-      )
-    `
-    )
-    .eq("id", conversationId)
-    .single()
-
-  if (error) {
-    if (error.code === "PGRST116") return null
-    console.error("Error fetching conversation:", error)
-    throw error
-  }
-
+export async function getConversation(
+  conversationId: string,
+  userId: string
+) {
+  const data = await one(
+    supabase
+      .from("conversations")
+      .select(CONV_SELECT)
+      .eq("id", conversationId)
+      .single(),
+    "Error fetching conversation",
+    true
+  )
+  if (!data) return null
   const conv = data as ConversationView
   const me = conv.participants.find((p) => p.user_id === userId)
   return { ...conv, last_read_message_id: me?.last_read_message_id ?? null }
 }
 
-/**
- * Page a conversation's messages (oldest→newest). `before` is a message id;
- * when set, only messages older than that one are returned.
- */
 export async function listMessages(
   conversationId: string,
   options: { limit?: number; before?: string } = {}
 ) {
   const limit = options.limit ?? 50
 
-  // ORDER BY is deterministic: `created_at DESC, id DESC` so messages that
-  // share the same millisecond (timestamptz has ms resolution) never reorder
-  // nondeterministically or flip pages.
+  // Deterministic (created_at, id) DESC ordering so same-ms ties never reorder.
   let query = supabase
     .from("messages")
     .select(
-      `id, conversation_id, sender_id, body, kind, created_at,
-       sender:users!messages_sender_id_fkey (${USER_SELECT})`
+      `id, conversation_id, sender_id, body, kind, created_at, sender:users!messages_sender_id_fkey (${USER_SELECT})`
     )
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: false })
@@ -2062,29 +1225,16 @@ export async function listMessages(
 
   if (options.before) {
     const cursor = await getMessageSortKey(options.before)
-    // Cursor row is gone/unreadable — returning the (empty) page as-is would
-    // mislead `loadOlder()` into thinking history ended awkwardly. Signal a
-    // clean empty result instead of paging from a bogus boundary.
     if (!cursor) return []
-    // Composite cursor: strictly older than (created_at, id), i.e.
-    //   (created_at < ts)  OR  (created_at = ts AND id < boundary).
-    // The previous `and(a,b),a` shape collapsed to `a`, which dropped the
-    // `id` term entirely and let same-millisecond messages cross page
-    // boundaries un/lost. `eq` on the timestamp pins ties to the id.
     query = query.or(
       `and(created_at.lt.${cursor.created_at}),and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`
     )
   }
 
   const { data, error } = await query
+  if (error) fail("Error listing messages", error)
 
-  if (error) {
-    console.error("Error listing messages:", error)
-    throw error
-  }
-
-  // PostgREST returns nested joins as arrays; the FK guarantees a single
-  // sender row, so we collapse to a single object for the UI shape.
+  // FK guarantees one sender row; PostgREST still returns it as an array.
   const flat = (
     (data ?? []) as Array<
       Omit<MessageWithSender, "sender"> & {
@@ -2097,44 +1247,30 @@ export async function listMessages(
       : (row.sender ?? null)
     return { ...row, sender } as MessageWithSender
   })
-
-  // Reverse so callers get ascending order out of the box.
   return flat.reverse()
 }
 
-/**
- * Insert a new chat message. The `notify_conversation_message` trigger
- * automatically writes an in-app notification row per recipient.
- */
 export async function sendMessage(input: {
   conversationId: string
   senderId: string
   body: string
   kind?: MessageKind
 }) {
-  const { data, error } = await supabase
-    .from("messages")
-    .insert({
-      conversation_id: input.conversationId,
-      sender_id: input.senderId,
-      body: input.body.trim(),
-      kind: input.kind ?? "text",
-    })
-    .select(
-      `
-      id, conversation_id, sender_id, body, kind, created_at,
-      sender:users!messages_sender_id_fkey (${USER_SELECT})
-    `
-    )
-    .single()
-
-  if (error) {
-    console.error("Error sending message:", error)
-    throw error
-  }
-
-  // PostgREST returns the joined sender as an array; collapse to a single
-  // object to match the MessageWithSender shape used by the UI.
+  const data = await one(
+    supabase
+      .from("messages")
+      .insert({
+        conversation_id: input.conversationId,
+        sender_id: input.senderId,
+        body: input.body.trim(),
+        kind: input.kind ?? "text",
+      })
+      .select(
+        `id, conversation_id, sender_id, body, kind, created_at, sender:users!messages_sender_id_fkey (${USER_SELECT})`
+      )
+      .single(),
+    "Error sending message"
+  )
   const raw = data as Omit<MessageWithSender, "sender"> & {
     sender: MessageWithSender["sender"] | MessageWithSender["sender"][]
   }
@@ -2144,231 +1280,161 @@ export async function sendMessage(input: {
   return { ...raw, sender }
 }
 
-/**
- * Mark the given message as the user's last-read pointer for this
- * conversation. Drives the unread badge in the sidebar.
- */
 export async function markConversationRead(input: {
   conversationId: string
   userId: string
   messageId: string
 }) {
-  const { error } = await supabase
-    .from("conversation_participants")
-    .update({ last_read_message_id: input.messageId })
-    .eq("conversation_id", input.conversationId)
-    .eq("user_id", input.userId)
-
-  if (error) {
-    console.error("Error marking conversation read:", error)
-    throw error
-  }
+  await ok(
+    supabase
+      .from("conversation_participants")
+      .update({ last_read_message_id: input.messageId })
+      .eq("conversation_id", input.conversationId)
+      .eq("user_id", input.userId),
+    "Error marking conversation read"
+  )
 }
 
-/**
- * Flag the current user as actively viewing a conversation. The
- * `notify_conversation_message` trigger skips notification creation while
- * `viewing_at` is within the last 2 minutes, so a message landing in an open
- * chat pane never lights up the bell / sends an email. The client refreshes
- * this on a heartbeat and clears it (viewing=false) when the pane unmounts.
- *
- * Best-effort: a failure just means the notification is created normally.
- */
 export async function setConversationViewing(input: {
   conversationId: string
   userId: string
   viewing: boolean
 }): Promise<void> {
+  // Best-effort: the trigger skips notifications while viewing_at is fresh.
   const { error } = await supabase
     .from("conversation_participants")
     .update({ viewing_at: input.viewing ? new Date().toISOString() : null })
     .eq("conversation_id", input.conversationId)
     .eq("user_id", input.userId)
-
-  if (error) {
-    console.warn("[setConversationViewing] failed:", error)
-  }
+  if (error) console.warn("[setConversationViewing] failed:", error)
 }
 
-/**
- * Mute / unmute a conversation for the current participant. The
- * `notify_conversation_message` trigger skips `muted = true` rows, so a muted
- * chat produces no notifications (in-app or email).
- */
 export async function setConversationMuted(input: {
   conversationId: string
   userId: string
   muted: boolean
 }): Promise<void> {
-  const { error } = await supabase
-    .from("conversation_participants")
-    .update({ muted: input.muted })
-    .eq("conversation_id", input.conversationId)
-    .eq("user_id", input.userId)
-
-  if (error) {
-    console.error("Error muting conversation:", error)
-    throw error
-  }
+  await ok(
+    supabase
+      .from("conversation_participants")
+      .update({ muted: input.muted })
+      .eq("conversation_id", input.conversationId)
+      .eq("user_id", input.userId),
+    "Error muting conversation"
+  )
 }
 
-/**
- * Archive / unarchive a conversation for the current participant. Archived
- * chats move out of the active inbox (the trades list trigger archives them
- * automatically on completion; this is the manual path from the chat menu).
- */
 export async function setConversationArchived(input: {
   conversationId: string
   archived: boolean
 }): Promise<void> {
-  const { error } = await supabase
-    .from("conversations")
-    .update({
-      status: input.archived ? "archived" : "open",
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", input.conversationId)
-
-  if (error) {
-    console.error("Error archiving conversation:", error)
-    throw error
+  let status = "archived"
+  if (!input.archived) {
+    // Preserve a locked thread: hardcoding "open" would re-enable sends. A
+    // failed read must abort (not silently default to "open").
+    const { data, error } = await supabase
+      .from("conversations")
+      .select("status")
+      .eq("id", input.conversationId)
+      .maybeSingle()
+    if (error) fail("[setConversationArchived] status read", error)
+    status = data?.status === "locked" ? "locked" : "open"
   }
+  await ok(
+    supabase
+      .from("conversations")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", input.conversationId),
+    "Error archiving conversation"
+  )
 }
 
-/**
- * Mark every unread notification tied to a conversation as read. Called when
- * the user opens the chat pane so the bell clears for the thread they are now
- * reading.
- */
 export async function markConversationNotificationsRead(input: {
   conversationId: string
   userId: string
 }): Promise<void> {
-  const { error } = await supabase
-    .from("notifications")
-    .update({ read_at: new Date().toISOString() })
-    .eq("user_id", input.userId)
-    .eq("conversation_id", input.conversationId)
-    .is("read_at", null)
-
-  if (error) {
-    console.error("Error marking conversation notifications read:", error)
-    throw error
-  }
+  await ok(
+    supabase
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("user_id", input.userId)
+      .eq("conversation_id", input.conversationId)
+      .is("read_at", null),
+    "Error marking conversation notifications read"
+  )
 }
 
-// =================================================================
-// NOTIFICATION QUERIES (see migration 20260724000005)
-// =================================================================
-
-/**
- * Newest-first notifications for a user. Unread first, then by created_at.
- */
 export async function listNotifications(userId: string, limit = 50) {
-  const { data, error } = await supabase
-    .from("notifications")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(limit)
-
-  if (error) {
-    console.error("Error listing notifications:", error)
-    throw error
-  }
-
-  return (data ?? []) as Notification[]
+  return (await many(
+    supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(limit),
+    "Error listing notifications"
+  )) as Notification[]
 }
 
-/**
- * Unread count for the navbar bell badge.
- */
 export async function getUnreadNotificationCount(userId: string) {
   const { count, error } = await supabase
     .from("notifications")
     .select("id", { count: "exact", head: true })
     .eq("user_id", userId)
     .is("read_at", null)
-
-  if (error) {
-    console.error("Error counting notifications:", error)
-    throw error
-  }
-
+  if (error) fail("Error counting notifications", error)
   return count ?? 0
 }
 
 export async function markNotificationRead(notificationId: string) {
-  const { error } = await supabase
-    .from("notifications")
-    .update({ read_at: new Date().toISOString() })
-    .eq("id", notificationId)
-
-  if (error) {
-    console.error("Error marking notification read:", error)
-    throw error
-  }
+  await ok(
+    supabase
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("id", notificationId),
+    "Error marking notification read"
+  )
 }
 
 export async function markAllNotificationsRead(userId: string) {
-  const { error } = await supabase
-    .from("notifications")
-    .update({ read_at: new Date().toISOString() })
-    .eq("user_id", userId)
-    .is("read_at", null)
-
-  if (error) {
-    console.error("Error marking all notifications read:", error)
-    throw error
-  }
+  await ok(
+    supabase
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("user_id", userId)
+      .is("read_at", null),
+    "Error marking all notifications read"
+  )
 }
 
 export async function getNotificationPreferences(userId: string) {
-  const { data, error } = await supabase
-    .from("notification_preferences")
-    .select("*")
-    .eq("user_id", userId)
-
-  if (error) {
-    console.error("Error fetching notification preferences:", error)
-    throw error
-  }
-
-  return (data ?? []) as NotificationPreferences[]
+  return (await many(
+    supabase.from("notification_preferences").select("*").eq("user_id", userId),
+    "Error fetching notification preferences"
+  )) as NotificationPreferences[]
 }
 
-/**
- * Upsert one preference row. Used by a future settings screen; called with
- * defaults on first user sync so dispatcher decisions have something to read.
- */
 export async function upsertNotificationPreference(input: {
   userId: string
   channel: NotificationChannel
   enabled: boolean
   emailAddress?: string | null
 }) {
-  const { error } = await supabase.from("notification_preferences").upsert(
-    {
-      user_id: input.userId,
-      channel: input.channel,
-      enabled: input.enabled,
-      email_address: input.emailAddress ?? null,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id,channel" }
+  await ok(
+    supabase.from("notification_preferences").upsert(
+      {
+        user_id: input.userId,
+        channel: input.channel,
+        enabled: input.enabled,
+        email_address: input.emailAddress ?? null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,channel" }
+    ),
+    "Error upserting notification preference"
   )
-
-  if (error) {
-    console.error("Error upserting notification preference:", error)
-    throw error
-  }
 }
 
-/**
- * Ensure a user has both channel rows (inapp + email) on file so the
- * dispatcher can always read prefs without hitting the "missing row" path.
- * Called from useSyncUser.
- */
 export async function ensureDefaultNotificationPreferences(userId: string) {
   const rows: Array<{
     user_id: string
@@ -2386,29 +1452,17 @@ export async function ensureDefaultNotificationPreferences(userId: string) {
   }
 }
 
-// =================================================================
-// REFERRAL PROGRAM ("Invite & Earn")
-// =================================================================
-
-/**
- * Return (minting on first call) the caller's opaque referral code.
- * Writes go through the SECURITY DEFINER RPC — `referral_codes` has no client
- * insert policy.
- */
 export async function getOrCreateReferralCode(): Promise<string | null> {
-  const { data, error } = await supabase.rpc("get_or_create_referral_code")
-  if (error) {
-    console.error("Error fetching referral code:", error)
-    return null
-  }
-  return (data as string) ?? null
+  // Throw on failure so the "Get my link" button can surface an error instead
+  // of silently no-op'ing.
+  const data = await rpcCall<string | null>(
+    "get_or_create_referral_code",
+    {},
+    "Error creating referral code"
+  )
+  return data ?? null
 }
 
-/**
- * Attribute the current session user to a referrer code (first-touch claim).
- * Fails safely on bad codes / self-referral / double-claim — the RPC raises
- * exceptions the caller surfaces as an error string.
- */
 export async function claimReferral(
   code: string
 ): Promise<{ ok: boolean; error?: string }> {
@@ -2420,10 +1474,6 @@ export async function claimReferral(
   return { ok: true }
 }
 
-/**
- * Full referral dashboard for the signed-in referrer: relations (with referred
- * profile), earning events, and running totals. Reads are owner-scoped by RLS.
- */
 export async function getReferralDashboard(
   userId: string
 ): Promise<ReferralDashboard> {
@@ -2436,9 +1486,7 @@ export async function getReferralDashboard(
     supabase
       .from("referral_relations")
       .select(
-        `*, referred:users!referral_relations_referred_user_id_fkey (
-          wallet_address, nickname, avatar_url
-        )`
+        `*, referred:users!referral_relations_referred_user_id_fkey (wallet_address, nickname, avatar_url)`
       )
       .eq("referrer_id", userId)
       .order("attributed_at", { ascending: false }),
@@ -2449,9 +1497,13 @@ export async function getReferralDashboard(
       .order("created_at", { ascending: false }),
   ])
 
+  // Surface read failures: silent [] / null would render an all-zero dashboard.
+  if (codeRes.error) fail("Error fetching referral code", codeRes.error)
+  if (relationsRes.error) fail("Error fetching referral relations", relationsRes.error)
+  if (eventsRes.error) fail("Error fetching referral events", eventsRes.error)
+
   const relations: ReferralRelationWithUser[] = relationsRes.data ?? []
   const events: ReferralFeeEvent[] = eventsRes.data ?? []
-
   const totalEarned = events.reduce(
     (sum, e) => sum + (Number(e.earned_amount) || 0),
     0
@@ -2459,7 +1511,6 @@ export async function getReferralDashboard(
   const pendingEarned = events
     .filter((e) => e.status === "pending")
     .reduce((sum, e) => sum + (Number(e.earned_amount) || 0), 0)
-  const paidEarned = totalEarned - pendingEarned
 
   return {
     code: (codeRes.data?.code as string | undefined) ?? null,
@@ -2467,37 +1518,16 @@ export async function getReferralDashboard(
     events,
     totalEarned,
     pendingEarned,
-    paidEarned,
+    paidEarned: totalEarned - pendingEarned,
   }
 }
 
-// =================================================================
-// AUTH UTILITIES
-// =================================================================
+const SIWE_MARKER_KEY = "coffernode:siwe:last"
+const siweDeclinedKey = (address: string) =>
+  `coffernode:siwe:declined:${address}`
 
-/**
- * Sign in with wallet (SIWE — Sign-In With Ethereum).
- *
- * Server-backed flow: the `siwe-auth` edge function issues a one-shot nonce,
- * we build the EIP-4361 challenge, the wallet signs it, and the edge verifies
- * the signature and mints a Supabase JWT (sub = users.id, custom claim
- * `wallet_address`) that we install via `supabase.auth.setSession`. All RLS
- * policies authorize through that JWT (see
- * migrations/20260829000002_siwe_auth_rls.sql).
- *
- * Local-dev fallback: when the edge function isn't reachable AND the app is
- * served from localhost (pre-deploy dev), we verify the signature in-browser
- * with viem and skip the session — the permissive pre-migration RLS makes the
- * app still work during development.
- */
-// Throttle code intentionally removed. The previous version had a
-// per-wallet 1-hour prompt cooldown (coffernode:siwe:lastPromptAt:<addr>)
-// but the user wants the success marker to be the durable "no re-prompt
-// on this device" signal and the rejected marker to be the durable
-// "no auto-re-prompt" signal. Only an explicit signOut / wallet switch
-// clears those and re-prompts. The hour cap added noise without solving
-// a real problem since the rejection marker already blocks the loop.
-
+// SIWE: edge function issues a nonce, verifies the signature and mints a
+// Supabase JWT (app_metadata.wallet_address is the RLS source of truth).
 async function signInWithWallet(
   walletAddress: string,
   options: {
@@ -2509,15 +1539,11 @@ async function signInWithWallet(
   const { signMessage, chainId, appName } = options
   const addr = walletAddress.toLowerCase() as `0x${string}`
 
-  // 1. One-shot nonce from the server.
   const { data: nonceRes, error: nonceErr } = await supabase.functions.invoke(
     "siwe-auth",
     { body: { action: "nonce", address: addr } }
   )
   if (nonceErr || !nonceRes?.nonce) {
-    // The edge re-issues a wallet's fresh unused nonce, so a 429 here is the
-    // rare remaining abuse-guard hit, not a tap-retry pile-up. Surface it as
-    // something a human can act on instead of a bare FunctionsHttpError.
     if (isEdgeFunctionRateLimited(nonceErr)) {
       throw new Error(
         "Too many sign-in attempts. Wait a few minutes and try again."
@@ -2528,7 +1554,6 @@ async function signInWithWallet(
   const nonce = String(nonceRes.nonce)
   if (!/^[a-zA-Z0-9_-]{8,64}$/.test(nonce)) throw new Error("bad nonce")
 
-  // 2. Build + sign the challenge.
   const { message, issuedAt } = buildSiweChallengeLocal(addr, {
     nonce,
     chainId,
@@ -2536,7 +1561,6 @@ async function signInWithWallet(
   })
   const signature = await signMessage({ message })
 
-  // 3. Server verifies the signature and mints a real Supabase JWT.
   const { data, error } = await supabase.functions.invoke("siwe-auth", {
     body: { action: "verify", message, signature },
   })
@@ -2544,11 +1568,8 @@ async function signInWithWallet(
     throw error ?? new Error("siwe-auth did not return a token")
   }
 
-  // Install the session. Use GoTrue's real refresh token when the edge
-  // function returns one (it does — see siwe-auth `handleVerify`): with
-  // `autoRefreshToken: true`, a placeholder would make the automated refresh
-  // fail, GoTrue would emit SIGNED_OUT, and the app would silently lose its
-  // session while the localStorage marker kept the UI looking signed in.
+  // Use the real refresh token when present: a placeholder would break
+  // autoRefreshToken, emit SIGNED_OUT and silently drop the session.
   const { error: sessionErr } = await supabase.auth.setSession({
     access_token: data.access_token as string,
     refresh_token:
@@ -2558,44 +1579,28 @@ async function signInWithWallet(
   })
   if (sessionErr) throw sessionErr
 
-  setSiweMarker({ address: addr, issuedAt }) // never persist the signature
+  setSiweMarker({ address: addr, issuedAt })
 
-  // Derive + persist the device-bound Coffer Identity from the signature
-  // (deterministic RFC 6979 → stable across logins, server never sees it).
-  // Best-effort: a failure must not block sign-in.
+  // Device-bound identity derived from the signature; best-effort.
   try {
     await persistCofferIdentity(addr, signature)
   } catch (err) {
     console.warn("[coffer] failed to persist identity:", err)
   }
-
-  // The edge function upserted the row keyed by wallet; read it back.
-  return await ensureUser(addr)
+  return ensureUser(addr)
 }
 
 function setSiweMarker(marker: { address: string; issuedAt: string }): void {
   if (typeof window !== "undefined") {
-    window.localStorage.setItem("coffernode:siwe:last", JSON.stringify(marker))
+    window.localStorage.setItem(SIWE_MARKER_KEY, JSON.stringify(marker))
   }
 }
 
-/**
- * True when the error was thrown by our own `siwe-auth` edge function with a
- * 429 (its MAX_ACTIVE_NONCES guard). supabase-js wraps non-2xx invoked
- * responses in a FunctionsHttpError carrying the status in `context.status`.
- */
 function isEdgeFunctionRateLimited(err: unknown): boolean {
   const ctx = (err as { context?: { status?: number } })?.context
   return ctx?.status === 429
 }
 
-/**
- * Returns the lowercased wallet address claimed in the active Supabase JWT,
- * or null when there is no session (or the claim is missing).
- *
- * A present token WITHOUT the claim mints a "valid" session the RLS layer
- * still denies, so callers treat it as not signed-in and re-run SIWE / refresh.
- */
 export async function getSessionWallet(): Promise<string | null> {
   const session = await getSession()
   return session?.access_token
@@ -2603,10 +1608,6 @@ export async function getSessionWallet(): Promise<string | null> {
     : null
 }
 
-/**
- * Best-effort base64url JWT payload decode (client-side display only — RLS
- * is what authorizes, and the server re-validates the signature).
- */
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const [, payload] = token.split(".")
@@ -2622,98 +1623,61 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
-/**
- * Read the `wallet_address` claim from a JWT — `app_metadata.wallet_address`
- * is the RLS source of truth; the top-level claim is the legacy fallback.
- */
+// app_metadata.wallet_address is the RLS source of truth. It MUST win over the
+// legacy top-level claim: trusting the latter first could shadow the real claim.
 function walletClaimFromToken(token: string): string | null {
   const payload = decodeJwtPayload(token)
   if (!payload) return null
   const appMeta = payload.app_metadata as Record<string, unknown> | undefined
   const raw =
-    typeof payload.wallet_address === "string"
-      ? payload.wallet_address
-      : typeof appMeta?.wallet_address === "string"
-        ? appMeta.wallet_address
+    typeof appMeta?.wallet_address === "string"
+      ? appMeta.wallet_address
+      : typeof payload.wallet_address === "string"
+        ? payload.wallet_address
         : null
   return typeof raw === "string" && raw ? raw.toLowerCase() : null
 }
 
-/**
- * Mark a wallet as "user declined the SIWE signature". Once set for a
- * wallet, `ensureWalletSession` short-circuits with `session: false` and
- * the caller can keep the app in read-only mode instead of re-prompting
- * MetaMask on every page mount. Cleared on `signOut` (same lifetime as
- * the success marker, so manual retry is still possible after logout).
- *
- * Stored under `coffernode:siwe:declined:{address}` so per-wallet
- * rejections don't poison other wallets on the same browser.
- */
+// Per-wallet "user declined" marker so a dismissed prompt is not retried on
+// every mount; cleared on signOut / explicit retry.
 function getSiweRejectedMarker(address: string): boolean {
   if (typeof window === "undefined") return false
-  return (
-    window.localStorage.getItem(`coffernode:siwe:declined:${address}`) === "1"
-  )
+  return window.localStorage.getItem(siweDeclinedKey(address)) === "1"
 }
 
 function setSiweRejectedMarker(address: string): void {
   if (typeof window === "undefined") return
-  window.localStorage.setItem(`coffernode:siwe:declined:${address}`, "1")
+  window.localStorage.setItem(siweDeclinedKey(address), "1")
 }
 
 function clearSiweRejectedMarker(address: string): void {
   if (typeof window === "undefined") return
-  window.localStorage.removeItem(`coffernode:siwe:declined:${address}`)
+  window.localStorage.removeItem(siweDeclinedKey(address))
 }
 
 async function isSignedInAs(walletAddress: string): Promise<boolean> {
   const addr = walletAddress.toLowerCase()
-
-  // Hard requirement: an actual Supabase session token must exist. The
-  // `coffernode:siwe:last` marker is a remember-me hint (and a claim-path
-  // fallback for GoTrue JWTs we can't decode client-side) — but a marker
-  // with no live token is a false positive that makes every RLS write
-  // fail silently (messages, last_active_at, mark-read…).
   const session = await getSession()
   if (!session?.access_token) return false
-
-  // Belt-and-suspenders: if the token is already past exp, supabase-js's
-  // background refresh may not have run yet — treat it as not signed in so
-  // we re-sign instead of authorizing with a dead JWT.
   const payload = decodeJwtPayload(session.access_token)
   if (typeof payload?.exp === "number" && payload.exp * 1000 < Date.now())
     return false
-
-  // getSessionWallet() falls back to the marker (when a token is present)
-  // so a claim we can't parse on the client still counts as signed-in —
-  // RLS re-authorizes the server side anyway.
   return (await getSessionWallet()) === addr
 }
 
-/**
- * Self-heal for sessions minted BEFORE the wallet-claim backfill shipped.
- * GoTrue issues fresh tokens with the CURRENT app_metadata, so exchanging the
- * stored refresh_token silently rewrites a claim-less JWT into one that carries
- * `app_metadata.wallet_address` — no wallet signature needed. Returns true when
- * the active token already does (or now does) carry the claim for `address`.
- * Callers fall through to the normal SIWE re-sign path.
- */
+// Self-heal pre-backfill sessions: GoTrue re-issues tokens with the CURRENT
+// app_metadata, so a stored refresh_token yields a wallet-claim JWT.
 async function refreshToWalletClaim(address: string): Promise<boolean> {
   const addr = address.toLowerCase()
   const session = await getSession()
   if (!session?.access_token || !session.refresh_token) return false
 
-  // Claim already present and matching — nothing to do, unless the token is
-  // already past `exp` (supabase's background refresh may not have run yet).
-  // In that case fall through so the caller re-signs instead of treating a
-  // dead JWT as a live session.
   const payload = decodeJwtPayload(session.access_token)
   const notExpired =
     typeof payload?.exp !== "number" || payload.exp * 1000 > Date.now()
   if (walletClaimFromToken(session.access_token) === addr && notExpired)
     return true
 
-  // Claim-less (valid) token: refresh once to pick up the backfilled metadata.
   const { data, error } = await supabase.auth.refreshSession()
   if (error) return false
   const accessToken = data?.session?.access_token
@@ -2721,82 +1685,43 @@ async function refreshToWalletClaim(address: string): Promise<boolean> {
   return walletClaimFromToken(accessToken) === addr
 }
 
-/**
- * Silently recover a session for `walletAddress` WITHOUT ever prompting the
- * wallet: verifies a live/refreshed claim, or exchanges the stored refresh
- * token for a claim-bearing access token (`refreshToWalletClaim`).
- *
- * Used on reload when the device already has a SIWE marker, so a returning
- * user isn't asked to sign again — only an explicit Disconnect clears the
- * session/marker. Returns true when a usable session exists afterwards.
- */
 export async function recoverWalletSession(
   walletAddress: string
 ): Promise<boolean> {
   const addr = walletAddress.toLowerCase()
-  // `isSignedInAs` also honours `exp`; supabase-js may refresh the token while
-  // resolving `getSession()`, so an expired-but-refreshable session recovers.
   if (await isSignedInAs(addr)) return true
   if (await refreshToWalletClaim(addr)) return true
   return false
 }
 
-/**
- * Ensure a session exists for the connected wallet: sign in (SIWE) if needed,
- * then resolve the user row. This is the entry point called on wallet connect.
- *
- * Returns `{ session, user }` — `session=false` means the user declined or the
- * sign-in failed (caller should keep the app in read-only mode).
- */
 export async function ensureWalletSession(
   walletAddress: string,
   options: {
     signMessage: (args: { message: string }) => Promise<`0x${string}`>
     chainId?: number
     appName?: string
-    /**
-     * Explicit user intent (e.g. the navbar "Sign in" button). Skips the
-     * persisted-rejection short-circuit so a deliberate click always opens
-     * MetaMask instead of silently no-op'ing on a marker written by an
-     * earlier dismissed/failed attempt.
-     */
+    /** Explicit intent (navbar "Sign in"): bypass the persisted rejection. */
     force?: boolean
   }
 ): Promise<{ session: boolean; user: User | null }> {
   const addr = walletAddress.toLowerCase()
 
-  // Pre-claim sessions (minted before the wallet metadata backfill) can be
-  // repaired silently by exchanging the refresh token — avoids re-prompting
-  // the wallet on app reload for users whose token predates the fix.
   if (await refreshToWalletClaim(addr)) {
     return { session: true, user: await ensureUser(addr) }
   }
-
   if (await isSignedInAs(addr)) {
-    // Already signed in for this wallet — just resolve the row.
     return { session: true, user: await ensureUser(addr) }
   }
-
-  // Honor a previous rejection: if the user already declined the SIWE
-  // signature for this wallet, do not pop MetaMask again. The app stays
-  // read-only (the caller branches on `session: false` and the inline
-  // retry paths surface a "sign-in required" toast instead of a popup).
   if (!options.force && getSiweRejectedMarker(addr)) {
     return { session: false, user: await ensureUser(addr) }
   }
 
   try {
     await signInWithWallet(addr, options)
-    // Successful sign-in clears any prior rejection so disconnect + reconnect
-    // starts the user with a fresh prompt if they want it again.
     clearSiweRejectedMarker(addr)
     return { session: true, user: await ensureUser(addr) }
   } catch (err) {
-    // ANY failure path marks the wallet as "declined for now" so we don't
-    // pester the user with a fresh MetaMask popup on every page mount.
-    // Treating every sign-in failure as a soft decline matches the intended
-    // UX: "if they didn't sign once, don't keep asking". The SiweGate modal
-    // shows a 'Try again' CTA so the user can opt back in explicitly.
+    // Any failure marks a soft decline — don't re-prompt on every mount.
     setSiweRejectedMarker(addr)
     if (isEdgeFunctionRateLimited(err)) {
       console.warn(
@@ -2810,17 +1735,13 @@ export async function ensureWalletSession(
   }
 }
 
-/**
- * Inlined copy of `buildSiweChallenge` so this module stays importable
- * without leaking the `lib/siwe` import (which would cause a circular dep
- * with `@/lib/notifications`). Defined local-first.
- */
+// Inlined copy of lib/siwe's challenge builder to keep this module importable
+// without a circular dep through @/lib/notifications.
 function buildSiweChallengeLocal(
   address: `0x${string}`,
   options: { chainId?: number; appName?: string; nonce?: string } = {}
 ): { nonce: string; message: string; issuedAt: string } {
   const issuedAt = new Date().toISOString()
-  // Server-issued nonce when signing in; random fallback in dev.
   const nonce = options.nonce ?? localNonce()
   const appName = options.appName ?? "CofferNode"
   const chainLine =
@@ -2837,11 +1758,6 @@ function buildSiweChallengeLocal(
   return { nonce, message, issuedAt }
 }
 
-/**
- * Tiny in-file nonce generator. Pulled out of `lib/siwe` to keep that
- * module import-cycle-free. Same algorithm — `crypto.getRandomValues` if
- * available, deterministic base64url string.
- */
 function localNonce(bytes = 16): string {
   const arr = new Uint8Array(bytes)
   if (typeof crypto !== "undefined" && crypto.getRandomValues) {
@@ -2857,35 +1773,25 @@ function localNonce(bytes = 16): string {
 
 function clearSiweMarkersFor(address: string): void {
   if (typeof window === "undefined") return
-  window.localStorage.removeItem("coffernode:siwe:last")
+  window.localStorage.removeItem(SIWE_MARKER_KEY)
   clearSiweRejectedMarker(address)
 }
 
-/**
- * Sign out — clears the Supabase session + all caches + both SIWE
- * markers (success + rejection) for the currently connected wallet.
- */
 export async function signOut() {
   clearAllUserCache()
-  // Best-effort: if we have an address hint cached, clear its rejection
-  // marker too. signOut itself doesn't take an address, so we read the
-  // marker to figure out the wallet (or fall back to just clearing the
-  // success marker if no rejection was ever recorded).
+  // Clear only the active wallet's markers — never sweep other wallets'
+  // rejection flags, which would re-enable auto-prompting for them.
   if (typeof window !== "undefined") {
-    const last = window.localStorage.getItem("coffernode:siwe:last")
+    const last = window.localStorage.getItem(SIWE_MARKER_KEY)
     if (last) {
       try {
         const parsed = JSON.parse(last) as { address?: string }
         if (parsed.address) clearSiweMarkersFor(parsed.address.toLowerCase())
-        else window.localStorage.removeItem("coffernode:siwe:last")
+        else window.localStorage.removeItem(SIWE_MARKER_KEY)
       } catch {
-        window.localStorage.removeItem("coffernode:siwe:last")
+        window.localStorage.removeItem(SIWE_MARKER_KEY)
       }
     }
-    // NOTE: do NOT sweep every `coffernode:siwe:declined:*` key here. Signing
-    // out wallet A must not clear wallet B's rejection — that would re-enable
-    // auto-prompting for an unrelated wallet on this device. The active
-    // wallet's marker is cleared above via `clearSiweMarkersFor`.
   }
   const { error } = await supabase.auth.signOut()
   if (error) {
@@ -2894,12 +1800,11 @@ export async function signOut() {
   }
 }
 
-/**
- * Get current user session
- */
 async function getSession() {
   const {
     data: { session },
+    error,
   } = await supabase.auth.getSession()
+  if (error) console.warn("[getSession] session read failed:", error)
   return session
 }

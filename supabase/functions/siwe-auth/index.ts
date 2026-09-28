@@ -57,11 +57,29 @@ import {
 
 const INCORRECT_HOST_ERROR = "URI host is not allowed for this app"
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+// Browser origins allowed to call this endpoint. Mirrors the app's
+// ALLOWED_URI_HOSTS intent (coffernode.app / localhost / 127.0.0.1) at origin
+// granularity. The endpoint returns session tokens, so the origin is echoed
+// only for this allowlist — everyone else gets a response with no
+// Access-Control-Allow-Origin and the browser withholds it from JS.
+const ALLOWED_ORIGINS = new Set([
+  "https://coffernode.app",
+  "https://www.coffernode.app",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+])
+
+function corsHeaders(origin: string | null): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    Vary: "Origin",
+  }
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin
+  }
+  return headers
 }
 
 interface SignInRequest {
@@ -72,16 +90,24 @@ interface SignInRequest {
 }
 
 Deno.serve(async (req: Request) => {
+  const cors = corsHeaders(req.headers.get("Origin"))
+  // Stamp the origin-scoped CORS headers onto every response. Per-request
+  // local, so concurrent invocations can never see each other's origin.
+  const respond = (res: Response): Response => {
+    for (const [key, value] of Object.entries(cors)) res.headers.set(key, value)
+    return res
+  }
+
   if (req.method === "OPTIONS")
-    return new Response("ok", { headers: corsHeaders })
-  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405)
+    return new Response("ok", { headers: cors })
+  if (req.method !== "POST")
+    return respond(json({ error: "Method not allowed" }, 405))
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
   if (!supabaseUrl || !serviceRoleKey) {
-    return json(
-      { error: "Missing SUPABASE_URL / SERVICE_ROLE_KEY" },
-      500
+    return respond(
+      json({ error: "Missing SUPABASE_URL / SERVICE_ROLE_KEY" }, 500)
     )
   }
 
@@ -89,16 +115,16 @@ Deno.serve(async (req: Request) => {
   try {
     body = (await req.json()) as SignInRequest
   } catch {
-    return json({ error: "Invalid JSON body" }, 400)
+    return respond(json({ error: "Invalid JSON body" }, 400))
   }
 
   if (body.action === "nonce") {
-    return issueNonce(body.address, supabaseUrl, serviceRoleKey)
+    return respond(await issueNonce(body.address, supabaseUrl, serviceRoleKey))
   }
   if (body.action === "verify") {
-    return handleVerify(body, supabaseUrl, serviceRoleKey)
+    return respond(await handleVerify(body, supabaseUrl, serviceRoleKey))
   }
-  return json({ error: "Unknown action" }, 400)
+  return respond(json({ error: "Unknown action" }, 400))
 })
 
 // ---------------------------------------------------------------------------
@@ -491,10 +517,12 @@ async function exchangeMagiclinkSession(
   }
 }
 
+// CORS headers are applied by `respond` in Deno.serve, which knows the
+// per-request Origin; this helper only serializes the body.
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
   })
 }
 

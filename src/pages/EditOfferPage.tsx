@@ -28,10 +28,8 @@ import { useCurrentUser } from "@/hooks/useCurrentUser"
 import { currencySymbol, CURRENCY_SYMBOLS } from "@/lib/utils"
 import { LOCATIONS, locationToRegions, regionToLocation } from "@/lib/locations"
 
-// Standard unit-of-measure decimals per asset. offers.crypto_amount /
-// min/max_amount are NUMERIC(30,18) but stored in the asset's natural human
-// units (e.g. 0.5 ETH), so derived crypto quantities are rounded to the
-// token's standard precision before persisting / previewing.
+// Standard decimals per asset; DB amounts are stored in natural human units
+// (e.g. 0.5 ETH), so derived quantities round to the token precision.
 const TOKEN_DECIMALS: Record<string, number> = {
   // Mainnet deployment pins USDC (6 decimals) as the escrow token.
   USDC: 6,
@@ -54,8 +52,7 @@ interface OfferForm {
   type: "buy" | "sell"
   token: string
   fiatCurrency: string
-  // Strings so the controlled inputs can be cleared while editing; parsed with
-  // Number() at validation/submit time (see CreateOfferPage for the rationale).
+  // Strings so inputs can be cleared while editing; parsed at submit time.
   price: string
   minAmount: string
   maxAmount: string
@@ -80,25 +77,19 @@ export function EditOfferPage() {
     isError: offerError,
   } = useOffer(id)
   const [formData, setFormData] = useState<OfferForm | null>(null)
-  // Track WHICH offer id we hydrated from, not just a boolean: React Router
-  // reuses this component across `/offer/:id/edit` param changes, so a boolean
-  // would keep offer A's values while displaying/submitting offer B.
+  // Track which offer id hydrated the form; React Router reuses this component
+  // across `/offer/:id/edit` changes and a boolean would keep stale values.
   const [hydratedOfferId, setHydratedOfferId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Map the loaded offer row into the form shape. Fires once per offer load.
-  // Keeps the rest of the form code identical to CreateOfferPage.
+  // Map the loaded offer row into the form shape, once per offer load.
   useEffect(() => {
     if (!offer || hydratedOfferId === offer.id) return
-    // Reverse the region code → human label map so the dropdown opens with
-    // the same label the seller picked at create time. Empty array means
-    // "Global" (the default in the picker).
+    // Reverse-map the region code to the label the seller picked at create.
     const locationLabel = regionToLocation(offer.available_regions?.[0])
 
-    // Hydrate the form once from the loaded offer. This is the canonical
-    // "seed editable state from async data" pattern; the React Compiler lint
-    // flags the synchronous setState, but deriving the form during render is
-    // not viable here (the user then owns the fields).
+    // Seed editable state from async data; the user then owns the fields, so
+    // deriving during render isn't viable.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFormData({
       type: offer.type,
@@ -118,9 +109,8 @@ export function EditOfferPage() {
     setHydratedOfferId(offer.id)
   }, [offer, hydratedOfferId])
 
-  // Ownership check: only the seller may edit. The `useOffer` query no longer
-  // returns the seller's uid (ADR-015) — ownership is asserted via the opaque
-  // `public_handle`, which is unique per user and present on both sides.
+  // Only the seller may edit; ownership is asserted via `public_handle`
+  // because the offer payload no longer exposes the seller uid (ADR-015).
   const isOwner = useMemo(() => {
     if (!user || !offer) return false
     const meHandle = user.public_handle
@@ -128,11 +118,8 @@ export function EditOfferPage() {
     return !!meHandle && meHandle === sellerHandle
   }, [user, offer])
 
-  // Loading only while the offer fetch is in flight, or while a successfully
-  // fetched offer is being mapped into the form (one render). The old
-  // `|| !hydrated` guard never released when the query errored/returned null
-  // (the hydration effect bails at `!offer`), so a bad offer id spun forever
-  // and the not-found branch below was unreachable.
+  // Loading while the offer fetch is in flight, or while it maps into the form
+  // (one render).
   if (offerLoading || (!!offer && hydratedOfferId !== offer.id)) {
     return (
       <section className="flex items-center justify-center py-20 text-muted-foreground">
@@ -244,9 +231,8 @@ export function EditOfferPage() {
     setIsSubmitting(true)
 
     try {
-      // Same SIWE-on-demand pattern as CreateOfferPage. `updateOffer` is
-      // an upsert via the public Supabase client; RLS is permissive in dev
-      // but we still gate on the connected wallet.
+      // SIWE-on-demand as in CreateOfferPage; updateOffer is an upsert via the
+      // public client, gated on the connected wallet.
       let me = await ensureUser(user.wallet_address)
       if (!me && user.wallet_address) {
         toast.loading(t("editOffer.signingIn"), { id: "siwe-inline" })

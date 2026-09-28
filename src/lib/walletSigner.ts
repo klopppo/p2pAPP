@@ -4,20 +4,10 @@ import { config } from '@/wagmi'
 
 /**
  * Sign an SIWE challenge with the connected wallet, waiting out wagmi's
- * connector rehydration window.
- *
- * On page reload with a previously-connected wallet, `useAccount()` flips
- * `isConnected` instantly (from persisted state) while wagmi asynchronously
- * re-attaches the connector behind the scenes. Paying via the hook's
- * `signMessageAsync` inside that window hits a half-built connector and
- * throws `connection.connector.getChainId is not a function` (see
- * wevm/wagmi#4216, rainbow-me/rainbowkit#2063). Other triggers: the browser
- * wallet silently signing out, or a stale connection object.
- *
- * Instead of trusting render-time hook state, this re-checks LIVE connector
- * readiness via `getConnectorClient` at call time and retries the check for a
- * short window before signing — the same fix recommended by wagmi maintainers
- * for every "sign/write right after connect" path.
+ * connector rehydration window. On reload `isConnected` flips instantly from
+ * persisted state while the connector re-attaches async; signing inside that
+ * window throws `connection.connector.getChainId is not a function`
+ * (wevm/wagmi#4216). Re-check LIVE readiness at call time and retry for ~3s.
  */
 const READY_RETRIES = 20
 const READY_DELAY_MS = 150
@@ -29,13 +19,8 @@ async function waitForConnector(): Promise<void> {
       await getConnectorClient(config)
       return
     } catch (err) {
-      // Treat ANY failure as transient while wagmi rehydrates the connector:
-      // a half-built connector throws `...getChainId is not a function` (the
-      // original wevm/wagmi#4216 symptom), and a connector whose provider
-      // transport blips throws `Connection interrupted while trying to
-      // subscribe` (dropped provider WebSocket). Both recover inside this
-      // window (3s), so only give up once it is exhausted instead of failing
-      // the sign-in on the first blip.
+      // A half-built connector or a blipped provider transport both recover
+      // inside this window — only give up once it is exhausted.
       lastError = err
       await new Promise((resolve) => setTimeout(resolve, READY_DELAY_MS))
     }
@@ -43,11 +28,7 @@ async function waitForConnector(): Promise<void> {
   throw new Error('Wallet connector not ready', { cause: lastError })
 }
 
-export async function signWalletMessage({
-  message,
-}: {
-  message: string
-}): Promise<Hex> {
+export async function signWalletMessage({ message }: { message: string }): Promise<Hex> {
   await waitForConnector()
   return signMessage(config, { message })
 }

@@ -1,8 +1,5 @@
 import { useCallback, useSyncExternalStore } from 'react'
 
-/**
- * Subscribe to a CSS media query. SSR-safe (returns `false` on the server).
- */
 function useMediaQuery(query: string): boolean {
   const subscribe = useCallback(
     (onStoreChange: () => void) => {
@@ -12,9 +9,7 @@ function useMediaQuery(query: string): boolean {
     },
     [query],
   )
-
   const getSnapshot = useCallback(() => window.matchMedia(query).matches, [query])
-
   return useSyncExternalStore(subscribe, getSnapshot, () => false)
 }
 

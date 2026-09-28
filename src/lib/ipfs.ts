@@ -1,120 +1,65 @@
 /**
- * Dispute evidence upload helper.
- *
- * Audit history:
- *   - #4: replaced the browser-Helia node, which never pinned CIDs to the
- *     public network (so uploaded evidence never resolved via
- *     `https://ipfs.io/ipfs/<cid>`). Uploads now go to Supabase Storage via
- *     `uploadDisputeEvidenceFile` in `src/lib/supabase/index.ts`.
- *   - #8: `warmUpIpns` (renamed from `warmUpIpfs`) is now wired into
- *     `AppLayout` so the Supabase session is warm before the user hits the
- *     dispute form.
- *   - #9: `uploadToIpfs` runs each upload through `Promise.race` against an
- *     `AbortController` — 120s on a cold call, 30s after `warmUpIpns()` has
- *     flipped the warm flag. Aborts surface as a friendly
- *     `IpfsUploadTimeoutError` the callers catch and pass to `errorMessage`.
+ * Dispute evidence upload helper. Uploads go to Supabase Storage (not an IPFS
+ * node) via `uploadDisputeEvidenceFile`; the result's `cid` is the storage
+ * path, and signed URLs are minted at render time. Each upload races a timeout
+ * (120s cold, 30s after `warmUpIpns()`) and surfaces an
+ * `IpfsUploadTimeoutError` the callers map via `errorMessage`.
  */
-import { uploadDisputeEvidenceFile } from '@/lib/supabase'
-import { supabase } from '@/lib/supabase'
-
-// `disputeId` is captured by the upload helper; we keep `cidToBytes32` here
-// because the page (and `DisputeDetailPage`) both consume it. The
-// `ipfs://${cid}` encoding mirrors the contract test in
-// `contrats/test/klerosTests.t.sol:2413,2425,2464` — see the comment on
-// `cidToBytes32` below.
+import { supabase, uploadDisputeEvidenceFile } from '@/lib/supabase'
 import { keccak256, toBytes } from 'viem'
 
-/** Cold-path upload budget (first ever upload in this tab). */
 const UPLOAD_TIMEOUT_MS_FIRST = 120_000
-/** Warm-path upload budget (after `warmUpIpns()` has resolved). */
 const UPLOAD_TIMEOUT_MS_WARM = 30_000
 
-/** Module-scoped warm flag. Set by `warmUpIpns()`; read by `uploadToIpfs`. */
 let isWarm = false
-/** Single in-flight warmup — concurrent callers all await the same promise. */
 let warmPromise: Promise<void> | null = null
 
-/**
- * Pre-warm the Supabase session. Best-effort: a failure does not throw;
- * callers should `void` the returned promise.
- *
- * Today there's no expensive node to spin up (Supabase Storage uses a plain
- * HTTPS upload). We still flip the `isWarm` flag so subsequent uploads use
- * the shorter timeout and skip the cold-path latency budget.
- */
+/** Pre-warm the Supabase session (best-effort; callers should `void` it). */
 export function warmUpIpns(): Promise<void> {
   if (isWarm) return Promise.resolve()
   if (warmPromise) return warmPromise
   warmPromise = (async () => {
-    // Touch the Supabase client — a no-op fetch against the auth endpoint.
-    // If the session is broken we want to fail here (in the warm path),
-    // not on the first user-initiated upload. Errors don't throw — they
-    // just leave `isWarm = true` so the page still uses the shorter
-    // budget.
     try {
       const { error } = await supabase.auth.getSession()
-      if (error) {
-        console.warn('[warmUpIpns] session check failed:', error)
-      }
+      if (error) console.warn('[warmUpIpns] session check failed:', error)
     } catch (err) {
       console.warn('[warmUpIpns] session check threw:', err)
     } finally {
+      // Even on failure stay warm so uploads use the shorter budget.
       isWarm = true
     }
   })()
   return warmPromise
 }
 
-/**
- * Shape returned from `uploadToIpfs`. Mirrors the legacy Helia shape so the
- * DisputePage / DisputeDetailPage call sites don't need to change their
- * destructuring — but we no longer mint a signed URL at upload time.
- * `cid` is the storage path; signed URLs are minted at render time via
- * `getDisputeEvidenceSignedUrl(cid)` in `src/lib/supabase`.
- */
 interface IpfsUploadResult {
-  /** Storage path (`dispute-evidence/<disputeId>/<basename>-<ts>-<rand>.<ext>`).
-   *  Stored in `dispute_evidence.ipfs_cid` — the column was originally for
-   *  an IPFS CID; the name is kept for back-compat with existing rows. */
+  /** Storage path, stored in `dispute_evidence.ipfs_cid` (name kept for back-compat). */
   cid: string
-  /** Raw file size in bytes. */
   size: number
-  /** Display name (File's name when present). */
   name: string
-  /** keccak256(fileBytes) — file_hash for `dispute_evidence.keccak_bytes32`.
-   *  Distinct from the on-chain URI bytes32 (see `cidToBytes32`). */
+  /** keccak256(fileBytes) for `dispute_evidence.keccak_bytes32`. */
   keccakBytes32: `0x${string}`
 }
 
-/** Thrown when the upload times out (cold or warm). Callers should map this
- *  to a localized toast via `errorMessage`. */
 class IpfsUploadTimeoutError extends Error {
   override name = 'IpfsUploadTimeoutError'
   readonly timeoutMs: number
   constructor(timeoutMs: number) {
-    super(
-      `Upload timed out after ${timeoutMs}ms — check your connection and try again.`,
-    )
+    super(`Upload timed out after ${timeoutMs}ms — check your connection and try again.`)
     this.timeoutMs = timeoutMs
   }
 }
 
 /**
- * Race `work` against a timeout. The actual `AbortController` is a thin
- * abstraction here because the Supabase Storage SDK doesn't accept an
- * `AbortSignal` on `.upload()` — once the timeout fires, the page sees a
- * `IpfsUploadTimeoutError` immediately even though the underlying HTTPS
- * request may keep running until Supabase cleans it up.
+ * Race `work` against a timeout. The Supabase Storage SDK can't take an
+ * AbortSignal, so the timeout only rejects the caller's promise.
  */
 async function withAbortTimeout<T>(work: Promise<T>, timeoutMs: number): Promise<T> {
   let reject!: (err: IpfsUploadTimeoutError) => void
   const timeoutPromise = new Promise<T>((_, rej) => {
     reject = rej
   })
-  const timer = setTimeout(
-    () => reject(new IpfsUploadTimeoutError(timeoutMs)),
-    timeoutMs,
-  )
+  const timer = setTimeout(() => reject(new IpfsUploadTimeoutError(timeoutMs)), timeoutMs)
   try {
     return await Promise.race([work, timeoutPromise])
   } finally {
@@ -123,13 +68,9 @@ async function withAbortTimeout<T>(work: Promise<T>, timeoutMs: number): Promise
 }
 
 /**
- * Upload a File to dispute evidence storage and return its storage path
- * (as `cid`) plus a signed URL the page can render.
- *
- * `disputeId` is mandatory — the Storage RLS predicate in
- * `migrations/20260824000007_storage_buckets.sql` keys on the leading UUID
- * in the object name, so a missing/empty `disputeId` would (a) produce a
- * path with no leading UUID and (b) be rejected by the RLS `with check`.
+ * Upload a File to dispute evidence storage.
+ * `disputeId` is mandatory — the Storage RLS predicate keys on the leading
+ * UUID in the object name.
  */
 export async function uploadToIpfs(
   file: File | Blob,
@@ -139,10 +80,7 @@ export async function uploadToIpfs(
   if (!disputeId) {
     throw new Error('uploadToIpfs: disputeId is required for evidence uploads')
   }
-  // Cast Blob to File so the helper's MIME-type fallback works. Most
-  // call sites already pass a File from <input type="file">.
   const f = file instanceof File ? file : new File([file], name, { type: file.type })
-
   const timeoutMs = isWarm ? UPLOAD_TIMEOUT_MS_WARM : UPLOAD_TIMEOUT_MS_FIRST
 
   let result: Awaited<ReturnType<typeof uploadDisputeEvidenceFile>>
@@ -157,38 +95,17 @@ export async function uploadToIpfs(
     throw err
   }
 
-  return {
-    cid: result.path,
-    size: result.size,
-    name: result.name,
-    keccakBytes32: result.keccakBytes32,
-  }
+  return { cid: result.path, size: result.size, name: result.name, keccakBytes32: result.keccakBytes32 }
 }
 
 /**
- * Convert an evidence storage path (the value we store in
- * `dispute_evidence.ipfs_cid`) to the bytes32 that
- * `KlerosEsc.submitEvidence(bytes32)` accepts on-chain.
- *
- * Encodes `ipfs://${cid}` (with the URI scheme prefix) before keccak256,
- * matching the contract test in `contrats/test/klerosTests.t.sol:2413,
- * 2425, 2464`:
- *
- *   bytes32 URI = keccak256("ipfs://evidence/buyer");
- *
- * The contract doesn't validate the URI format — it just emits whatever
- * bytes32 is passed — but the off-chain Kleros UI and our own audit trail
- * both key on this encoding, so we keep the prefix consistent.
- *
- * IMPORTANT: this is NOT the same value as `dispute_evidence.keccak_bytes32`,
- * which holds the file-content hash (`keccak256(fileBytes)`) for off-chain
- * integrity checks. See `uploadDisputeEvidenceFile` in `src/lib/supabase`.
+ * Convert an evidence storage path to the bytes32 `submitEvidence(bytes32)`
+ * accepts: keccak256("ipfs://" + cid), matching the contract tests.
+ * NOT the same as `dispute_evidence.keccak_bytes32` (the file-content hash).
  */
 export function cidToBytes32(cid: string): `0x${string}` {
-  // Shape validation: reject empty/whitespace/oversized/control-character
-  // inputs before hashing. keccak256 of an empty string is a valid hash
-  // but a meaningless one — the resulting on-chain URI bytes32 would not
-  // match any real evidence row and would silently corrupt the audit trail.
+  // Reject empty / oversized / control-character / non-printable inputs before
+  // hashing — a meaningless URI would silently corrupt the audit trail.
   if (typeof cid !== 'string') {
     throw new TypeError('cidToBytes32: cid must be a string')
   }
@@ -196,25 +113,15 @@ export function cidToBytes32(cid: string): `0x${string}` {
   if (trimmed.length === 0) {
     throw new Error('cidToBytes32: cid must be a non-empty string')
   }
-  // 256 char cap is well above any realistic storage path or CID and
-  // protects against runaway inputs.
   if (trimmed.length > 256) {
-    throw new Error(
-      `cidToBytes32: cid is too long (${trimmed.length} chars, max 256)`,
-    )
+    throw new Error(`cidToBytes32: cid is too long (${trimmed.length} chars, max 256)`)
   }
-  // Reject control characters (incl. newlines / NULs) — they would corrupt
-  // the on-chain log and the Supabase object-name column. Allow standard
-  // printable ASCII plus the CID/storage-path alphabet (digits, letters,
-  // '-', '_', '.', '/', ':', '+').
   // eslint-disable-next-line no-control-regex
   if (/[\x00-\x1f\x7f]/.test(trimmed)) {
     throw new Error('cidToBytes32: cid contains control characters')
   }
   if (!/^[A-Za-z0-9._/:+-]+$/.test(trimmed)) {
-    throw new Error(
-      `cidToBytes32: cid contains disallowed characters (got "${trimmed}")`,
-    )
+    throw new Error(`cidToBytes32: cid contains disallowed characters (got "${trimmed}")`)
   }
   return keccak256(toBytes(`ipfs://${trimmed}`))
 }

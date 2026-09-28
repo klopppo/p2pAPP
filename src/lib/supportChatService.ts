@@ -38,11 +38,37 @@ export interface SupportThread {
 const STORAGE_THREADS_KEY = 'coffernode_support_threads_v1'
 const STORAGE_MESSAGES_KEY = 'coffernode_support_messages_v1'
 const EVENT_NAME = 'coffernode_support_chat_update'
+const CHANNEL_NAME = 'coffernode_support_channel'
+const TEAM_SENDER_ID = '00000000-0000-0000-0000-000000000000'
 
 export const OUR_TEAM_WELCOME_TEXT =
-  "👋 Welcome to CofferNode! You can contact us from here for any " +
-  "issues, questions, or support requests — our operator team will reply " +
-  "directly in this chat. For live community support, you can also join our Discord."
+  "👋 Welcome to CofferNode! You can contact us from here for any issues, questions, or support requests — our operator team will reply directly in this chat. For live community support, you can also join our Discord."
+
+const ago = (min: number) => new Date(Date.now() - 1000 * 60 * min).toISOString()
+
+const seedMsg = (
+  id: string,
+  thread_id: string,
+  user_id: string,
+  user_wallet: string,
+  sender_type: SupportSenderType,
+  sender_id: string,
+  sender_name: string,
+  body: string,
+  minutesAgo: number,
+  extra: Partial<SupportMessage> = {},
+): SupportMessage => ({
+  id,
+  thread_id,
+  user_id,
+  user_wallet,
+  sender_type,
+  sender_id,
+  sender_name,
+  body,
+  created_at: ago(minutesAgo),
+  ...extra,
+})
 
 const SEED_THREADS: SupportThread[] = [
   {
@@ -51,10 +77,10 @@ const SEED_THREADS: SupportThread[] = [
     user_wallet: '0x71C...89A1',
     user_nickname: 'CryptoTrader99',
     status: 'OPEN',
-    created_at: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    updated_at: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
+    created_at: ago(45),
+    updated_at: ago(10),
     last_message: 'Salve, quanto tempo richiede solitamente lo sblocco dell’escrow se la controparte non risponde?',
-    last_message_at: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
+    last_message_at: ago(10),
     last_sender_type: 'user',
     unread_for_operator: 1,
     unread_for_user: 0,
@@ -65,10 +91,10 @@ const SEED_THREADS: SupportThread[] = [
     user_wallet: '0x34B...44D2',
     user_nickname: 'Marco_DeFi',
     status: 'IN_PROGRESS',
-    created_at: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-    updated_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+    created_at: ago(180),
+    updated_at: ago(30),
     last_message: 'Perfetto, grazie Elena per aver verificato la transazione.',
-    last_message_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+    last_message_at: ago(30),
     last_sender_type: 'user',
     unread_for_operator: 0,
     unread_for_user: 0,
@@ -78,73 +104,12 @@ const SEED_THREADS: SupportThread[] = [
 ]
 
 const SEED_MESSAGES: SupportMessage[] = [
-  {
-    id: 'msg-demo-1-welcome',
-    thread_id: 'thread-demo-01',
-    user_id: '20000000-0000-0000-0000-000000000001',
-    user_wallet: '0x71C...89A1',
-    sender_type: 'system',
-    sender_id: '00000000-0000-0000-0000-000000000000',
-    sender_name: 'ourTeam',
-    body: OUR_TEAM_WELCOME_TEXT,
-    created_at: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-  },
-  {
-    id: 'msg-demo-1-user',
-    thread_id: 'thread-demo-01',
-    user_id: '20000000-0000-0000-0000-000000000001',
-    user_wallet: '0x71C...89A1',
-    sender_type: 'user',
-    sender_id: '20000000-0000-0000-0000-000000000001',
-    sender_name: 'CryptoTrader99',
-    body: 'Salve, quanto tempo richiede solitamente lo sblocco dell’escrow se la controparte non risponde?',
-    created_at: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
-  },
-  {
-    id: 'msg-demo-2-welcome',
-    thread_id: 'thread-demo-02',
-    user_id: '20000000-0000-0000-0000-000000000002',
-    user_wallet: '0x34B...44D2',
-    sender_type: 'system',
-    sender_id: '00000000-0000-0000-0000-000000000000',
-    sender_name: 'ourTeam',
-    body: OUR_TEAM_WELCOME_TEXT,
-    created_at: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-  },
-  {
-    id: 'msg-demo-2-user-1',
-    thread_id: 'thread-demo-02',
-    user_id: '20000000-0000-0000-0000-000000000002',
-    user_wallet: '0x34B...44D2',
-    sender_type: 'user',
-    sender_id: '20000000-0000-0000-0000-000000000002',
-    sender_name: 'Marco_DeFi',
-    body: 'Buongiorno, ho un dubbio sulla percentuale di fee per i trade USDT.',
-    created_at: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-  },
-  {
-    id: 'msg-demo-2-op-1',
-    thread_id: 'thread-demo-02',
-    user_id: '20000000-0000-0000-0000-000000000002',
-    user_wallet: '0x34B...44D2',
-    sender_type: 'operator',
-    sender_id: '10000000-0000-0000-0000-000000000003',
-    sender_name: 'ourTeam (Elena Bianchi)',
-    sender_role: 'Support Specialist',
-    body: 'Ciao Marco! Le fee del protocollo sono dello 0.5% e vengono calcolate automaticamente dal contratto KlerosEscrow al momento del lock.',
-    created_at: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-  },
-  {
-    id: 'msg-demo-2-user-2',
-    thread_id: 'thread-demo-02',
-    user_id: '20000000-0000-0000-0000-000000000002',
-    user_wallet: '0x34B...44D2',
-    sender_type: 'user',
-    sender_id: '20000000-0000-0000-0000-000000000002',
-    sender_name: 'Marco_DeFi',
-    body: 'Perfetto, grazie Elena per aver verificato la transazione.',
-    created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-  },
+  seedMsg('msg-demo-1-welcome', 'thread-demo-01', '20000000-0000-0000-0000-000000000001', '0x71C...89A1', 'system', TEAM_SENDER_ID, 'ourTeam', OUR_TEAM_WELCOME_TEXT, 45),
+  seedMsg('msg-demo-1-user', 'thread-demo-01', '20000000-0000-0000-0000-000000000001', '0x71C...89A1', 'user', '20000000-0000-0000-0000-000000000001', 'CryptoTrader99', 'Salve, quanto tempo richiede solitamente lo sblocco dell’escrow se la controparte non risponde?', 10),
+  seedMsg('msg-demo-2-welcome', 'thread-demo-02', '20000000-0000-0000-0000-000000000002', '0x34B...44D2', 'system', TEAM_SENDER_ID, 'ourTeam', OUR_TEAM_WELCOME_TEXT, 180),
+  seedMsg('msg-demo-2-user-1', 'thread-demo-02', '20000000-0000-0000-0000-000000000002', '0x34B...44D2', 'user', '20000000-0000-0000-0000-000000000002', 'Marco_DeFi', 'Buongiorno, ho un dubbio sulla percentuale di fee per i trade USDT.', 120),
+  seedMsg('msg-demo-2-op-1', 'thread-demo-02', '20000000-0000-0000-0000-000000000002', '0x34B...44D2', 'operator', '10000000-0000-0000-0000-000000000003', 'ourTeam (Elena Bianchi)', 'Ciao Marco! Le fee del protocollo sono dello 0.5% e vengono calcolate automaticamente dal contratto KlerosEscrow al momento del lock.', 60, { sender_role: 'Support Specialist' }),
+  seedMsg('msg-demo-2-user-2', 'thread-demo-02', '20000000-0000-0000-0000-000000000002', '0x34B...44D2', 'user', '20000000-0000-0000-0000-000000000002', 'Marco_DeFi', 'Perfetto, grazie Elena per aver verificato la transazione.', 30),
 ]
 
 let IN_MEMORY_THREADS: SupportThread[] = [...SEED_THREADS]
@@ -153,32 +118,28 @@ let isHydrated = false
 
 function hydrateFromStorage(): void {
   if (isHydrated) return
-  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
-    isHydrated = true
-    return
-  }
+  isHydrated = true
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return
   try {
     const rawT = localStorage.getItem(STORAGE_THREADS_KEY)
-    if (rawT) {
-      IN_MEMORY_THREADS = JSON.parse(rawT) as SupportThread[]
-    } else {
-      localStorage.setItem(STORAGE_THREADS_KEY, JSON.stringify(IN_MEMORY_THREADS))
-    }
+    if (rawT) IN_MEMORY_THREADS = JSON.parse(rawT) as SupportThread[]
+    else localStorage.setItem(STORAGE_THREADS_KEY, JSON.stringify(IN_MEMORY_THREADS))
     const rawM = localStorage.getItem(STORAGE_MESSAGES_KEY)
-    if (rawM) {
-      IN_MEMORY_MESSAGES = JSON.parse(rawM) as SupportMessage[]
-    } else {
-      localStorage.setItem(STORAGE_MESSAGES_KEY, JSON.stringify(IN_MEMORY_MESSAGES))
-    }
+    if (rawM) IN_MEMORY_MESSAGES = JSON.parse(rawM) as SupportMessage[]
+    else localStorage.setItem(STORAGE_MESSAGES_KEY, JSON.stringify(IN_MEMORY_MESSAGES))
   } catch {
     // ignore
   }
-  isHydrated = true
 }
 
 function getStoredThreads(): SupportThread[] {
   hydrateFromStorage()
   return IN_MEMORY_THREADS
+}
+
+function getStoredMessages(): SupportMessage[] {
+  hydrateFromStorage()
+  return IN_MEMORY_MESSAGES
 }
 
 function persist(key: string, value: unknown): void {
@@ -192,14 +153,21 @@ function persist(key: string, value: unknown): void {
   notifyUpdate()
 }
 
+function notifyUpdate() {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(EVENT_NAME))
+  try {
+    const channel = new BroadcastChannel(CHANNEL_NAME)
+    channel.postMessage({ type: 'UPDATE', timestamp: Date.now() })
+    channel.close()
+  } catch {
+    // BroadcastChannel optional
+  }
+}
+
 function setStoredThreads(threads: SupportThread[]): void {
   IN_MEMORY_THREADS = threads
   persist(STORAGE_THREADS_KEY, threads)
-}
-
-function getStoredMessages(): SupportMessage[] {
-  hydrateFromStorage()
-  return IN_MEMORY_MESSAGES
 }
 
 function setStoredMessages(messages: SupportMessage[]): void {
@@ -217,48 +185,26 @@ function makeWelcomeMessage(
     user_id: user.id,
     user_wallet: user.wallet_address || '0x...',
     sender_type: 'system',
-    sender_id: '00000000-0000-0000-0000-000000000000',
+    sender_id: TEAM_SENDER_ID,
     sender_name: 'ourTeam',
     body: OUR_TEAM_WELCOME_TEXT,
     created_at: thread.created_at || new Date().toISOString(),
   }
 }
 
-function notifyUpdate() {
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent(EVENT_NAME))
-    try {
-      const channel = new BroadcastChannel('coffernode_support_channel')
-      channel.postMessage({ type: 'UPDATE', timestamp: Date.now() })
-      channel.close()
-    } catch {
-      // BroadcastChannel optional
-    }
-  }
-}
-
-/**
- * Normalise thread id for a given user.
- */
-function getUserThreadId(userId: string): string {
-  return `thread-user-${userId}`
-}
-
-/**
- * Get or create the support thread for the active user.
- */
+/** Get (or create) the active user's support thread. */
 function getOrCreateUserThread(user: {
   id: string
   wallet_address?: string | null
   nickname?: string | null
 }): SupportThread {
   const threads = getStoredThreads()
-  const threadId = getUserThreadId(user.id)
+  const threadId = `thread-user-${user.id}`
   let found = threads.find((t) => t.id === threadId || t.user_id === user.id)
 
   if (!found) {
     const now = new Date().toISOString()
-    found = {
+    const created: SupportThread = {
       id: threadId,
       user_id: user.id,
       user_wallet: user.wallet_address || '0x...',
@@ -272,22 +218,19 @@ function getOrCreateUserThread(user: {
       unread_for_operator: 0,
       unread_for_user: 0,
     }
-    const nextThreads = [found, ...threads]
-    setStoredThreads(nextThreads)
+    found = created
+    setStoredThreads([created, ...threads])
 
-    // Also seed the initial welcome message for this thread if absent
     const messages = getStoredMessages()
-    if (!messages.some((m) => m.thread_id === found!.id)) {
-      setStoredMessages([...messages, makeWelcomeMessage(user, { id: found.id, created_at: now })])
+    if (!messages.some((m) => m.thread_id === created.id)) {
+      setStoredMessages([...messages, makeWelcomeMessage(user, { id: created.id, created_at: now })])
     }
   }
 
   return found
 }
 
-/**
- * Returns all messages in the ourTeam support thread for the given user.
- */
+/** All messages in the ourTeam support thread for the given user. */
 export function getOurTeamMessagesForUser(user: {
   id: string
   wallet_address?: string | null
@@ -295,32 +238,20 @@ export function getOurTeamMessagesForUser(user: {
 }): SupportMessage[] {
   const thread = getOrCreateUserThread(user)
   const allMessages = getStoredMessages()
-  const threadMessages = allMessages.filter(
-    (m) => m.thread_id === thread.id || m.user_id === user.id
-  )
+  const threadMessages = allMessages.filter((m) => m.thread_id === thread.id || m.user_id === user.id)
 
-  // Ensure at least welcome message exists
   if (threadMessages.length === 0) {
     const welcomeMsg = makeWelcomeMessage(user, thread)
     setStoredMessages([...allMessages, welcomeMsg])
     return [welcomeMsg]
   }
 
-  return threadMessages.sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  )
+  return threadMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 }
 
-/**
- * User sends a message to ourTeam support.
- */
+/** User sends a message to ourTeam support. */
 export async function sendUserOurTeamMessage(
-  user: {
-    id: string
-    wallet_address?: string | null
-    nickname?: string | null
-    avatar_url?: string | null
-  },
+  user: { id: string; wallet_address?: string | null; nickname?: string | null; avatar_url?: string | null },
   body: string
 ): Promise<SupportMessage> {
   const cleanBody = body.trim()
@@ -340,35 +271,28 @@ export async function sendUserOurTeamMessage(
     body: cleanBody,
     created_at: now,
   }
+  setStoredMessages([...getStoredMessages(), newMessage])
 
-  // Update messages
-  const messages = getStoredMessages()
-  setStoredMessages([...messages, newMessage])
-
-  // Update thread
-  const threads = getStoredThreads()
-  const updatedThreads = threads.map((t) => {
-    if (t.id === thread.id) {
-      return {
-        ...t,
-        status: t.status === 'RESOLVED' ? ('OPEN' as const) : t.status,
-        last_message: cleanBody,
-        last_message_at: now,
-        last_sender_type: 'user' as const,
-        updated_at: now,
-        unread_for_operator: (t.unread_for_operator || 0) + 1,
-      }
-    }
-    return t
-  })
-  setStoredThreads(updatedThreads)
+  setStoredThreads(
+    getStoredThreads().map((t) =>
+      t.id === thread.id
+        ? {
+            ...t,
+            status: t.status === 'RESOLVED' ? ('OPEN' as const) : t.status,
+            last_message: cleanBody,
+            last_message_at: now,
+            last_sender_type: 'user' as const,
+            updated_at: now,
+            unread_for_operator: (t.unread_for_operator || 0) + 1,
+          }
+        : t
+    )
+  )
 
   return newMessage
 }
 
-/**
- * Operator sends a reply to a user's support thread.
- */
+/** Operator replies to a user's support thread. */
 export async function sendOperatorOurTeamReply(
   threadId: string,
   operator: SysOperator,
@@ -382,10 +306,6 @@ export async function sendOperatorOurTeamReply(
   if (!thread) throw new Error(`Support thread ${threadId} not found`)
 
   const now = new Date().toISOString()
-  const senderName = operator.full_name
-    ? `ourTeam (${operator.full_name})`
-    : `ourTeam (${operator.username})`
-
   const newMessage: SupportMessage = {
     id: `msg-op-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     thread_id: thread.id,
@@ -393,36 +313,31 @@ export async function sendOperatorOurTeamReply(
     user_wallet: thread.user_wallet,
     sender_type: 'operator',
     sender_id: operator.id,
-    sender_name: senderName,
+    sender_name: operator.full_name ? `ourTeam (${operator.full_name})` : `ourTeam (${operator.username})`,
     sender_role: (operator.roles ?? [])[0] || 'Support Operator',
     body: cleanBody,
     created_at: now,
   }
+  setStoredMessages([...getStoredMessages(), newMessage])
 
-  // Save message
-  const messages = getStoredMessages()
-  setStoredMessages([...messages, newMessage])
+  setStoredThreads(
+    threads.map((t) =>
+      t.id === thread.id
+        ? {
+            ...t,
+            status: 'IN_PROGRESS' as const,
+            last_message: cleanBody,
+            last_message_at: now,
+            last_sender_type: 'operator' as const,
+            updated_at: now,
+            unread_for_user: (t.unread_for_user || 0) + 1,
+            assigned_operator_id: operator.id,
+            assigned_operator_name: operator.full_name || operator.username,
+          }
+        : t
+    )
+  )
 
-  // Update thread
-  const updatedThreads = threads.map((t) => {
-    if (t.id === thread.id) {
-      return {
-        ...t,
-        status: 'IN_PROGRESS' as const,
-        last_message: cleanBody,
-        last_message_at: now,
-        last_sender_type: 'operator' as const,
-        updated_at: now,
-        unread_for_user: (t.unread_for_user || 0) + 1,
-        assigned_operator_id: operator.id,
-        assigned_operator_name: operator.full_name || operator.username,
-      }
-    }
-    return t
-  })
-  setStoredThreads(updatedThreads)
-
-  // Audit log operator response
   try {
     await logUserActivity({
       operator_id: operator.id,
@@ -446,48 +361,38 @@ export async function sendOperatorOurTeamReply(
   return newMessage
 }
 
-/**
- * List all support threads for the operator portal.
- */
+/** All support threads, newest activity first (operator portal). */
 export function listSupportThreads(): SupportThread[] {
-  const threads = getStoredThreads()
-  return [...threads].sort(
+  return [...getStoredThreads()].sort(
     (a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
   )
 }
 
-/**
- * Get messages for a specific thread.
- */
+/** Messages for one thread, oldest first. */
 export function getThreadMessages(threadId: string): SupportMessage[] {
-  const messages = getStoredMessages()
-  return messages
+  return getStoredMessages()
     .filter((m) => m.thread_id === threadId)
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 }
 
-/**
- * Update support thread status.
- */
 export async function updateSupportThreadStatus(
   threadId: string,
   status: SupportThreadStatus,
   operator?: SysOperator
 ): Promise<void> {
-  const threads = getStoredThreads()
-  const updated = threads.map((t) => {
-    if (t.id === threadId) {
-      return {
-        ...t,
-        status,
-        updated_at: new Date().toISOString(),
-        assigned_operator_id: operator?.id || t.assigned_operator_id,
-        assigned_operator_name: operator?.full_name || operator?.username || t.assigned_operator_name,
-      }
-    }
-    return t
-  })
-  setStoredThreads(updated)
+  setStoredThreads(
+    getStoredThreads().map((t) =>
+      t.id === threadId
+        ? {
+            ...t,
+            status,
+            updated_at: new Date().toISOString(),
+            assigned_operator_id: operator?.id || t.assigned_operator_id,
+            assigned_operator_name: operator?.full_name || operator?.username || t.assigned_operator_name,
+          }
+        : t
+    )
+  )
 
   if (operator) {
     try {
@@ -499,10 +404,7 @@ export async function updateSupportThreadStatus(
         resource_type: 'support_thread',
         resource_id: threadId,
         status: 'SUCCESS',
-        metadata: {
-          new_status: status,
-          operator_username: operator.username,
-        },
+        metadata: { new_status: status, operator_username: operator.username },
       })
     } catch (err) {
       console.warn('[supportChatService] audit log failed:', err)
@@ -510,14 +412,10 @@ export async function updateSupportThreadStatus(
   }
 }
 
-/**
- * Mark thread as read by user.
- */
 export function markThreadReadByUser(userId: string): void {
-  const threads = getStoredThreads()
-  const threadId = getUserThreadId(userId)
+  const threadId = `thread-user-${userId}`
   let changed = false
-  const updated = threads.map((t) => {
+  const updated = getStoredThreads().map((t) => {
     if ((t.id === threadId || t.user_id === userId) && t.unread_for_user > 0) {
       changed = true
       return { ...t, unread_for_user: 0 }
@@ -527,13 +425,9 @@ export function markThreadReadByUser(userId: string): void {
   if (changed) setStoredThreads(updated)
 }
 
-/**
- * Mark thread as read by operator.
- */
 export function markThreadReadByOperator(threadId: string): void {
-  const threads = getStoredThreads()
   let changed = false
-  const updated = threads.map((t) => {
+  const updated = getStoredThreads().map((t) => {
     if (t.id === threadId && t.unread_for_operator > 0) {
       changed = true
       return { ...t, unread_for_operator: 0 }
@@ -543,18 +437,13 @@ export function markThreadReadByOperator(threadId: string): void {
   if (changed) setStoredThreads(updated)
 }
 
-/**
- * Returns latest preview and unread count for the ourTeam conversation item in sidebar.
- */
+/** Latest preview + unread count for the ourTeam sidebar item. */
 export function getOurTeamThreadPreview(userId: string): {
   last_message_preview: string
   last_message_at: string
   unread_count: number
 } {
-  const threads = getStoredThreads()
-  const threadId = getUserThreadId(userId)
-  const thread = threads.find((t) => t.id === threadId || t.user_id === userId)
-
+  const thread = getStoredThreads().find((t) => t.id === `thread-user-${userId}` || t.user_id === userId)
   if (thread) {
     return {
       last_message_preview: thread.last_message,
@@ -562,7 +451,6 @@ export function getOurTeamThreadPreview(userId: string): {
       unread_count: thread.unread_for_user || 0,
     }
   }
-
   return {
     last_message_preview: OUR_TEAM_WELCOME_TEXT.slice(0, 200),
     last_message_at: new Date().toISOString(),
@@ -570,23 +458,20 @@ export function getOurTeamThreadPreview(userId: string): {
   }
 }
 
-/**
- * Subscribe to support chat changes across tabs or inside the same tab.
- */
+/** Subscribe to support chat changes across tabs or inside the same tab. */
 export function subscribeSupportChat(callback: () => void): () => void {
   if (typeof window === 'undefined') return () => undefined
 
   const handler = () => callback()
+  const storageHandler = (e: StorageEvent) => {
+    if (e.key === STORAGE_THREADS_KEY || e.key === STORAGE_MESSAGES_KEY) callback()
+  }
   window.addEventListener(EVENT_NAME, handler)
-  window.addEventListener('storage', (e) => {
-    if (e.key === STORAGE_THREADS_KEY || e.key === STORAGE_MESSAGES_KEY) {
-      callback()
-    }
-  })
+  window.addEventListener('storage', storageHandler)
 
   let channel: BroadcastChannel | null = null
   try {
-    channel = new BroadcastChannel('coffernode_support_channel')
+    channel = new BroadcastChannel(CHANNEL_NAME)
     channel.onmessage = () => callback()
   } catch {
     // ignore
@@ -594,6 +479,7 @@ export function subscribeSupportChat(callback: () => void): () => void {
 
   return () => {
     window.removeEventListener(EVENT_NAME, handler)
+    window.removeEventListener('storage', storageHandler)
     if (channel) channel.close()
   }
 }

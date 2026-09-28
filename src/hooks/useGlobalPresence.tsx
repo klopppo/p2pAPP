@@ -1,28 +1,13 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from './useCurrentUser'
 import type { User } from '@/types/database'
 
 /**
- * App-wide presence channel. Every mounted `/app` page joins
- * `presence:coffernode:global` and tracks the connected wallet's user row,
- * so "online" means "connected to the app with a wallet right now" — not
- * "last_active_at was ever non-null" (the old profile badge) and not "is
- * actively viewing THIS conversation" (the old per-conversation presence,
- * which left the chat green dot gray whenever the partner browsed
- * elsewhere).
- *
- * Consumers read a live `Set<userId>` of currently-online users via
- * `useGlobalPresence()`. Presence keys are the `public.users.id`, which is
- * what `ConversationView.participants[].user_id` / `profile.id` use, so the
- * two line up without joins.
+ * App-wide presence: every mounted `/app` page joins
+ * `presence:coffernode:global` and tracks the connected user, so "online"
+ * means connected to the app right now. Keys are `public.users.id`.
  */
 const OnlineUsersContext = createContext<ReadonlySet<string>>(new Set())
 
@@ -38,19 +23,16 @@ interface PresenceUser {
 
 export function GlobalPresenceProvider({ children }: { children: ReactNode }) {
   const { data: user } = useCurrentUser()
-  // Remount on identity change so the online set resets without a
-  // synchronous setState in an effect — and so switching/logging out of a
-  // wallet never inherits the previous user's state.
-  return <GlobalPresenceInner key={user?.id ?? 'anon'} user={user}>{children}</GlobalPresenceInner>
+  // Remount on identity change so the online set resets and switching/logging
+  // out never inherits the previous user's state.
+  return (
+    <GlobalPresenceInner key={user?.id ?? 'anon'} user={user}>
+      {children}
+    </GlobalPresenceInner>
+  )
 }
 
-function GlobalPresenceInner({
-  user,
-  children,
-}: {
-  user: User | null | undefined
-  children: ReactNode
-}) {
+function GlobalPresenceInner({ user, children }: { user: User | null | undefined; children: ReactNode }) {
   const [online, setOnline] = useState<ReadonlySet<string>>(new Set())
 
   useEffect(() => {
@@ -58,15 +40,14 @@ function GlobalPresenceInner({
     const nickname = user?.nickname ?? null
     if (!id) return
 
-    // Broadcast/presence topic — must keep a shared bare name across
-    // clients (uniqueRealtimeTopic() is only for postgres_changes).
+    // Presence topics keep a shared bare name across clients (unlike
+    // postgres_changes, which uses uniqueRealtimeTopic()).
     const channel: RealtimeChannel = supabase.channel('presence:coffernode:global', {
       config: { presence: { key: id } },
     })
 
-    // Re-baseline from the full presence state. Never subtract per-user on
-    // `leave`: a wallet open in two tabs tracks two entries under the same
-    // key, so closing one tab must NOT flip them offline.
+    // Re-baseline from the full state — two tabs share one key, so a single
+    // `leave` must not flip the user offline.
     const sync = () => {
       const state = channel.presenceState<PresenceUser>()
       const ids = new Set<string>()
@@ -84,11 +65,7 @@ function GlobalPresenceInner({
       .on('presence', { event: 'leave' }, sync)
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          await channel.track({
-            user_id: id,
-            nickname,
-            online_at: new Date().toISOString(),
-          })
+          await channel.track({ user_id: id, nickname, online_at: new Date().toISOString() })
         }
       })
 

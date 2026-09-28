@@ -32,14 +32,7 @@ export function WalletConnectButton() {
   const { t } = useTranslation()
   const [signingIn, setSigningIn] = useState(false)
 
-  /**
-   * One CTA, two jobs:
-   *   - no wallet        → open the RainbowKit picker
-   *   - wallet connected → run SIWE for the already-connected wallet. Without
-   *     this the label said "Sign in" but clicking opened a connect modal that
-   *     could never complete the missing session (the wallet was already
-   *     connected), leaving the user stuck on empty chats.
-   */
+  /** No wallet → open the picker; connected wallet → run SIWE for it. */
   const handleConnectOrSign = async () => {
     if (!isConnected || !address) {
       openConnectModal?.()
@@ -56,9 +49,8 @@ export function WalletConnectButton() {
         signMessage: signWalletMessage,
         force: true,
       })
-      // `ensureWalletSession` resolves even on failure (returns
-      // `session: false`); it never rejects. Treat a non-session as an error
-      // so the user isn't left with a silently-stopped spinner.
+      // Resolves with `session: false` instead of rejecting; surface it so the
+      // user isn't left with a silently-stopped spinner.
       if (!session) {
         toast.error(t('signInPrompt.failed', {
           defaultValue: 'Sign-in was not completed. Please try again.',
@@ -85,9 +77,7 @@ export function WalletConnectButton() {
   const copyAddress = async () => {
     if (!address) return
     try {
-      // Async Clipboard API requires a secure context (HTTPS) and isn't
-      // available in every browser, so fall back to execCommand for the
-      // non-secure / older-browser cases.
+      // Async Clipboard API needs a secure context; execCommand covers the rest.
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(address)
       } else {
@@ -169,11 +159,8 @@ export function WalletConnectButton() {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={async () => {
-            // Clear the SIWE markers (success + rejection for this wallet)
-            // synchronously, before disconnecting. signOut's own marker
-            // cleanup also runs from useSyncUser's effect, but doing it here
-            // means there's no race window where the prompt could re-trigger
-            // on the next connect.
+            // Clear SIWE markers before disconnecting so the prompt can't
+            // re-trigger on the next connect.
             try {
               await signOut()
             } catch {

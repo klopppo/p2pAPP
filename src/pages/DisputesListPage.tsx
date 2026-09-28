@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { shortTradeId } from '@/lib/utils'
+import { formatDate } from '@/lib/uiFormat'
 import { ShieldAlert, Loader2, Inbox, Plus, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -40,15 +41,6 @@ function statusLabelKey(status: DisputeStatusValue): string {
     closed: 'disputes.statusClosed',
   }
   return map[status]
-}
-
-function formatDate(iso: string | null | undefined) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
 }
 
 /**

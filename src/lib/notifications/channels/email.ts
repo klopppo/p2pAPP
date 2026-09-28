@@ -3,33 +3,16 @@ import { supabase } from '@/lib/supabase'
 import { renderNotificationSubject } from '..'
 
 /**
- * Email channel.
- *
- * Sends via a Supabase Edge Function called `send-email`. The function is
- * intentionally NOT bundled here — it lives under `supabase/functions/`
- * and can use any provider (Resend, SendGrid, SES, etc.). The body contract
- * is lean for a reason — see docs/security-audit.md §6:
- *
- *   { user_id: string; subject: string; text: string }
- *
- * The recipient is RESOLVED SERVER-SIDE by the edge function from the user's
- * `notification_preferences` row. The client never sends an address (that
- * was the open relay). `html` is unsupported — text only.
- *
- * `to` is used only as a local hint: when the dispatcher's snapshot says the
- * user has no email contact on file we skip the network call entirely. When a
- * contact exists we still let the edge function resolve authoritatively.
- *
- * If the edge function isn't deployed yet (dev environments) we silently
- * log the email locally so QA still gets feedback.
+ * Email channel via the `send-email` edge function. The recipient is resolved
+ * SERVER-SIDE from `notification_preferences` — the client never sends an
+ * address. `to` is only a local hint to skip the call when no contact exists.
+ * If the function isn't deployed (dev), the send is silently skipped.
  */
 export async function sendEmail(notification: Notification, to: string | null) {
   if (!to) return
 
   const subject = renderNotificationSubject(notification)
-  const text = `${notification.title}\n\n${notification.body}\n\nOpen: ${appUrl(
-    notification
-  )}`
+  const text = `${notification.title}\n\n${notification.body}\n\nOpen: ${appUrl(notification)}`
 
   try {
     const { error } = await supabase.functions.invoke('send-email', {
@@ -37,10 +20,9 @@ export async function sendEmail(notification: Notification, to: string | null) {
     })
     if (error) throw error
   } catch {
-    // Edge function unavailable — silently skip in production.
+    // Edge function unavailable — silently skip.
   }
 }
-
 
 function appUrl(n: Notification): string {
   const origin = typeof window !== 'undefined' ? window.location.origin : ''

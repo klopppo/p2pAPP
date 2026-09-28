@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-export interface DropdownOption {
+interface DropdownOption {
   label: string
   value: string
   icon?: LucideIcon

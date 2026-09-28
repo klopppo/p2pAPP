@@ -21,26 +21,13 @@ interface Props {
   onViewChange: (view: ConversationView) => void
   /** Show the "Archived" row only when the user actually has archived chats. */
   hasArchived: boolean
-  /**
-   * The parent's `useConversations()` result for the current view. Owned by
-   * the parent so the realtime channel + polling observer are created once —
-   * calling the hook again here would mount a second subscription.
-   */
+  /** Owned by the parent so the realtime subscription is created only once. */
   conversations: ReturnType<typeof useConversations>
 }
 
 /**
- * The chat sidebar — full list of conversations the current user participates
- * in, sorted by last_message_at desc. Hidden on mobile when a conversation is
- * selected (the right pane takes over).
- *
- * An "Archived" row sits at the top of the active inbox; selecting it swaps
- * the list for the archive (chats whose trade reached a terminal state).
- * Direct chats started from a profile are never archived and stay in the
- * active inbox forever.
- *
- * The synthetic `ourTeam` virtual contact (welcome system thread) is only shown
- * in the active view — there's no DB row, just a static welcome.
+ * Chat sidebar: conversations sorted by last_message_at, with an Archived row
+ * (terminal-state trades only). The synthetic ourTeam thread shows in the active view only.
  */
 export function ConversationList({
   activeId,
@@ -77,10 +64,7 @@ export function ConversationList({
   }, [data, user, view, supportTick])
 
   return (
-    // Light mode's `--muted` is almost identical to its background, so the
-    // panel reads as a subtle surface. Dark mode's `--muted` is much lighter
-    // than its (near-black) background, so `/60` looks like a heavy gray slab —
-    // drop the opacity in dark to keep the same "barely there" panel as light.
+    // Dark mode gets lower opacity: --muted is much lighter than its background.
     <div className="w-full md:w-[380px] h-full flex-shrink-0 bg-muted/60 dark:bg-muted/25 backdrop-blur-sm flex flex-col min-h-0 overflow-hidden">
       <div className="p-4 shrink-0 flex items-center gap-2">
         {view === 'archived' && (

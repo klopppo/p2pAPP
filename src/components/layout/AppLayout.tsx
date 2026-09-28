@@ -15,15 +15,11 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const { pathname } = useLocation()
-  // The chat page is a fixed-height app surface: it owns the space between
-  // the navbar and the viewport bottom and scrolls its own panes, so the
-  // document itself must not scroll. Every other app page keeps the normal
-  // document flow (min-h-screen + footer).
+  // Chat owns the viewport height and scrolls its own panes, so the document
+  // must not scroll; every other page keeps normal flow (min-h-screen + footer).
   const isChat = pathname.startsWith('/app/messages')
-  // Audit #8: pre-warm the Supabase session so the first dispute evidence
-  // upload uses the shorter (warm-path) timeout. Schedule on idle so the
-  // warm-up doesn't block first paint; best-effort — failures here just
-  // leave the first upload on the cold-path 120s budget.
+  // Pre-warm the Supabase session on idle so the first dispute evidence upload
+  // uses the shorter warm-path timeout (best-effort).
   useEffect(() => {
     const trigger = () => {
       void warmUpIpns()

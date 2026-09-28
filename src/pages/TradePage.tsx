@@ -38,6 +38,7 @@ import {
 } from "@/lib/contracts"
 import { parseUnits } from "viem"
 import { errorMessage } from "@/lib/errorMessage"
+import { assertTxSuccess } from "@/lib/uiFormat"
 import { currencySymbol } from "@/lib/utils"
 import { REGION_NAMES } from "@/lib/locations"
 
@@ -56,11 +57,7 @@ export function TradePage() {
   const [depositRate, setDepositRate] = useState(
     String(Number(DEFAULT_SECURITY_DEPOSIT_BPS) / 100)
   )
-  // Grace period in HOURS (kept as a string so it can be cleared while
-  // editing). Converted to seconds for `createEscrow`.
-  // Grace period in HOURS. Prefilled from the offer's persisted value (the
-  // seller chose it at create/edit time); `gracePeriodInput` holds a user
-  // override so we don't need a setState-in-effect to seed it.
+  // Grace period in hours; prefilled from the offer, with a user override.
   const [gracePeriodInput, setGracePeriodInput] = useState<string | null>(null)
   const gracePeriod =
     gracePeriodInput ??
@@ -129,8 +126,7 @@ export function TradePage() {
     amountNum <= maxAmount
   const cryptoEstimate = amountValid && price > 0 ? amountNum / price : null
 
-  // Deposit rate in percent (0–15). On-chain it's bps; the contract accepts
-  // exactly 0 or ≥ MIN_SECURITY_DEPOSIT_BPS (1%).
+  // Percent (0–15); contract accepts exactly 0 or ≥ 1%.
   const depositRateNum = Number(depositRate)
   const depositValid =
     !Number.isNaN(depositRateNum) &&
@@ -140,9 +136,7 @@ export function TradePage() {
   const depositBps =
     depositRateNum === 0 ? 0n : BigInt(Math.round(depositRateNum * 100))
 
-  // Grace period: 1 hour … 365 days (KlerosEsc.MAX_GRACE_PERIOD). The value
-  // entered here is what `createEscrow` stores on the escrow — previously the
-  // page hardcoded a 7-day default regardless of any input.
+  // Bound by KlerosEsc.MAX_GRACE_PERIOD (365 days).
   const maxGraceHours = Number(MAX_GRACE_PERIOD_SECONDS) / 3600
   const gracePeriodNum = Number(gracePeriod)
   const gracePeriodValid =
@@ -195,18 +189,14 @@ export function TradePage() {
     try {
       const me = await ensureUser(address)
       if (!me) {
-        // Wallet is connected but no SIWE session was established — ask the
-        // user to sign back in before opening a trade.
+        // Connected wallet without a SIWE session — require sign-in first.
         toast.error(t("trade.errorConnectWallet"))
         setStage("idle")
         return
       }
 
-      // Resolve the real parties SERVER-SIDE (get_offer_trade_intent). The
-      // public offer payload no longer carries the seller's id/wallet
-      // (ADR-015) — the counterparty identity is revealed exclusively through
-      // this RPC, and only to a signed-in, non-seller caller. It also
-      // re-validates status/expiry and rejects self-trading.
+      // Counterparty identities come only from the server-side RPC (ADR-015),
+      // which re-validates status/expiry and rejects self-trading.
       let intent: OfferTradeIntent
       try {
         intent = await getOfferTradeIntent(offer.id)
@@ -242,14 +232,8 @@ export function TradePage() {
 
       const cryptoAmount = amountNum / price // human-units (e.g. 1.5 ETH)
 
-      // Read the escrow token + its decimals so the on-chain amount is exact.
-      // The factory pins a single token; the escrow holds tradeAmount in base
-      // units (wei-equivalent). Without this, amounts < 1 token were floored
-      // to 0 / integers and every trade under-collateralized the escrow.
-      //
-      // Also read the pinned treasury + Kleros court configuration in the
-      // same round-trip so the server-side indexer / Trade list has the
-      // immutable escrow fields without re-reading the chain per row (B-10).
+      // Read pinned token/treasury/Kleros config in one round-trip; base units
+      // keep sub-1-token amounts exact (they used to floor to 0).
       const factoryAddress = KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`
       const [
         tokenAddress,
@@ -291,10 +275,7 @@ export function TradePage() {
         `0x${string}`,
       ]
 
-// The factory refuses its treasury wallet as a trade party
-      // (`InvalidTreasury()` — the role is reserved for fees). Early deploys
-      // pin the deployer as treasury, so testing with that account reverts
-      // on-chain; catch it here with a clear message instead.
+      // The treasury wallet can't be a trade party (contract InvalidTreasury).
       const treasuryLc = treasuryAddress.toLowerCase()
       if (
         treasuryLc === buyerWallet.toLowerCase() ||
@@ -305,12 +286,8 @@ export function TradePage() {
         return
       }
 
-      // The factory pins ONE token (immutable at construction). The offer's
-      // `crypto_token` is a free-text symbol, so an offer denominated in
-      // anything else (USDT/ETH/…) would otherwise deploy an escrow in the
-      // pinned token while the trade row claims the offer's token — silently
-      // escrowing the wrong asset. Reject the mismatch when the on-chain
-      // symbol is readable.
+      // The factory pins ONE token; reject when the offer symbol differs so
+      // the escrow can't silently hold the wrong asset.
       try {
         const factorySymbol = (await publicClient.readContract({
           address: tokenAddress,
@@ -333,9 +310,9 @@ export function TradePage() {
           setStage("idle")
           return
         }
-      } catch {
-        // Non-standard ERC20 without symbol() — fall through; the factory's
-        // own token pinning still governs which asset is escrowed.
+      } catch (symbolErr) {
+        // Non-standard ERC20 without symbol() — factory pinning still governs.
+        console.warn("[TradePage] factory token symbol() read failed:", symbolErr)
       }
 
       const decimals = (await publicClient.readContract({
@@ -355,13 +332,8 @@ export function TradePage() {
         return
       }
 
-      // Pre-flight gas estimation: catch a REVERT before broadcasting. RPC
-      // providers cap raw-tx gas (Infura: 16,777,216); when estimateGas
-      // reverts, some wallets sign with a padded ~21M gas limit that the cap
-      // then rejects with the misleading "gas limit too high" error — masking
-      // the real cause. Estimating now surfaces the true reason and bounds
-      // the submitted gas so it can never trip the cap. Known trap: the
-      // factory refuses its treasury/owner wallet as a trade party.
+      // Pre-flight gas estimate: surface the real revert and bound gas below
+      // the RPC cap (wallets otherwise sign a padded 21M limit and trip it).
       let gas: bigint | undefined
       try {
         gas = await publicClient.estimateContractGas({
@@ -389,18 +361,11 @@ export function TradePage() {
         setStage("idle")
         return
       }
-      // 30% headroom above the true estimate, capped below Infura's 16.7M
-      // per-tx RPC ceiling (well above the ~1.5M that `createEscrow`
-      // actually consumes on Sepolia).
+      // 30% headroom; stays below Infura's 16.7M per-tx ceiling.
       const gasLimit = ((gas ?? 1_500_000n) * 130n) / 100n
 
-      // Deploy a KlerosEsc clone via the factory, honoring the seller's
-      // grace window from the offer (hours → seconds). Security deposit
-      // defaults to 10% (within KlerosEsc's MIN/MAX).
-      //
-      // The explicit `gas: gasLimit` prevents viem's auto-estimate fallback
-      // (which hits the 21M block gas limit and reverts with "transaction
-      // gas limit too high" on Infura's Sepolia endpoint).
+      // Deploy a KlerosEsc clone; explicit `gas` prevents viem's auto-estimate
+      // fallback from hitting Infura's "gas limit too high" ceiling.
       setStage("mining")
       const txHash = await writeContractAsync({
         address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
@@ -415,20 +380,14 @@ export function TradePage() {
         ],
         gas: gasLimit,
       })
-      // Bound the wait so a Sepolia RPC stall doesn't leave the form
-      // spinning at stage='mining' forever. Without this, a stalled RPC
-      // surfaces as a silent hang to the user until the toast fires much
-      // later (or never).
+      // Bounded wait so an RPC stall can't leave the form spinning forever.
       const receipt = await publicClient.waitForTransactionReceipt({
         hash: txHash,
         timeout: 90_000,
       })
-      // Decode the EscrowCreated event to extract the deployed clone address.
-      // Match by BOTH buyer and seller: under concurrent trade creation for the
-      // same wallet, the naive "first EscrowCreated in this receipt" or the
-      // `escrowCountByBuyer - 1` fallback can point at a clone that belongs to
-      // a DIFFERENT trade (the other tx may have mined first). The indexed
-      // buyer/seller topics are reliable identifiers, so verify them.
+      assertTxSuccess(receipt)
+      // Decode EscrowCreated and match BOTH buyer and seller — the naive
+      // "first event"/count fallback can pick a clone from a concurrent trade.
       const { decodeEventLog } = await import("viem")
       let deployedAddress: `0x${string}` | null = null
       const factoryAbi = KLEROS_ESCROW_FACTORY_ABI as Abi
@@ -462,8 +421,7 @@ export function TradePage() {
       }
 
       if (!deployedAddress) {
-        // Fallback: read the factory's clones map for the latest escrow
-        // registered to the buyer (cheaper than waiting for indexers).
+        // Fallback: latest clone registered to the buyer.
         const cloneCount = (await publicClient.readContract({
           address: KLEROS_ESCROW_FACTORY_ADDRESS as `0x${string}`,
           abi: KLEROS_ESCROW_FACTORY_ABI as Abi,
@@ -484,11 +442,8 @@ export function TradePage() {
         throw new Error(t("trade.errorFailedToDeploy"))
       }
 
-      // Persist the trade to Supabase with on-chain metadata. B-10: also write
-      //   - treasury_address (fee recipient; was always NULL before)
-      //   - creator (msg.sender of createEscrow)
-      //   - kleros_court_addr + extraData parts (so the indexer / trades list can
-      //     skip the on-chain multicall for these immutable per-escrow fields)
+      // Persist the trade plus immutable on-chain metadata (treasury, creator,
+      // Kleros court) so the trades list can skip the on-chain multicall.
       setStage("saving")
       const trade = await createTrade({
         offer_id: offer.id,
@@ -504,7 +459,6 @@ export function TradePage() {
         platform_fee_bps: Number(offer.platform_fee_bps) || 50,
         treasury_address: treasuryAddress,
         taker_role: isMakerBuyer ? "seller" : "buyer",
-        // The Trade type already has `escrow_contract_addr` (string | null).
         escrow_contract_addr: deployedAddress,
         creator: address,
         kleros_court_addr: klerosCourtAddr,

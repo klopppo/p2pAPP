@@ -3,6 +3,8 @@ import { logUserActivity } from '@/lib/auditLogger'
 import { getCurrentOperator, hasPermission } from '@/lib/operatorService'
 import type { UserReport, ReportCategory, ReportStatus } from '@/types/rbac'
 
+const ago = (min: number) => new Date(Date.now() - 1000 * 60 * min).toISOString()
+
 const IN_MEMORY_REPORTS: UserReport[] = [
   {
     id: 'rep-001',
@@ -13,8 +15,8 @@ const IN_MEMORY_REPORTS: UserReport[] = [
     evidence_urls: [],
     conversation_id: 'conv-03',
     status: 'PENDING',
-    created_at: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
-    updated_at: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
+    created_at: ago(90),
+    updated_at: ago(90),
   },
   {
     id: 'rep-002',
@@ -25,8 +27,8 @@ const IN_MEMORY_REPORTS: UserReport[] = [
     trade_id: 'tr-99824',
     conversation_id: 'conv-01',
     status: 'IN_REVIEW',
-    created_at: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-    updated_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+    created_at: ago(180),
+    updated_at: ago(30),
   },
   {
     id: 'rep-003',
@@ -37,9 +39,9 @@ const IN_MEMORY_REPORTS: UserReport[] = [
     status: 'RESOLVED',
     resolution_notes: 'Utente ammonito formalmente e messaggio offensivo rimosso.',
     resolved_by_operator_id: '10000000-0000-0000-0000-000000000001',
-    resolved_at: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
-    created_at: new Date(Date.now() - 1000 * 60 * 480).toISOString(),
-    updated_at: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
+    resolved_at: ago(360),
+    created_at: ago(480),
+    updated_at: ago(360),
   },
 ]
 
@@ -57,9 +59,6 @@ interface CreateReportParams {
   message_id?: string | null
 }
 
-/**
- * Invia una nuova segnalazione utente
- */
 export async function createUserReport(params: CreateReportParams): Promise<UserReport> {
   const newReport: UserReport = {
     id: `rep-${Date.now().toString().slice(-6)}`,
@@ -78,10 +77,8 @@ export async function createUserReport(params: CreateReportParams): Promise<User
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }
-
   IN_MEMORY_REPORTS.unshift(newReport)
 
-  // Logga l'azione di invio segnalazione
   await logUserActivity({
     wallet_address: params.reporter_wallet,
     user_id: params.reporter_user_id,
@@ -97,28 +94,30 @@ export async function createUserReport(params: CreateReportParams): Promise<User
     },
   })
 
-  // Salva su Supabase se disponibile
   try {
-    const { data, error } = await supabase.from('user_reports').insert({
-      reporter_user_id: newReport.reporter_user_id,
-      reporter_wallet: newReport.reporter_wallet,
-      reported_user_id: newReport.reported_user_id,
-      reported_wallet: newReport.reported_wallet,
-      category: newReport.category,
-      reason: newReport.reason,
-      evidence_urls: newReport.evidence_urls,
-      trade_id: newReport.trade_id,
-      dispute_id: newReport.dispute_id,
-      conversation_id: newReport.conversation_id,
-      message_id: newReport.message_id,
-      status: newReport.status,
-    }).select().maybeSingle()
-
-    if (!error && data) {
-      return data as UserReport
-    }
-  } catch {
-    // Ignora errori di rete
+    const { data, error } = await supabase
+      .from('user_reports')
+      .insert({
+        reporter_user_id: newReport.reporter_user_id,
+        reporter_wallet: newReport.reporter_wallet,
+        reported_user_id: newReport.reported_user_id,
+        reported_wallet: newReport.reported_wallet,
+        category: newReport.category,
+        reason: newReport.reason,
+        evidence_urls: newReport.evidence_urls,
+        trade_id: newReport.trade_id,
+        dispute_id: newReport.dispute_id,
+        conversation_id: newReport.conversation_id,
+        message_id: newReport.message_id,
+        status: newReport.status,
+      })
+      .select()
+      .maybeSingle()
+    if (error) console.warn('[reportsService] report insert failed, kept locally:', error)
+    else if (data) return data as UserReport
+  } catch (err) {
+    // Offline fallback — return the in-memory report.
+    console.warn('[reportsService] report insert threw, kept locally:', err)
   }
 
   return newReport
@@ -130,48 +129,30 @@ export interface ListReportsFilters {
   reported_wallet?: string
 }
 
-/**
- * Recupera l'elenco delle segnalazioni per gli operatori
- */
 export async function listUserReports(filters?: ListReportsFilters): Promise<UserReport[]> {
   try {
     let query = supabase.from('user_reports').select('*').order('created_at', { ascending: false })
-    if (filters?.status && filters.status !== 'all') {
-      query = query.eq('status', filters.status)
-    }
-    if (filters?.category && filters.category !== 'all') {
-      query = query.eq('category', filters.category)
-    }
-    if (filters?.reported_wallet) {
-      query = query.ilike('reported_wallet', `%${filters.reported_wallet}%`)
-    }
+    if (filters?.status && filters.status !== 'all') query = query.eq('status', filters.status)
+    if (filters?.category && filters.category !== 'all') query = query.eq('category', filters.category)
+    if (filters?.reported_wallet) query = query.ilike('reported_wallet', `%${filters.reported_wallet}%`)
 
     const { data, error } = await query
-    if (!error && data && data.length > 0) {
-      return data as UserReport[]
-    }
-  } catch {
-    // Fallback locale
+    if (error) console.warn('[reportsService] report list failed, using local:', error)
+    else if (data && data.length > 0) return data as UserReport[]
+  } catch (err) {
+    console.warn('[reportsService] report list threw, using local:', err)
   }
 
   let result = [...IN_MEMORY_REPORTS]
-  if (filters?.status && filters.status !== 'all') {
-    result = result.filter(r => r.status === filters.status)
-  }
-  if (filters?.category && filters.category !== 'all') {
-    result = result.filter(r => r.category === filters.category)
-  }
+  if (filters?.status && filters.status !== 'all') result = result.filter((r) => r.status === filters.status)
+  if (filters?.category && filters.category !== 'all') result = result.filter((r) => r.category === filters.category)
   if (filters?.reported_wallet) {
     const w = filters.reported_wallet.toLowerCase()
-    result = result.filter(r => r.reported_wallet.toLowerCase().includes(w))
+    result = result.filter((r) => r.reported_wallet.toLowerCase().includes(w))
   }
-
   return result
 }
 
-/**
- * Risolvi o aggiorna lo stato di una segnalazione da parte di un operatore
- */
 export async function resolveUserReport(
   reportId: string,
   operatorId: string,
@@ -179,15 +160,15 @@ export async function resolveUserReport(
   notes?: string
 ): Promise<UserReport> {
   const currentOp = getCurrentOperator()
-  const canResolve = hasPermission(currentOp.roles, 'USER_REPORTS', 'RESOLVE_REPORT')
-  if (!canResolve) {
+  if (!hasPermission(currentOp.roles, 'USER_REPORTS', 'RESOLVE_REPORT')) {
     throw new Error('Accesso negato: Permesso USER_REPORTS:RESOLVE_REPORT mancante')
   }
 
   const now = new Date().toISOString()
+  const action = status === 'RESOLVED' ? 'RESOLVE_USER_REPORT' : 'UPDATE_REPORT_STATUS'
 
-  // In-memory (seed/demo) report — mutate in place, then best-effort persist.
-  const inMemory = IN_MEMORY_REPORTS.find(r => r.id === reportId)
+  // Seed/demo report — mutate in place, then best-effort persist.
+  const inMemory = IN_MEMORY_REPORTS.find((r) => r.id === reportId)
   if (inMemory) {
     const oldState = { ...inMemory }
     inMemory.status = status
@@ -200,7 +181,7 @@ export async function resolveUserReport(
       operator_id: operatorId,
       wallet_address: currentOp.wallet_address,
       program_id: 'USER_REPORTS',
-      action: status === 'RESOLVED' ? 'RESOLVE_USER_REPORT' : 'UPDATE_REPORT_STATUS',
+      action,
       resource_type: 'user_report',
       resource_id: reportId,
       old_state: { status: oldState.status, notes: oldState.resolution_notes },
@@ -208,33 +189,33 @@ export async function resolveUserReport(
       metadata: { operator_username: currentOp.username },
     })
 
-    try {
-      await supabase.from('user_reports').update({
+    // PostgREST returns errors (never throws); a seed/demo row is absent from
+    // the DB, so a failure just keeps the local mutation.
+    const { error: persistErr } = await supabase
+      .from('user_reports')
+      .update({
         status: inMemory.status,
         resolution_notes: inMemory.resolution_notes,
         resolved_by_operator_id: inMemory.resolved_by_operator_id,
         resolved_at: inMemory.resolved_at,
         updated_at: inMemory.updated_at,
-      }).eq('id', reportId)
-    } catch {
-      // offline fallback
-    }
+      })
+      .eq('id', reportId)
+    if (persistErr)
+      console.warn('[reportsService] report persist failed, kept locally:', persistErr)
 
     return inMemory
   }
 
-  // DB-backed report (the real path in a populated environment). The old code
-  // only searched IN_MEMORY_REPORTS and threw for every row loaded from
-  // Supabase, so resolving a real report from the dashboard always failed.
-  const { data: existingData } = await supabase
+  // DB-backed report (the real path in a populated environment).
+  const { data: existingData, error: existingErr } = await supabase
     .from('user_reports')
     .select('*')
     .eq('id', reportId)
     .maybeSingle()
+  if (existingErr) throw existingErr
   const existing = (existingData ?? null) as UserReport | null
-  if (!existing) {
-    throw new Error('Segnalazione non trovata')
-  }
+  if (!existing) throw new Error('Segnalazione non trovata')
 
   const { data, error } = await supabase
     .from('user_reports')
@@ -254,7 +235,7 @@ export async function resolveUserReport(
     operator_id: operatorId,
     wallet_address: currentOp.wallet_address,
     program_id: 'USER_REPORTS',
-    action: status === 'RESOLVED' ? 'RESOLVE_USER_REPORT' : 'UPDATE_REPORT_STATUS',
+    action,
     resource_type: 'user_report',
     resource_id: reportId,
     old_state: { status: existing.status, notes: existing.resolution_notes },

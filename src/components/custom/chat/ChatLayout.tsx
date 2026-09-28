@@ -5,7 +5,6 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 
-
 import {
   useConversations,
   useConversation,
@@ -55,18 +54,8 @@ interface Props {
 }
 
 /**
- * Two-pane chat shell. Wires together all chat hooks (conversations, messages,
- * typing, presence) and renders either the conversation list + active
- * conversation, or an empty state.
- *
- * The `ourTeam` virtual conversation (synthetic welcome pointing at the
- * platform Discord) is handled inline — there's no DB row, so the
- * conversation query never returns, and the composer is hidden (no thread
- * to send to).
- *
- * Layout matches the original ChatPage exactly:
- *   - desktop: fixed 380px sidebar + flex-1 chat pane
- *   - mobile:  when a chat is open, sidebar hides; back button shows in header
+ * Two-pane chat shell: conversation list + active thread. The synthetic
+ * `ourTeam` thread is handled inline (no DB row, composer hidden).
  */
 export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   const navigate = useNavigate()
@@ -90,20 +79,13 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   // switch the active pane away from the one the user is reading.
   const [pinnedId, setPinnedId] = useState<string | null>(null)
 
-  // Reset the pinned id whenever the route param changes (or the forced
-  // prop changes) — the route param always wins. The reset is a single
-  // conditional setState inside an effect; the React Compiler / lint rule
-  // flags synchronous setState in an effect body, but this is the canonical
-  // pattern for "reset derived state on prop change" (the alternative is
-  // a separate useEffect for the comparison-and-reset, which is heavier).
+  // Route param wins: reset the pinned id when it (or the forced prop) changes.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPinnedId(null)
   }, [routeId, forcedId])
 
-  // Only the ACTIVE inbox drives the default selection — opening /app/messages
-  // must not auto-open the most recently archived chat. On MOBILE we never
-  // auto-select: the list is the landing view and a tap opens a chat.
+  // Only the active inbox drives auto-selection, and never on mobile.
   const isDesktop = useIsDesktop()
   const fallbackId = isDesktop ? (activeConversations.data?.[0]?.id ?? null) : null
   const activeId = forcedId ?? pinnedId ?? routeId ?? fallbackId
@@ -156,11 +138,8 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
     if (!messages.data || messages.data.length === 0) return
     const last = messages.data[messages.data.length - 1]
     if (!last) return
-    // Skip the optimistic temp-* ids from `useSendMessage.onMutate` —
-    // writing them to `last_read_message_id` makes the unread-count
-    // query fall back to the 1970-01-01 timestamp and spike the badge
-    // until onSuccess swaps the real id in. Once the swap happens the
-    // effect re-runs and we mark the real id.
+    // Skip optimistic temp-* ids: they aren't valid UUIDs, so writing them
+    // makes the unread-count query spike until onSuccess swaps the real id in.
     if (last.id.startsWith('temp-')) return
     mark(activeId)
     if (lastMarkedRef.current !== last.id) {
@@ -169,10 +148,8 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
     }
   }, [activeId, user, messages.data, mark, markRead, isOurTeam])
 
-  // Tell the server this conversation is being viewed (heartbeat, refreshed
-  // every 60s). The `notify_conversation_message` trigger skips recipients
-  // whose `viewing_at` is recent, so a message landing in the open pane never
-  // creates a notification / email. Cleared on unmount / chat switch.
+  // Viewing heartbeat (60s) so the notify trigger skips recipients who are
+  // already looking at the thread; cleared on unmount / chat switch.
   useEffect(() => {
     if (!activeId || !user || isOurTeam) return
     const conversationId = activeId
@@ -188,9 +165,8 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
     }
   }, [activeId, user, isOurTeam])
 
-  // Opening a chat clears that thread's unread notifications (and any that
-  // slipped in on the race before the viewing heartbeat landed, hence the
-  // `messages.data?.length` dep).
+  // Opening a chat clears its unread notifications; the `messages` dep catches
+  // any that slipped in before the viewing heartbeat landed.
   useEffect(() => {
     if (!activeId || !user || isOurTeam) return
     void markConversationNotificationsRead({
@@ -262,10 +238,8 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
     )
   }
 
-  // Wallet connected but no live Supabase session. The RLS reads would be
-  // denied and come back as an empty array (no error), so render an explicit
-  // sign-in prompt rather than a misleading "conversation not found". Signing
-  // in via the navbar CTA fixes this.
+  // No live session: RLS reads return an empty array, not an error, so show an
+  // explicit sign-in prompt instead of a misleading "conversation not found".
   if (!hasSession) {
     return (
       <section className="flex-1 flex items-center justify-center p-8 text-muted-foreground text-sm text-center">
@@ -278,10 +252,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
     !!activeConversations.data && activeConversations.data.length === 0 && !isOurTeam
   const showSidebar = !activeId || !forcedId
 
-  // Page-level loading state. Until the conversation list resolves we don't
-  // know if there's an active conversation, so the right pane can't show
-  // a meaningful empty state. Render a centered spinner across the full
-  // chat area to make the hydration visible.
+  // The right pane can't pick an empty state until the conversation list resolves.
   if (activeConversations.isLoading && !isOurTeam && !forcedId) {
     return (
       <section className="flex-1 flex items-center justify-center p-8">
@@ -291,12 +262,8 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   }
 
   return (
-    // Height chain: AppLayout gives the chat route a definite `h-[100dvh]`
-    // shell (navbar shrink-0, main flex-1 min-h-0, no footer), PageContainer
-    // is `flex-1 min-h-0` with zero padding, and this section fills it. From
-    // here every pane is `min-h-0` so only the intended child (ConversationList
-    // / MessageThread) gets its own `overflow-y-auto` — the document never
-    // scrolls.
+    // Height chain from AppLayout's `h-[100dvh]`: every pane is `min-h-0` so
+    // only the intended child scrolls — the document itself never does.
     <section className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div className="flex flex-1 min-h-0 rounded-l-2xl overflow-hidden">
         {showSidebar && (
@@ -383,11 +350,7 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   )
 }
 
-/**
- * Right pane for the ourTeam thread.
- * Renders support messages, live operator responses, and allows the user
- * to send messages to the operator team while keeping the Discord community link accessible.
- */
+/** Right pane for the ourTeam thread: support messages + operator replies. */
 function OurTeamPane({
   onBack,
 }: {

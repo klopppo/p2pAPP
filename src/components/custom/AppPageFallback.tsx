@@ -21,12 +21,7 @@ function card({ className }: { className?: string }) {
   )
 }
 
-/**
- * Skeleton shown while a lazily-imported route chunk loads. Rendered inside
- * the active layout so the navbar stays mounted and content appears to
- * stream in. Uses design tokens only (bg-muted / border-border) with a
- * subtle pulse; sets aria-busy so SRs announce the pending state.
- */
+/** Skeleton for lazily-imported route chunks; rendered inside the active layout. */
 export function AppPageFallback() {
   return (
     <section className="space-y-8" role="status" aria-busy="true" aria-label="Loading">

@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import type { ConversationView, ConversationWithParticipant } from '@/types/database'
-import { cn, shortTradeId } from '@/lib/utils'
+import { cn, shortAddress, shortTradeId } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { OUR_TEAM_ID } from './ourTeam'
 
 interface Props {
   conversation: ConversationView
@@ -11,13 +12,7 @@ interface Props {
   onSelect: (id: string) => void
 }
 
-/**
- * One row in the chat sidebar.
- *
- * Shows the other party's avatar + nickname + last message preview and an
- * unread badge. Uses `bg-primary` for the badge to match the existing chat
- * visual language.
- */
+/** One chat-sidebar row: counterparty, preview/trade tag, unread badge. */
 export function ConversationItem({
   conversation,
   currentUserId,
@@ -26,17 +21,17 @@ export function ConversationItem({
   onSelect,
 }: Props) {
   const other: ConversationWithParticipant | undefined = useMemo(() => {
-    // PostgREST doesn't guarantee participant ordering. Filter by the
-    // explicit currentUserId from props so the sidebar consistently
-    // shows the counterparty regardless of which row comes back first.
+    // Participant order isn't guaranteed; filter by currentUserId to find the counterparty.
     if (!currentUserId) return conversation.participants[1]
     return conversation.participants.find((p) => p.user_id !== currentUserId)
   }, [conversation.participants, currentUserId])
 
-  const isOurTeam = conversation.id === 'ourTeam'
+  const isOurTeam = conversation.id === OUR_TEAM_ID
   const name = isOurTeam
     ? 'ourTeam'
-    : (other?.user.nickname?.trim() || shortAddress(other?.user.wallet_address ?? ''))
+    : other?.user.nickname?.trim() ||
+      shortAddress(other?.user.wallet_address ?? '') ||
+      'Unknown'
   const preview = conversation.last_message_preview ?? 'Trade opened — say hi'
   const time = conversation.last_message_at
     ? new Date(conversation.last_message_at).toLocaleTimeString('en-US', {
@@ -60,8 +55,7 @@ export function ConversationItem({
           <span className="text-sm font-semibold truncate">{name}</span>
           {time && <span className="text-xs text-muted-foreground shrink-0">{time}</span>}
         </div>
-        {/* Trade chats show ONLY the trade tag (no last-message preview);
-            direct chats show the message preview. */}
+        {/* Trade chats show only the tag; direct chats show the preview. */}
         {conversation.trade ? (
           <div className="mt-0.5">
             <Badge
@@ -85,11 +79,6 @@ export function ConversationItem({
       )}
     </button>
   )
-}
-
-function shortAddress(addr: string): string {
-  if (!addr) return 'Unknown'
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`
 }
 
 function Avatar({ name, avatarUrl, isOurTeam }: { name: string; avatarUrl: string | null; isOurTeam?: boolean }) {

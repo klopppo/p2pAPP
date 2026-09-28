@@ -1,14 +1,9 @@
 /**
- * Single source of truth for offer locations / regions. The create & edit
- * offer forms, the offer detail, and the marketplace filter all consume
- * these maps so the picker labels, the persisted `available_regions` codes
- * and the rendered names never drift.
- *
- * Stored shape: `available_regions` holds ISO 3166-1 alpha-2 codes (an empty
- * array means "Global"). `tags` additionally carries the human picker label.
+ * Single source of truth for offer locations / regions. `available_regions`
+ * stores ISO 3166-1 alpha-2 codes (empty = Global); `tags` carries the picker
+ * label so labels, codes and rendered names never drift.
  */
 
-/** Location picker order — "Global" is the default and maps to no region. */
 export const LOCATIONS = [
   'Global',
   'United States',
@@ -34,7 +29,6 @@ export const LOCATIONS = [
   'Spain',
 ]
 
-/** Human picker label → region code, as persisted on the offer. */
 const REGION_CODES: Record<string, string> = {
   'United States': 'US',
   'European Union': 'EU',
@@ -59,7 +53,6 @@ const REGION_CODES: Record<string, string> = {
   'Spain': 'ES',
 }
 
-/** Region code → human picker label (used to render stored codes). */
 export const REGION_NAMES: Record<string, string> = Object.fromEntries(
   Object.entries(REGION_CODES).map(([name, code]) => [code, name]),
 )
@@ -77,9 +70,8 @@ export function regionToLocation(code: string | undefined): string {
 }
 
 /**
- * True when an offer (its persisted regions + tags) matches a market filter
- * selection. `selection` is 'all', or a picker label (e.g. 'United States').
- * "Global" is a special value: it matches offers that persist no region.
+ * True when an offer (persisted regions + tags) matches a market filter
+ * selection ('all' or a picker label). "Global" matches offers with no region.
  */
 export function offerMatchesLocation(
   regions: string[] | null | undefined,
@@ -88,12 +80,7 @@ export function offerMatchesLocation(
 ): boolean {
   if (selection === 'all') return true
   const regs = regions ?? []
-  if (selection === 'Global') {
-    return regs.length === 0 || regs.includes('Global')
-  }
+  if (selection === 'Global') return regs.length === 0 || regs.includes('Global')
   const code = REGION_CODES[selection]
-  return (
-    (code !== undefined && regs.includes(code)) ||
-    (tags ?? []).includes(selection)
-  )
+  return (code !== undefined && regs.includes(code)) || (tags ?? []).includes(selection)
 }

@@ -14,6 +14,29 @@ interface WebhookPayload {
   old_record?: Record<string, unknown>
 }
 
+// Constant-time secret comparison. WebCrypto has no timingSafeEqual, so HMAC
+// both values under a fixed key and XOR the fixed-length digests: no early
+// exit on mismatch and no length signal. Runs on both Workers and Deno.
+async function timingSafeEqual(a: string, b: string): Promise<boolean> {
+  const encoder = new TextEncoder()
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode('cache-purge-timing-safe-equal'),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  )
+  const [digestA, digestB] = await Promise.all([
+    crypto.subtle.sign('HMAC', key, encoder.encode(a)),
+    crypto.subtle.sign('HMAC', key, encoder.encode(b)),
+  ])
+  const bytesA = new Uint8Array(digestA)
+  const bytesB = new Uint8Array(digestB)
+  let diff = 0
+  for (let i = 0; i < bytesA.length; i++) diff |= bytesA[i] ^ bytesB[i]
+  return diff === 0
+}
+
 async function purge(urls: string[]): Promise<{ purged: string[]; failed: string[] }> {
   const purged: string[] = []
   const failed: string[] = []
@@ -43,7 +66,8 @@ export const onRequestPost = async ({
     })
 
   if (!env.PURGE_SECRET) return json({ error: 'purge secret not configured' }, 500)
-  if (request.headers.get('x-webhook-secret') !== env.PURGE_SECRET) {
+  const providedSecret = request.headers.get('x-webhook-secret') ?? ''
+  if (!(await timingSafeEqual(providedSecret, env.PURGE_SECRET))) {
     return json({ error: 'unauthorized' }, 401)
   }
 

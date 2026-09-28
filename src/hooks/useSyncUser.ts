@@ -12,20 +12,9 @@ import { hasSignedInMarker } from './siweMarker'
 /**
  * Keeps the Supabase `users` row in sync with the connected wallet.
  *
- * Whenever a wallet connects (or the active account changes) this:
- *   1. Establishes/verifies a Supabase session by checking live tokens or signing
- *      an SIWE challenge (handled by `ensureWalletSession` -> `siwe-auth` edge function).
- *   2. Ensures a `users` row exists for the wallet.
- *
- * Race fix: a monotonically increasing `token` is bumped on every
- * (re)connect/disconnect. The async `ensureWalletSession` callback captures
- * the token at call-time and only commits its result to the refs if the
- * token still matches. Out-of-order resolutions are dropped on the floor.
- * Without this, a connect→disconnect→reconnect cycle could let the original
- * in-flight sign-in overwrite the new session with the old wallet's user row.
- *
- * Onboarding: if the row has no profile yet (no nickname), the user is sent
- * straight to the Edit Profile page so they can create one.
+ * Race fix: `tokenRef` is bumped on every wallet state change; async callbacks
+ * capture it and drop their result if it no longer matches, so a stale sign-in
+ * can't overwrite a newer wallet's session.
  */
 export function useSyncUser() {
   const { address, isConnected } = useAccount()
@@ -33,18 +22,13 @@ export function useSyncUser() {
   const redirectedAddress = useRef<string | null>(null)
   const navigate = useNavigate()
   const qc = useQueryClient()
-  // Token bumped on every wallet state change. Captured by async callbacks
-  // so stale resolutions from a prior address can no-op.
   const tokenRef = useRef(0)
-  // Tracks whether the wallet was connected on a previous render, so a
-  // disconnect can be distinguished from the initial not-yet-reconnected
-  // mount (wagmi reports `isConnected: false` before it restores the session).
+  // Distinguishes a real disconnect from the initial not-yet-reconnected mount
+  // (wagmi reports `isConnected: false` before restoring the session).
   const wasConnectedRef = useRef(false)
 
-  // After a wallet disconnect, send the user back to the marketplace. Watched
-  // on the isConnected transition (not on our own Disconnect button) so a
-  // disconnect from RainbowKit's account modal behaves identically. The ref
-  // starts false, so a cold load that hasn't restored a session yet is a no-op.
+  // After a wallet disconnect (including via RainbowKit's modal) go back to
+  // the marketplace.
   useEffect(() => {
     if (isConnected) {
       wasConnectedRef.current = true
@@ -59,26 +43,23 @@ export function useSyncUser() {
     const myToken = ++tokenRef.current
 
     if (!isConnected || !address) {
-      // Wallet gone: tear down the Supabase session + caches so the stale
-      // session can't keep authorizing reads/writes as the old wallet.
-      // Bump the token first so any in-flight ensureWalletSession from the
-      // previous connect is ignored when it resolves.
+      // Bump the token first so an in-flight ensureWalletSession from the
+      // previous connect is ignored, then tear down session + caches.
       const prev = syncedAddress.current
       syncedAddress.current = null
       if (prev) {
         clearPersistedQueryCache()
-        void signOut().catch((signOutErr) => {
-          console.warn('[useSyncUser] signOut on wallet disconnect failed:', signOutErr)
+        void signOut().catch((err) => {
+          console.warn('[useSyncUser] signOut on wallet disconnect failed:', err)
         })
       }
       return
     }
 
-    // Skip redundant sign-ins for an address we already synced in this session.
+    // Skip redundant sign-ins for an address already synced this session.
     if (syncedAddress.current === address) return
-    // Wallet switched (A → B) without a disconnect: drop the previous wallet's
-    // in-memory + persisted caches so wallet-scoped keys that don't embed the
-    // address can't leak across identities.
+    // Wallet switched without a disconnect: drop the previous wallet's caches
+    // so wallet-scoped keys can't leak across identities.
     if (syncedAddress.current) {
       void qc.cancelQueries()
       qc.clear()
@@ -86,15 +67,12 @@ export function useSyncUser() {
     }
     syncedAddress.current = address
 
-    // Returning user on this device: recover the persisted Supabase session
-    // silently (valid claim, or exchange the stored refresh token) and NEVER
-    // pop MetaMask. If recovery fails, the app stays read-only until the user
-    // explicitly clicks "Sign in" — matching "no signature on every reload".
+    // Returning user: recover the persisted session silently and NEVER pop
+    // MetaMask. If recovery fails the app stays read-only until "Sign in".
     if (hasSignedInMarker(address)) {
       recoverWalletSession(address)
         .then((recovered) => {
           if (tokenRef.current !== myToken || !recovered) return
-          // The token may have been refreshed/repaired — let the gate re-read.
           void qc.invalidateQueries({ queryKey: ['wallet-session'] })
           void qc.invalidateQueries({ queryKey: ['current-user'] })
         })
@@ -106,16 +84,13 @@ export function useSyncUser() {
 
     ensureWalletSession(address, { signMessage: signWalletMessage })
       .then(({ user }) => {
-        // Drop the result if a newer connect/disconnect has superseded us.
         if (tokenRef.current !== myToken) return
-        // No profile created yet → open the Edit Profile page to create one.
-        // Only once per session, so closing the page doesn't loop the redirect.
+        // No profile yet → open Edit Profile (once per session).
         if (user && !user.nickname && redirectedAddress.current !== address) {
           redirectedAddress.current = address
           navigate('/app/profile/edit')
         }
-        // If `user` is null the user declined the wallet signature — stay
-        // read-only for this wallet.
+        // `user === null` means the user declined the signature — stay read-only.
         if (user) {
           void claimPendingReferralIfPresent().catch((err) =>
             console.warn('[useSyncUser] referral claim failed:', err),
@@ -125,18 +100,12 @@ export function useSyncUser() {
       .catch((error) => {
         if (tokenRef.current !== myToken) return
         console.warn('[useSyncUser] ensureWalletSession failed:', error)
-        // Reset so a later re-render can retry.
         syncedAddress.current = null
       })
   }, [address, isConnected, navigate, qc])
 }
 
-/**
- * Best-effort first-touch attribution: if this device landed on a /r/CODE
- * link before the wallet completed its first session, claim the code now.
- * `consumePendingReferral` clears the marker whatever the outcome, so a bad
- * or already-used code can't loop on every reconnect.
- */
+/** First-touch attribution: claim a stashed /r/CODE after first sign-in. */
 async function claimPendingReferralIfPresent(): Promise<void> {
   const code = consumePendingReferral()
   if (!code || !isValidReferralCode(code)) return
@@ -146,10 +115,7 @@ async function claimPendingReferralIfPresent(): Promise<void> {
   }
 }
 
-/**
- * Mount this once, high in the tree (inside Wagmi/RainbowKit providers AND the
- * router), to enable global user syncing on wallet connect. Renders nothing.
- */
+/** Mount once high in the tree; renders nothing. */
 export const UserSync: FC = () => {
   useSyncUser()
   return null

@@ -7,12 +7,7 @@ interface Props {
   size?: 'sm' | 'md' | 'lg'
 }
 
-/**
- * Centered loading indicator used by the chat layout. Lives in the middle
- * of the right pane (or full page) while conversations / messages / dispute
- * detail data are still hydrating. Three sizes so the same component
- * works for small inline states and full-pane gating.
- */
+/** Centered chat loading indicator; sizes cover inline and full-pane states. */
 export function ChatLoading({ label = 'Loading…', size = 'md' }: Props) {
   const dims =
     size === 'lg'

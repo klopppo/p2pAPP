@@ -1,10 +1,7 @@
 /**
- * Block-explorer base URLs.
- *
- * Every link goes through `blockscan.com` — Etherscan's multi-chain resolver —
- * which routes an address / tx / token to the correct chain explorer. This
- * avoids chain-specific hardcoding (`etherscan.io` vs `sepolia.etherscan.io`)
- * and behaves for any EVM chain the app deploys to.
+ * Block-explorer URLs via blockscan.com — Etherscan's multi-chain resolver —
+ * so addresses / txs / tokens route to the right explorer without hardcoding
+ * chain-specific hosts.
  */
 
 const BLOCKSCAN = 'https://blockscan.com'

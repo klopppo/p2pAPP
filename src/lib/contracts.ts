@@ -1,80 +1,44 @@
 /**
  * Smart contract configuration — KlerosEsc + KlerosEscrowFactory.
  *
- * The dispute flow has two layers:
- *
- *   1. Per-trade escrow (KlerosEsc clone, EIP-1167 minimal proxy)
- *      - Deployed by KlerosEscrowFactory.createEscrow(buyer, seller, grace, amount, depBps)
- *      - Holds the seller's crypto + optional security deposits
- *      - Routes disputes to a Kleros Court via ERC-792
- *
- *   2. Kleros Court (production: 0x988b3a538b618C7A603e1c11Ab82Cd16dbE28069, mainnet)
- *      - Off-chain arbitrators rule each dispute round
- *      - Calls back into the escrow via rule(_disputeID, _ruling)
- *
  * Rulings (NUMBER_OF_CHOICES = 4; `_ruling > 4` reverts):
- *   0 = REFUSED                   → auto-cancel: crypto → seller, deposits back
- *   1 = AWARD_BUYER_PENALTY_SELLER   → buyer + seller's deposit; nothing to seller
- *   2 = AWARD_SELLER_PENALTY_BUYER   → seller + buyer's deposit; nothing to buyer
- *   3 = AWARD_BUYER_RETURN_DEPOSITS   → buyer (minus fee); both deposits back
- *   4 = AWARD_SELLER_RETURN_DEPOSITS  → seller; both deposits back
+ *   0 REFUSED · 1 AWARD_BUYER_PENALTY_SELLER · 2 AWARD_SELLER_PENALTY_BUYER
+ *   3 AWARD_BUYER_RETURN_DEPOSITS · 4 AWARD_SELLER_RETURN_DEPOSITS
  *
- * Dispute state machine (KlerosEsc.State):
- *   AWAITING_FUNDING (0) → FUNDED (1) → CONFIRMED_PENDING (2)
- *      → AWAITING_RULING (3) → RULING_RECEIVED (4) → RULING_EXECUTED (5)
- *      → COMPLETED (6)
- *   Any state may transition to CANCELLED (7) during funding.
+ * State machine: AWAITING_FUNDING → FUNDED → CONFIRMED_PENDING →
+ * AWAITING_RULING → RULING_RECEIVED → RULING_EXECUTED → COMPLETED;
+ * any state may move to CANCELLED during funding.
  *
- * ERC-1497 evidence: buyer/seller submit evidence via submitEvidence(bytes32
- * _evidenceURI) where the URI is a content-addressed pointer to an off-chain
- * bundle (e.g. an IPFS CID). The Kleros frontend reads the URI from the
- * emitted `Evidence` event.
- *
- * NOTE: The on-chain escrow is the source of truth. The Supabase `disputes`
- * row is a mirror for fast querying and to store IPFS CIDs / on-chain metadata
- * that doesn't fit on-chain (free-text descriptions, multi-image attachments).
+ * The on-chain escrow is the source of truth; the Supabase `disputes` row is a
+ * mirror for fast querying and off-chain metadata (IPFS CIDs, attachments).
  */
 import { parseAbi, type Abi } from 'viem'
 
-// ─── Kleros Court address ────────────────────────────────────────────────────
-// ERC-792 / Kleros v1 mainnet court. Disputes from every escrow deployed by
-// the factory go here (the factory pins this address at construction).
+/** Kleros v1/ERC-792 mainnet court pinned by the factory. */
 export const KLEROS_COURT_MAINNET =
   '0x988b3A538b618C7A603e1c11Ab82Cd16dbE28069' as `0x${string}`
 
-// ─── KlerosEscrowFactory address ──────────────────────────────────────────────
-// Each environment (mainnet, sepolia, local) deploys its own factory. The
-// factory's address is the entry point for listing the user's escrows via
-// the paginated `escrowByBuyer / escrowBySeller` getters.
+/** Per-environment factory address (entry point for listing user escrows). */
 export const KLEROS_ESCROW_FACTORY_ADDRESS = (
   import.meta.env.VITE_KLEROS_ESCROW_FACTORY?.trim() || ''
 ) as `0x${string}` | ''
 
-// ─── Protocol constants from contracts/Constants.sol ─────────────────────────
 /** KlerosEsc.NUMBER_OF_CHOICES — any ruling > this reverts with InvalidRuling. */
 export const NUMBER_OF_CHOICES = 4n
-/** KlerosEsc.DISPUTE_TIMEOUT = 30 days — anyone can timeoutDispute() after. */
+/** KlerosEsc.DISPUTE_TIMEOUT = 30 days. */
 export const DISPUTE_TIMEOUT_SECONDS = 30n * 24n * 60n * 60n
-/** KlerosEsc.cancelTrade() TIMELOCK = 1 day — depositor can cancel if counterparty stalls. */
+/** KlerosEsc.cancelTrade() TIMELOCK = 1 day. */
 export const CANCEL_TIMELOCK_SECONDS = 1n * 24n * 60n * 60n
-/** KlerosEsc.MAX_GRACE_PERIOD = 365 days — passed to factory.createEscrow(). */
+/** KlerosEsc.MAX_GRACE_PERIOD = 365 days. */
 export const MAX_GRACE_PERIOD_SECONDS = 365n * 24n * 60n * 60n
-/** KlerosEsc.MIN_SECURITY_DEPOSIT_BPS = 1% — must be ≥ this OR exactly 0. */
+/** KlerosEsc.MIN_SECURITY_DEPOSIT_BPS = 1% (must be ≥ this OR exactly 0). */
 export const MIN_SECURITY_DEPOSIT_BPS = 100n
 /** KlerosEsc.MAX_SECURITY_DEPOSIT_BPS = 15%. */
 export const MAX_SECURITY_DEPOSIT_BPS = 1500n
 
-// ─── App-level trade defaults ─────────────────────────────────────────────────
-// `offers.grace_period` (hours) now lives on the offer row and is converted to
-// seconds when the escrow is deployed (see TradePage). `DEFAULT_GRACE_PERIOD_SECONDS`
-// is kept as the fallback for legacy rows without a value. The security deposit
-// fraction is still chosen by the taker at trade creation (TradePage UI, bps).
-
-/** Buyer/seller each post this fraction of `tradeAmount` as a slashable
- *  security deposit. 10% = 1000 bps (within MIN..MAX bound). */
+/** Default slashable deposit fraction (10%). */
 export const DEFAULT_SECURITY_DEPOSIT_BPS = 1000n
-/** Fallback default used only if a caller doesn't supply a per-trade grace
- *  period. The Trade page now collects it explicitly (default 1 hour). */
+/** Fallback grace period when a caller doesn't supply one. */
 export const DEFAULT_GRACE_PERIOD_SECONDS = 1n * 60n * 60n
 /** KlerosDisputeStatus enum (matches IKlerosCourt / KlerosCourt). */
 export const KLEROS_DISPUTE_STATUS = {
@@ -93,10 +57,9 @@ export const KlerosEscState = {
   COMPLETED: 6,
   CANCELLED: 7,
 } as const
-export type KlerosEscStateValue =
-  (typeof KlerosEscState)[keyof typeof KlerosEscState]
+export type KlerosEscStateValue = (typeof KlerosEscState)[keyof typeof KlerosEscState]
 
-/** Ruling enum (matches KlerosEsc.Ruling). uint8 sent on-chain, not a severity. */
+/** Ruling enum (matches KlerosEsc.Ruling). */
 export const Ruling = {
   REFUSED: 0,
   AWARD_BUYER_PENALTY_SELLER: 1,
@@ -105,8 +68,7 @@ export const Ruling = {
   AWARD_SELLER_RETURN_DEPOSITS: 4,
 } as const
 
-/** App-level severity (NOT on-chain). Maps to the form's Low/Medium/High/Critical
- *  dropdown. Stored in Supabase for filtering; Kleros doesn't have severity. */
+/** App-level severity (NOT on-chain) — maps to the form dropdown. */
 export const SEVERITY_TO_APPLEVEL = {
   Low: 0,
   Medium: 1,
@@ -115,19 +77,14 @@ export const SEVERITY_TO_APPLEVEL = {
 } as const
 export type SeverityLabel = keyof typeof SEVERITY_TO_APPLEVEL
 
-// ─── ABIs ────────────────────────────────────────────────────────────────────
-
-/** Subset of KlerosEsc we actually call from the frontend. */
+/** Subset of KlerosEsc we call from the frontend. */
 export const KLEROS_ESC_ABI = parseAbi([
-  // Funding + post-funding
   'function depositBuyerSecurityDeposit() external',
   'function depositSellerSecurityDeposit() external',
   'function lockFunds() external',
   'function confirm() external',
   'function release() external',
   'function cancelTrade() external',
-
-  // Dispute flow
   'function raiseDispute() external payable',
   'function submitEvidence(bytes32 _evidenceURI) external',
   'function appeal() external payable',
@@ -135,8 +92,6 @@ export const KLEROS_ESC_ABI = parseAbi([
   'function executeRuling() external',
   'function finalize() external',
   'function timeoutDispute() external',
-
-  // Views: escrow identity
   'function token() external view returns (address)',
   'function buyer() external view returns (address)',
   'function seller() external view returns (address)',
@@ -149,8 +104,6 @@ export const KLEROS_ESC_ABI = parseAbi([
   'function tradeAmount() external view returns (uint256)',
   'function securityDepositPct() external view returns (uint256)',
   'function securityDepositAmount() external view returns (uint256)',
-
-  // Views: escrow state machine
   'function state() external view returns (uint8)',
   'function buyerSecurityDeposited() external view returns (bool)',
   'function sellerSecurityDeposited() external view returns (bool)',
@@ -167,29 +120,15 @@ export const KLEROS_ESC_ABI = parseAbi([
   'function sellerDepositTime() external view returns (uint256)',
 ]) satisfies Abi
 
-/** KlerosEscrowFactory: list user's escrows + create new ones.
- *
- *  Includes the two-step owner setters (`setPendingFee` / `setTreasury` and
- *  their `accept*` companions) plus the corresponding pending-state getters.
- *  Owners operate through a multisig via `cast` today (see
- *  docs/factory-admin-runbook.md); these entries are here so a future admin
- *  page can drive them without ABI drift.
- *
- *  Also includes the events the factory emits so `decodeEventLog` /
- *  `parseEventLogs` can identify them in receipts.
- */
+/** KlerosEscrowFactory: list/create escrows, two-step admin setters, events. */
 export const KLEROS_ESCROW_FACTORY_ABI = parseAbi([
   'function createEscrow(address buyer, address seller, uint256 gracePeriod, uint256 tradeAmount, uint256 securityDepositPct) external returns (address)',
-  // Custom errors the factory reverts with (see KlerosEscrowFactory.sol).
-  // In the ABI so viem decodes the reason instead of "signature not found". The
-  // treasury wallet can never be a trade party — early deploys pin the
-  // deployer as treasury, so this fires when testing with that account.
+  // In the ABI so viem decodes the custom error instead of "signature not found".
   'error InvalidTreasury()',
   'function escrowCountByBuyer(address _party) external view returns (uint256)',
   'function escrowByBuyer(address _party, uint256 _index) external view returns (address)',
   'function escrowCountBySeller(address _party) external view returns (uint256)',
   'function escrowBySeller(address _party, uint256 _index) external view returns (address)',
-  // Pinned configuration (immutable in the contract).
   'function token() external view returns (address)',
   'function klerosCourt() external view returns (address)',
   'function klerosExtraDataPart1() external view returns (bytes32)',
@@ -197,36 +136,24 @@ export const KLEROS_ESCROW_FACTORY_ABI = parseAbi([
   'function feeBps() external view returns (uint256)',
   'function treasury() external view returns (address)',
   'function implementation() external view returns (address)',
-  // Two-step fee change (owner-only step 1, permissionless step 2).
   'function pendingFeeBps() external view returns (uint256)',
   'function feeChangePending() external view returns (bool)',
   'function setPendingFee(uint256 _feeBps) external',
   'function acceptFee() external',
-  // Two-step treasury transfer (owner proposes, new treasury accepts).
   'function pendingTreasury() external view returns (address)',
   'function setTreasury(address _treasury) external',
   'function acceptTreasury() external',
   'function owner() external view returns (address)',
-  // Events emitted by the factory — see KlerosEscrowFactory.sol:50-74.
-  // Without these entries viem's decodeEventLog throws AbiEventNotFoundError
-  // for every log in the receipt and the caller falls through to the
-  // escrowCountByBuyer fallback (which is race-prone for concurrent trades).
-  // Three indexed topics (buyer, seller, creator) followed by the data
-  // payload (escrowAddress, escrowTreasury, gracePeriod, feeBps, tradeAmount,
-  // securityDepositPct).
+  // Without these, decodeEventLog throws AbiEventNotFoundError for factory logs.
   'event EscrowCreated(address indexed buyer, address indexed seller, address indexed creator, address escrowAddress, address escrowTreasury, uint256 gracePeriod, uint256 feeBps, uint256 tradeAmount, uint256 securityDepositPct)',
-  // Immutable-config stamp emitted on the same proxy address right after.
   'event KlerosEscrowConfigured(address indexed escrowAddress, address indexed klerosCourt, bytes32 klerosExtraDataPart1, bytes32 klerosExtraDataPart2)',
-  // Admin events — useful if a future admin page wants to watch fee /
-  // treasury changes without polling.
   'event FeeUpdated(uint256 newFeeBps)',
   'event PendingFeeSet(uint256 pendingFeeBps)',
   'event TreasuryUpdated(address newTreasury)',
   'event TreasuryChangeRequested(address indexed newTreasury)',
 ]) satisfies Abi
 
-/** IKlerosCourt — ERC-792 subset used for fee estimation and (optionally)
- *  reading the live ruling/appeal period without going through the escrow. */
+/** IKlerosCourt — ERC-792 subset for fee estimation / ruling reads. */
 export const KLEROS_COURT_ABI = parseAbi([
   'function arbitrationCost(bytes _extraData) external view returns (uint256)',
   'function appealCost(uint256 _disputeID, bytes _extraData) external view returns (uint256)',
@@ -235,22 +162,8 @@ export const KLEROS_COURT_ABI = parseAbi([
   'function currentRuling(uint256 _disputeID) external view returns (uint256)',
 ]) satisfies Abi
 
-// ─── Events (typed for viem's decodeEventLog / parseEventLogs) ───────────────
-// Re-declared here so the frontend can decode receipts/logs without depending
-// on the on-chain ABI elsewhere.
-
-/**
- * All events emitted by `KlerosEsc.sol`. Used by the front-end watcher
- * (`useEscrowEventWatcher`) and by future server-side indexers to mirror
- * on-chain state into Supabase. Includes the financing-phase events so a
- * single typed ABI covers deposit / lock / cancel / release transitions as
- * well as the dispute lifecycle.
- *
- * Indexed topics mirror the contract `indexed` modifiers; fields that aren't
- * searchable on-chain (e.g. `amount`) stay unindexed.
- */
+/** Every event emitted by KlerosEsc (typed for decodeEventLog/parseEventLogs). */
 export const KLEROS_ESC_EVENTS_ABI = parseAbi([
-  // Initialization + funding phase.
   'event Initialized(address token, address buyer, address seller, address klerosCourt, bytes32 klerosExtraDataPart1, bytes32 klerosExtraDataPart2, address treasury, uint256 gracePeriod, uint256 feeBps, uint256 tradeAmount, uint256 securityDepositPct)',
   'event BuyerSecurityDeposited(address indexed buyer, uint256 amount)',
   'event SellerSecurityDeposited(address indexed seller, uint256 amount)',
@@ -258,48 +171,34 @@ export const KLEROS_ESC_EVENTS_ABI = parseAbi([
   'event TradeFullyFunded()',
   'event TradeCancelled(address indexed canceller)',
   'event FundsReturned(address indexed party, uint256 amount)',
-  // Post-funding.
   'event Confirmed(uint256 confirmationTime)',
   'event Released(uint256 buyerAmount, uint256 feeAmount)',
-  // Dispute lifecycle.
   'event DisputeRaised(uint256 indexed klerosDisputeID, address indexed raiser, uint256 feePaid)',
   'event AppealFunded(uint256 indexed klerosDisputeID, address indexed appellant, uint256 feePaid)',
   'event RulingReceived(uint256 indexed klerosDisputeID, uint8 ruling)',
   'event RulingExecuted(uint256 indexed klerosDisputeID, uint8 ruling)',
   'event Finalized(uint256 indexed klerosDisputeID)',
   'event DisputeTimedOut(address indexed winner, bool indexed buyerWasDisputer)',
-  // ERC-1497 evidence integration.
   'event MetaEvidence(uint256 indexed metaEvidenceID, address indexed arbitrator, bytes32 evidenceURI, bytes4 interfaceId)',
   'event Dispute(uint256 indexed disputeID, uint256 indexed metaEvidenceID, uint256 evidenceGroupID)',
   'event Evidence(uint256 indexed metaEvidenceID, address indexed party, bytes32 evidenceURI, uint256 evidenceGroupID)',
 ]) satisfies Abi
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 export function isFactoryConfigured(): boolean {
   return /^0x[a-fA-F0-9]{40}$/.test(KLEROS_ESCROW_FACTORY_ADDRESS)
 }
 
 /**
- * Encode the two Kleros extraData parts into the single `bytes` the court
- * expects (per ERC-792: bytes 0..32 subcourtId, bytes 32..64 minJurors).
- * The factory stores them as two bytes32 already-packed fields; this helper
- * concatenates them so callers can pass directly to `arbitrationCost(bytes)`.
+ * Concatenate the two Kleros extraData parts into the single `bytes` the court
+ * expects (ERC-792: subcourtId || minJurors).
  */
-export function encodeKlerosExtraData(
-  part1: `0x${string}`,
-  part2: `0x${string}`,
-): `0x${string}` {
-  // Strip 0x prefix from each 32-byte word, concat, re-prefix.
+export function encodeKlerosExtraData(part1: `0x${string}`, part2: `0x${string}`): `0x${string}` {
   const p1 = part1.startsWith('0x') ? part1.slice(2) : part1
   const p2 = part2.startsWith('0x') ? part2.slice(2) : part2
   return `0x${p1}${p2}` as `0x${string}`
 }
 
-// ─── ERC-20 helpers (minimal ABI subset for the funding flow) ────────────────
-
-/** ERC-20 read + approve subset. Used by TradeDetailPage to display the
- *  trade token and to let the user approve the escrow to pull funds. */
+/** ERC-20 read + approve subset for the funding flow. */
 export const ERC20_ABI = parseAbi([
   'function name() external view returns (string)',
   'function symbol() external view returns (string)',

@@ -11,11 +11,7 @@ export function shortAddress(addr: string): string {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`
 }
 
-/**
- * Truncate a trade (or other) identifier to `ABC...xyz` — first 3 chars, three
- * dots, last 3 chars (e.g. `TRD-MTTVDYSH2QL4AMRTUK` → `TRD...TUK`). Full
- * identifiers must never be rendered in the UI.
- */
+/** Truncate an identifier to `ABC...xyz`. Full ids must never be rendered. */
 export function shortTradeId(id: string | null | undefined): string {
   if (!id) return '—'
   const s = String(id)
@@ -23,10 +19,7 @@ export function shortTradeId(id: string | null | undefined): string {
   return `${s.slice(0, 3)}...${s.slice(-3)}`
 }
 
-/**
- * Human label for an escrow grace period given in seconds: hours under a day,
- * otherwise days (e.g. 3600 → "1h", 604800 → "7d").
- */
+/** Human grace-period label: hours under a day, otherwise days. */
 export function formatGracePeriod(seconds: number | bigint): string {
   const s = Number(seconds)
   if (!Number.isFinite(s) || s <= 0) return '—'
@@ -34,12 +27,7 @@ export function formatGracePeriod(seconds: number | bigint): string {
   return `${Math.round(s / (24 * 60 * 60))}d`
 }
 
-/**
- * Countdown label for a remaining duration (seconds):
- *   ≥ 1 day  → "2d 3h"
- *   ≥ 1 hour → "5h"
- *   < 1 hour → "42m"
- */
+/** Countdown label: "2d 3h" / "5h" / "42m". */
 export function formatDuration(seconds: number | bigint): string {
   const s = Math.max(0, Math.floor(Number(seconds)))
   const days = Math.floor(s / 86_400)
@@ -50,7 +38,6 @@ export function formatDuration(seconds: number | bigint): string {
   return `${minutes}m`
 }
 
-/** International ISO 4217 Currency Symbols map */
 export const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: '$',
   EUR: '€',
@@ -76,4 +63,3 @@ export function currencySymbol(code?: string | null): string {
   if (!code) return ''
   return CURRENCY_SYMBOLS[code] ?? `${code} `
 }
-

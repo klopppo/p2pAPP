@@ -16,10 +16,8 @@ interface AppErrorBoundaryState {
 }
 
 /**
- * Top-level React boundary. Catches render errors from any route chunk,
- * reports them through the self-hosted pipeline (ADR-013) and swaps in a
- * token-styled fallback instead of a white screen. `resetKey` lets the
- * router clear the boundary on navigation so the app recovers in place.
+ * Top-level React boundary: reports render errors (ADR-013) and shows a styled
+ * fallback. `resetKey` clears the boundary on navigation.
  */
 export class AppErrorBoundary extends Component<
   AppErrorBoundaryProps,

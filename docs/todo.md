@@ -183,10 +183,6 @@ tests/security`). Remaining roadmap below is tracked here.
       chat → notifications → disputes/ratings/reputation, all scoped via
       `public.current_user_id()` (JWT `wallet_address` claim); default-deny
       catch-all; avatars storage owner-scoped. _(2026-08-29, deploy above)_
-- [ ] **Escrow address verification** — verify `escrowByBuyer`/`escrowBySeller`
-      (or `implementation()` match) against the factory before every
-      approve/deposit/dispute call; hard-fail on mismatch; remove
-      `queryEscrow` URL bypass; exact-amount approvals instead of `maxUint256`.
 - [ ] **Message writes server-enforced** — `sender_id` from JWT only; client
       `kind` rejected (no forged system messages); participant check.
 - [ ] **Mirror writes indexer-only** — `updateTradeStatus` /

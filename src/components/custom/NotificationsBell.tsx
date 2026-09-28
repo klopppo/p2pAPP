@@ -9,6 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { timeAgo } from '@/components/custom/timeAgo'
 import {
   useNotifications,
   useUnreadCount,
@@ -155,7 +156,7 @@ function NotificationRow({
         <div className="flex items-baseline justify-between gap-2">
           <p className="text-sm font-medium truncate">{highlightPrivateOffer(notification.title)}</p>
           <span className="text-[10px] text-muted-foreground shrink-0">
-            {timeAgo(notification.created_at, t)}
+            {timeAgo(notification.created_at, t, NOTIFICATION_TIME_KEYS)}
           </span>
         </div>
         <p className="text-xs text-muted-foreground line-clamp-2">{notification.body}</p>
@@ -197,10 +198,9 @@ function KindIcon({ kind }: { kind: NotificationKind }) {
   return <Icon className="w-4 h-4" />
 }
 
-function timeAgo(iso: string, t: (key: string, options?: Record<string, unknown>) => string): string {
-  const ms = Date.now() - new Date(iso).getTime()
-  if (ms < 60_000) return t('notifications.now')
-  if (ms < 3_600_000) return t('notifications.minutesAgo', { count: Math.floor(ms / 60_000) })
-  if (ms < 86_400_000) return t('notifications.hoursAgo', { count: Math.floor(ms / 3_600_000) })
-  return t('notifications.daysAgo', { count: Math.floor(ms / 86_400_000) })
+const NOTIFICATION_TIME_KEYS = {
+  now: 'notifications.now',
+  minutes: 'notifications.minutesAgo',
+  hours: 'notifications.hoursAgo',
+  days: 'notifications.daysAgo',
 }

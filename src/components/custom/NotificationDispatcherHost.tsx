@@ -1,25 +1,15 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useNotificationPreferences } from '@/hooks/useNotifications'
+import { subscribeShared } from '@/hooks/realtimeChannel'
 import { dispatchNotification } from '@/lib/notifications'
-import { uniqueRealtimeTopic } from '@/lib/realtimeTopic'
 import type { Notification } from '@/types/database'
 
 /**
- * Mounted once inside the app shell. Subscribes to `notifications` for the
- * current user and fans each new row out to the enabled channels via
- * `dispatchNotification`. Renders nothing.
- *
- * Dedup: `notification.id` is recorded in a FIFO-capped `seen` Set (max
- * `SEEN_MAX`) so reconnects don't dispatch the same row twice AND the Set
- * can't grow unbounded over a long session.
- *
- * Gating: the realtime channel is only created once the prefs query has
- * resolved (`prefs.isLoading === false`). Before that point we have no
- * idea which channels the user has enabled and would dispatch to a
- * hard-coded `{inapp:true, email:false}` default.
+ * Mounted once in the app shell: fans realtime `notifications` rows out to the
+ * user's enabled channels. Deduped via a FIFO-capped `seen` Set; subscribes
+ * only after prefs resolve. Renders nothing.
  */
 
 const SEEN_MAX = 500
@@ -31,9 +21,7 @@ export function NotificationDispatcherHost() {
   const seen = useRef<Set<string>>(new Set())
   // FIFO order so we can evict the oldest entry once `SEEN_MAX` is reached.
   const seenQueue = useRef<string[]>([])
-  // Mirror `prefs.data` into a ref so the realtime subscription callback
-  // (which closes over the ref) always reads the latest preferences. Updating
-  // the ref inside a `useEffect` (not during render) keeps the component pure.
+  // Mirror prefs into a ref so the subscription callback reads the latest values.
   const prefsRef = useRef(prefs.data)
   useEffect(() => {
     prefsRef.current = prefs.data
@@ -42,58 +30,53 @@ export function NotificationDispatcherHost() {
   const userId = user?.id
 
   useEffect(() => {
-    // Wait for prefs before subscribing — otherwise we'd dispatch to the
-    // hard-coded fallback (`{inapp:true,email:false}`) and the user might
-    // have inapp disabled.
+    // Wait for prefs so we don't dispatch to the hard-coded fallback.
     if (!userId || prefs.isLoading) return
 
-    const channel = supabase
-      .channel(uniqueRealtimeTopic(`notif-dispatcher:${userId}`))
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${userId}`,
-        },
-        async (payload) => {
-          const n = payload.new as Notification
-          if (seen.current.has(n.id)) return
-          seen.current.add(n.id)
-          // FIFO eviction: once the window exceeds SEEN_MAX, drop the
-          // oldest id from both the Set and the queue.
-          seenQueue.current.push(n.id)
-          if (seenQueue.current.length > SEEN_MAX) {
-            const evict = seenQueue.current.shift()
-            if (evict !== undefined) seen.current.delete(evict)
-          }
-
-          const currentPrefs = prefsRef.current
-          const prefsMap = currentPrefs
-            ? Object.fromEntries(currentPrefs.map((p) => [p.channel, p.enabled]))
-            : { inapp: true, email: false }
-          const contacts: Record<string, string | null> = currentPrefs
-            ? Object.fromEntries(
-                currentPrefs.map((p) => [p.channel, p.email_address])
-              )
-            : {}
-
-          await dispatchNotification({
-            notification: n,
-            prefs: prefsMap,
-            contacts,
-          })
-
-          qc.invalidateQueries({ queryKey: ['notifications', userId] })
-          qc.invalidateQueries({ queryKey: ['notifications:unread', userId] })
+    // Shares ONE `notifications:user:<id>` channel with useNotifications /
+    // useUnreadCount (same filter); only INSERTs fan out to channels.
+    return subscribeShared(
+      `notifications:user:${userId}`,
+      {
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${userId}`,
+      },
+      (payload) => {
+        if (payload.eventType !== 'INSERT') return
+        const n = payload.new as unknown as Notification
+        if (!n?.id || seen.current.has(n.id)) return
+        seen.current.add(n.id)
+        // FIFO eviction: once the window exceeds SEEN_MAX, drop the
+        // oldest id from both the Set and the queue.
+        seenQueue.current.push(n.id)
+        if (seenQueue.current.length > SEEN_MAX) {
+          const evict = seenQueue.current.shift()
+          if (evict !== undefined) seen.current.delete(evict)
         }
-      )
-      .subscribe()
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
+        const currentPrefs = prefsRef.current
+        const prefsMap = currentPrefs
+          ? Object.fromEntries(currentPrefs.map((p) => [p.channel, p.enabled]))
+          : { inapp: true, email: false }
+        const contacts: Record<string, string | null> = currentPrefs
+          ? Object.fromEntries(
+              currentPrefs.map((p) => [p.channel, p.email_address])
+            )
+          : {}
+
+        void dispatchNotification({
+          notification: n,
+          prefs: prefsMap,
+          contacts,
+        }).catch((err) => {
+          console.warn('[NotificationDispatcherHost] dispatch failed:', err)
+        })
+
+        qc.invalidateQueries({ queryKey: ['notifications', userId] })
+        qc.invalidateQueries({ queryKey: ['notifications:unread', userId] })
+      },
+    )
   }, [userId, prefs.isLoading, qc])
 
   return null

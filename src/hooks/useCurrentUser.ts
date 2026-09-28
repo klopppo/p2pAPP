@@ -3,15 +3,7 @@ import { useAccount } from 'wagmi'
 import type { User } from '@/types/database'
 import { ensureUser } from '@/lib/supabase'
 
-/**
- * Resolves the connected wallet to a Supabase `users` row.
- *
- * The wallet is the canonical identity in this app (see `useSyncUser`), so
- * "the current user" is just `users` where `wallet_address = lowercased(address)`.
- *
- * Uses `ensureUser` which reads from cache first, then DB. Does NOT overwrite
- * profile fields.
- */
+/** Resolve the connected wallet to its `users` row (read-through cache). */
 export function useCurrentUser() {
   const { address, isConnected } = useAccount()
 

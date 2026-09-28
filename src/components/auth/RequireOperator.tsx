@@ -5,13 +5,8 @@ import { supabase } from '@/lib/supabase'
 import { useWalletSession } from '@/hooks/useWalletSession'
 
 /**
- * Server-side operator gate for `/app/operator`.
- *
- * The RBAC portal must never be reachable by an ordinary signed-in user: the
- * dashboard's identity/permission layer is client-side, so the only trustworthy
- * boundary is `public.is_operator()` (SECURITY DEFINER, checks the admin-only
- * `app_metadata.wallet_address` against an ACTIVE `sys_operators` row). Anyone
- * else is bounced to the marketplace.
+ * Operator gate for `/app/operator`: trusts only the server-side
+ * `public.is_operator()` check; everyone else is bounced to the marketplace.
  */
 export function RequireOperator({ children }: { children: ReactNode }) {
   const { sessionWallet, hasSession, isLoading: sessionLoading } =

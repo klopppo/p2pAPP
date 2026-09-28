@@ -44,7 +44,6 @@ export default defineConfig([
     files: [
       'src/components/ui/**',
       'src/components/infinite-list.tsx',
-      'src/components/marquee.tsx',
     ],
     rules: {
       'react-refresh/only-export-components': 'off',

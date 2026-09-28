@@ -1,20 +1,11 @@
 /**
  * Client error-reporting domain logic: scrubbing, fingerprinting and
- * normalisation. Everything here is PURE and unit-tested
- * (`tests/error-logging.spec.ts`) — the self-installing wire-up in
- * `src/error-logger.ts` and the edge endpoint
- * (`functions/api/error-report.ts`) both build on these helpers.
- *
- * Privacy: this is a non-custodial P2P app. Raw error strings can carry
- * wallet addresses, tx hashes, token amounts or PII, so every report is
- * scrubbed HERE (client) and AGAIN at the edge before it touches Postgres.
+ * normalisation. Everything here is PURE and unit-tested. Raw error strings
+ * can carry wallet addresses, tx hashes or PII, so every report is scrubbed
+ * here (client) and again at the edge before it touches Postgres.
  */
 
-type ErrorType =
-  | "error"
-  | "unhandledrejection"
-  | "react_render"
-  | "fetch_error"
+type ErrorType = 'error' | 'unhandledrejection' | 'react_render' | 'fetch_error'
 
 export interface ErrorReport {
   fingerprint: string
@@ -51,13 +42,12 @@ export function scrubText(text: string): string {
     text
       // EVM addresses (40 hex) and tx hashes (64 hex) — longer first so a
       // 64-char hash isn't half-mangled by the 40-char rule.
-      .replace(/\b0x[a-fA-F0-9]{64}\b/g, "0x…")
-      .replace(/\b0x[a-fA-F0-9]{40}\b/g, "0x…")
-      .replace(/\b0x[a-fA-F0-9]{36,}\b/g, "0x…")
-      // Emails.
-      .replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, "[email]")
+      .replace(/\b0x[a-fA-F0-9]{64}\b/g, '0x…')
+      .replace(/\b0x[a-fA-F0-9]{40}\b/g, '0x…')
+      .replace(/\b0x[a-fA-F0-9]{36,}\b/g, '0x…')
+      .replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[email]')
       // URL query params keep their names, lose their values.
-      .replace(/([?&])([^=&]+)=[^&\s]+/g, "$1$2=[redacted]")
+      .replace(/([?&])([^=&]+)=[^&\s]+/g, '$1$2=[redacted]')
   )
 }
 
@@ -74,26 +64,21 @@ export function buildFingerprint(input: {
   route?: string
 }): string {
   return truncate(
-    [
-      input.error_type,
-      scrubText(String(input.message).trim()),
-      input.source ?? "",
-      input.route ?? "",
-    ]
-      .join("|")
+    [input.error_type, scrubText(String(input.message).trim()), input.source ?? '', input.route ?? '']
+      .join('|')
       .toLowerCase(),
-    MAX_FINGERPRINT_LEN
+    MAX_FINGERPRINT_LEN,
   )
 }
 
 /** Pull a one-line message out of an unknown rejection/error value. */
 export function extractMessage(err: unknown): string {
-  if (err == null) return "Unknown error"
-  if (typeof err === "string") return err
-  if (err instanceof Error) return err.message || err.name || "Error"
-  if (typeof err === "object") {
+  if (err == null) return 'Unknown error'
+  if (typeof err === 'string') return err
+  if (err instanceof Error) return err.message || err.name || 'Error'
+  if (typeof err === 'object') {
     const msg = (err as { message?: unknown }).message
-    if (typeof msg === "string" && msg) return msg
+    if (typeof msg === 'string' && msg) return msg
     try {
       return JSON.stringify(err)
     } catch {
@@ -108,22 +93,21 @@ export function buildReport(
   input: RawReportInput,
   route: string,
   userAgent?: string,
-  language?: string
+  language?: string,
 ): ErrorReport {
   const rawMessage = input.message ?? extractMessage(input.error)
   const message = truncate(scrubText(rawMessage), MAX_MESSAGE_LEN)
-  const stack = input.stack
-    ? truncate(scrubText(input.stack), MAX_STACK_LEN)
-    : undefined
+  const errorType = input.error_type ?? 'error'
+  const stack = input.stack ? truncate(scrubText(input.stack), MAX_STACK_LEN) : undefined
 
   return {
     fingerprint: buildFingerprint({
-      error_type: input.error_type ?? "error",
+      error_type: errorType,
       message,
       source: input.source,
       route,
     }),
-    error_type: input.error_type ?? "error",
+    error_type: errorType,
     message,
     stack,
     source: input.source ? truncate(scrubText(input.source), 300) : undefined,

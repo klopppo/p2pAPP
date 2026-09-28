@@ -94,12 +94,7 @@ const SocialLinks = ({ className = '' }: { className?: string }) => (
   </div>
 )
 
-/**
- * Top-level navigation. `requiresAuth: true` items are hidden when no wallet
- * is connected — they need a wallet identity to be meaningful (and
- * `messages` needs it to query conversations at all). Items without the
- * flag (`offers`) stay visible so visitors can still browse the marketplace.
- */
+/** Top-level nav links; `requiresAuth` items are hidden until SIWE completes. */
 const NAV_LINKS: ReadonlyArray<{
   labelKey: string
   to: string
@@ -121,7 +116,6 @@ const RESOURCE_LINKS: ReadonlyArray<
   { labelKey: 'nav.docs', to: '/docs', icon: BookOpen },
   { labelKey: 'nav.discord', href: 'https://discord.gg/example', icon: MessageCircle },
 ] as const
-
 
 const LANGUAGES: { label: string; code: string }[] = [
   { label: 'English', code: 'en' },
@@ -145,9 +139,7 @@ interface NavbarProps {
 export function Navbar({ showTabs = false }: NavbarProps) {
   const { t, i18n } = useTranslation()
   const { theme, setTheme } = useTheme()
-  // Navbar's "signed in" state requires both wallet + signature, not just
-  // the wagmi connection. The SiweGate handles the actual sign-in flow;
-  // this hook is the source of truth for the top-header affordances.
+  // Signed-in requires wallet + signature, not just the wagmi connection.
   const { isFullySignedIn } = useSignedInStatus()
   const [resourcesOpen, setResourcesOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -162,11 +154,7 @@ export function Navbar({ showTabs = false }: NavbarProps) {
   const navigate = useNavigate()
   const currentPath = location.pathname
 
-  // Items with `requiresAuth` are filtered out when the user hasn't
-  // completed the SIWE sign-in (wallet alone isn't enough — see
-  // useSignedInStatus). Public items (offers, profile, docs, discord)
-  // stay visible so visitors can still discover the marketplace from
-  // the navbar.
+  // Public items stay visible so visitors can still discover the marketplace.
   const visibleNavLinks = isFullySignedIn
     ? NAV_LINKS
     : NAV_LINKS.filter((l) => !l.requiresAuth)

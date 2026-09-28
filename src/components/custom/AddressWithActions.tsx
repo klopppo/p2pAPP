@@ -13,24 +13,14 @@ type Props = {
   copyToastMessage?: string
   showText?: boolean
   textClassName?: string
-  /**
-   * If provided, a Message icon button is rendered alongside Copy / Open
-   * in Explorer. The handler should navigate to /app/messages/:convId or
-   * create-and-navigate when the conversation doesn't exist yet.
-   */
+  /** When set, renders a Message button that navigates to /app/messages/:convId. */
   onMessage?: () => void
   messageTitle?: string
   messageLabel?: string
   messageDisabled?: boolean
 }
 
-/**
- * Compact address pill with inline action buttons (Copy, Open in Explorer,
- * optional Message). Wraps text + icons in a single bordered pill so the
- * three actions read as one unit attached to the address (GitLab commit-SHA
- * + Primer ButtonGroup idiom). 32×32 icon hit areas clear the iOS/Material
- * touch minimum for compact metadata rows.
- */
+/** Address pill with inline actions (Copy, Explorer, optional Message). */
 export function AddressWithActions({
   address,
   className = '',

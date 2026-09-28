@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { shortTradeId } from '@/lib/utils'
+import { formatAddress, formatDate } from '@/lib/uiFormat'
 import { getCachedEscrowStatus } from '@/lib/escrowStatusCache'
 import { DateRangeFilter, type DateRange } from '@/components/custom/DateRangeFilter'
 import { endOfDay, startOfDay } from 'date-fns'
@@ -40,20 +41,6 @@ type StatusFilter =
   | 'disputed'
   | 'refunded'
   | 'pending'
-
-function formatAddress(addr: string | null | undefined) {
-  if (!addr) return '—'
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`
-}
-
-function formatDate(iso: string | null | undefined) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
 
 interface TradeRow {
   id: string

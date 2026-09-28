@@ -1,28 +1,15 @@
 /**
  * Coffer Identity vault — device-bound, pseudonymous trading identity.
  *
- * Threat model: the *counterparty* must not be able to correlate our trade /
- * conversation activity back to our on-chain wallet, while the operator can
- * still read data (anti-fraud / dispute resolution). We do NOT fight the
- * operator here — server-side pseudonyms would just be a mapping the operator
- * can invert, so instead:
- *
  *   master = HKDF(signature, salt = DOMAIN, info = "master")   ← client-only
- *   key_x  = HKDF(master, info = "x")                          ← client-only
- *   pseudonym(label) = "CN-" + sha256(key_label)[0..8 bytes]
+ *   key_x  = HKDF(master, info = "epoch:x")                    ← client-only
+ *   pseudonym(label) = "CN-" + sha256(key_label)[0..16]
  *
- * The ECDSA `personal_sign` signature is *deterministic* (RFC 6979): the same
- * wallet signing the same EIP-4361 message always yields the same bytes, so
- * the master is stable across logins WITHOUT the server ever seeing it. It is
- * stored only on this device and never leaves it.
- *
- * The master can NOT spend funds and can NOT recover wallet keys — worst case
- * on theft is that an attacker re-derives our app-layer pseudonyms.
- *
- * Rotation: bumping the epoch re-derives every label → all pseudonyms change.
- * Burn: deletes the local vault → this device's pseudonym history is gone.
+ * The ECDSA `personal_sign` signature is deterministic (RFC 6979), so the
+ * master is stable across logins without the server ever seeing it; it stays
+ * on-device. It can NOT spend funds or recover wallet keys. Bumping the epoch
+ * re-derives every label; burning deletes the local vault.
  */
-
 import { hkdfSha256, sha256Hex, bytesToHex, hexToBytes } from "@/lib/crypt"
 
 const COFFER_DOMAIN = "coffernode:coffer:v1"
@@ -49,12 +36,7 @@ export interface CofferStorage {
 }
 
 function localStorageBackedStorage(): CofferStorage | null {
-  if (
-    typeof window === "undefined" ||
-    typeof window.localStorage === "undefined"
-  ) {
-    return null
-  }
+  if (typeof window === "undefined" || typeof window.localStorage === "undefined") return null
   return {
     get() {
       const raw = window.localStorage.getItem(STORAGE_KEY)
@@ -78,16 +60,10 @@ function localStorageBackedStorage(): CofferStorage | null {
 
 let cachedIdentity: CofferIdentity | null = null
 
-/**
- * Derive the identity master from the SIWE signature bytes.
- * Deterministic per (wallet + message): same signature → same master.
- */
-export async function deriveMasterSecret(
-  signature: `0x${string}`
-): Promise<string> {
-  const ikm = hexToBytes(signature)
+/** Derive the identity master from the SIWE signature (deterministic). */
+export async function deriveMasterSecret(signature: `0x${string}`): Promise<string> {
   const key = await hkdfSha256({
-    ikm,
+    ikm: hexToBytes(signature),
     salt: COFFER_DOMAIN,
     info: MASTER_INFO,
     length: 32,
@@ -95,15 +71,8 @@ export async function deriveMasterSecret(
   return bytesToHex(key)
 }
 
-/**
- * Build an in-memory identity object (pure). Use `persistCofferIdentity` to
- * commit it to device storage.
- */
-export function buildCofferIdentity(
-  address: string,
-  masterHex: string,
-  epoch = 0
-): CofferIdentity {
+/** Build an in-memory identity (pure). Commit it with `persistCofferIdentity`. */
+export function buildCofferIdentity(address: string, masterHex: string, epoch = 0): CofferIdentity {
   return {
     address: address.toLowerCase(),
     masterHex,
@@ -112,17 +81,13 @@ export function buildCofferIdentity(
   }
 }
 
-/**
- * Create the vault for `address` from its SIWE signature and persist it.
- * Non-fatal for the caller: identity is best-effort, never blocks sign-in.
- */
+/** Create the vault for `address` from its SIWE signature and persist it. */
 export async function persistCofferIdentity(
   address: string,
   signature: `0x${string}`,
-  storage: CofferStorage | null = localStorageBackedStorage()
+  storage: CofferStorage | null = localStorageBackedStorage(),
 ): Promise<CofferIdentity | null> {
-  const masterHex = await deriveMasterSecret(signature)
-  const identity = buildCofferIdentity(address, masterHex)
+  const identity = buildCofferIdentity(address, await deriveMasterSecret(signature))
   cachedIdentity = identity
   storage?.set(identity)
   return identity
@@ -130,7 +95,7 @@ export async function persistCofferIdentity(
 
 /** Load the vault stored on this device for the connected wallet. */
 export function loadCofferIdentity(
-  storage: CofferStorage | null = localStorageBackedStorage()
+  storage: CofferStorage | null = localStorageBackedStorage(),
 ): CofferIdentity | null {
   if (cachedIdentity) return cachedIdentity
   cachedIdentity = storage?.get() ?? null
@@ -138,10 +103,7 @@ export function loadCofferIdentity(
 }
 
 /** Expand a per-label key from the master (client-only, deterministic). */
-async function deriveCofferKey(
-  identity: CofferIdentity,
-  label: string
-): Promise<string> {
+async function deriveCofferKey(identity: CofferIdentity, label: string): Promise<string> {
   const key = await hkdfSha256({
     ikm: hexToBytes(identity.masterHex),
     salt: COFFER_DOMAIN,
@@ -152,57 +114,40 @@ async function deriveCofferKey(
 }
 
 /**
- * An opaque, deterministic pseudonym for a label (trade id, conversation id,
- * …). Same label + same identity → same pseudonym; different epochs → all
- * pseudonyms change.
+ * Opaque, deterministic pseudonym for a label (trade id, conversation id, …).
+ * Same label + identity → same pseudonym; different epochs → all change.
  */
-export async function cofferPseudonym(
-  identity: CofferIdentity,
-  label: string
-): Promise<string> {
-  const key = await deriveCofferKey(identity, label)
-  const digest = await sha256Hex(hexToBytes(key))
-  return `${PSEUDONYM_PREFIX}${digest
-    .slice(0, PSEUDONYM_HEX_CHARS)
-    .toUpperCase()}`
+export async function cofferPseudonym(identity: CofferIdentity, label: string): Promise<string> {
+  const digest = await sha256Hex(hexToBytes(await deriveCofferKey(identity, label)))
+  return `${PSEUDONYM_PREFIX}${digest.slice(0, PSEUDONYM_HEX_CHARS).toUpperCase()}`
 }
 
-/** Per-trade pseudonym — addresses/offers embed this, not the wallet. */
-export async function tradePseudonym(
-  identity: CofferIdentity,
-  tradeId: string
-): Promise<string> {
+/** Per-trade pseudonym — offers embed this, not the wallet. */
+export async function tradePseudonym(identity: CofferIdentity, tradeId: string): Promise<string> {
   return cofferPseudonym(identity, `trade:${tradeId}`)
 }
 
 /** Per-conversation pseudonym for chat. */
 export async function conversationPseudonym(
   identity: CofferIdentity,
-  conversationId: string
+  conversationId: string,
 ): Promise<string> {
   return cofferPseudonym(identity, `conversation:${conversationId}`)
 }
 
-/** Stable identity fingerprint — shown in the profile card, not correlatable
- *  back to the wallet by a counterparty. */
-export async function profileFingerprint(
-  identity: CofferIdentity
-): Promise<string> {
+/** Stable identity fingerprint for the profile card (not wallet-correlatable). */
+export async function profileFingerprint(identity: CofferIdentity): Promise<string> {
   return cofferPseudonym(identity, "self")
 }
 
-/** Pure rotation — returns a NEW identity with a bumped epoch. Commit it with
- *  `saveRotatedIdentity`. */
+/** Pure rotation — commit with `saveRotatedIdentity`. */
 export function rotateIdentity(identity: CofferIdentity): CofferIdentity {
-  return {
-    ...identity,
-    epoch: identity.epoch + 1,
-  }
+  return { ...identity, epoch: identity.epoch + 1 }
 }
 
 export function saveRotatedIdentity(
   rotated: CofferIdentity,
-  storage: CofferStorage | null = localStorageBackedStorage()
+  storage: CofferStorage | null = localStorageBackedStorage(),
 ): CofferIdentity {
   cachedIdentity = rotated
   storage?.set(rotated)
@@ -211,7 +156,7 @@ export function saveRotatedIdentity(
 
 /** Delete the vault from this device. Funds are unaffected. */
 export function burnCofferIdentity(
-  storage: CofferStorage | null = localStorageBackedStorage()
+  storage: CofferStorage | null = localStorageBackedStorage(),
 ): void {
   cachedIdentity = null
   storage?.remove()

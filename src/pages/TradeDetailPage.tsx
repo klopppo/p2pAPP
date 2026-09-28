@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { currencySymbol, formatGracePeriod, formatDuration } from '@/lib/utils'
+import { assertTxSuccess, formatAddress } from '@/lib/uiFormat'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   useAccount,
+  useChainId,
   usePublicClient,
   useReadContract,
   useWriteContract,
 } from 'wagmi'
 import { toast } from 'sonner'
-import { formatUnits, maxUint256, type Abi } from 'viem'
+import { formatUnits, type Abi } from 'viem'
 import {
   Wallet,
   Loader2,
@@ -41,6 +43,7 @@ import {
 } from '@/lib/contracts'
 import { useConversationByTradeId } from '@/hooks/useConversations'
 import { useEscrowEventWatcher, useEscrowState } from '@/hooks/useDisputes'
+import { useVerifiedEscrow } from '@/hooks/useVerifiedEscrow'
 import {
   EscrowStatus,
   getTradeById,
@@ -92,19 +95,9 @@ function formatTokenAmount(raw: bigint, decimals: number, symbol: string) {
   return `${human} ${symbol}`
 }
 
-function formatAddress(addr: string | null | undefined) {
-  if (!addr) return '—'
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`
-}
-
-/**
- * viem's `waitForTransactionReceipt` resolves for a mined-but-reverted tx, so
- * callers MUST check `status` before treating the action as successful
- * (otherwise a revert is followed by a success toast + DB/reputation writes).
- */
-function assertTxSuccess(receipt: { status: 'success' | 'reverted' }) {
-  if (receipt.status === 'reverted') {
-    throw new Error('Transaction reverted on-chain')
+function warnRejected(results: PromiseSettledResult<unknown>[]) {
+  for (const r of results) {
+    if (r.status === 'rejected') console.warn('[TradeDetailPage.tsx] reputation update failed:', r.reason)
   }
 }
 
@@ -113,6 +106,7 @@ export function TradeDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { address, isConnected } = useAccount()
+  const chainId = useChainId()
   const publicClient = usePublicClient()
   const { writeContractAsync } = useWriteContract()
   const { sessionWallet, hasSession } = useWalletSession()
@@ -141,8 +135,14 @@ export function TradeDetailPage() {
     escrowAddress,
   )
 
-  // Read the trade token (immutable on the factory, but cached per escrow for
-  // convenience). Used for ERC-20 approve + display.
+  // Trust gate: before any fund-moving write, confirm the factory deployed this
+  // escrow for this wallet; lookup failure/pending stays unverified (CTAs off).
+  const {
+    isVerified: escrowVerified,
+    isVerifying: escrowVerifying,
+  } = useVerifiedEscrow(escrowAddress)
+
+  // Trade token (immutable on the factory) for ERC-20 approve + display.
   const tokenAddress = escrowState?.token
   const { data: tokenSymbol } = useReadContract({
     address: tokenAddress as `0x${string}` | undefined,
@@ -173,10 +173,9 @@ export function TradeDetailPage() {
   const isSeller =
     !!address && !!escrowState && address.toLowerCase() === escrowState.seller.toLowerCase()
 
-  // ── Allowance (drives the "Approve + …" → "Send" button label) ────────────
-  // Re-read after an approve so the CTA flips the moment the wallet confirms.
+  // Allowance drives the "Approve + …" → "Send" label; refetched post-approve.
   const { data: allowance, refetch: refetchAllowance } = useQuery<bigint | null>({
-    queryKey: ['escrow-allowance', tokenAddress, escrowAddress, address],
+    queryKey: ['escrow-allowance', chainId, tokenAddress, escrowAddress, address],
     queryFn: async () => {
       if (!publicClient || !tokenAddress || !escrowAddress || !address) return null
       return (await publicClient.readContract({
@@ -206,10 +205,22 @@ export function TradeDetailPage() {
     sellerAmountWei > 0n && allowance != null && allowance >= sellerAmountWei
 
   const onChainState = escrowState?.state
-  // escrowState.state is typed as KlerosEscStateValue (already narrowed in
-  // the hook). Guard the lookup so TS doesn't try to index with `undefined`.
+  // Guard the state lookup so TS can't index with `undefined`.
   const liveState: KlerosEscStateValue | null =
     onChainState != null ? (onChainState as KlerosEscStateValue) : null
+
+  // Gate every escrow write on factory membership (buttons are also disabled;
+  // re-checking here guards against a stale render re-enabling one).
+  const requireVerifiedEscrow = useCallback((): boolean => {
+    if (escrowVerified) return true
+    toast.error(
+      t('tradeDetail.escrowUnverified', {
+        defaultValue:
+          'This escrow could not be verified against the configured factory for your wallet. The action is disabled to protect your funds.',
+      }),
+    )
+    return false
+  }, [escrowVerified, t])
 
   // ── Action: approve + deposit (buyer OR seller path) ─────────────────────
   const fundEscrow = async (
@@ -220,6 +231,7 @@ export function TradeDetailPage() {
     >,
   ) => {
     if (!tokenAddress || !escrowAddress || !publicClient) return
+    if (!requireVerifiedEscrow()) return
 
     try {
       // 1) Check current allowance — skip approve if already sufficient.
@@ -233,15 +245,14 @@ export function TradeDetailPage() {
       })) as bigint
 
       if (currentAllowance < amountWei) {
-        // High #7 (audit 2026-08-24): wait for the approve to mine before
-        // firing the deposit. Without this, the deposit reverted mid-flight
-        // with the generic ERC20 "insufficient allowance" error and the
-        // user saw it as a deposit failure instead of a wallet-confirm step.
+        // Approve the exact amount this path pulls — never unlimited — so a
+        // bad escrow address can't drain more than the trade needs. Wait for
+        // the approve to mine before depositing so it can't outrun allowance.
         const approveHash = await writeContractAsync({
           address: tokenAddress,
           abi: ERC20_ABI as Abi,
           functionName: 'approve',
-          args: [escrowAddress, maxUint256],
+          args: [escrowAddress, amountWei],
         })
         assertTxSuccess(
           await publicClient.waitForTransactionReceipt({
@@ -249,15 +260,12 @@ export function TradeDetailPage() {
             timeout: 90_000,
           }),
         )
-        // Confirm the approval, then flip the CTA to "Send" (the allowance
-        // query is invalidated so the button label updates immediately).
+        // Invalidate allowance so the CTA flips to "Send" immediately.
         toast.success(t('tradeDetail.approveSuccess'))
         void refetchAllowance()
       }
 
-      // 2) Call the appropriate deposit function on the escrow. The seller's
-      //    path needs both depositSellerSecurityDeposit + lockFunds, so the
-      //    callback may return two tx hashes (we mirror both).
+      // 2) Deposit callback may return two tx hashes on the seller path.
       setTxStage('depositing')
       const result = await afterApprove()
 
@@ -267,8 +275,7 @@ export function TradeDetailPage() {
         typeof result === 'string' ? null : result.lockHash
 
       setTxStage('mining')
-      // viem does NOT throw on a reverted receipt, so a failed tx would
-      // otherwise be followed by a success toast + a DB status mirror.
+      // Reverted receipts don't throw — assert before success toast/mirror.
       if (depositTxHash) {
         assertTxSuccess(await publicClient.waitForTransactionReceipt({ hash: depositTxHash }))
       }
@@ -276,9 +283,8 @@ export function TradeDetailPage() {
         assertTxSuccess(await publicClient.waitForTransactionReceipt({ hash: lockTxHash }))
       }
 
-      // 3) Mirror on-chain progress into Supabase so the listing pages can
-      // filter by `escrow_status` without a re-read. When there is no deposit
-      // tx (0%-deposit escrow, seller only locks), the lock tx is the anchor.
+      // 3) Mirror escrow_status for the listing pages; the lock tx is the
+      // anchor when there is no deposit tx (0%-deposit seller path).
       const anchorTxHash = depositTxHash ?? lockTxHash
       if (!anchorTxHash) return
       const newStatus =
@@ -292,10 +298,8 @@ export function TradeDetailPage() {
       ).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); /* non-fatal — the chain tx already happened */
       })
 
-      // 3a) Seller path: after lockFunds the escrow is FUNDED only when the
-      //     security-deposit requirement is satisfied (pct == 0, or both
-      //     deposits in). Writing FUNDED unconditionally could contradict the
-      //     contract (e.g. seller locks before the buyer deposits at pct > 0).
+      // 3a) FUNDED only when the deposit requirement is met (pct == 0 or both
+      //     deposits in); writing it unconditionally could contradict chain.
       if (lockTxHash) {
         const fullyFunded =
           escrowState.securityDepositPct === 0n ||
@@ -344,13 +348,8 @@ export function TradeDetailPage() {
 
   const handleSellerFund = async () => {
     if (!escrowState) return
-    // The seller's funding step can be deposit+lock, or lock-only:
-    //   - pct == 0            → no deposit (it would revert); lock tradeAmount.
-    //   - seller deposited    → only lockTradeAmount remains.
-    //   - pct > 0, not deposited → deposit first, then lock.
-    // lockFunds() requires `sellerSecurityDeposited` when pct > 0, so the
-    // order matters; once deposited, re-running the old always-deposit+lock
-    // path reverted `AlreadyDeposited` and left the escrow stuck.
+    // deposit+lock ordering matters: when pct > 0, lockFunds() requires
+    // sellerSecurityDeposited, but re-depositing reverts AlreadyDeposited.
     const needsDeposit =
       escrowState.securityDepositPct > 0n && !escrowState.sellerSecurityDeposited
     const amountWei =
@@ -364,7 +363,9 @@ export function TradeDetailPage() {
           abi: KLEROS_ESC_ABI as Abi,
           functionName: 'depositSellerSecurityDeposit',
         })
-        await publicClient!.waitForTransactionReceipt({ hash: depositHash })
+        assertTxSuccess(
+          await publicClient!.waitForTransactionReceipt({ hash: depositHash }),
+        )
       }
       const lockHash = await writeContractAsync({
         address: escrowAddress!,
@@ -377,6 +378,7 @@ export function TradeDetailPage() {
 
   const handleConfirm = async () => {
     if (!escrowAddress) return
+    if (!requireVerifiedEscrow()) return
     try {
       setTxStage('confirming')
       const txHash = await writeContractAsync({
@@ -401,6 +403,7 @@ export function TradeDetailPage() {
 
   const handleRelease = async () => {
     if (!escrowAddress) return
+    if (!requireVerifiedEscrow()) return
     try {
       setTxStage('confirming')
       const txHash = await writeContractAsync({
@@ -417,13 +420,14 @@ export function TradeDetailPage() {
         escrowEventType: TradeEventType.ESCROW_RELEASED,
       }).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); /* non-fatal — the chain tx already happened */
       })
-      // Successful release bumps both parties' reputation slightly. The
-      // RPC clamps the overall score to [0,100].
+      // Bump both parties' reputation (RPC clamps the score to [0,100]).
       if (trade) {
-        await Promise.allSettled([
-          updateUserReputation(trade.buyer_id, 3),
-          updateUserReputation(trade.seller_id, 3),
-        ])
+        warnRejected(
+          await Promise.allSettled([
+            updateUserReputation(trade.buyer_id, 3),
+            updateUserReputation(trade.seller_id, 3),
+          ]),
+        )
       }
       toast.success(t('tradeDetail.releaseSuccess'))
       refetchEscrow()
@@ -437,6 +441,7 @@ export function TradeDetailPage() {
   // ── Action: execute a received Kleros ruling ─────────────────────────────
   const handleExecuteRuling = async () => {
     if (!escrowAddress) return
+    if (!requireVerifiedEscrow()) return
     try {
       setTxStage('confirming')
       const txHash = await writeContractAsync({
@@ -446,8 +451,7 @@ export function TradeDetailPage() {
       })
       setTxStage('mining')
       assertTxSuccess(await publicClient!.waitForTransactionReceipt({ hash: txHash }))
-      // Rulings 1/3 award the crypto to the buyer (refund); 0/2/4 leave it
-      // with the seller (completed release). Mirror accordingly.
+      // Rulings 1/3 → buyer refund; 0/2/4 → seller release.
       const ruling = escrowState?.currentRuling != null ? Number(escrowState.currentRuling) : undefined
       const buyerWins =
         ruling === Ruling.AWARD_BUYER_PENALTY_SELLER ||
@@ -462,10 +466,12 @@ export function TradeDetailPage() {
       if (trade) {
         const winnerId = buyerWins ? trade.buyer_id : trade.seller_id
         const loserId = buyerWins ? trade.seller_id : trade.buyer_id
-        await Promise.allSettled([
-          updateUserReputation(winnerId, 2),
-          updateUserReputation(loserId, -3),
-        ])
+        warnRejected(
+          await Promise.allSettled([
+            updateUserReputation(winnerId, 2),
+            updateUserReputation(loserId, -3),
+          ]),
+        )
       }
       toast.success(t('tradeDetail.rulingExecutedSuccess'))
       refetchEscrow()
@@ -478,17 +484,13 @@ export function TradeDetailPage() {
 
   // ── Derived action visibility ─────────────────────────────────────────────
   const depositPct = escrowState?.securityDepositPct ?? 0n
-  // `depositBuyerSecurityDeposit()` / `depositSellerSecurityDeposit()` revert
-  // with NoSecurityDepositRequired() at 0%, and `AlreadyDeposited()` once done.
+  // Deposit fns revert at 0% (NoSecurityDepositRequired) or once done.
   const showBuyerDeposit =
     !!isBuyer && liveState === KlerosEscState.AWAITING_FUNDING &&
     depositPct > 0n &&
     !(escrowState?.buyerSecurityDeposited ?? false)
-  // Seller: a deposit is only needed when pct > 0 and not yet deposited; the
-  // lock is a separate step that becomes available once the deposit is in
-  // (or immediately at pct == 0, since `lockFunds` skips the deposit check
-  // then). Both buttons route through `handleSellerFund`, which performs
-  // exactly the steps still outstanding.
+  // Seller: lock is available once the deposit is in (or immediately at
+  // pct == 0); both buttons route through handleSellerFund.
   const showSellerDeposit =
     !!isSeller &&
     liveState === KlerosEscState.AWAITING_FUNDING &&
@@ -503,9 +505,7 @@ export function TradeDetailPage() {
   const showBuyerConfirm =
     !!isBuyer && liveState === KlerosEscState.FUNDED
 
-  // CONFIRMED_PENDING: gate `release()` on the on-chain grace period having
-  // elapsed (`now >= confirmationTime + gracePeriod`). `confirmationTime` is
-  // zero until the buyer has actually called `confirm()`.
+  // Gate release() on the on-chain grace period (confirmationTime + gracePeriod).
   const nowSecsBig = useNowSecsBig()
   const graceEndSeconds = useMemo(() => {
     if (!escrowState || liveState !== KlerosEscState.CONFIRMED_PENDING) return null
@@ -518,29 +518,22 @@ export function TradeDetailPage() {
     liveState === KlerosEscState.CONFIRMED_PENDING && gracePeriodElapsed === true
   const showExecuteRuling =
     liveState === KlerosEscState.RULING_RECEIVED
-  // raiseDispute is callable from FUNDED (no grace window) and from
-  // CONFIRMED_PENDING while still inside the grace window. After the
-  // grace window closes (now >= confirmationTime + gracePeriod),
-  // KlerosEsc.raiseDispute reverts with DisputeWindowClosed() — we
-  // mirror that boundary here so the user doesn't click into a
-  // guaranteed revert.
+  // raiseDispute is valid from FUNDED or CONFIRMED_PENDING inside the grace
+  // window; after it closes the contract reverts DisputeWindowClosed.
   const disputeWindowClosed =
     liveState === KlerosEscState.CONFIRMED_PENDING &&
     gracePeriodElapsed === true
-  const showRaiseDispute =
+  const disputeActionAvailable =
     (liveState === KlerosEscState.FUNDED ||
       liveState === KlerosEscState.CONFIRMED_PENDING) &&
     (isBuyer || isSeller) &&
     !disputeWindowClosed
+  // Dispute CTA is also gated on the factory-membership check.
+  const showRaiseDispute = escrowVerified && disputeActionAvailable
 
-  // Funding-phase timelock cancel. Per KlerosEsc.cancelTrade():
-  //   buyer  → buyerSecurityDeposited && !fundsLocked && now >= buyerDepositTime + 1 day
-  //   seller → sellerSecurityDeposited && !buyerSecurityDeposited && now >= sellerDepositTime + 1 day
-  // We surface the button when the connected wallet could plausibly call it
-  // and let the contract revert if the timelock hasn't elapsed.
-  // Reuse the single `nowSecsBig` from the funding-timelock effect above
-  // (hoisting a second interval here would tick the same wall clock twice
-  // per second for the same component).
+  // Funding-phase timelock cancel (KlerosEsc.cancelTrade): own deposit in,
+  // not locked/counter-deposited, 1 day elapsed. Button visibility is
+  // best-effort; the contract reverts if the timelock hasn't elapsed.
 
   const { showCancel } = useMemo(() => {
     const buyerOk =
@@ -570,8 +563,21 @@ export function TradeDetailPage() {
     escrowState?.sellerDepositTime,
   ])
 
+  // Whether this wallet could act ignoring verification; drives the trust
+  // warning (actions stay gated while unverified).
+  const hasEscrowAction =
+    showBuyerDeposit ||
+    showSellerDeposit ||
+    showSellerLock ||
+    showBuyerConfirm ||
+    showRelease ||
+    showExecuteRuling ||
+    showCancel ||
+    disputeActionAvailable
+
   const handleCancelTrade = async () => {
     if (!escrowAddress) return
+    if (!requireVerifiedEscrow()) return
     try {
       setTxStage('confirming')
       const txHash = await writeContractAsync({
@@ -581,10 +587,8 @@ export function TradeDetailPage() {
       })
       setTxStage('mining')
       assertTxSuccess(await publicClient!.waitForTransactionReceipt({ hash: txHash }))
-      // Funding-phase mutual cancel — both parties get their own deposits
-      // back (and seller gets tradeAmount back if it was locked). NOT a
-      // ruling; do not label this as 'refunded' (which means buyer-favorable
-      // dispute payout). Use EscrowStatus.CANCELLED.
+      // Mutual cancel: each party gets deposits back. Not a ruling — use
+      // CANCELLED, not 'refunded' (which means a buyer-favorable payout).
       await updateTradeStatus(trade!.id, 'cancelled', {
         escrowStatus: EscrowStatus.CANCELLED,
         txHash,
@@ -600,13 +604,9 @@ export function TradeDetailPage() {
   }
 
   // ── B-2: live refresh on counterparty actions ───────────────────────────
-  // The KlerosEsc emits events for every state transition. We mount the
-  // shared watcher here so counterparty `cancelTrade` / `release` / `lockFunds`
-  // / deposit events show up without a manual page refresh. Only relevant
-  // financing-phase + dispute-lifecycle events are dispatched by name.
-  // Depend on the primitive `tradeId` (not the full `trade` object): react-query
-  // hands back a fresh reference on every refetch, which would otherwise tear
-  // down + resubscribe the watcher each poll and miss on-chain events in the gap.
+  // Refresh state on escrow events without a manual reload; depend on the
+  // primitive `tradeId` so refetches don't resubscribe the watcher and miss
+  // events in the gap.
   const tradeId = trade?.id
   const handleEscrowEvent = useCallback(
     (name: string) => {
@@ -622,8 +622,7 @@ export function TradeDetailPage() {
         name === 'Confirmed'
       ) {
         refetchEscrow()
-        // Mirror the financing-phase transition into Supabase so the trades
-        // list + dispute page see the new state immediately.
+        // Mirror the transition so the trades list + dispute page update.
         if (name === 'TradeFullyFunded') {
           setTradeEscrowStatus(tradeId, EscrowStatus.FUNDED, {
             escrowEventType: TradeEventType.ESCROW_FUNDED,
@@ -673,10 +672,8 @@ export function TradeDetailPage() {
   const ratedId = myRole === 'buyer' ? trade?.seller_id : trade?.buyer_id
   const ratingDirection = myRole === 'buyer' ? 'seller' as const : 'buyer' as const
 
-  // A trade is rateable once it reaches a terminal outcome: the on-chain escrow
-  // is COMPLETED, or the DB mirror already shows completed/refunded (refunded
-  // covers buyer-favorable rulings, which never set the on-chain COMPLETED
-  // state through `release()`).
+  // Rateable once terminal: on-chain COMPLETED, or DB completed/refunded
+  // (buyer-favorable rulings never set the on-chain COMPLETED state).
   const tradeTerminal =
     trade?.status === 'completed' ||
     trade?.status === 'refunded' ||
@@ -696,8 +693,7 @@ export function TradeDetailPage() {
     liveState === KlerosEscState.COMPLETED ? trade?.id : undefined,
   )
 
-  // Chat counterpart — conversation is created by the
-  // create_conversation_for_trade trigger on trade insert.
+  // Conversation is created by the create_conversation_for_trade trigger.
   const { data: conversation } = useConversationByTradeId(
     trade?.id ?? null,
   )
@@ -741,11 +737,7 @@ export function TradeDetailPage() {
   return (
     <div className="w-full max-w-xl mx-auto">
       <ChainGuard />
-      {/* Same AppPageHeader centered shape as CreateOfferPage / TradesPage:
-          back button left, title + subtitle centered, no horizontal
-          divider. The escrow status badge used to live under the
-          subtitle; it was removed per UX feedback (the state is
-          repeated inside the Funding card below). */}
+      {/* Centered AppPageHeader (back left, title/subtitle centered). */}
       <AppPageHeader
         title={`${t('tradeDetail.trade')} ${trade.crypto_token}`}
         subtitle={
@@ -851,10 +843,7 @@ export function TradeDetailPage() {
         </Card>
       )}
 
-      {/* Grace period info — visible whenever the trade is in the
-          CONFIRMED_PENDING state on-chain (buyer has called confirm()).
-          Explains what the grace period is, who can act during it, and
-          a countdown if the window hasn't elapsed yet. */}
+      {/* Grace-period info while CONFIRMED_PENDING, with countdown. */}
       {escrowState && liveState === KlerosEscState.CONFIRMED_PENDING && (
         <Card className="glass-panel rounded-2xl p-6 mt-3">
           <Text variant="h4" className="font-bold mb-2">
@@ -920,12 +909,30 @@ export function TradeDetailPage() {
 
           <Separator />
 
+          {/* Unverified escrow → fund-moving CTAs disabled (handlers re-check). */}
+          {!escrowVerified && hasEscrowAction && (
+            <Alert className="mt-3 rounded-2xl">
+              <ShieldAlert className="w-4 h-4" />
+              <AlertDescription>
+                {escrowVerifying
+                  ? t('tradeDetail.escrowVerifying', {
+                      defaultValue:
+                        'Verifying the escrow contract against the configured factory…',
+                    })
+                  : t('tradeDetail.escrowUnverified', {
+                      defaultValue:
+                        'This escrow could not be verified against the configured factory for your connected wallet. Fund-moving actions are disabled to protect your funds.',
+                    })}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Action buttons */}
           <div className="flex flex-col gap-2 pt-2">
             {showBuyerDeposit && (
               <Button
                 onClick={handleBuyerDeposit}
-                disabled={isTxBusy || !tokenAddress}
+                disabled={isTxBusy || !tokenAddress || !escrowVerified}
                 className="rounded-full"
               >
                 {isTxBusy ? (
@@ -944,7 +951,7 @@ export function TradeDetailPage() {
             {showSellerDeposit && (
               <Button
                 onClick={handleSellerFund}
-                disabled={isTxBusy || !tokenAddress}
+                disabled={isTxBusy || !tokenAddress || !escrowVerified}
                 className="rounded-full"
               >
                 {isTxBusy ? (
@@ -963,7 +970,7 @@ export function TradeDetailPage() {
             {showSellerLock && (
               <Button
                 onClick={handleSellerFund}
-                disabled={isTxBusy}
+                disabled={isTxBusy || !escrowVerified}
                 className="rounded-full"
               >
                 {isTxBusy ? (
@@ -982,7 +989,7 @@ export function TradeDetailPage() {
             {showBuyerConfirm && (
               <Button
                 onClick={handleConfirm}
-                disabled={isTxBusy}
+                disabled={isTxBusy || !escrowVerified}
                 className="rounded-full"
               >
                 {isTxBusy ? (
@@ -997,7 +1004,7 @@ export function TradeDetailPage() {
             {showRelease && (
               <Button
                 onClick={handleRelease}
-                disabled={isTxBusy}
+                disabled={isTxBusy || !escrowVerified}
                 variant="outline"
                 className="rounded-full"
               >
@@ -1027,7 +1034,7 @@ export function TradeDetailPage() {
             {showExecuteRuling && (
               <Button
                 onClick={handleExecuteRuling}
-                disabled={isTxBusy}
+                disabled={isTxBusy || !escrowVerified}
                 className="rounded-full"
               >
                 {isTxBusy ? (
@@ -1071,7 +1078,7 @@ export function TradeDetailPage() {
             {showCancel && (
               <Button
                 onClick={handleCancelTrade}
-                disabled={isTxBusy}
+                disabled={isTxBusy || !escrowVerified}
                 variant="ghost"
                 className="rounded-full text-muted-foreground hover:text-destructive"
               >
@@ -1169,6 +1176,3 @@ function FundingRow({
     </div>
   )
 }
-
-// Keep imports minimal — Label removed (was unused).
-void 0

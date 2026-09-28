@@ -2,16 +2,7 @@ interface NonCustodialGraphicProps {
   className?: string
 }
 
-/**
- * Enhanced animated "non-custodial" illustration.
- *
- * Isometric wallet (you hold your keys) → bidirectional animated particle
- * flow → smart-contract core with orbital rings, shield lock, and hexagonal
- * blockchain nodes. 3-face isometric shading, blurred contact shadows,
- * glowing accents. Theme-aware: wireframe uses `currentColor`, accents use
- * `--primary`. Keyframes in index.css: `.ncg-float` / `.ncg-flow-dash` /
- * `.ncg-pulse-slow` / `.ncg-orbit` / `.ncg-particle` / `.ncg-hex-pulse`.
- */
+/** Animated isometric "non-custodial" illustration; theme-aware via `--primary`. */
 export function NonCustodialGraphic({ className }: NonCustodialGraphicProps) {
   const glow = (strength: number) =>
     `drop-shadow(0 0 ${strength}px color-mix(in srgb, var(--primary) 65%, transparent))`

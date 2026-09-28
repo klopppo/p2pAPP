@@ -2,17 +2,23 @@ import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 
+const QUERY_ROOTS = [
+  'wallet-session',
+  'current-user',
+  'messages',
+  'conversation',
+  'conversations',
+  'trades',
+  'trade',
+  'disputes',
+  'dispute',
+  'notifications',
+  'notification-prefs',
+]
+
 /**
- * Bridges supabase-js auth events into React Query.
- *
- * Without this, a silent token death (refresh failure, sign-out in another
- * tab, restored session that finished restoring after mount) leaves every
- * wallet-scoped query holding its last cache entry while RLS starts denying —
- * the UI keeps showing stale or empty chat data with no way to recover until a
- * manual reload. Invalidating `wallet-session` re-evaluates the session gate;
- * the chat/user roots are invalidated too so a session that becomes live again
- * refetches immediately instead of waiting for the poll interval.
- *
+ * Bridge supabase-js auth events into React Query. Without this a silent token
+ * death leaves wallet-scoped queries holding stale/RLS-denied data until reload.
  * Mount once, inside `QueryClientProvider`.
  */
 export function AuthSessionSync() {
@@ -20,23 +26,11 @@ export function AuthSessionSync() {
 
   useEffect(() => {
     const { data } = supabase.auth.onAuthStateChange(() => {
-      // Defer past the callback: supabase-js holds an internal auth lock
-      // while dispatching this event, and the invalidated queries call
-      // `supabase.auth.getSession()` again. Invoking that synchronously here
-      // can deadlock (a documented supabase-js footgun) — a macrotask lets
-      // the lock release first.
+      // Defer past the callback: supabase-js holds its auth lock while
+      // dispatching, and invalidated queries call getSession() again — running
+      // them synchronously can deadlock. A macrotask lets the lock release.
       setTimeout(() => {
-        void qc.invalidateQueries({ queryKey: ['wallet-session'] })
-        void qc.invalidateQueries({ queryKey: ['current-user'] })
-        void qc.invalidateQueries({ queryKey: ['messages'] })
-        void qc.invalidateQueries({ queryKey: ['conversation'] })
-        void qc.invalidateQueries({ queryKey: ['conversations'] })
-        void qc.invalidateQueries({ queryKey: ['trades'] })
-        void qc.invalidateQueries({ queryKey: ['trade'] })
-        void qc.invalidateQueries({ queryKey: ['disputes'] })
-        void qc.invalidateQueries({ queryKey: ['dispute'] })
-        void qc.invalidateQueries({ queryKey: ['notifications'] })
-        void qc.invalidateQueries({ queryKey: ['notification-prefs'] })
+        for (const key of QUERY_ROOTS) void qc.invalidateQueries({ queryKey: [key] })
       }, 0)
     })
     return () => data.subscription.unsubscribe()

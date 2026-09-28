@@ -9,6 +9,45 @@
 
 ---
 
+## Compaction + security hardening + bug-reliability pass — 2026-09-27
+
+Non-UI rewrite/review pass (parallel workers + verifier) plus a literature-guided
+bug hunt (TanStack Query v5 / supabase-js v2 / wagmi v2 best practices).
+
+- **Compaction (no UI behavior change):** `src/lib/supabase/index.ts` 2,905 → 1,810;
+  `src/types` → 242; `src/hooks` → ~1,800; `src/lib` (excl. supabase) → ~2,900.
+  Deleted 6 zero-reference components (`OfferRow`, `FilterDropdown`, `MetricCard`,
+  `MiniSparkline`, `StatDividerGrid`, `marquee`) and dead exports/files
+  (`lib/siwe.ts`, `lib/useExpectedChain.ts`, dead notification channel); deduped
+  `timeAgo`, `formatAddress`/`formatDate`/`assertTxSuccess` (`src/lib/uiFormat.ts`).
+- **Security:**
+  - Escrow verification (todo item shipped): new `useVerifiedEscrow` checks the
+    escrow address against the factory's `escrowByBuyer/BySeller` lists and
+    fail-closes all fund/settlement CTAs — TradeDetailPage, DisputeDetailPage
+    (`executeRuling`/`finalize`/`timeoutDispute`/`appeal`) and `DisputePage.raiseDispute`
+    (the `?escrowAddress=` path now verified).
+  - Exact-amount ERC-20 approvals (no more `maxUint256`).
+  - `siwe-auth` CORS allowlist instead of `*`; SIWE header-domain + URI must match.
+  - `cache-purge` constant-time secret compare; CSP theme pre-paint script
+    extracted to `public/theme-init.js` (inline script was blocked by `script-src 'self'`).
+  - Wallet claim reads prefer admin-only `app_metadata`; `setConversationArchived`
+    preserves `locked` (no re-enable of sends).
+- **Reliability:** optimistic mutations cancel before writing + roll back only the
+  temp entry; `useMessages` poll preserves pages from `loadOlder`; one shared
+  realtime channel per topic (`subscribeShared`) instead of duplicates; ~15
+  swallowed supabase errors now surface; wagmi receipts checked (`assertTxSuccess`)
+  before success writes; persistence/cache payloads validated; filename sanitizer
+  no longer builds a RegExp from user input.
+- Verified: `npm run build` ✓, `eslint` 0 errors; vitest not installed locally
+  (tests statically import-checked). Migration + `siwe-auth` redeploy for the
+  `app_metadata` claim still pending on the Supabase side.
+
+Files: `src/lib/**`, `src/hooks/**`, `src/pages/**`, `src/components/**`,
+`src/types/**`, `functions/**`, `supabase/functions/siwe-auth/**`, `index.html`,
+`public/theme-init.js`, `.env.example`, `eslint.config.js`.
+
+---
+
 ## Deletion-first refactor of the data layer (`src/lib`, `src/hooks`, `src/types`) — 2026-09-27
 
 Three parallel review workers, one verifier. Scope: UX/web3/Supabase layers only —

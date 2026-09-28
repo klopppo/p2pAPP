@@ -35,9 +35,8 @@ import { InviteEarnCard } from "@/components/custom/InviteEarnCard"
 import { CofferIdentityCard } from "@/components/custom/CofferIdentityCard"
 import { currencySymbol } from "@/lib/utils"
 
-// Local UI shape for the offers table. Mirrors what OffersTableWrapper expects;
-// kept here because the data comes from useOffersBySeller (which returns the DB
-// row) and needs to be reshaped before being passed down.
+// Local UI shape for the offers table, reshaped from the DB row returned by
+// useOffersBySeller.
 interface Offer {
   id: string
   trader: string
@@ -215,12 +214,8 @@ export function ProfilePage() {
     return sorted
   }, [mappedOffers, sortKey, sortDir])
 
-  // No wallet + no URL target → there is nothing meaningful to render on
-  // the main /app/profile route. The Navbar still shows "Profile"
-  // (so the user can connect from there), but the page body is empty
-  // until they connect. Showing the centered "Connect your wallet" card
-  // here was duplicative — the WalletConnectButton in the Navbar already
-  // covers it.
+  // Nothing to render without a wallet or URL target; the Navbar's
+  // WalletConnectButton covers the connect affordance.
   if (!isConnected && isOwnProfile && !urlWalletAddress) {
     return null
   }
@@ -278,13 +273,8 @@ export function ProfilePage() {
       })
     : "—"
 
-  // "Message" button — find any conversation with this user via the
-  // current user's conversation list. v1's `create_conversation_for_trade`
-  // trigger only creates conversation rows at trade creation, so a
-  // conversation exists iff the two users share a prior trade. Either
-  // buyer or seller of that trade qualifies as a participant.
-  // Placed BEFORE the early returns below to satisfy rules-of-hooks.
-  // (Hook call lives above with the others.)
+  // Find any conversation shared with this user; a thread exists iff the two
+  // traded before (the trigger creates rows at trade creation).
   const existingConv = conversations.find((c) => {
     const ids = c.participants.map((p) => p.user_id)
     return ids.includes(user?.id ?? "") && ids.includes(profile.id)
@@ -303,9 +293,7 @@ export function ProfilePage() {
       if (convId) navigate(`/app/messages/${convId}`)
       else toast.error(t("profile.errorStartChat"))
     } catch (err) {
-      // P0002 = "unknown user" — the other user has no public.users row yet
-      // (their wallet never finished SIWE, or the row is still being
-      // provisioned by a parallel tab).
+      // P0002 = no public.users row yet (SIWE unfinished or provisioning).
       if ((err as { code?: string }).code === "P0002") {
         toast.error(t("profile.errorUnknownUser"))
       } else {

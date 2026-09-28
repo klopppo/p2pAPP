@@ -48,8 +48,10 @@ import {
   type DisputeEvidenceFile,
 } from '@/lib/supabase'
 import { useUserEscrows, useArbitrationCost, useEscrowState } from '@/hooks/useDisputes'
+import { useVerifiedEscrow } from '@/hooks/useVerifiedEscrow'
 import { DisputeStatus, TradeEventType } from '@/types/database'
 import { errorMessage } from '@/lib/errorMessage'
+import { assertTxSuccess } from '@/lib/uiFormat'
 
 interface UploadedFile {
   file: File
@@ -77,9 +79,7 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-// cidToBytes32 is imported below from '@/lib/ipfs' (renamed: hashes
-// 'ipfs://' + cid to match the contract test encoding in
-// contrats/test/klerosTests.t.sol:2413,2425,2464).
+// cidToBytes32 hashes "ipfs://" + cid to match the contract encoding.
 
 export function DisputePage() {
   const { t } = useTranslation()
@@ -91,9 +91,8 @@ export function DisputePage() {
   const publicClient = usePublicClient()
   const { writeContractAsync } = useWriteContract()
 
-  // Stable short codes for `disputes.reason` (varchar(200) — keep under the
-  // limit). `reason_category` carries the full localized label. Codes mirror
-  // what the relational-schema doc calls `dispute_category` enum values.
+  // Stable short codes for `disputes.reason`; `reason_category` carries the
+  // localized label.
   const DISPUTE_REASONS = useMemo(
     () => [
       { value: 'no_payment', label: t('disputePage.reasonNoPayment') },
@@ -129,11 +128,9 @@ export function DisputePage() {
     [t],
   )
 
-  // When the user lands here from a trade detail page, the route carries
-  // ?tradeId=<id> (which encodes the escrow contract address — see
-  // TradeDetailPage's "Raise a Kleros dispute" link). We auto-select that
-  // escrow once the user's escrows load.
-  const queryEscrow = searchParams.get('escrowAddress') as `0x${string}` | null
+  const queryEscrowParam = searchParams.get('escrowAddress')
+  const queryEscrow =
+    queryEscrowParam && /^0x[a-fA-F0-9]{40}$/.test(queryEscrowParam) ? (queryEscrowParam as `0x${string}`) : null
 
   const [escrowAddress, setEscrowAddress] = useState<`0x${string}` | ''>('')
   const [reason, setReason] = useState(DISPUTE_REASONS[0].value)
@@ -148,19 +145,22 @@ export function DisputePage() {
   const factoryReady = isFactoryConfigured()
 
   const { data: userEscrows = [], isLoading: escrowsLoading } = useUserEscrows()
-  // Derived: if the user hasn't picked one yet, fall back to a `?escrowAddress=`
-// query param (when arriving from a TradeDetailPage link), then to the first
-// escrow in their list. The arbitration-cost hook + dropdown both consume
-// `effectiveEscrow`; no separate effect needed.
-const effectiveEscrow =
-    escrowAddress || queryEscrow || userEscrows[0] || ''
+  // Fall back to the ?escrowAddress= param, then to the first user escrow.
+  // The arbitration-cost hook + dropdown both consume `effectiveEscrow`.
+  const effectiveEscrow = escrowAddress || queryEscrow || userEscrows[0] || ''
   const { data: arbitrationCostWei } = useArbitrationCost(
     effectiveEscrow || undefined,
   )
 
-  // B-4: read the escrow state to determine the filer's role
-  // (buyer vs seller). Previously this defaulted to 'buyer' in
-  // `insertDisputeEvidence`, mis-tagging seller-raised disputes.
+  // Trust gate: `effectiveEscrow` can come from the ?escrowAddress= param, so
+  // the arbitration fee (msg.value) must not be sent until the factory confirms
+  // it deployed this clone for the connected wallet.
+  const {
+    isVerified: escrowVerified,
+    isVerifying: escrowVerifying,
+  } = useVerifiedEscrow(effectiveEscrow || undefined)
+
+  // Read escrow state to tag the filer role (buyer vs seller).
   const { data: escrowState } = useEscrowState(
     effectiveEscrow || undefined,
   )
@@ -237,6 +237,15 @@ const effectiveEscrow =
       )
       return
     }
+    if (!escrowVerified) {
+      toast.error(
+        t('disputePage.escrowUnverified', {
+          defaultValue:
+            'This escrow could not be verified against the configured factory for your wallet. The action is disabled to protect your funds.',
+        }),
+      )
+      return
+    }
     if (files.length === 0) {
       toast.error(t('disputePage.errorUploadProof'))
       return
@@ -249,9 +258,7 @@ const effectiveEscrow =
       toast.error(t('disputePage.errorArbitrationFee'))
       return
     }
-    // Don't submit until we know the escrow state + filer role. Without
-    // escrowState we can't enforce the DisputeWindowClosed gate or tag the
-    // dispute with the correct raiser role.
+    // Need escrow state + role to enforce the window gate and raiser tag.
     if (!escrowState) {
       toast.error(t('disputePage.errorEscrowStateLoading'))
       return
@@ -260,9 +267,8 @@ const effectiveEscrow =
       toast.error(t('disputePage.errorNotAParty'))
       return
     }
-    // KlerosEsc.raiseDispute reverts with DisputeWindowClosed() once the
-    // CONFIRMED_PENDING grace window has elapsed. Block the submit before
-    // charging gas + arbitration so the user doesn't pay to fail.
+    // Contract reverts DisputeWindowClosed after the grace window; block
+    // before paying gas + arbitration.
     const graceElapsed =
       escrowState.confirmationTime > 0n &&
       BigInt(Math.floor(Date.now() / 1000)) >=
@@ -274,9 +280,7 @@ const effectiveEscrow =
       toast.error(t('disputePage.errorDisputeWindowClosed'))
       return
     }
-    // raiseDispute() reverts with InvalidState() outside FUNDED /
-    // CONFIRMED_PENDING (e.g. still awaiting funding, already completed or
-    // cancelled). Block before paying gas + arbitration.
+    // raiseDispute() reverts InvalidState() outside FUNDED/CONFIRMED_PENDING.
     if (
       escrowState.state !== KlerosEscState.FUNDED &&
       escrowState.state !== KlerosEscState.CONFIRMED_PENDING
@@ -284,40 +288,37 @@ const effectiveEscrow =
       toast.error(t('disputePage.errorInvalidState'))
       return
     }
-    // Send a small buffer over the quoted fee: the contract re-reads
-    // arbitrationCost at execution and reverts WrongArbitrationFee() on any
-    // increase, but refunds excess — so overpaying is safe, underpaying isn't.
+    // +10% buffer: the contract re-reads arbitrationCost and refunds excess,
+    // so overpaying is safe but underpaying reverts WrongArbitrationFee.
     const arbitrationValueWei = arbitrationCostWei + arbitrationCostWei / 10n
-    // ETH balance preflight: the tx pays arbitrationFee + gas for the
-    // raiseDispute call + (best-effort) submitEvidence. ~0.005 ETH leaves
-    // headroom on Sepolia; surface the warning if the balance is lower.
-    const balance = (await publicClient.getBalance({ address })) as bigint
-    const required = arbitrationValueWei + 100000000000000n // arbitration + ~0.0001 ETH gas headroom
-    if (balance < required) {
-      toast.error(
-        t('disputePage.errorInsufficientBalance', {
-          required: Number(required) / 1e18,
-          balance: Number(balance) / 1e18,
-        }),
-      )
-      return
-    }
+    // Placeholder row is cleaned up in `finally` on any failure; a leftover
+    // row would block every retry via the double-raise preflight.
+    let placeholderId: string | null = null
+    try {
+      // Preflight balance: arbitrationFee + gas (~0.0001 ETH headroom).
+      const balance = (await publicClient.getBalance({ address })) as bigint
+      const required = arbitrationValueWei + 100000000000000n // arbitration + ~0.0001 ETH gas headroom
+      if (balance < required) {
+        toast.error(
+          t('disputePage.errorInsufficientBalance', {
+            required: Number(required) / 1e18,
+            balance: Number(balance) / 1e18,
+          }),
+        )
+        return
+      }
 
-    // Preflight: resolve user, linked trade, double-raise check BEFORE we
-    // touch the dispute-evidence bucket. The Storage RLS predicate keys
-    // on the leading dispute UUID in the object name and requires a real
-    // disputes row to exist, which means we have to create the row first
-    // (audit #4 sub-fix: reordering for RLS).
-    const me = await ensureUser(address)
-    if (!me) {
+      // Preflight user + trade + double-raise check BEFORE any storage upload:
+      // the Storage RLS predicate joins on the leading dispute UUID, so the
+      // row must exist first.
+      const me = await ensureUser(address)
+      if (!me) {
         toast.error(t('disputePage.errorConnectWallet'))
-        setStage('idle')
         return
       }
       const linkedTrade = await getTradeByEscrowAddress(effectiveEscrow)
       if (!linkedTrade) {
         toast.error(t('disputePage.errorNoTrade'))
-        setStage('idle')
         return
       }
       const existing = await getDisputesByTrade(linkedTrade.id)
@@ -328,20 +329,9 @@ const effectiveEscrow =
         return
       }
 
-    setStage('uploading')
-    // Placeholder id is tracked locally so the finally block at the bottom
-    // of handleSubmit can clean it up on any failure path. Without this,
-    // a rejected MetaMask prompt or a reverted tx leaves the row behind —
-    // the per-trade preflight (getDisputesByTrade) then blocks every
-    // retry, locking the user out of the dispute flow.
-    let placeholderId: string | null = null
-    try {
-      // 0) Create the dispute row FIRST so its UUID can be the leading
-      //    segment of every evidence object path. The Storage RLS
-      //    predicate (`storage_object_dispute_id(name)`) joins on
-      //    disputes.id, so the row has to exist before any upload. We
-      //    don\'t yet know kleros_dispute_id or the tx hash — those
-      //    land via updateDisputeOnChain after raiseDispute lands.
+      setStage('uploading')
+      // 0) Row first: its UUID is the leading segment of every evidence path
+      //    (Storage RLS joins on disputes.id). On-chain ids land after.
       const dispute = await createDispute({
         dispute_id: generateDisputeId(),
         trade_id: linkedTrade.id,
@@ -367,14 +357,8 @@ const effectiveEscrow =
       })
       placeholderId = dispute.id
 
-      // 1) Upload proof pictures to dispute-evidence storage — the FIRST
-
-      // 1) Upload proof pictures to dispute-evidence storage — the FIRST
-      //    CID becomes the on-chain evidence reference passed to
-      //    submitEvidence(). Bounded concurrency (3 at a time) so a
-      //    batch of 10 files doesn\'t open 10 simultaneous PUTs against
-      //    the Supabase edge (audit #9 sub-bug). Per-file failures are
-      //    isolated — the surviving uploads still ship.
+      // 1) Upload proof pictures; the FIRST CID becomes the on-chain evidence
+      //    reference. Bounded concurrency (3) and per-file failure isolation.
       const uploads: Array<{
         cid: string
         name: string
@@ -427,12 +411,10 @@ const effectiveEscrow =
         )
       }
       const primaryCid = uploads[0].cid
-      // On-chain URI bytes32 = keccak256("ipfs://" + cid) — matches the
-      // contract test in contrats/test/klerosTests.t.sol:2413,2425,2464.
+      // On-chain bytes32 = keccak256("ipfs://" + cid).
       const evidenceBytes32 = cidToBytes32(primaryCid)
 
-      // 2) Raise the dispute on-chain. raiseDispute() forwards ETH to the
-      //    Kleros court internally; we only need to attach the fee.
+      // 2) Raise on-chain; raiseDispute() forwards the fee to Kleros.
       setStage('raising')
       const txHash = await writeContractAsync({
         address: effectiveEscrow,
@@ -441,21 +423,15 @@ const effectiveEscrow =
         value: arbitrationValueWei,
       })
 
-      // 3) Wait for inclusion + decode the on-chain Kleros dispute ID assigned
-      //    by KlerosCourt.createDispute() (via the DisputeRaised event).
-      //    Bound the wait so a Sepolia RPC stall doesn't leave the form
-      //    spinning at `stage='mining'` forever.
+      // 3) Wait (bounded) and decode the Kleros dispute ID from DisputeRaised.
       setStage('mining')
       const receipt = await publicClient.waitForTransactionReceipt({
         hash: txHash,
         timeout: 90_000,
       })
 
-      // Audit M6: if the on-chain raise reverted, the placeholder
-      // `disputes` row we just inserted (to satisfy the Storage RLS
-      // predicate) would otherwise persist and the per-trade preflight
-      // would block every retry — leaving the user permanently unable to
-      // file. Tear it down so they can try again.
+      // Reverted raise: tear down the RLS placeholder row, else the
+      // double-raise preflight blocks every retry.
       if (receipt.status === 'reverted') {
         await deleteDisputePlaceholder(dispute.id).catch((cleanupErr) => {
           console.warn('[DisputePage] placeholder cleanup failed:', cleanupErr)
@@ -480,35 +456,31 @@ const effectiveEscrow =
         console.warn('[DisputePage.tsx] decodeErr:', decodeErr)
       }
 
-      // 4) Submit the on-chain evidence bytes32 (ERC-1497 Evidence event).
-      //    Buyer or seller only — enforced by the contract. May also be
-      //    called later by either party via the detail page.
+      // 4) Submit evidence bytes32 (ERC-1497); buyer/seller only (contract).
       setStage('submitting-evidence')
       let evidenceTxHash: `0x${string}` | null = null
       try {
-        evidenceTxHash = await writeContractAsync({
+        const evidenceHash = await writeContractAsync({
           address: effectiveEscrow,
           abi: KLEROS_ESC_ABI as Abi,
           functionName: 'submitEvidence',
           args: [evidenceBytes32],
         })
-        await publicClient.waitForTransactionReceipt({
-          hash: evidenceTxHash,
-          timeout: 90_000,
-        })
+        assertTxSuccess(
+          await publicClient.waitForTransactionReceipt({
+            hash: evidenceHash,
+            timeout: 90_000,
+          }),
+        )
+        evidenceTxHash = evidenceHash
       } catch (_evidenceErr) {
-        // The dispute itself is raised; evidence submission is best-effort
-        // and can be retried from the detail page. Don\'t fail the whole flow.
+        // Dispute is raised; evidence is best-effort and retryable later.
         console.warn('[DisputePage] submitEvidence failed:', _evidenceErr)
         toast.warning(t('disputePage.warningEvidenceFailed'))
       }
 
-      // 5) Persist on-chain metadata + status on the dispute row created
-      //    in step 0. B-9: bump to IN_REVIEW immediately so the list
-      //    page filter surfaces this row. The description blob is
-      //    back-compat with DisputeDetailPage.parseDescription (older
-      //    rows still key on the in-blob values; new rows prefer the
-      //    dedicated columns).
+      // 5) Persist on-chain metadata; IN_REVIEW so list filters surface it.
+      //    The description blob stays back-compat with parseDescription.
       setStage('saving')
       await updateDisputeOnChain(dispute.id, {
         klerosDisputeId,
@@ -533,21 +505,15 @@ const effectiveEscrow =
         console.warn('[DisputePage.tsx] updateDisputeOnChain:', err)
       })
 
-      // 5a) Persist each uploaded file as a dispute_evidence row. The
-      //     per-file keccakBytes32 here is `keccak256(fileBytes)` (the
-      //     file_hash, computed in uploadDisputeEvidenceFile) — NOT the
-      //     on-chain URI hash. They\'re intentionally distinct: the
-      //     on-chain value is in disputes.tx_hash_evidence + the
-      //     contract\'s Evidence event, this column is the
-      //     off-chain integrity check.
+      // 5a) One dispute_evidence row per file. keccakBytes32 is
+      //     keccak256(fileBytes) (off-chain integrity check) — distinct from
+      //     the on-chain URI hash stored in tx_hash_evidence.
       const evidenceFiles: DisputeEvidenceFile[] = uploads.map((u, idx) => ({
         cid: u.cid,
         name: u.name,
         size: u.size,
         keccakBytes32: u.keccakBytes32,
-        // txHash is the on-chain submitEvidence call, which only the
-        // primary file was sent through. Extras carry null so a
-        // future indexer doesn\'t claim they\'re on-chain.
+        // Only the primary file went through submitEvidence; extras null.
         txHash: idx === 0 ? evidenceTxHash : null,
         evidenceGroupId: 0,
       }))
@@ -560,9 +526,7 @@ const effectiveEscrow =
         console.warn('[DisputePage] insertDisputeEvidence failed:', insertErr)
       })
 
-      // 5b) Mirror the trade into `disputed` so the trades list stops
-      //     showing it as a funding/active trade. Non-fatal — the
-      //     dispute row is the source of truth for listing.
+      // 5b) Mirror the trade as disputed (non-fatal; dispute row is truth).
       await updateTradeStatus(linkedTrade.id, 'disputed', {
         escrowStatus: 'disputed',
         txHash,
@@ -572,18 +536,14 @@ const effectiveEscrow =
       })
 
       toast.success(t('disputePage.successFiled'))
-      // Success — the dispute row is now the source of truth. Clear the
-      // placeholder id so the finally block doesn't delete it.
+      // Success: clear the placeholder so `finally` doesn't delete the row.
       placeholderId = null
       navigate(`/app/disputes/${dispute.id}`)
     } catch (err) {
       toast.error(errorMessage(err, 'disputePage', t))
     } finally {
-      // If the placeholder id is still set, an early-return / thrown error
-      // path above didn't clean up the row. Tear it down so the per-trade
-      // preflight doesn't permanently block the user from retrying. The
-      // helper also strips any uploaded files from the dispute-evidence
-      // bucket (Finding 2).
+      // Any early return/throw left the placeholder: delete it (and its
+      // uploaded files) so the double-raise preflight can't lock the user out.
       if (placeholderId) {
         const orphanId = placeholderId
         void deleteDisputePlaceholder(orphanId).catch((cleanupErr) => {
@@ -601,6 +561,7 @@ const effectiveEscrow =
   const canSubmit =
     agreed &&
     effectiveEscrow &&
+    escrowVerified &&
     files.length > 0 &&
     arbitrationCostWei != null &&
     !isSubmitting
@@ -632,6 +593,22 @@ const effectiveEscrow =
           </AlertDescription>
         </Alert>
       )}
+      {isConnected && factoryReady && !!effectiveEscrow && !escrowVerified && (
+        <Alert className="mb-3 rounded-2xl">
+          <ShieldAlert className="w-4 h-4" />
+          <AlertDescription>
+            {escrowVerifying
+              ? t('disputePage.escrowVerifying', {
+                  defaultValue:
+                    'Verifying the escrow contract against the configured factory…',
+                })
+              : t('disputePage.escrowUnverified', {
+                  defaultValue:
+                    'This escrow could not be verified against the configured factory for your connected wallet. Fund-moving actions are disabled to protect your funds.',
+                })}
+          </AlertDescription>
+        </Alert>
+      )}
       {isConnected && factoryReady && userEscrows.length === 0 && !escrowsLoading && (
         <Alert className="mb-3 rounded-2xl">
           <AlertTriangle className="w-4 h-4" />
@@ -648,14 +625,8 @@ const effectiveEscrow =
             {t('disputePage.tradeAndReason')}
           </Text>
 
-          {/* Escrow contract — read-only when arriving from a trade detail
-              page (`?escrowAddress=0x…` set by TradeDetailPage's
-              "Raise a Kleros dispute" link). The user can't pick a different
-              escrow because the dispute is tied to the specific trade that
-              was opened from. We still resolve via `userEscrows` so the
-              deposit-time / lock-time gates work; if the contract isn't in
-              that list yet (rare race), the selector falls back to a plain
-              read-only chip below. */}
+          {/* Read-only escrow (from the trade-detail link); resolved via
+              userEscrows so the deposit-time / lock-time gates work. */}
           {escrowsLoading ? (
             <div className="h-10 rounded-full bg-muted/60 animate-pulse" />
           ) : effectiveEscrow ? (

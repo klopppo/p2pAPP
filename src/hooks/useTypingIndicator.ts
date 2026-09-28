@@ -8,19 +8,10 @@ interface TypingUser {
 }
 
 /**
- * Typing indicator broadcast over a Supabase Realtime `broadcast` channel
- * scoped to the conversation. We use broadcast (not postgres_changes)
- * because typing pings are ephemeral and should never hit the DB.
- *
- * Usage:
- *   const { typingUsers, notifyTyping } = useTypingIndicator(conversationId, { userId, nickname })
- *
- * The returned `notifyTyping` is debounced internally — call it freely from
- * the input's onChange.
- *
- * On unmount (component swap, conversation switch, page nav) we fire a
- * final `stop_typing` broadcast so the partner doesn't see "Alice is
- * typing…" stuck on for the full 4-second auto-clear window.
+ * Typing indicator over a Supabase Realtime `broadcast` channel (ephemeral, so
+ * it never hits the DB). `notifyTyping` is throttled to one ping per 1.5s;
+ * entries auto-clear after 4s per user. A final `stop_typing` is broadcast on
+ * unmount so the partner's badge clears immediately.
  */
 export function useTypingIndicator(
   conversationId: string | null | undefined,
@@ -30,10 +21,10 @@ export function useTypingIndicator(
   const channelRef = useRef<RealtimeChannel | null>(null)
   const lastSentRef = useRef(0)
   const isTypingRef = useRef(false)
+  const lastSeenRef = useRef<Map<string, number>>(new Map())
 
   useEffect(() => {
     if (!conversationId) return
-
     const channel = supabase.channel(`typing:${conversationId}`, {
       config: { broadcast: { self: false, ack: false }, presence: { key: identity?.userId ?? 'anon' } },
     })
@@ -42,18 +33,12 @@ export function useTypingIndicator(
       .on('broadcast', { event: 'typing' }, (msg: { payload: unknown }) => {
         const payload = msg.payload as TypingUser & { ts?: number }
         if (!payload?.user_id || payload.user_id === identity?.userId) return
-        setTypingUsers((prev) => {
-          const others = prev.filter((u) => u.user_id !== payload.user_id)
-          return [...others, { user_id: payload.user_id, nickname: payload.nickname ?? null }]
-        })
-        // Stamp the per-user last-seen so the rolling 4s timer in the
-        // sync effect actually rolls — without this, the sync effect
-        // reconstructs the map from `typingUsers` but the timestamp we
-        // stored was the FIRST ping's, so the badge would clear after 4s
-        // and flicker back on the next broadcast.
-        if (typeof payload.ts === 'number') {
-          lastSeenRef.current.set(payload.user_id, payload.ts)
-        }
+        setTypingUsers((prev) => [
+          ...prev.filter((u) => u.user_id !== payload.user_id),
+          { user_id: payload.user_id, nickname: payload.nickname ?? null },
+        ])
+        // Stamp last-seen so the rolling 4s timer resets on every keystroke.
+        if (typeof payload.ts === 'number') lastSeenRef.current.set(payload.user_id, payload.ts)
       })
       .on('broadcast', { event: 'stop_typing' }, (msg: { payload: unknown }) => {
         const payload = msg.payload as { user_id: string }
@@ -65,24 +50,12 @@ export function useTypingIndicator(
     channelRef.current = channel
 
     return () => {
-      // Fire a final stop_typing so the partner's "Alice is typing…" badge
-      // clears immediately when the user switches chats or leaves the
-      // page. Best-effort — fire-and-forget. Swallow BOTH sync throws
-      // and async rejections so we don't generate an unhandled rejection
-      // if the channel has already been torn down.
+      // Best-effort final stop_typing; swallow sync throws and async
+      // rejections if the channel is already gone.
       if (isTypingRef.current && identity?.userId) {
         try {
-          const sendPromise = channel.send({
-            type: 'broadcast',
-            event: 'stop_typing',
-            payload: { user_id: identity.userId },
-          })
-          if (
-            sendPromise &&
-            typeof (sendPromise as Promise<unknown>).catch === 'function'
-          ) {
-            ;(sendPromise as Promise<unknown>).catch(() => {})
-          }
+          const p = channel.send({ type: 'broadcast', event: 'stop_typing', payload: { user_id: identity.userId } })
+          if (p && typeof (p as Promise<unknown>).catch === 'function') (p as Promise<unknown>).catch(() => {})
         } catch {
           // sync throw — handled
         }
@@ -94,29 +67,15 @@ export function useTypingIndicator(
     }
   }, [conversationId, identity])
 
-  // Auto-clear stale typing entries after 4s of silence PER USER. Track
-  // the last-received timestamp per user in a ref so each user's expiry
-  // is independent — a new `typing` event for Alice resets *only* Alice's
-  // timer, not Bob's. The effect runs a single ticker so we don't
-  // accumulate setTimeouts on every broadcast.
-  const lastSeenRef = useRef<Map<string, number>>(new Map())
-  // Roll the per-user timestamp forward on every `typingUsers` change.
-  // The broadcast handler also writes to this map directly (see
-  // above) so the user actually gets a fresh timer on each keystroke.
+  // Seed timestamps for users we haven't stamped yet.
   useEffect(() => {
     const now = Date.now()
     for (const u of typingUsers) {
-      if (!lastSeenRef.current.has(u.user_id)) {
-        lastSeenRef.current.set(u.user_id, now)
-      }
+      if (!lastSeenRef.current.has(u.user_id)) lastSeenRef.current.set(u.user_id, now)
     }
   }, [typingUsers])
 
-  // The 4s rolling timer ticks every second while at least one user is
-  // typing. `isTypingActive` is the boolean dependency so the effect only
-  // re-runs on the false→true / true→false transitions — the inner `prev`
-  // callback always reads the latest `lastSeenRef.current` so we don't
-  // need a re-run when an individual typing ping arrives.
+  // Single 1s ticker while anyone is typing; expiries are per-user.
   const isTypingActive = typingUsers.length > 0
   useEffect(() => {
     if (!isTypingActive) return
@@ -125,8 +84,7 @@ export function useTypingIndicator(
       setTypingUsers((prev) => {
         let changed = false
         const filtered = prev.filter((u) => {
-          const last = lastSeenRef.current.get(u.user_id) ?? 0
-          if (last < cutoff) {
+          if ((lastSeenRef.current.get(u.user_id) ?? 0) < cutoff) {
             changed = true
             return false
           }
@@ -141,7 +99,6 @@ export function useTypingIndicator(
   const notifyTyping = useCallback(() => {
     if (!channelRef.current || !identity) return
     const now = Date.now()
-    // Throttle to one broadcast per 1.5s so we don't spam the channel.
     if (now - lastSentRef.current < 1500) return
     lastSentRef.current = now
     isTypingRef.current = true
@@ -172,17 +129,9 @@ interface PresenceUser {
 }
 
 /**
- * Online presence for the participants of a conversation. Driven by a
- * Supabase Realtime presence channel scoped to the conversation id.
- *
- * Subscribes to three presence events so the green dot / typing indicator
- * never sticks when a partner disconnects:
- *   - 'sync'    : full state dump from the server (re-baseline)
- *   - 'join'    : someone just connected (no-op — `sync` will catch it)
- *   - 'leave'   : someone just disconnected (drop them from local
- *                 state immediately so the dot disappears; the server
- *                 doesn't always re-broadcast `sync` for the last
- *                 departing user when their tab closes)
+ * Online presence for the participants of a conversation. Re-baselines from
+ * the full presence state on sync AND leave (a wallet open in two tabs tracks
+ * two entries under one key, so per-user subtraction would be wrong).
  */
 export function useConversationPresence(
   conversationId: string | null | undefined,
@@ -192,7 +141,6 @@ export function useConversationPresence(
 
   useEffect(() => {
     if (!conversationId || !identity) return
-
     const channel = supabase.channel(`presence:${conversationId}`, {
       config: { presence: { key: identity.userId } },
     })
@@ -201,18 +149,13 @@ export function useConversationPresence(
       const state = channel.presenceState<PresenceUser>()
       const list: PresenceUser[] = []
       Object.values(state).forEach((entries) => {
-        (entries as PresenceUser[]).forEach((p) => list.push(p))
+        ;(entries as PresenceUser[]).forEach((p) => list.push(p))
       })
       setOnline(list)
     }
 
     channel
       .on('presence', { event: 'sync' }, syncFromState)
-      // Re-baseline on leave instead of subtracting: a wallet open in two
-      // tabs tracks two entries under the same key, so closing one tab
-      // must NOT flip the user offline while the other tab is still here.
-      // The server doesn't always re-broadcast `sync` for the last leaver,
-      // so drive the refresh from the local event.
       .on('presence', { event: 'leave' }, syncFromState)
       .subscribe(async (status: string) => {
         if (status === 'SUBSCRIBED') {

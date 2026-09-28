@@ -15,12 +15,7 @@ import {
   type CofferIdentity,
 } from "@/lib/cofferIdentity"
 
-/**
- * "Coffer Identity" card on the OWN profile. Shows the device-bound pseudo-
- * anonymous fingerprint + a sample per-trade pseudonym, and lets the user
- * rotate (all pseudonyms change) or burn (clear this device's vault). The
- * identity can NOT move funds and is purely app-layer.
- */
+/** Own-profile card: device-bound fingerprint + sample pseudonym, rotate/burn. */
 export function CofferIdentityCard({ address }: { address: string }) {
   const { t } = useTranslation()
   const [identity, setIdentity] = useState<CofferIdentity | null>(() =>

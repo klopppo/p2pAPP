@@ -9,10 +9,9 @@ import { useWalletSession } from './useWalletSession'
 type EscrowStateValue = (typeof KlerosEscState)[keyof typeof KlerosEscState]
 
 /**
- * Collapse the on-chain KlerosEsc state machine (plus the funding flags) into
- * the `escrow_status` vocabulary the UI already renders. The DB mirror can
- * lag (or fail if the SECURITY DEFINER RPC isn't deployed), so the list reads
- * the chain and lets this override the stored value.
+ * Collapse the on-chain KlerosEsc state machine (+ funding flags) into the
+ * `escrow_status` vocabulary the UI renders. The DB mirror can lag, so the list
+ * reads the chain and lets this override the stored value.
  */
 export function deriveEscrowStatus(
   state: number,
@@ -23,10 +22,8 @@ export function deriveEscrowStatus(
 ): string {
   switch (state as EscrowStateValue) {
     case KlerosEscState.AWAITING_FUNDING:
-      // Mirror KlerosEsc._checkFullyFunded: at pct == 0 a lock alone funds the
-      // escrow; at pct > 0 the buyer AND seller must have deposited, then the
-      // seller locks. Reporting 'funded' on two bare deposits (without the
-      // lock) would misstate a still-unfunded escrow.
+      // Mirrors KlerosEsc._checkFullyFunded: at pct == 0 a lock alone funds the
+      // escrow; otherwise both deposits AND the lock are required.
       if (securityDepositPct === 0n) {
         if (fundsLocked) return 'funded'
         if (sellerDeposited) return 'seller_deposited'
@@ -39,7 +36,6 @@ export function deriveEscrowStatus(
     case KlerosEscState.FUNDED:
       return 'funded'
     case KlerosEscState.CONFIRMED_PENDING:
-      // Buyer confirmed, release window open — this is the "grace period".
       return 'confirmed'
     case KlerosEscState.AWAITING_RULING:
     case KlerosEscState.RULING_RECEIVED:
@@ -55,16 +51,10 @@ export function deriveEscrowStatus(
 }
 
 /**
- * All trades where the connected wallet is buyer or seller, newest first.
- *
- * Gated on a live Supabase session, not just a wallet: `trades_select_parties`
- * authorizes off the JWT claim, so an unauthenticated read would return `[]`
- * with no error (the "connected but empty" failure mode). The session wallet is
- * in the key so completing SIWE / switching wallets refetches.
- *
- * Each row is enriched with `live_escrow_status` (read straight from the
- * escrow contract) so the list shows the true phase even when the DB mirror is
- * stale. Falls back to the stored `escrow_status` when the read fails.
+ * All trades for the wallet, newest first, each enriched with
+ * `live_escrow_status` read from the escrow contract. Gated on a live session
+ * (RLS returns [] silently). `chainId` is in the key because a chain switch
+ * changes which escrows we read.
  */
 export function useTrades() {
   const { address } = useAccount()
@@ -72,8 +62,6 @@ export function useTrades() {
   const publicClient = usePublicClient()
   const chainId = useChainId()
   return useQuery({
-    // `chainId` is part of the key: a chain switch changes which escrows we
-    // read, and the persisted snapshot is per-chain.
     queryKey: ['trades', 'by-wallet', address, sessionWallet, chainId],
     queryFn: async () => {
       const user = address ? await getUserByWallet(address) : null
@@ -83,8 +71,6 @@ export function useTrades() {
       const withEscrow = trades.filter(
         (t) => typeof t.escrow_contract_addr === 'string' && t.escrow_contract_addr,
       )
-      // `publicClient` is guaranteed here because the query is disabled until
-      // it exists (see `enabled`). The guard is only for TypeScript narrowing.
       if (!publicClient || withEscrow.length === 0) return trades
 
       try {
@@ -108,20 +94,15 @@ export function useTrades() {
           const base = i * 5
           const stateRes = results[base]
           if (!stateRes || stateRes.status !== 'success') return
-          const buyerDep = results[base + 1]?.result as boolean | undefined
-          const sellerDep = results[base + 2]?.result as boolean | undefined
-          const locked = results[base + 3]?.result as boolean | undefined
-          const pct = results[base + 4]?.result as bigint | undefined
           const derived = deriveEscrowStatus(
             Number(stateRes.result),
-            !!buyerDep,
-            !!sellerDep,
-            !!locked,
-            pct ?? 0n,
+            !!results[base + 1]?.result,
+            !!results[base + 2]?.result,
+            !!results[base + 3]?.result,
+            (results[base + 4]?.result as bigint | undefined) ?? 0n,
           )
           liveByTradeId.set(t.id, derived)
-          // Persist the last-known phase per escrow so reloads can show it
-          // instantly, even if the query snapshot is missing/pruned.
+          // Persist last-known phase so reloads can show it instantly.
           setCachedEscrowStatus(t.escrow_contract_addr as string, derived)
         })
 
@@ -134,13 +115,8 @@ export function useTrades() {
         return trades
       }
     },
-    // Gate on a live public client too: without it we can't read the live
-    // escrow phase, and resolving with DB-only rows would cache the stale
-    // `escrow_status` (the reload flash). Disabled → the persisted snapshot is
-    // still served, so the last-known phase shows immediately.
+    // Without a public client we'd cache DB-only (stale) rows.
     enabled: !!address && hasSession && !!publicClient,
-    // Background poll every 5 minutes as a safety net; the on-chain phase is
-    // also re-checked on mount / window focus.
     refetchInterval: 300_000,
     staleTime: 5_000,
   })

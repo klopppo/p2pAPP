@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { isAddress } from 'viem'
 import type { ConversationView } from '@/types/database'
 import { Badge } from '@/components/ui/badge'
 import { shortTradeId } from '@/lib/utils'
@@ -8,15 +9,17 @@ import { deriveEscrowStatus } from '@/hooks/useTrades'
 import { getCachedEscrowStatus, setCachedEscrowStatus } from '@/lib/escrowStatusCache'
 
 /**
- * Compact pill shown in the chat header — the linked trade id + its live
- * status. The status is derived from the escrow contract (same mapping as the
- * /trades list) so it shows the real phase (grace period, funded, …) instead of
- * a lagging DB mirror value.
+ * Chat-header pill: trade id + live escrow-contract status (falls back to the
+ * DB mirror only when there's no escrow address).
  */
 export function TradeSummaryPill({ trade }: { trade: NonNullable<ConversationView['trade']> }) {
   const { t } = useTranslation()
 
-  const escrowAddr = (trade.escrow_contract_addr ?? undefined) as `0x${string}` | undefined
+  // Validate before the cast: a malformed DB value would otherwise trigger
+  // pointless RPC polling against an invalid address.
+  const rawEscrowAddr = trade.escrow_contract_addr
+  const escrowAddr =
+    rawEscrowAddr && isAddress(rawEscrowAddr) ? rawEscrowAddr : undefined
   const { data: escrowState } = useEscrowState(escrowAddr)
 
   const liveStatus = escrowState

@@ -31,6 +31,7 @@ import {
   type KlerosEscStateValue,
 } from '@/lib/contracts'
 import { useDispute, useEscrowState, useAppealInfo, useEscrowEventWatcher } from '@/hooks/useDisputes'
+import { useVerifiedEscrow } from '@/hooks/useVerifiedEscrow'
 import {
   type DisputeEvidenceFile,
   EscrowStatus,
@@ -44,6 +45,7 @@ import { uploadToIpfs, cidToBytes32 } from '@/lib/ipfs'
 import { errorMessage } from '@/lib/errorMessage'
 import { explorerBase } from '@/lib/explorer'
 import { shortTradeId } from '@/lib/utils'
+import { assertTxSuccess, formatAddress } from '@/lib/uiFormat'
 import { DisputeStatus, TradeStatus } from '@/types/database'
 
 type DisputeStatusValue =
@@ -100,7 +102,6 @@ interface ParsedDescription {
   onChainDisputeId: string | null
   evidenceCid: string | null
   arbitrationFeeWei: string | null
-  evidence: Array<{ cid: string; url: string; name: string; size: number }>
 }
 
 /** Split the dispute.description blob (user text + on-chain metadata) the
@@ -115,7 +116,6 @@ function parseDescription(raw: string | null | undefined): ParsedDescription {
     onChainDisputeId: null,
     evidenceCid: null,
     arbitrationFeeWei: null,
-    evidence: [],
   }
   if (!raw) return empty
 
@@ -132,12 +132,7 @@ function parseDescription(raw: string | null | undefined): ParsedDescription {
   const idMatch = meta.match(/kleros_dispute_id:\s*(\S+)/)
   const cidMatch = meta.match(/evidence_cid:\s*(\S+)/)
   const feeMatch = meta.match(/arbitration_fee_wei:\s*(\d+)/)
-  // NB: there is no `evidence: [...]` JSON-array line in the
-  // description-blob format written by DisputePage.tsx (only the scalar
-  // metadata fields above + a single `evidence_cid:`). The old parser
-  // tried to match it anyway and JSON.parsed an empty array every call —
-  // removed: see audit #Low. Evidence rendering is sourced from
-  // `dispute.evidence` (the dispute_evidence table join) below.
+  // Blobs carry no evidence array; the gallery reads `dispute.evidence`.
 
   return {
     userText,
@@ -151,12 +146,6 @@ function parseDescription(raw: string | null | undefined): ParsedDescription {
       idMatch && idMatch[1] !== '(event not decoded)' ? idMatch[1] : null,
     evidenceCid: cidMatch?.[1] ?? null,
     arbitrationFeeWei: feeMatch?.[1] ?? null,
-    // Always empty: the description blob never carried a JSON array of
-    // evidence files. The live gallery reads from `dispute.evidence`
-    // (dispute_evidence table join) further down. Kept on the type so
-    // the JSX guard `{parsed.evidence.length > 0 && ...}` still type-
-    // checks; it's a permanent false.
-    evidence: [],
   }
 }
 
@@ -171,32 +160,13 @@ function formatDateTime(iso: string | null | undefined) {
   })
 }
 
-function formatAddress(addr: string | null | undefined) {
-  if (!addr) return '—'
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`
-}
-
 function bytes(n: number) {
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
 }
 
-/**
- * viem's `waitForTransactionReceipt` resolves for a mined-but-reverted tx;
- * callers must check `status` before mirroring state / toasting success.
- */
-function assertTxSuccess(receipt: { status: 'success' | 'reverted' }) {
-  if (receipt.status === 'reverted') {
-    throw new Error('Transaction reverted on-chain')
-  }
-}
-
-/**
- * Per-row evidence thumbnail. Mints a fresh signed URL on each render so
- * the image never expires (was: stored the signed URL on insert, 10-min
- * expiry meant every image 404s after the first session — H2 audit).
- */
+/** Per-row thumbnail; mints a fresh signed URL each render (stored URLs expire). */
 function EvidenceThumb({ path, name, size }: { path: string; name?: string; size?: number }) {
   const [url, setUrl] = useState<string | null>(null)
   useEffect(() => {
@@ -206,8 +176,9 @@ function EvidenceThumb({ path, name, size }: { path: string; name?: string; size
       .then((signed) => {
         if (!cancelled) setUrl(signed)
       })
-      // A failed/expired signed-URL fetch used to be an unhandled rejection.
-      .catch(() => {
+      // Failed/expired URL → placeholder below.
+      .catch((err) => {
+        console.warn('[DisputeDetailPage.tsx] evidence signed URL failed:', err)
         if (!cancelled) setUrl(null)
       })
     return () => {
@@ -231,8 +202,7 @@ function EvidenceThumb({ path, name, size }: { path: string; name?: string; size
     </div>
   )
   return (
-    // Only an anchor once a usable URL exists — `href="#"` scrolled the page
-    // to the top when the signed URL was still resolving/failed.
+    // Anchor only once the URL resolves — `href="#"` scrolled to top.
     url ? (
       <a href={url} target="_blank" rel="noopener noreferrer" className="block group">
         {content}
@@ -267,18 +237,8 @@ export function DisputeDetailPage() {
   const { writeContractAsync, isPending: isWritePending } = useWriteContract()
   const qc = useQueryClient()
 
-  // Mirror the latest dispute into a ref so the event-watcher handler can
-  // read fresh values (appeal_count, evidence_group_id, …) without binding
-  // them into a useCallback dep array — a binding would rebuild the watcher
-  // subscription on every refetch and miss any events fired during the gap.
-  const disputeRef = useRef(dispute)
-  useEffect(() => {
-    disputeRef.current = dispute
-  }, [dispute])
-
   const parsed = parseDescription(dispute?.description)
-  // Prefer the new DB column (`escrow_address`), fall back to the description
-  // blob for rows written before the column existed.
+  // Prefer the DB column, fall back to the description blob for legacy rows.
   const escrowAddress = (dispute?.escrow_address ?? parsed.escrowAddress ?? '') as
     | `0x${string}`
     | ''
@@ -288,17 +248,32 @@ export function DisputeDetailPage() {
     escrowAddress || undefined,
   )
 
-  // Subscribe to on-chain events for this escrow. The handler refreshes the
-  // multicall AND writes the cached columns on `disputes.*` so the page
-  // reflects state transitions without a manual reload (and the
-  // `useEscrowEventWatcher` filter list matches what the server-side indexer
-  // will eventually need).
+  // Trust gate: the escrow address comes from a Supabase row, so fund-moving
+  // actions must confirm the factory deployed it for this wallet. Absence
+  // (pending / RPC failure / not a factory clone) keeps the CTAs disabled.
+  const {
+    isVerified: escrowVerified,
+    isVerifying: escrowVerifying,
+  } = useVerifiedEscrow(escrowAddress || undefined)
+
+  const requireVerifiedEscrow = useCallback((): boolean => {
+    if (escrowVerified) return true
+    toast.error(
+      t('disputeDetail.escrowUnverified', {
+        defaultValue:
+          'This escrow could not be verified against the configured factory for your wallet. The action is disabled to protect your funds.',
+      }),
+    )
+    return false
+  }, [escrowVerified, t])
+
+  // Subscribe to on-chain events; the handler refreshes the multicall and
+  // writes the cached `disputes.*` columns so state shows without reload.
   const handleEscrowEvent = useCallback(
     async (eventName: string, args: Record<string, unknown>) => {
       const disputed = dispute?.id
       if (!disputed) return
-      // Read trade id lazily so we don't need the destructured `trade`
-      // variable in scope here (declared below after the early returns).
+      // Read trade id lazily; `trade` is declared after the early returns.
       const tradeId =
         (dispute?.trade as null | { id?: string | null })?.id ?? null
       try {
@@ -306,11 +281,8 @@ export function DisputeDetailPage() {
           const ruling = Number((args.ruling as bigint | number | undefined) ?? 0)
           await updateDisputeOnChain(disputed, {
             escrowState: KlerosEscState.RULING_RECEIVED,
-            // Kleros transitions Waiting (0) → Appealable (1) when the jurors
-            // post their ruling via rule(). The ruling is final only once the
-            // appeal period elapses; until then either party can still post an
-            // appeal. Capture that here so the UI badge + appeal button update
-            // without waiting for the next refetch.
+            // rule() moves Kleros Waiting(0) → Appealable(1); the ruling is
+            // final only after the appeal window, so capture status 1 here.
             klerosDisputeStatus: 1,
             onChainRuling: ruling,
             rulingReceivedTime: BigInt(Math.floor(Date.now() / 1000)).toString(),
@@ -347,8 +319,7 @@ export function DisputeDetailPage() {
             winner,
             resolvedAt: new Date().toISOString(),
           })
-          // Mirror the timeout outcome to the linked trade (mirror was
-          // missing — surfaces as `trades.status='disputed'` forever).
+          // Mirror the timeout outcome to the linked trade.
           if (tradeId) {
             await mirrorDisputeToTrade(tradeId, {
               tradeStatus:
@@ -364,24 +335,18 @@ export function DisputeDetailPage() {
             }).catch((err) => { console.warn('[DisputeDetailPage.tsx]', err); return undefined })
           }
         } else if (eventName === 'AppealFunded') {
-          // Read counters from the ref so a refetch that landed between the
-          // event emission and this handler running doesn't cause us to write
-          // a stale appeal_count / evidence_group_id (the closure-captured
-          // `dispute` would otherwise be one cache-bust behind reality).
-          const latest = disputeRef.current
+          // The watcher invokes the latest render's callback, so these counts
+          // are fresh — don't write a stale appeal_count / evidence_group_id.
           await updateDisputeOnChain(disputed, {
             escrowState: KlerosEscState.AWAITING_RULING,
             klerosDisputeStatus: 1,
             onChainRuling: null,
             status: DisputeStatus.ESCALATED,
-            appealCount: (latest?.appeal_count ?? 0) + 1,
-            evidenceGroupId: (latest?.evidence_group_id ?? 0) + 1,
+            appealCount: (dispute?.appeal_count ?? 0) + 1,
+            evidenceGroupId: (dispute?.evidence_group_id ?? 0) + 1,
           })
         } else if (eventName === 'Evidence') {
-          // Best-effort: nothing to write beyond what `submitEvidence` tx did
-          // on the chain; the dispute_evidence row was added by the page
-          // that called submitEvidence (this page or DisputePage). Future
-          // indexer will reconcile via the Evidence event topic.
+          // Nothing to persist — the evidence row is written at submit time.
         }
       } catch (err) {
         console.warn('[DisputeDetailPage.tsx] err:', err)
@@ -394,20 +359,14 @@ export function DisputeDetailPage() {
           eventName === 'DisputeTimedOut'
         ) {
           refetchEscrowState()
-          // Invalidate the DB-cached dispute row + the disputes list so the
-          // detail page + sidebar list surfaces the new state without a
-          // manual refresh.
+          // Refresh the cached dispute + list so the new state shows.
           qc.invalidateQueries({ queryKey: ['dispute', disputed] })
           qc.invalidateQueries({ queryKey: ['disputes'] })
         }
       }
     },
-    // The dispute object refetches on every state transition, so reading
-    // trade id lazily inside the callback (via dispute?.trade) keeps the
-    // handler fresh without needing a destructured `trade` variable in
-    // deps (which would TDZ because trade is declared below the early
-    // returns).
-
+    // `trade` is read lazily via dispute?.trade; binding it here would TDZ
+    // (declared after the early returns).
     [dispute, refetchEscrowState, qc],
   )
   useEscrowEventWatcher(escrowAddress || undefined, handleEscrowEvent)
@@ -418,14 +377,9 @@ export function DisputeDetailPage() {
     escrowState?.klerosDisputeID ?? null,
   )
 
-  // 30-day DISPUTE_TIMEOUT — gate the button client-side so the user doesn't
-  // pay gas to revert. Held in state (not a render expression) because
-  // Date.now() is impure and React 19's purity check rejects it on the
-  // render path. Tick only while the timeout gate could actually flip
-  // (escrow in AWAITING_RULING / RULING_RECEIVED AND disputeTimestamp
-  // known) — outside that window the value can't change the rendered UI,
-  // so we don't pay the 30-second tick. Placed BEFORE the early returns
-  // below to satisfy rules-of-hooks.
+  // Gate the 30-day timeout button client-side so users don't pay gas to
+  // revert. `now` lives in state (Date.now() is impure under React 19) and
+  // ticks only while the gate can flip; placed before the early returns.
   const DISPUTE_TIMEOUT_SECONDS = 30n * 24n * 60n * 60n
   const [nowSeconds, setNowSeconds] = useState(() =>
     BigInt(Math.floor(Date.now() / 1000)),
@@ -525,8 +479,7 @@ export function DisputeDetailPage() {
   submitted_at: string | null
 }>
 
-  // Resolve the on-chain ruling: prefer the cached column from DB, fall back
-  // to the live escrow-state read.
+  // Prefer the DB-cached ruling, falling back to the live escrow read.
   const onChainRuling =
     dispute.on_chain_ruling != null
       ? Number(dispute.on_chain_ruling)
@@ -539,10 +492,8 @@ export function DisputeDetailPage() {
       ? (escrowState.state as KlerosEscStateValue)
       : null
 
-  // Whether the connected wallet can submit evidence: must be buyer or seller
-  // (contract: `KlerosEsc.submitEvidence` reverts for anyone else). The
-  // additional-evidence flow lives on the detail page so jurors see
-  // post-appeal rounds on kleros.io.
+  // Contract allows only buyer/seller to submit (others revert). Detail page
+  // hosts the flow so jurors see post-appeal rounds on kleros.io.
   const canSubmitMoreEvidence =
     !!escrowAddress &&
     !!escrowState &&
@@ -559,6 +510,7 @@ export function DisputeDetailPage() {
 
   const handleExecuteRuling = async () => {
     if (!escrowAddress || !publicClient) return
+    if (!requireVerifiedEscrow()) return
     try {
       const hash = await writeContractAsync({
         address: escrowAddress,
@@ -566,10 +518,8 @@ export function DisputeDetailPage() {
         functionName: 'executeRuling',
       })
       assertTxSuccess(await publicClient.waitForTransactionReceipt({ hash, timeout: 90_000 }))
-      // Mirror: state → RULING_EXECUTED, Kleros status → Solved (2), cache the
-      // ruling. Prefer the DB-cached `on_chain_ruling` over the live chain
-      // read so a stale `useEscrowState` doesn't flip the trade-side
-      // outcome right after execute.
+      // Cache the ruling; prefer the DB value so a stale `useEscrowState`
+      // can't flip the trade outcome right after execute.
       const liveRuling = escrowState?.currentRuling != null
         ? Number(escrowState.currentRuling)
         : null
@@ -581,8 +531,7 @@ export function DisputeDetailPage() {
         klerosDisputeStatus: 2,
         onChainRuling: ruling,
       }).catch((err) => { console.warn('[DisputeDetailPage.tsx]', err) })
-      // Mirror the trade payout (B-3, B-7): rulings 1/3 → buyer wins
-      // (refund), 0/2/4 → seller wins (release).
+      // Rulings 1/3 → buyer wins (refund); 0/2/4 → seller wins.
       if (trade?.id && ruling != null) {
         const buyerWins = ruling === 1 || ruling === 3
         await mirrorDisputeToTrade(trade.id, {
@@ -603,6 +552,7 @@ export function DisputeDetailPage() {
 
   const handleFinalize = async () => {
     if (!escrowAddress || !publicClient) return
+    if (!requireVerifiedEscrow()) return
     try {
       const hash = await writeContractAsync({
         address: escrowAddress,
@@ -616,11 +566,9 @@ export function DisputeDetailPage() {
         status: DisputeStatus.RESOLVED,
         resolvedAt: new Date().toISOString(),
       }).catch((err) => { console.warn('[DisputeDetailPage.tsx]', err) })
-      // Mirror the trade-side outcome at finalize time (B-7).
       if (trade?.id) {
-        // Prefer the DB-cached winner from a prior timeout / execute path
-        // over recomputing from the ruling. Avoids overriding a stored
-        // outcome when the live chain read is stale.
+        // Prefer the DB-cached winner (timeout/execute) over a possibly
+        // stale live ruling read.
         const existingWinner = dispute?.winner
         let buyerWins: boolean
         if (existingWinner === 'buyer') buyerWins = true
@@ -647,6 +595,7 @@ export function DisputeDetailPage() {
 
   const handleTimeoutDispute = async () => {
     if (!escrowAddress || !publicClient) return
+    if (!requireVerifiedEscrow()) return
     try {
       const hash = await writeContractAsync({
         address: escrowAddress,
@@ -654,11 +603,8 @@ export function DisputeDetailPage() {
         functionName: 'timeoutDispute',
       })
       assertTxSuccess(await publicClient.waitForTransactionReceipt({ hash, timeout: 90_000 }))
-      // Mirror: state → COMPLETED, dispute → closed (timeout is unilateral loss
-      // for the disputer, not a Kleros-mediated resolution). Compute the
-      // winner here too so the DB row is consistent with the watcher path
-      // (which always writes `winner`). The watcher's `DisputeTimedOut`
-      // handler still mirrors the trade side as a backstop.
+      // Timeout = unilateral loss for the disputer (not Kleros-mediated).
+      // Compute the winner so the DB row matches the watcher path.
       const buyerWasDisputer =
         !!escrowState?.disputer &&
         escrowState.disputer.toLowerCase() === escrowState.buyer.toLowerCase()
@@ -673,8 +619,7 @@ export function DisputeDetailPage() {
         winner,
         resolvedAt: new Date().toISOString(),
       }).catch((err) => { console.warn('[DisputeDetailPage.tsx]', err) })
-      // Mirror the trade-side outcome (B-7): the disputer loses. Use
-      // `escrowState.disputer` to determine the winner without re-reading.
+      // Disputer loses; winner was derived from `escrowState.disputer`.
       if (trade?.id && winner) {
         await mirrorDisputeToTrade(trade.id, {
           tradeStatus:
@@ -694,20 +639,16 @@ export function DisputeDetailPage() {
     }
   }
 
-  // `executeRuling()` reverts with DisputeNotSolved() while the Kleros court
-  // still reports the dispute as Appealable (status 1). Allow the action when
-  // the court says Solved (2), or when the court read is unavailable (null —
-  // e.g. mock court), which preserves the previous behaviour.
+  // executeRuling() reverts while the court still reports Appealable (1);
+  // allow when Solved (2) or when the court read is unavailable.
   const canExecuteRuling =
     liveEscrowStateValue === KlerosEscState.RULING_RECEIVED &&
     appealInfo?.klerosDisputeStatus !== 1n
   const canFinalize =
     liveEscrowStateValue === KlerosEscState.RULING_EXECUTED
 
-  // 30-day DISPUTE_TIMEOUT — gate the button client-side so the user doesn't
-  // pay gas to revert. The "now" timestamp lives in state (declared above
-  // before the early returns) so we don't call Date.now() during render
-  // — React 19's purity check rejects impure render expressions.
+  // Client-side gate for the 30-day timeout; `now` is state (declared above)
+  // because Date.now() is impure during render (React 19 purity check).
   const disputeTimestamp =
     escrowState?.disputeTimestamp != null && escrowState.disputeTimestamp > 0n
       ? escrowState.disputeTimestamp
@@ -715,8 +656,7 @@ export function DisputeDetailPage() {
   const timeoutReady =
     disputeTimestamp != null &&
     nowSeconds >= disputeTimestamp + DISPUTE_TIMEOUT_SECONDS
-  // KlerosEsc.timeoutDispute() is valid from AWAITING_RULING, RULING_RECEIVED,
-  // and RULING_EXECUTED (the defensive finalize path).
+  // timeoutDispute() is valid from all three post-ruling states.
   const canTimeout =
     (liveEscrowStateValue === KlerosEscState.AWAITING_RULING ||
       liveEscrowStateValue === KlerosEscState.RULING_RECEIVED ||
@@ -725,6 +665,7 @@ export function DisputeDetailPage() {
 
   const handleAppeal = async () => {
     if (!escrowAddress || !publicClient || !appealInfo?.appealCostWei) return
+    if (!requireVerifiedEscrow()) return
     try {
       const hash = await writeContractAsync({
         address: escrowAddress,
@@ -733,8 +674,7 @@ export function DisputeDetailPage() {
         value: appealInfo.appealCostWei,
       })
       assertTxSuccess(await publicClient.waitForTransactionReceipt({ hash, timeout: 90_000 }))
-      // Mirror: state moves back to AWAITING_RULING for the new round; mark
-      // the dispute as escalated.
+      // New appeal round: back to AWAITING_RULING, mark escalated.
       await updateDisputeOnChain(dispute.id, {
         escrowState: KlerosEscState.AWAITING_RULING,
         klerosDisputeStatus: 1,
@@ -749,8 +689,7 @@ export function DisputeDetailPage() {
       toast.error(errorMessage(err, 'disputeDetail', t, 'appealFundedError'))
     }
   }
-  // KlerosEsc.appeal() is only valid from these states; an appealable court
-  // status while the escrow sits elsewhere would revert CannotAppeal().
+  // appeal() is only valid from these states; elsewhere it reverts.
   const appealableState =
     liveEscrowStateValue === KlerosEscState.AWAITING_RULING ||
     liveEscrowStateValue === KlerosEscState.RULING_RECEIVED ||
@@ -884,19 +823,33 @@ export function DisputeDetailPage() {
               </div>
             )}
 
-            {/* On-chain actions the connected wallet can take. B-7: drop `isFiler` so
-                any connected wallet can call executeRuling / finalize /
-                timeoutDispute — they're permissionless on the contract
-                (deliberate keeper-bot design). Only the appeal path remains
-                buyer/seller-only because `appeal()` checks msg.sender. */}
+            {/* executeRuling / finalize / timeoutDispute are permissionless on-chain;
+                only appeal() is buyer/seller-only (checks msg.sender). */}
             {isConnected && (canExecuteRuling || canFinalize || canTimeout || canAppeal) && (
               <div className="flex flex-wrap gap-2 pt-2 border-t border-border/50">
+                {/* Unverified escrow → settlement CTAs disabled (handlers re-check). */}
+                {!escrowVerified && (
+                  <Alert className="w-full rounded-2xl">
+                    <ShieldAlert className="w-4 h-4" />
+                    <AlertDescription>
+                      {escrowVerifying
+                        ? t('disputeDetail.escrowVerifying', {
+                            defaultValue:
+                              'Verifying the escrow contract against the configured factory…',
+                          })
+                        : t('disputeDetail.escrowUnverified', {
+                            defaultValue:
+                              'This escrow could not be verified against the configured factory for your connected wallet. Fund-moving actions are disabled to protect your funds.',
+                          })}
+                    </AlertDescription>
+                  </Alert>
+                )}
                 {canExecuteRuling && (
                   <Button
                     size="sm"
                     variant="outline"
                     className="rounded-full"
-                    disabled={isWritePending}
+                    disabled={isWritePending || !escrowVerified}
                     onClick={handleExecuteRuling}
                   >
                     {isWritePending ? (
@@ -912,7 +865,7 @@ export function DisputeDetailPage() {
                     size="sm"
                     variant="outline"
                     className="rounded-full"
-                    disabled={isWritePending}
+                    disabled={isWritePending || !escrowVerified}
                     onClick={handleAppeal}
                   >
                     {isWritePending ? (
@@ -933,7 +886,7 @@ export function DisputeDetailPage() {
                     size="sm"
                     variant="outline"
                     className="rounded-full"
-                    disabled={isWritePending}
+                    disabled={isWritePending || !escrowVerified}
                     onClick={handleFinalize}
                   >
                     {t('disputeDetail.finalizeEscrow')}
@@ -944,7 +897,7 @@ export function DisputeDetailPage() {
                     size="sm"
                     variant="outline"
                     className="rounded-full"
-                    disabled={isWritePending}
+                    disabled={isWritePending || !escrowVerified}
                     onClick={handleTimeoutDispute}
                   >
                     <Timer className="w-3.5 h-3.5 mr-1" />
@@ -953,11 +906,8 @@ export function DisputeDetailPage() {
                 )}
               </div>
             )}
-            {/* "Submit additional evidence" — buyer/seller only (enforced by
-                 the contract). On click: uploads file to IPFS, calls
-                 KlerosEsc.submitEvidence(bytes32(keccak256(cid))) on-chain,
-                 and writes a dispute_evidence row linked to the current
-                 evidence_group_id so jurors see post-appeal rounds. */}
+            {/* Buyer/seller only (contract-enforced): uploads to IPFS, calls
+                submitEvidence, writes a dispute_evidence row for the round. */}
             {isConnected && filerRole && canSubmitMoreEvidence && (
               <SubmitMoreEvidence
                 escrowAddress={escrowAddress}
@@ -1045,20 +995,6 @@ export function DisputeDetailPage() {
         </Card>
       )}
 
-      {/* Evidence (images from IPFS) */}
-      {parsed.evidence.length > 0 && (
-        <Card className="glass-panel rounded-2xl p-6 mt-3">
-          <Text variant="h4" className="font-bold mb-2">
-            {t('disputeDetail.proof')}
-          </Text>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {parsed.evidence.map((e, i) => (
-              <EvidenceThumb key={`${e.cid}-${i}`} path={e.cid} name={e.name} size={e.size} />
-            ))}
-          </div>
-        </Card>
-      )}
-
       {/* On-chain transactions (tx hashes from the description blob) */}
       {(parsed.txHash || parsed.evidenceTxHash || parsed.onChainDisputeId || parsed.evidenceCid) && (
         <Card className="glass-panel rounded-2xl p-6 mt-3">
@@ -1125,10 +1061,7 @@ export function DisputeDetailPage() {
         </Card>
       )}
 
-      {/* Evidence from dispute_evidence table. Renamed columns in
-          migration 20260824*: `ipfs_cid` (was `file_hash`), `ipfs_url` (was
-          `file_encrypted`), with new `keccak_bytes32` + `tx_hash` +
-          `evidence_group_id` for round-aware display. */}
+      {/* Evidence rows from the `dispute_evidence` table (round-aware). */}
       {evidenceRows.length > 0 && (
         <Card className="glass-panel rounded-2xl p-6 mt-3">
           <Text variant="h4" className="font-bold mb-2">
@@ -1193,14 +1126,8 @@ export function DisputeDetailPage() {
   )
 }
 
-/**
- * "Submit additional evidence" affordance shown on `DisputeDetailPage` so
- * buyers/sellers can pin post-appeal rounds to the chain (`KlerosEsc.sol:611`).
- * Each file → one IPFS upload → one `submitEvidence(bytes32)` tx → one
- * `dispute_evidence` row tagged with the current `evidence_group_id`.
- *
- * B-5: used to be hidden (DisputePage raised only the first CID on-chain).
- */
+/** Buyer/seller affordance: one IPFS upload → one submitEvidence tx → one
+ *  dispute_evidence row tagged with the current evidence_group_id. */
 function SubmitMoreEvidence({
   escrowAddress,
   evidenceGroupId,
@@ -1224,8 +1151,7 @@ function SubmitMoreEvidence({
     setBusy(true)
     try {
       const upload = await uploadToIpfs(file, disputeId)
-      // On-chain URI bytes32 = keccak256("ipfs://" + cid) — matches the
-      // contract test in contrats/test/klerosTests.t.sol:2413,2425,2464.
+      // On-chain bytes32 = keccak256("ipfs://" + cid).
       const evidenceBytes32 = cidToBytes32(upload.cid)
       const txHash = await writeContractAsync({
         address: escrowAddress,
@@ -1240,9 +1166,7 @@ function SubmitMoreEvidence({
           name: upload.name ?? file.name,
           size: upload.size ?? file.size,
           kind: file.type.split('/')[1] ?? 'image',
-          // Per audit #4 sub-fix: this column now holds the file-content
-          // hash (keccak256(fileBytes), not the on-chain URI hash) — see
-          // `uploadDisputeEvidenceFile` in src/lib/supabase.
+          // File-content hash (keccak256(fileBytes)), not the URI hash.
           keccakBytes32: upload.keccakBytes32,
           txHash,
           evidenceGroupId: Number(evidenceGroupId),
