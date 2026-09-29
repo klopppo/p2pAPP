@@ -161,7 +161,8 @@ export function useSendMessage(conversationId: string | null | undefined) {
     },
     onMutate: async (input) => {
       if (!conversationId || !user || !hasSession) return
-      const key = messagesKey(conversationId, sessionWallet)
+      const targetConversationId = conversationId
+      const key = messagesKey(targetConversationId, sessionWallet)
       await qc.cancelQueries({ queryKey: key })
       const tempId = `temp-${Date.now()}-${++tempIdRef.current}`
       const optimistic: MessageWithSender = {
@@ -180,13 +181,16 @@ export function useSendMessage(conversationId: string | null | undefined) {
         },
       }
       qc.setQueryData<MessageWithSender[]>(key, (prev) => [...(prev ?? []), optimistic])
-      return { tempId }
+      // Capture the cache key + conversation with the mutation: by the time a
+      // callback runs the user may have switched chats, and rolling back (or
+      // writing a read receipt) against the NEW conversation would corrupt it.
+      return { tempId, key, targetConversationId }
     },
     onError: (err, _vars, ctx) => {
-      if (!conversationId || !ctx) return
+      if (!ctx) return
       // Drop only the optimistic row: restoring a snapshot would clobber
       // realtime inserts that arrived while the send was in flight.
-      qc.setQueryData<MessageWithSender[]>(messagesKey(conversationId, sessionWallet), (prev) =>
+      qc.setQueryData<MessageWithSender[]>(ctx.key, (prev) =>
         (prev ?? []).filter((m) => m.id !== ctx.tempId),
       )
       // Loudest SIWE RLS causes: missing/invalid session (42501) and dead
@@ -201,17 +205,22 @@ export function useSendMessage(conversationId: string | null | undefined) {
       }
     },
     onSuccess: (saved, _vars, ctx) => {
-      if (!conversationId || !ctx || !user) return
+      if (!ctx || !user) return
       // Swap temp id for the real one; filter the temp row first so a realtime
       // INSERT that slipped through the echo-skip can't leave two copies.
-      qc.setQueryData<MessageWithSender[]>(messagesKey(conversationId, sessionWallet), (prev) => {
+      qc.setQueryData<MessageWithSender[]>(ctx.key, (prev) => {
         const list = (prev ?? []).filter((m) => m.id !== ctx.tempId)
         const realId = (saved as MessageWithSender).id
         if (list.some((m) => m.id === realId)) return list
         return [...list, saved as MessageWithSender].sort(byTimeAsc)
       })
-      // Best-effort read receipt; a failure must not fail the send.
-      markConversationRead({ conversationId, userId: user.id, messageId: saved.id }).catch(() => {})
+      // Best-effort read receipt against the conversation this message was
+      // sent to; a failure must not fail the send.
+      markConversationRead({
+        conversationId: ctx.targetConversationId,
+        userId: user.id,
+        messageId: saved.id,
+      }).catch(() => {})
     },
     onSettled: () => {
       if (user) qc.invalidateQueries({ queryKey: ['conversations', user.id] })

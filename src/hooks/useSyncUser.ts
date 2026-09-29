@@ -48,6 +48,11 @@ export function useSyncUser() {
       const prev = syncedAddress.current
       syncedAddress.current = null
       if (prev) {
+        // Drop the in-memory cache too: the persister re-attaches with the
+        // anonymous buster after disconnect, so leaving wallet-scoped data
+        // resident would re-persist it and hydrate it for the next anon visit.
+        void qc.cancelQueries()
+        qc.clear()
         clearPersistedQueryCache()
         void signOut().catch((err) => {
           console.warn('[useSyncUser] signOut on wallet disconnect failed:', err)

@@ -282,7 +282,7 @@ export function ProfilePage() {
   const canMessage = !!profile && !isOwnProfile && !!user
 
   const startChat = async () => {
-    if (!user || !profile) return
+    if (!user || !profile || startingChat) return
     setStartingChat(true)
     try {
       if (existingConv) {

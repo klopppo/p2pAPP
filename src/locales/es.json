@@ -554,7 +554,8 @@
     "gracePeriod": "Periodo de gracia (horas)",
     "gracePeriodHint": "Cuánto tiempo tiene la contraparte para confirmar el pago antes de permitir la liberación.",
     "gracePeriodError": "El periodo de gracia debe estar entre 1 hora y 365 días.",
-    "errorOfferUnavailable": "Esta oferta ya no está disponible para operar."
+    "errorOfferUnavailable": "Esta oferta ya no está disponible para operar.",
+    "errorPersistPending": "La custodia se desplegó, pero no se pudo guardar la operación. Reintenta — sin gas adicional."
   },
   "tradeDetail": {
     "loadingTrade": "Cargando operación…",
@@ -627,7 +628,10 @@
     "gracePeriodRemaining": "Restante: {{time}}",
     "sendDeposit": "Enviar",
     "lockFunds": "Bloquear fondos",
-    "approveSuccess": "Aprobación correcta."
+    "approveSuccess": "Aprobación correcta.",
+    "unlockAfterTimeout": "Recuperar fondos (comprador inactivo)",
+    "unlockSuccess": "Fondos recuperados — la custodia queda cancelada.",
+    "unlockFailed": "Recuperación fallida: {{message}}"
   },
   "editProfile": {
     "title": "Editar perfil",

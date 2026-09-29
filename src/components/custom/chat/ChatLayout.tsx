@@ -187,8 +187,15 @@ export function ChatLayout({ conversationId: forcedId, onBack }: Props) {
   const handleSend = () => {
     const body = draft.trim()
     if (!body || isOurTeam) return
-    send.mutate({ body })
     setDraft('')
+    send.mutate(
+      { body },
+      // Failed sends drop the optimistic bubble; restore the text so the user
+      // can retry without retyping (unless they've already typed something new).
+      {
+        onError: () => setDraft((current) => (current ? current : body)),
+      },
+    )
   }
 
   const handleBack = () => {

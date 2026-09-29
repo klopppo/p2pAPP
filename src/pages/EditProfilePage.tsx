@@ -120,6 +120,8 @@ export function EditProfilePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    // Implicit form submission (Enter) can fire while a save is in flight.
+    if (saving) return
     if (!address || !isConnected) {
       toast.error(t('editProfile.errorConnectWallet'))
       return

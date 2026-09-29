@@ -152,10 +152,15 @@ export function OperatorDashboardPage() {
   }
 
   const handleUpdateStatus = async (threadId: string, status: SupportThreadStatus) => {
-    await updateSupportThreadStatus(threadId, status, currentOp)
-    fetchSupport()
-    fetchLogs()
-    toast.success(`Stato ticket aggiornato a: ${status}`)
+    try {
+      await updateSupportThreadStatus(threadId, status, currentOp)
+      fetchSupport()
+      fetchLogs()
+      toast.success(`Stato ticket aggiornato a: ${status}`)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Errore nell’aggiornamento dello stato'
+      toast.error(msg)
+    }
   }
 
   // Fetch Reports
@@ -167,6 +172,8 @@ export function OperatorDashboardPage() {
       }
       const data = await listUserReports(filters)
       setReports(data)
+    } catch (err) {
+      console.warn('[OperatorDashboard] fetchReports failed:', err)
     } finally {
       setReportsLoading(false)
     }
@@ -184,6 +191,8 @@ export function OperatorDashboardPage() {
       }
       const data = await listUserActivityLogs(filters)
       setLogs(data)
+    } catch (err) {
+      console.warn('[OperatorDashboard] fetchLogs failed:', err)
     } finally {
       setLogsLoading(false)
     }
@@ -205,17 +214,21 @@ export function OperatorDashboardPage() {
 
   // Load initial data
   const loadInitial = async () => {
-    const ops = await listOperators()
-    setOperators(ops)
-    setCurOp(await resolveCurrentOperator())
-    fetchSupport()
-    fetchReports()
-    fetchLogs()
+    try {
+      const ops = await listOperators()
+      setOperators(ops)
+      setCurOp(await resolveCurrentOperator())
+      fetchSupport()
+      fetchReports()
+      fetchLogs()
+    } catch (err) {
+      console.warn('[OperatorDashboard] loadInitial failed:', err)
+    }
   }
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadInitial()
+    void loadInitial()
     const unsubSupport = subscribeSupportChat(() => {
       fetchSupport()
     })

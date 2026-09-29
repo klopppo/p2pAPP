@@ -6,7 +6,6 @@ import {
   getActiveOffers,
   getDisputesByUser,
   getRatingsByUser,
-  getReputationScores,
   getTradesByUser,
   getUnreadNotificationCount,
   getUserByWallet,
@@ -44,7 +43,6 @@ export function usePrefetchAppData() {
     warm(["current-user", address], () => ensureUser(address))
     warm(["user-profile", address], () => ensureUser(address))
     warm(["user-reviews", userId], () => getRatingsByUser(userId))
-    warm(["user-reputation", userId], () => getReputationScores(userId))
     warm(["offers", "seller", user?.public_handle ?? "no-handle"], () =>
       getPublicOffersBySeller(user?.public_handle ?? "")
     )

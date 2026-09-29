@@ -26,6 +26,7 @@ import {
   createTrade,
   ensureUser,
   getOfferTradeIntent,
+  getTradeByEscrowAddress,
   type OfferTradeIntent,
 } from "@/lib/supabase"
 import {
@@ -43,6 +44,37 @@ import { currencySymbol } from "@/lib/utils"
 import { REGION_NAMES } from "@/lib/locations"
 
 type Stage = "idle" | "creating-escrow" | "mining" | "saving"
+
+type CreateTradeInput = Parameters<typeof createTrade>[0]
+
+// Orphan-escrow recovery: `createEscrow` deploys a clone on-chain and the
+// trade row is persisted afterwards. If that persist fails (network/RLS) the
+// clone exists but nothing references it, and retrying used to deploy a second
+// clone. Remember the un-persisted input so a retry reuses the same escrow.
+const pendingTradeKey = (offerId: string, wallet: string) =>
+  `coffernode:pending-trade:${wallet.toLowerCase()}:${offerId}`
+function readPendingTrade(offerId: string, wallet: string): CreateTradeInput | null {
+  try {
+    const raw = window.localStorage.getItem(pendingTradeKey(offerId, wallet))
+    return raw ? (JSON.parse(raw) as CreateTradeInput) : null
+  } catch {
+    return null
+  }
+}
+function rememberPendingTrade(offerId: string, wallet: string, input: CreateTradeInput): void {
+  try {
+    window.localStorage.setItem(pendingTradeKey(offerId, wallet), JSON.stringify(input))
+  } catch {
+    /* quota/private mode — the user can still retry manually */
+  }
+}
+function clearPendingTrade(offerId: string, wallet: string): void {
+  try {
+    window.localStorage.removeItem(pendingTradeKey(offerId, wallet))
+  } catch {
+    /* ignore */
+  }
+}
 
 export function TradePage() {
   const { id } = useParams()
@@ -133,8 +165,12 @@ export function TradePage() {
     depositRateNum >= 0 &&
     depositRateNum <= 15 &&
     (depositRateNum === 0 || depositRateNum >= 1)
+  // Guard the BigInt conversion: a non-finite input (e.g. "..") would throw
+  // RangeError during render and take the whole page down.
   const depositBps =
-    depositRateNum === 0 ? 0n : BigInt(Math.round(depositRateNum * 100))
+    !depositValid || depositRateNum === 0
+      ? 0n
+      : BigInt(Math.round(depositRateNum * 100))
 
   // Bound by KlerosEsc.MAX_GRACE_PERIOD (365 days).
   const maxGraceHours = Number(MAX_GRACE_PERIOD_SECONDS) / 3600
@@ -151,6 +187,9 @@ export function TradePage() {
   const expiresAt = offer.expires_at ? new Date(offer.expires_at) : null
 
   const handleOpenTrade = async () => {
+    // Enter-in-input can fire submit while a previous createEscrow is in
+    // flight; never deploy a second escrow for the same click sequence.
+    if (isSubmitting) return
     if (!isConnected || !address) {
       toast.error(t("trade.errorConnectWallet"))
       return
@@ -192,6 +231,32 @@ export function TradePage() {
         // Connected wallet without a SIWE session — require sign-in first.
         toast.error(t("trade.errorConnectWallet"))
         setStage("idle")
+        return
+      }
+
+      // Recovery: a previous attempt deployed the escrow but failed to persist
+      // the trade. Reuse the stored input instead of deploying a second clone.
+      const pending = readPendingTrade(offer.id, address)
+      if (pending) {
+        setStage("saving")
+        try {
+          const existing = await getTradeByEscrowAddress(
+            pending.escrow_contract_addr as string
+          )
+          if (existing) {
+            clearPendingTrade(offer.id, address)
+            toast.success(t("trade.successDeployed"))
+            navigate(`/app/trades/${existing.id}`)
+            return
+          }
+          const recovered = await createTrade(pending)
+          clearPendingTrade(offer.id, address)
+          toast.success(t("trade.successDeployed"))
+          navigate(`/app/trades/${recovered.id}`)
+        } catch (recoverErr) {
+          toast.error(errorMessage(recoverErr, "trade", t, "errorFailedToDeploy"))
+          setStage("idle")
+        }
         return
       }
 
@@ -445,7 +510,7 @@ export function TradePage() {
       // Persist the trade plus immutable on-chain metadata (treasury, creator,
       // Kleros court) so the trades list can skip the on-chain multicall.
       setStage("saving")
-      const trade = await createTrade({
+      const tradeInput = {
         offer_id: offer.id,
         buyer_id: buyerId,
         seller_id: sellerId,
@@ -458,18 +523,30 @@ export function TradePage() {
         payment_details: {},
         platform_fee_bps: Number(offer.platform_fee_bps) || 50,
         treasury_address: treasuryAddress,
-        taker_role: isMakerBuyer ? "seller" : "buyer",
+        taker_role: isMakerBuyer ? ("seller" as const) : ("buyer" as const),
         escrow_contract_addr: deployedAddress,
         creator: address,
         kleros_court_addr: klerosCourtAddr,
         kleros_extra_data_part1: klerosPart1,
         kleros_extra_data_part2: klerosPart2,
-      })
+      }
+      let trade
+      try {
+        trade = await createTrade(tradeInput)
+      } catch (persistErr) {
+        rememberPendingTrade(offer.id, address, tradeInput)
+        throw persistErr
+      }
+      clearPendingTrade(offer.id, address)
 
       toast.success(t("trade.successDeployed"))
       navigate(`/app/trades/${trade.id}`)
     } catch (error) {
-      toast.error(errorMessage(error, "trade", t, "errorFailedToDeploy"))
+      if (readPendingTrade(offer.id, address)) {
+        toast.error(t("trade.errorPersistPending"))
+      } else {
+        toast.error(errorMessage(error, "trade", t, "errorFailedToDeploy"))
+      }
     } finally {
       setStage("idle")
     }

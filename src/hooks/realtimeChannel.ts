@@ -19,6 +19,7 @@ export function subscribeShared(
   listener: (payload: SharedChangePayload) => void,
 ): () => void {
   let entry = channels.get(topic)
+  const isNew = !entry
   if (!entry) {
     const listeners = new Set<(payload: SharedChangePayload) => void>()
     const channel = supabase
@@ -26,17 +27,24 @@ export function subscribeShared(
       .on('postgres_changes', { event: '*', ...filter }, (payload) => {
         for (const fn of listeners) fn(payload)
       })
-      .subscribe()
     entry = { refs: 0, channel, listeners }
     channels.set(topic, entry)
   }
-  entry.refs += 1
-  entry.listeners.add(listener)
+  const shared = entry
+  shared.refs += 1
+  // Attach BEFORE subscribing: the callback fans out through this Set, so a
+  // payload delivered on the join tick must already find its listener.
+  shared.listeners.add(listener)
+  if (isNew) shared.channel.subscribe()
   return () => {
-    entry.listeners.delete(listener)
-    entry.refs -= 1
-    if (entry.refs > 0) return
-    channels.delete(topic)
-    void supabase.removeChannel(entry.channel)
+    shared.listeners.delete(listener)
+    shared.refs -= 1
+    if (shared.refs > 0) return
+    // Only retire the entry if the map still points at it — a cleanup from a
+    // superseded entry must not evict a newer channel for the same topic.
+    if (channels.get(topic) === shared) {
+      channels.delete(topic)
+      void supabase.removeChannel(shared.channel)
+    }
   }
 }

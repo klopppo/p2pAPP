@@ -145,13 +145,18 @@ const UUID_STRICT_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const isUuid = (value: string): boolean => UUID_RE.test(value)
 
+// OD-02: `anon` may read only the identity-free projection. A signed-in
+// session may additionally read the profile socials (the DB grants
+// `authenticated` table-level SELECT after 20260920000005) — ProfilePage renders
+// them, so other users' profiles would otherwise show blank socials.
+const AUTHENTICATED_USER_COLUMNS = `${PUBLIC_USER_COLUMNS},website,twitter_handle,telegram_handle,github_handle,role,updated_at`
+
 // Own row needs writable-only fields (EditProfilePage); anon must stick to the
 // OD-02 projection.
 async function userColumnsForRead(walletAddress: string): Promise<string> {
   const sessionWallet = await getSessionWallet()
-  return sessionWallet === walletAddress.toLowerCase()
-    ? "*"
-    : PUBLIC_USER_COLUMNS
+  if (sessionWallet === walletAddress.toLowerCase()) return "*"
+  return sessionWallet ? AUTHENTICATED_USER_COLUMNS : PUBLIC_USER_COLUMNS
 }
 
 export async function getUserByWallet(walletAddress: string) {
@@ -171,13 +176,21 @@ export async function getUserByWallet(walletAddress: string) {
 export async function ensureUser(walletAddress: string): Promise<User | null> {
   const addr = walletAddress.toLowerCase()
   const sessionWallet = await getSessionWallet()
+  const isSelf = sessionWallet === addr
   const cached = getCachedUser(addr)
-  if (cached) return cached
+  // A cache entry written from the public projection lacks `role` (and the
+  // writable/social fields). Don't reuse it for the signed-in owner (the edit
+  // form would hydrate empty socials and save them back as null) nor for any
+  // signed-in read (other users' profiles would show blank socials).
+  const cacheMissingPrivateCols = !!cached && !("role" in cached)
+  if (cached && !(cacheMissingPrivateCols && (isSelf || !!sessionWallet))) {
+    return cached
+  }
 
   const existing = await one(
     supabase
       .from("users")
-      .select(sessionWallet === addr ? "*" : PUBLIC_USER_COLUMNS)
+      .select(await userColumnsForRead(addr))
       .eq("wallet_address", addr)
       .maybeSingle(),
     "[ensureUser] read error"
@@ -260,7 +273,10 @@ export async function uploadAvatar(
   walletAddress: string
 ): Promise<{ url: string; path: string }> {
   const addr = walletAddress.toLowerCase()
-  const ext = file.name.split(".").pop()?.toLowerCase() || "png"
+  // Only a plain alphanumeric extension: the raw suffix can carry path
+  // separators / `..` / control chars into the storage object name.
+  const rawExt = file.name.split(".").pop()?.toLowerCase() ?? ""
+  const ext = /^[a-z0-9]+$/.test(rawExt) ? rawExt : "png"
   const path = `${addr}-${Date.now()}.${ext}`
 
   await ok(
@@ -297,6 +313,9 @@ export async function uploadDisputeEvidenceFile(
       // eslint-disable-next-line no-control-regex
       .replace(/[/\\\u0000-\u001f\u007f]/g, "_")
       .replace(/^\.+/, "")
+      // Interior `..` would make the object name unusable by the cleanup
+      // listing (it filters paths containing `..`) — collapse to a single dot.
+      .replace(/\.{2,}/g, ".")
       .slice(0, 80) || "evidence"
   const ext = safeBase.includes(".")
     ? safeBase.slice(safeBase.lastIndexOf(".")).toLowerCase()
@@ -1743,7 +1762,9 @@ function buildSiweChallengeLocal(
 ): { nonce: string; message: string; issuedAt: string } {
   const issuedAt = new Date().toISOString()
   const nonce = options.nonce ?? localNonce()
-  const appName = options.appName ?? "CofferNode"
+  // Must equal the URI host below: `parseSiweMessage` (siwe-auth) derives the
+  // header domain and rejects unless it is allowlisted AND equals `uriHost`.
+  const appName = options.appName ?? "coffernode.app"
   const chainLine =
     options.chainId != null ? `\nChain ID: ${options.chainId}` : ""
   const message =

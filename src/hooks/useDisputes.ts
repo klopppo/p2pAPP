@@ -72,8 +72,15 @@ export function useUserEscrows() {
       for (let i = 0n; i < buyerCount; i++) indexCalls.push({ functionName: 'escrowByBuyer', index: i })
       for (let i = 0n; i < sellerCount; i++) indexCalls.push({ functionName: 'escrowBySeller', index: i })
 
+      // Cap the scan: an unbounded index list builds a multicall RPC providers
+      // reject wholesale. Keep the newest (most likely to be disputed).
+      const capped = indexCalls.length > 200 ? indexCalls.slice(-200) : indexCalls
+      if (capped.length !== indexCalls.length) {
+        console.warn(`[useUserEscrows] ${indexCalls.length} escrows > 200; reading newest 200`)
+      }
+
       const addresses = (await c.multicall({
-        contracts: indexCalls.map((call) => ({ ...factory, functionName: call.functionName, args: [address, call.index] })),
+        contracts: capped.map((call) => ({ ...factory, functionName: call.functionName, args: [address, call.index] })),
         allowFailure: false,
       })) as readonly `0x${string}`[]
 
@@ -94,6 +101,7 @@ interface EscrowState {
   klerosDisputeID: bigint; currentRuling: bigint; rulingReceivedTime: bigint; disputeTimestamp: bigint
   disputer: `0x${string}`
   evidenceGroupID: bigint; confirmationTime: bigint; buyerDepositTime: bigint; sellerDepositTime: bigint
+  fundedAt: bigint
 }
 
 const ESCROW_FIELDS = [
@@ -101,7 +109,7 @@ const ESCROW_FIELDS = [
   'gracePeriod', 'feeBps', 'tradeAmount', 'securityDepositPct', 'securityDepositAmount', 'state',
   'buyerSecurityDeposited', 'sellerSecurityDeposited', 'fundsLocked', 'disputeCreated', 'klerosDisputeID',
   'currentRuling', 'rulingReceivedTime', 'disputeTimestamp', 'disputer', 'evidenceGroupID',
-  'confirmationTime', 'buyerDepositTime', 'sellerDepositTime',
+  'confirmationTime', 'buyerDepositTime', 'sellerDepositTime', 'fundedAt',
 ] as const
 
 type PublicClient = NonNullable<ReturnType<typeof usePublicClient>>
@@ -221,9 +229,15 @@ export function useEscrowEventWatcher(
       if (cancelled) return
       const cb = onEventRef.current
       if (!cb) return
+      // Serialize callbacks in log order: each is a fire-and-forget DB mirror,
+      // and concurrent dispatch lets a later event's write commit before an
+      // earlier one (e.g. "funded" landing before "seller_deposited").
+      let chain: Promise<unknown> = Promise.resolve()
       for (const log of logs) {
         const eventName = (log as unknown as { eventName?: string }).eventName
-        if (eventName) cb(eventName, (log as unknown as { args?: Record<string, unknown> }).args ?? {})
+        if (!eventName) continue
+        const args = (log as unknown as { args?: Record<string, unknown> }).args ?? {}
+        chain = chain.then(() => cb(eventName, args)).catch(() => {})
       }
     }
     const unwatch = c.watchContractEvent({

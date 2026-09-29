@@ -90,6 +90,9 @@ export function CreateOfferPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
+    // Implicit form submission (Enter) can fire while a create is in flight.
+    if (isSubmitting) return
+
     if (!isConnected || !address) {
       toast.error(t('createOffer.errorConnectWallet'))
       return

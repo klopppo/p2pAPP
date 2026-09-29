@@ -554,7 +554,8 @@
     "gracePeriod": "Ek süre (saat)",
     "gracePeriodHint": "Karşı tarafın, serbest bırakmaya izin verilmeden önce ödemeyi onaylaması için geçen süre.",
     "gracePeriodError": "Ek süre 1 saat ile 365 gün arasında olmalıdır.",
-    "errorOfferUnavailable": "Bu teklif artık işlem için müsait değil."
+    "errorOfferUnavailable": "Bu teklif artık işlem için müsait değil.",
+    "errorPersistPending": "Emanet dağıtıldı ancak işlem kaydedilemedi. Tekrar deneyin — ekstra gas gerekmez."
   },
   "tradeDetail": {
     "loadingTrade": "İşlem yükleniyor…",
@@ -627,7 +628,10 @@
     "gracePeriodRemaining": "Kalan: {{time}}",
     "sendDeposit": "Gönder",
     "lockFunds": "Fonları kilitle",
-    "approveSuccess": "Onay başarılı."
+    "approveSuccess": "Onay başarılı.",
+    "unlockAfterTimeout": "Fonları geri al (alıcı yanıt vermiyor)",
+    "unlockSuccess": "Fonlar geri alındı — emanet iptal edildi.",
+    "unlockFailed": "Geri alma başarısız: {{message}}"
   },
   "editProfile": {
     "title": "Profili Düzenle",

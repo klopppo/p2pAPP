@@ -9,6 +9,36 @@
 
 ---
 
+## Post-refactor bug review + residual fixes — 2026-09-27
+
+Second independent review of the refactored tree (3 workers + final reviewer).
+
+- **~20 concrete bugs fixed:** client SIWE header-domain/URI mismatch (would
+  have broken sign-in once the new edge ships), `userCache` serving the public
+  projection to the signed-in owner (edit-profile data loss), avatar extension
+  path injection, wallet-disconnect private-cache leak, chat-switch send
+  rollback corrupting another conversation, skipped `FUNDED` mirror on the
+  deposit+lock path, `TradePage` NaN render crash + double-deploy on
+  double-submit, realtime channel listener/eviction races, `useVerifiedEscrow`
+  cap off-by-one, object-URL leaks, lost draft on failed send, `ChatHeader`
+  state not re-synced, unhandled rejections (clipboard/WebCrypto/presence/
+  operator dashboard), escrow-event mirror dispatch now serialized,
+  notifications dispatcher requires a live session, `useUserEscrows` multicall
+  capped.
+- **Residual gaps closed:** `unlockAfterTimeout` seller-recovery CTA (ABI +
+  `fundedAt` read + all 5 locales); orphan-escrow recovery (wallet-scoped
+  pending `createTrade` input reused on retry, idempotent via
+  `getTradeByEscrowAddress`); public-profile socials readable for authenticated
+  sessions (anon stays on the OD-02 projection); interior `..` stripped from
+  evidence filenames.
+- Verified: `npm run build` ✓, `eslint` 0 errors; vitest not installed locally.
+
+Files: `src/pages/{TradePage,TradeDetailPage,DisputePage,...}.tsx`,
+`src/hooks/**`, `src/lib/{contracts.ts,supabase/index.ts}`, `src/components/**`,
+`src/locales/*.json`.
+
+---
+
 ## Compaction + security hardening + bug-reliability pass — 2026-09-27
 
 Non-UI rewrite/review pass (parallel workers + verifier) plus a literature-guided

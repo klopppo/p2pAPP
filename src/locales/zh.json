@@ -554,7 +554,8 @@
     "gracePeriod": "宽限期（小时）",
     "gracePeriodHint": "对方在允许释放之前确认付款的时间。",
     "gracePeriodError": "宽限期必须在 1 小时到 365 天之间。",
-    "errorOfferUnavailable": "该报价已不可用于交易。"
+    "errorOfferUnavailable": "该报价已不可用于交易。",
+    "errorPersistPending": "托管已部署，但交易保存失败。请重试——无需额外 gas。"
   },
   "tradeDetail": {
     "loadingTrade": "正在加载交易…",
@@ -627,7 +628,10 @@
     "gracePeriodRemaining": "剩余：{{time}}",
     "sendDeposit": "发送",
     "lockFunds": "锁定资金",
-    "approveSuccess": "授权成功。"
+    "approveSuccess": "授权成功。",
+    "unlockAfterTimeout": "取回资金（买家未响应）",
+    "unlockSuccess": "资金已取回——托管已取消。",
+    "unlockFailed": "取回失败：{{message}}"
   },
   "editProfile": {
     "title": "编辑资料",

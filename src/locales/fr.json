@@ -542,7 +542,7 @@
     "errorRpcClient": "Le client RPC public n'est pas prêt. Veuillez réessayer.",
     "errorOwnOffer": "Vous ne pouvez pas échanger avec votre propre offre.",
     "errorSameCounterparty": "L'acheteur et le vendeur doivent être des portefeuilles distincts.",
-"errorTreasuryParty": "Ce portefeuille est la trésorerie de la garantie et ne peut pas être une partie de l'opération.",
+    "errorTreasuryParty": "Ce portefeuille est la trésorerie de la garantie et ne peut pas être une partie de l'opération.",
     "errorAmountTooSmall": "Le montant est trop faible pour ce séquestre.",
     "errorCreateEscrowEstimate": "Le contrat de séquestre a rejeté cet échange",
     "errorFailedToDeploy": "Impossible de résoudre l'adresse du séquestre déployé.",
@@ -554,7 +554,8 @@
     "gracePeriod": "Période de grâce (heures)",
     "gracePeriodHint": "Durée dont dispose la contrepartie pour confirmer le paiement avant que la libération soit autorisée.",
     "gracePeriodError": "La période de grâce doit être comprise entre 1 heure et 365 jours.",
-    "errorOfferUnavailable": "Cette offre n'est plus disponible pour l'échange."
+    "errorOfferUnavailable": "Cette offre n'est plus disponible pour l'échange.",
+    "errorPersistPending": "Le séquestre est déployé, mais l enregistrement a échoué. Réessayez — sans frais de gas supplémentaires."
   },
   "tradeDetail": {
     "loadingTrade": "Chargement de l'échange…",
@@ -627,7 +628,10 @@
     "gracePeriodRemaining": "Restant : {{time}}",
     "sendDeposit": "Envoyer",
     "lockFunds": "Verrouiller les fonds",
-    "approveSuccess": "Approbation réussie."
+    "approveSuccess": "Approbation réussie.",
+    "unlockAfterTimeout": "Récupérer les fonds (acheteur inactif)",
+    "unlockSuccess": "Fonds récupérés — le séquestre est annulé.",
+    "unlockFailed": "Échec de la récupération : {{message}}"
   },
   "editProfile": {
     "title": "Modifier le profil",

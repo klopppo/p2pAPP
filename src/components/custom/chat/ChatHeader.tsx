@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Flag, MoreVertical, BellOff, Bell, Ban, Archive } from 'lucide-react'
 import { toast } from 'sonner'
@@ -57,6 +57,19 @@ export function ChatHeader({ conversation, currentUserId, online, onBack, onBloc
     () => !!currentUserId && !!otherUserId && isUserBlocked(currentUserId, otherUserId),
   )
   const [archived, setArchived] = useState(conversation.status === 'archived')
+
+  // Keep the local (optimistic) state in sync when the server-side row
+  // refreshes (realtime/poll) — e.g. the counterparty archived or the user
+  // toggled mute on another device. The flag values only change on transitions,
+  // so this can't clobber an in-flight optimistic update.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMuted(!!myParticipant?.muted)
+  }, [myParticipant?.muted])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setArchived(conversation.status === 'archived')
+  }, [conversation.status])
 
   // Partner avatar + name link to their profile. Falls back to a plain block
   // when the counterparty (and its wallet address) isn't resolved yet.

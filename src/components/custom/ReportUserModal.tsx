@@ -49,6 +49,7 @@ export function ReportUserModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (submitting) return
     if (!reason.trim()) {
       toast.error(t('report.requiredReason'))
       return

@@ -73,7 +73,7 @@ export function OpenOfferPage() {
   // + wallet are resolved server-side by `start_offer_conversation`.
   const canMessage = !!user && isConnected && !isOwner && !!seller
   const startChat = async () => {
-    if (!user || !seller) return
+    if (!user || !seller || startingChat) return
     setStartingChat(true)
     try {
       const convId = await startOfferConversation(offer.id)

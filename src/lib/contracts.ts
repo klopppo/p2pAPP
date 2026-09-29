@@ -29,6 +29,9 @@ export const NUMBER_OF_CHOICES = 4n
 export const DISPUTE_TIMEOUT_SECONDS = 30n * 24n * 60n * 60n
 /** KlerosEsc.cancelTrade() TIMELOCK = 1 day. */
 export const CANCEL_TIMELOCK_SECONDS = 1n * 24n * 60n * 60n
+/** KlerosEsc.UNCONFIRMED_TIMEOUT_MULTIPLIER — unlockAfterTimeout() opens at
+ *  `fundedAt + 7 * gracePeriod` while the trade is still FUNDED. */
+export const UNCONFIRMED_TIMEOUT_MULTIPLIER = 7n
 /** KlerosEsc.MAX_GRACE_PERIOD = 365 days. */
 export const MAX_GRACE_PERIOD_SECONDS = 365n * 24n * 60n * 60n
 /** KlerosEsc.MIN_SECURITY_DEPOSIT_BPS = 1% (must be ≥ this OR exactly 0). */
@@ -85,6 +88,7 @@ export const KLEROS_ESC_ABI = parseAbi([
   'function confirm() external',
   'function release() external',
   'function cancelTrade() external',
+  'function unlockAfterTimeout() external',
   'function raiseDispute() external payable',
   'function submitEvidence(bytes32 _evidenceURI) external',
   'function appeal() external payable',
@@ -116,6 +120,7 @@ export const KLEROS_ESC_ABI = parseAbi([
   'function rulingReceivedTime() external view returns (uint256)',
   'function evidenceGroupID() external view returns (uint256)',
   'function confirmationTime() external view returns (uint256)',
+  'function fundedAt() external view returns (uint256)',
   'function buyerDepositTime() external view returns (uint256)',
   'function sellerDepositTime() external view returns (uint256)',
 ]) satisfies Abi

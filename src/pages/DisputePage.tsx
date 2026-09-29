@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
@@ -140,6 +140,19 @@ export function DisputePage() {
   const [isDragging, setIsDragging] = useState(false)
   const [agreed, setAgreed] = useState(false)
   const [stage, setStage] = useState<Stage>('idle')
+
+  // Mirror `files` into a ref so the unmount cleanup can revoke every preview
+  // object URL without re-running on each change (that would kill live previews).
+  const filesRef = useRef(files)
+  useEffect(() => {
+    filesRef.current = files
+  }, [files])
+  useEffect(
+    () => () => {
+      filesRef.current.forEach((f) => URL.revokeObjectURL(f.previewUrl))
+    },
+    [],
+  )
 
   const isSubmitting = stage !== 'idle'
   const factoryReady = isFactoryConfigured()

@@ -565,7 +565,8 @@
     "errorTokenMismatch": "This offer is denominated in {{offered}}, but the escrow contract only supports {{escrow}}.",
     "gracePeriod": "Grace period (hours)",
     "gracePeriodHint": "How long the counterparty has to confirm the payment before release is allowed.",
-    "gracePeriodError": "Grace period must be between 1 hour and 365 days."
+    "gracePeriodError": "Grace period must be between 1 hour and 365 days.",
+    "errorPersistPending": "Escrow deployed, but saving the trade failed. Retry — no extra gas needed."
   },
   "tradeDetail": {
     "loadingTrade": "Loading trade…",
@@ -638,7 +639,10 @@
     "messageCounterpartTitle": "Open the chat with your counterpart",
     "sendDeposit": "Send",
     "lockFunds": "Lock funds",
-    "approveSuccess": "Approval successful."
+    "approveSuccess": "Approval successful.",
+    "unlockAfterTimeout": "Recover funds (buyer unresponsive)",
+    "unlockSuccess": "Funds recovered — the escrow is cancelled.",
+    "unlockFailed": "Recovery failed: {{message}}"
   },
   "editProfile": {
     "title": "Edit Profile",

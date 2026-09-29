@@ -40,7 +40,14 @@ export function AddressWithActions({
   if (!address) return null
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(address)
+    // `writeText` rejects in insecure contexts / when permission is denied —
+    // swallow it so it can't surface as an unhandled rejection.
+    try {
+      const pending = navigator.clipboard?.writeText(address)
+      if (pending) void pending.catch(() => {})
+    } catch {
+      // Clipboard API unavailable — copying is best-effort.
+    }
     toast.success(resolvedCopyMessage)
   }
 

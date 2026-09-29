@@ -49,9 +49,15 @@ export function useVerifiedEscrow(escrowAddress: `0x${string}` | undefined) {
       for (let depth = 0n; calls.length < MAX_ESCROW_SCAN; depth++) {
         const buyerIndex = buyerCount - 1n - depth
         const sellerIndex = sellerCount - 1n - depth
-        if (buyerIndex >= 0n) calls.push({ functionName: 'escrowByBuyer', index: buyerIndex })
-        if (sellerIndex >= 0n) calls.push({ functionName: 'escrowBySeller', index: sellerIndex })
         if (buyerIndex < 0n && sellerIndex < 0n) break
+        // Re-check capacity after each push: depth adds up to two calls, so
+        // without it the batch can exceed the cap by one.
+        if (buyerIndex >= 0n && calls.length < MAX_ESCROW_SCAN) {
+          calls.push({ functionName: 'escrowByBuyer', index: buyerIndex })
+        }
+        if (sellerIndex >= 0n && calls.length < MAX_ESCROW_SCAN) {
+          calls.push({ functionName: 'escrowBySeller', index: sellerIndex })
+        }
       }
       if (calls.length === 0) return false
 

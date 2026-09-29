@@ -32,12 +32,20 @@ export function CofferIdentityCard({ address }: { address: string }) {
   useEffect(() => {
     if (!ownId) return
     let cancelled = false
-    void profileFingerprint(ownId).then((fp) => {
-      if (!cancelled) setFingerprint(fp)
-    })
-    void tradePseudonym(ownId, "SAMPLE-trade").then((p) => {
-      if (!cancelled) setSamplePseudonym(p)
-    })
+    void profileFingerprint(ownId)
+      .then((fp) => {
+        if (!cancelled) setFingerprint(fp)
+      })
+      .catch(() => {
+        // WebCrypto unavailable — leave the placeholder.
+      })
+    void tradePseudonym(ownId, "SAMPLE-trade")
+      .then((p) => {
+        if (!cancelled) setSamplePseudonym(p)
+      })
+      .catch(() => {
+        // WebCrypto unavailable — leave the placeholder.
+      })
     return () => {
       cancelled = true
     }

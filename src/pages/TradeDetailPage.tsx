@@ -25,6 +25,7 @@ import {
   ExternalLink,
   XCircle,
   MessageCircle,
+  Unlock,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -39,6 +40,7 @@ import {
   KLEROS_ESC_ABI,
   KlerosEscState,
   Ruling,
+  UNCONFIRMED_TIMEOUT_MULTIPLIER,
   type KlerosEscStateValue,
 } from '@/lib/contracts'
 import { useConversationByTradeId } from '@/hooks/useConversations'
@@ -301,9 +303,15 @@ export function TradeDetailPage() {
       // 3a) FUNDED only when the deposit requirement is met (pct == 0 or both
       //     deposits in); writing it unconditionally could contradict chain.
       if (lockTxHash) {
+        // lockFunds() implies the seller's deposit is in: it either landed in
+        // an earlier render or earlier in this same seller flow (depositTxHash
+        // set). Reading the pre-flow render state here would wrongly conclude
+        // "not funded" on the deposit+lock path and skip the FUNDED mirror.
+        const sellerFundsIn =
+          escrowState.sellerSecurityDeposited || depositTxHash != null
         const fullyFunded =
           escrowState.securityDepositPct === 0n ||
-          (escrowState.buyerSecurityDeposited && escrowState.sellerSecurityDeposited)
+          (escrowState.buyerSecurityDeposited && sellerFundsIn)
         if (fullyFunded) {
           await setTradeEscrowStatus(
             trade!.id,
@@ -563,6 +571,18 @@ export function TradeDetailPage() {
     escrowState?.sellerDepositTime,
   ])
 
+  // KlerosEsc.unlockAfterTimeout(): the seller can reclaim the trade amount
+  // when a FUNDED trade was never confirmed within 7× the grace period. Mirror
+  // the contract's time check so the CTA only appears when it can succeed.
+  const unlockTimeoutEnd =
+    liveState === KlerosEscState.FUNDED && escrowState && escrowState.fundedAt > 0n
+      ? escrowState.fundedAt +
+        UNCONFIRMED_TIMEOUT_MULTIPLIER * escrowState.gracePeriod
+      : null
+  const unlockAvailable =
+    !!isSeller && unlockTimeoutEnd != null && nowSecsBig >= unlockTimeoutEnd
+  const showUnlock = escrowVerified && unlockAvailable
+
   // Whether this wallet could act ignoring verification; drives the trust
   // warning (actions stay gated while unverified).
   const hasEscrowAction =
@@ -572,6 +592,7 @@ export function TradeDetailPage() {
     showBuyerConfirm ||
     showRelease ||
     showExecuteRuling ||
+    unlockAvailable ||
     showCancel ||
     disputeActionAvailable
 
@@ -598,6 +619,33 @@ export function TradeDetailPage() {
       refetchEscrow()
     } catch (err) {
       toast.error(errorMessage(err, 'tradeDetail', t, 'cancelFailed'))
+    } finally {
+      setTxStage('idle')
+    }
+  }
+
+  const handleUnlockAfterTimeout = async () => {
+    if (!escrowAddress) return
+    if (!requireVerifiedEscrow()) return
+    try {
+      setTxStage('confirming')
+      const txHash = await writeContractAsync({
+        address: escrowAddress,
+        abi: KLEROS_ESC_ABI as Abi,
+        functionName: 'unlockAfterTimeout',
+      })
+      setTxStage('mining')
+      assertTxSuccess(await publicClient!.waitForTransactionReceipt({ hash: txHash }))
+      // Seller recovers the locked trade amount; the escrow ends CANCELLED.
+      await updateTradeStatus(trade!.id, 'cancelled', {
+        escrowStatus: EscrowStatus.CANCELLED,
+        txHash,
+        escrowEventType: TradeEventType.ESCROW_CANCELLED,
+      }).catch((err) => { console.warn('[TradeDetailPage.tsx]', err); return undefined })
+      toast.success(t('tradeDetail.unlockSuccess'))
+      refetchEscrow()
+    } catch (err) {
+      toast.error(errorMessage(err, 'tradeDetail', t, 'unlockFailed'))
     } finally {
       setTxStage('idle')
     }
@@ -1088,6 +1136,24 @@ export function TradeDetailPage() {
                   <XCircle className="w-4 h-4 mr-2" />
                 )}
                 {isTxBusy ? getTxLabel(t, txStage) : t('tradeDetail.cancelTrade')}
+              </Button>
+            )}
+
+            {showUnlock && (
+              <Button
+                onClick={handleUnlockAfterTimeout}
+                disabled={isTxBusy || !escrowVerified}
+                variant="ghost"
+                className="rounded-full text-muted-foreground hover:text-destructive"
+              >
+                {isTxBusy ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Unlock className="w-4 h-4 mr-2" />
+                )}
+                {isTxBusy
+                  ? getTxLabel(t, txStage)
+                  : t('tradeDetail.unlockAfterTimeout')}
               </Button>
             )}
 

@@ -182,6 +182,9 @@ export function EditOfferPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
+    // Implicit form submission (Enter) can fire while a save is in flight.
+    if (isSubmitting) return
+
     if (!user || status !== "connected") {
       toast.error(t("editOffer.errorConnectWallet"))
       return

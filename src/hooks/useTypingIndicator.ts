@@ -159,11 +159,15 @@ export function useConversationPresence(
       .on('presence', { event: 'leave' }, syncFromState)
       .subscribe(async (status: string) => {
         if (status === 'SUBSCRIBED') {
-          await channel.track({
-            user_id: identity.userId,
-            nickname: identity.nickname,
-            online_at: new Date().toISOString(),
-          })
+          try {
+            await channel.track({
+              user_id: identity.userId,
+              nickname: identity.nickname,
+              online_at: new Date().toISOString(),
+            })
+          } catch (err) {
+            console.warn('[useTypingIndicator] presence track failed:', err)
+          }
         }
       })
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useWalletSession } from '@/hooks/useWalletSession'
 import { useNotificationPreferences } from '@/hooks/useNotifications'
 import { subscribeShared } from '@/hooks/realtimeChannel'
 import { dispatchNotification } from '@/lib/notifications'
@@ -16,6 +17,7 @@ const SEEN_MAX = 500
 
 export function NotificationDispatcherHost() {
   const { data: user } = useCurrentUser()
+  const { hasSession } = useWalletSession()
   const prefs = useNotificationPreferences()
   const qc = useQueryClient()
   const seen = useRef<Set<string>>(new Set())
@@ -30,8 +32,9 @@ export function NotificationDispatcherHost() {
   const userId = user?.id
 
   useEffect(() => {
-    // Wait for prefs so we don't dispatch to the hard-coded fallback.
-    if (!userId || prefs.isLoading) return
+    // Wait for a live session AND resolved prefs so we never dispatch on the
+    // hard-coded fallback while unauthenticated (RLS would deny any read).
+    if (!hasSession || !userId || prefs.isLoading) return
 
     // Shares ONE `notifications:user:<id>` channel with useNotifications /
     // useUnreadCount (same filter); only INSERTs fan out to channels.
@@ -77,7 +80,7 @@ export function NotificationDispatcherHost() {
         qc.invalidateQueries({ queryKey: ['notifications:unread', userId] })
       },
     )
-  }, [userId, prefs.isLoading, qc])
+  }, [hasSession, userId, prefs.isLoading, qc])
 
   return null
 }
